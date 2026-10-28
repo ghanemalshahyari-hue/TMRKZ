@@ -1,0 +1,22 @@
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+# Generated caches and dependencies
+__pycache__/
+*.py[cod]
+node_modules/
+.venv/
+venv/
+.DS_Store
+# Original preview service identity stays outside this repository
+.openai/
+# Future application runtime data
+logs/
+*.log
+storage/
+uploads/
