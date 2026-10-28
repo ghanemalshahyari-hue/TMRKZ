@@ -1,0 +1,17 @@
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    assetsInlineLimit: 0,
+    rollupOptions: { output: { manualChunks: { react: ['react', 'react-dom'], leaflet: ['leaflet'] } } },
+  },
+  server: {
+    port: 5173,
+    proxy: { '/api': { target: 'http://localhost:8080', changeOrigin: false } },
+  },
+  test: { environment: 'node', include: ['src/**/*.test.ts'] },
+});

@@ -1,0 +1,45 @@
+/* Additions for screens the prototype did not have. prototype.css is kept verbatim; only its tokens are reused here. */
+
+/* login */
+.login-shell{min-height:100dvh;display:grid;place-items:center;padding:30px 16px;background:var(--canvas)}
+.login-card{width:min(430px,100%);padding:30px}
+.login-card h1{margin:6px 0 4px}
+.login-brand{display:flex;align-items:center;gap:12px;margin-bottom:24px;color:var(--ink)}
+.login-brand .brand-logo{width:38px;height:38px;border-radius:10px;background:var(--nav);color:#8fd0b7;display:grid;place-items:center}
+.login-brand strong{font:bold 19px Arial,sans-serif;letter-spacing:1px;display:block}
+.login-brand strong span{color:var(--accent)}
+.login-brand small{font-size:9px;color:var(--muted)}
+.login-card .field input{width:100%}
+.login-demo{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}
+.login-demo p{margin:6px 0 10px}
+.login-demo-list{max-height:260px;overflow:auto}
+
+/* identity in header (non-demo) */
+.identity-name{font-size:10px;color:var(--ink)}
+
+/* notifications */
+.notif-wrap{position:relative}
+.notif-badge{position:absolute;top:-5px;left:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--orange);color:#fff;font:bold 9px/16px Arial,sans-serif;text-align:center}
+.notif-pop{position:absolute;top:44px;left:0;width:320px;max-height:420px;overflow:auto;padding:16px;z-index:1200;box-shadow:0 18px 50px #19363822}
+.notif-item{display:flex;flex-direction:column;gap:2px;width:100%;text-align:right;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:10px 12px;margin-top:8px}
+.notif-item b{font-size:11px;font-weight:500}
+.notif-item small{font-size:9px}
+.notif-item.unread{border-color:#cde2d1;background:#f1f7f0;box-shadow:3px 0 0 #87b699}
+
+/* attachments & execution */
+.attachment-row{display:block;margin-top:4px}
+.attachment-row b{font-weight:500}
+.attachment-row b.ok{color:var(--green)}
+.attachment-row b.bad{color:var(--red)}
+.attachment-links{display:flex;flex-direction:column;gap:2px}
+.exec-complete{display:flex;gap:8px;margin-top:8px}
+.exec-complete input{flex:1;font-size:11px;padding:6px 9px}
+
+/* workflow studio assignee chooser */
+.assignee-choice{display:inline-flex;align-items:center;gap:4px}
+.assignee-choice select{padding:3px 5px;font-size:9px}
+
+/* data-table inline inputs */
+.data-table td input[type=text],.data-table td input:not([type]),.data-table td input[type=number]{padding:5px 7px;font-size:11px}
+
+@media(max-width:700px){.notif-pop{left:auto;right:-120px;width:290px}}

@@ -1,0 +1,28 @@
+package ae.mover.common;
+
+public enum ErrorCode {
+    VALIDATION_FAILED(400),
+    UNAUTHENTICATED(401),
+    FORBIDDEN(403),
+    RESOURCE_NOT_FOUND(404),
+    STALE_REVISION(409),
+    TASK_ALREADY_COMPLETED(409),
+    RESERVATION_CONFLICT(409),
+    IDEMPOTENCY_CONFLICT(409),
+    ATTACHMENT_NOT_READY(409),
+    WORKFLOW_NOT_PUBLISHED(409),
+    INVALID_WORKFLOW(400),
+    SIGNATURE_REQUIRED(400),
+    SIGNATURE_PROVIDER_UNAVAILABLE(503),
+    INTERNAL_ERROR(500);
+
+    private final int status;
+
+    ErrorCode(int status) {
+        this.status = status;
+    }
+
+    public int status() {
+        return status;
+    }
+}

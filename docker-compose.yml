@@ -1,0 +1,68 @@
+# MOVER — isolated on-premises stack (development / acceptance profile).
+# Project name is distinct ("tmrkz-mover") so it never collides with other compose projects on the host.
+# Only the web entry point is published. Images are pinned by exact version; see docs/OPERATIONS.md for
+# building an offline bundle and docs/INSTALL_AIRGAPPED.md for egress controls (Docker alone is not isolation).
+name: tmrkz-mover
+
+services:
+  db:
+    image: postgres:17.11-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mover
+      POSTGRES_USER: mover
+      POSTGRES_PASSWORD: ${MOVER_DB_PASSWORD:?set MOVER_DB_PASSWORD in .env}
+      TZ: UTC
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mover -d mover"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    image: mover/backend:1.0.0
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MOVER_DB_URL: jdbc:postgresql://db:5432/mover
+      MOVER_DB_USER: mover
+      MOVER_DB_PASSWORD: ${MOVER_DB_PASSWORD}
+      MOVER_STORAGE_ROOT: /var/lib/mover
+      MOVER_MAP_ROOT: /opt/mover/map-packages
+      MOVER_ATTESTATION_KEY: ${MOVER_ATTESTATION_KEY:?set MOVER_ATTESTATION_KEY (32+ chars) in .env}
+      MOVER_SECURE_COOKIE: ${MOVER_SECURE_COOKIE:-false}
+      MOVER_DEMO_MODE: ${MOVER_DEMO_MODE:-false}
+      MOVER_DEMO_SEED: ${MOVER_DEMO_SEED:-false}
+      MOVER_DEMO_PASSWORD: ${MOVER_DEMO_PASSWORD:-}
+    volumes:
+      - files:/var/lib/mover
+    networks: [internal]
+
+  web:
+    image: mover/web:1.0.0
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${MOVER_HTTP_PORT:-8088}:80"
+    networks: [internal]
+
+volumes:
+  db-data:
+  files:
+
+networks:
+  internal:
+    driver: bridge

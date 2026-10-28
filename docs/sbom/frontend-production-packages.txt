@@ -1,0 +1,7 @@
+mover-frontend@1.0.0 C:\Users\ADMIN\Desktop\TMRKZ\frontend
+├── leaflet@1.9.4
+├─┬ react-dom@19.3.1
+│ ├── react@19.3.1 deduped
+│ └── scheduler@0.28.0
+└── react@19.3.1
+

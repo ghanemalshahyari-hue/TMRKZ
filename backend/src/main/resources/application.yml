@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: mover
+  datasource:
+    url: ${MOVER_DB_URL:jdbc:postgresql://localhost:5432/mover}
+    username: ${MOVER_DB_USER:mover}
+    password: ${MOVER_DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${MOVER_DB_POOL:20}
+  flyway:
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 26MB
+  main:
+    banner-mode: off
+
+server:
+  port: 8080
+  forward-headers-strategy: framework
+  shutdown: graceful
+  error:
+    include-message: never
+    include-stacktrace: never
+
+flowable:
+  database-schema-update: true
+  async-executor-activate: false
+  history-level: audit
+  check-process-definitions: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: mover
+
+logging:
+  pattern:
+    level: "%5p [%X{traceId:-}]"
+
+mover:
+  version: 1.0.0
+  storage:
+    root: ${MOVER_STORAGE_ROOT:/var/lib/mover}
+  map:
+    root: ${MOVER_MAP_ROOT:/opt/mover/map-packages}
+  signature:
+    attestation-key: ${MOVER_ATTESTATION_KEY:}
+  security:
+    session-idle-minutes: ${MOVER_SESSION_IDLE_MINUTES:30}
+    session-absolute-hours: ${MOVER_SESSION_ABSOLUTE_HOURS:12}
+    secure-cookie: ${MOVER_SECURE_COOKIE:false}
+    max-failed-logins: 5
+    lock-minutes: 15
+  demo:
+    mode: ${MOVER_DEMO_MODE:false}
+    seed: ${MOVER_DEMO_SEED:false}
+    password: ${MOVER_DEMO_PASSWORD:}
+  outbox:
+    enabled: ${MOVER_OUTBOX_ENABLED:true}
+    poll-ms: 2000

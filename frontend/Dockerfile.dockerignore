@@ -1,0 +1,9 @@
+# BuildKit reads this file for frontend/Dockerfile (context = repository root).
+**/node_modules
+frontend/dist
+backend
+ops
+tests
+.git
+**/.DS_Store
+**/*.log

@@ -24,3 +24,9 @@ The local role picker and signature demonstration are not production authenticat
 Do not rely on a cloud service or Vercel for the isolated production deployment. Use stable compatible dependency versions, retain third-party attribution, and keep secrets out of source control.
 
 Start implementation from the recorded assumptions and open decisions without repeating the original questionnaire.
+
+## Production implementation (added 2026-10-28)
+
+Production modules live beside the preserved concept: `backend/` (Spring Boot 4.0.9 + embedded Flowable 8.0.0, Java 21, PostgreSQL 17 via Flyway), `frontend/` (React 19 + Vite, styles reuse `unified/style.css` verbatim), `map-packages/` (licensed local basemap with manifest and checksums), `ops/` (env generation, backup/restore/verify, air-gap bundle, load test, OpenAPI generator), `tests/acceptance/` (end-to-end journey). Run with `sh ops/init-env.sh --demo && docker compose up -d --build` (compose project `tmrkz-mover`, port 8088).
+
+Before changing behaviour, read `docs/STATUS.md` (delivered, limits, open decisions), `docs/TRACEABILITY.md` (R-xx/AT-xx → code → test) and `docs/ARCHITECTURE_DECISIONS.md` (why Keycloak/OpenFGA/PostGIS were replaced). Verify with `sh ops/test-backend.sh` (33 acceptance tests on real PostgreSQL), `node tests/acceptance/journey.mjs`, `sh ops/verify-restore.sh`, and `cd frontend && npm test && npm run build`. Regenerate `docs/api/openapi.json` with `python ops/tools/gen-openapi.py` after changing controllers. Keep `docs/TRACEABILITY.md` and `docs/STATUS.md` current with every change.

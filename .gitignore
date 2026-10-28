@@ -20,3 +20,10 @@ logs/
 *.log
 storage/
 uploads/
+# Production application build output, backups and offline bundles
+backend/target/
+frontend/dist/
+backups/
+offline-bundle/
+.idea/
+.vscode/

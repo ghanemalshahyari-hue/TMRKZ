@@ -1,0 +1,3351 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "MOVER API",
+    "version": "1.0.0",
+    "description": "Administrative facilities, reservations and approvals. Session cookie MOVER_SESSION (HttpOnly, SameSite=Strict). Times are ISO-8601 UTC; periods are half-open [start, end). Generated from the controllers by ops/tools/gen-openapi.py; payload shapes in docs/api/API_V1.md."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "MOVER_SESSION"
+      }
+    }
+  },
+  "security": [
+    {
+      "session": []
+    }
+  ],
+  "paths": {
+    "/api/v1/attachments/{id}/content": {
+      "get": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "download",
+        "summary": "download",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/audit-events": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "audit",
+        "summary": "audit",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/demo-switch": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "demoSwitch",
+        "summary": "demo switch",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/demo-users": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "demoUsers",
+        "summary": "demo users",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "login",
+        "summary": "login",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "logout",
+        "summary": "logout",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/availability/check": {
+      "post": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "check",
+        "summary": "check",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/availability/grid": {
+      "get": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "grid",
+        "summary": "grid",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/delegations": {
+      "get": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "delegations",
+        "summary": "delegations",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "delegate",
+        "summary": "delegate",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/delegations/{id}/revoke": {
+      "post": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "revoke",
+        "summary": "revoke",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/execution-tasks": {
+      "get": {
+        "tags": [
+          "Reservation"
+        ],
+        "operationId": "executionTasks",
+        "summary": "execution tasks",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/execution-tasks/{id}/complete": {
+      "post": {
+        "tags": [
+          "Reservation"
+        ],
+        "operationId": "complete",
+        "summary": "complete",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Replays return the stored result; reuse with a different body → 409 IDEMPOTENCY_CONFLICT",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/exports": {
+      "post": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "createExport",
+        "summary": "create export",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/exports/{id}": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "export",
+        "summary": "export",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/exports/{id}/content": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "exportContent",
+        "summary": "export content",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/form-versions/{id}": {
+      "get": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "formVersion",
+        "summary": "form version",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/form-versions/{id}/publish": {
+      "post": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "publishForm",
+        "summary": "publish form",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/form-versions/{id}/validate": {
+      "post": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "validateForm",
+        "summary": "validate form",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/forms": {
+      "get": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "forms",
+        "summary": "forms",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/forms/{id}/drafts": {
+      "post": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "formDraft",
+        "summary": "form draft",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "integrations",
+        "summary": "integrations",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/org-structure/preview": {
+      "post": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "previewOrgImport",
+        "summary": "preview org import",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/org-structure/runs/{id}/commit": {
+      "post": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "commitOrgImport",
+        "summary": "commit org import",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/map/features": {
+      "get": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "features",
+        "summary": "features",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/map/packages": {
+      "get": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "packages",
+        "summary": "packages",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/map/packages/{id}/content": {
+      "get": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "packageContent",
+        "summary": "package content",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "me",
+        "summary": "me",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/me/capabilities": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "capabilities",
+        "summary": "capabilities",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/memberships": {
+      "post": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "addMembership",
+        "summary": "add membership",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memberships/{id}/end": {
+      "post": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "endMembership",
+        "summary": "end membership",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "notifications",
+        "summary": "notifications",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "markRead",
+        "summary": "mark read",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/openapi.json": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "openapi",
+        "summary": "openapi",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/tree": {
+      "get": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "tree",
+        "summary": "tree",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{id}": {
+      "get": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "organization",
+        "summary": "organization",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/organizations/{id}/children": {
+      "get": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "children",
+        "summary": "children",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/people": {
+      "get": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "people",
+        "summary": "people",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/policies/current": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "currentPolicy",
+        "summary": "current policy",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/policies/drafts": {
+      "post": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "policyDraft",
+        "summary": "policy draft",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/policies/history": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "policyHistory",
+        "summary": "policy history",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/policy-versions/{id}/publish": {
+      "post": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "publishPolicy",
+        "summary": "publish policy",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/reports/kpis": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "kpis",
+        "summary": "kpis",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/request-types": {
+      "get": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "requestTypes",
+        "summary": "request types",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/requests": {
+      "get": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "list",
+        "summary": "list",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "create",
+        "summary": "create",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/requests/{id}": {
+      "get": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "detail",
+        "summary": "detail",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/requests/{id}/attachments": {
+      "post": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "upload",
+        "summary": "upload",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/requests/{id}/close": {
+      "post": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "close",
+        "summary": "close",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/requests/{id}/draft": {
+      "patch": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "updateDraft",
+        "summary": "update draft",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/requests/{id}/submit": {
+      "post": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "submit",
+        "summary": "submit",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Replays return the stored result; reuse with a different body → 409 IDEMPOTENCY_CONFLICT",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/reservations": {
+      "get": {
+        "tags": [
+          "Reservation"
+        ],
+        "operationId": "list",
+        "summary": "list",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/reservations/{id}/change-requests": {
+      "post": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "changeRequest",
+        "summary": "change request",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resources": {
+      "post": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "createResource",
+        "summary": "create resource",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/resources/{id}/reservations": {
+      "get": {
+        "tags": [
+          "Reservation"
+        ],
+        "operationId": "byResource",
+        "summary": "by resource",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/roles": {
+      "get": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "roles",
+        "summary": "roles",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/roles/{code}": {
+      "put": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "updateRole",
+        "summary": "update role",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sites": {
+      "get": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "sites",
+        "summary": "sites",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "createSite",
+        "summary": "create site",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{id}": {
+      "get": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "site",
+        "summary": "site",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "updateSite",
+        "summary": "update site",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sites/{id}/retire": {
+      "post": {
+        "tags": [
+          "Facility"
+        ],
+        "operationId": "retire",
+        "summary": "retire",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/system/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "health",
+        "summary": "health",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/system/info": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "info",
+        "summary": "info",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/tasks": {
+      "get": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "tasks",
+        "summary": "tasks",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/tasks/{id}/approval-document": {
+      "get": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "approvalDocument",
+        "summary": "approval document",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/tasks/{id}/decision": {
+      "post": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "decide",
+        "summary": "decide",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Replays return the stored result; reuse with a different body → 409 IDEMPOTENCY_CONFLICT",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflow-versions/{id}": {
+      "get": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "workflowVersion",
+        "summary": "workflow version",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/workflow-versions/{id}/bpmn": {
+      "get": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "bpmn",
+        "summary": "bpmn",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/workflow-versions/{id}/publish": {
+      "post": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "publishWorkflow",
+        "summary": "publish workflow",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/workflow-versions/{id}/simulate": {
+      "post": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "simulate",
+        "summary": "simulate",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows": {
+      "get": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "workflows",
+        "summary": "workflows",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/{id}/drafts": {
+      "post": {
+        "tags": [
+          "Studio"
+        ],
+        "operationId": "workflowDraft",
+        "summary": "workflow draft",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
