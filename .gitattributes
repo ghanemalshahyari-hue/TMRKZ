@@ -1,15 +1,7 @@
-* text=auto
-*.sh text eol=lf
-*.mjs text eol=lf
-*.sql text eol=lf
-*.java text eol=lf
-*.ts text eol=lf
-*.tsx text eol=lf
-*.md text eol=lf
-*.yml text eol=lf
-*.json text eol=lf
+# Check out text with LF on every platform so scripts run on Linux hosts and MANIFEST.sha256 verifies everywhere.
+* text=auto eol=lf
 *.png binary
+*.jpg binary
 *.ttf binary
 *.zip binary
-*.svg text eol=lf
-*.geojson text eol=lf
+*.tar binary
