@@ -47,3 +47,24 @@ PostgreSQL 342 MiB, nginx 33 MiB.
 - Sign-in cost is dominated by BCrypt by design.
 - Not measured: attachment upload throughput, concurrent final approvals at scale (correctness is proven by AT-10),
   long-running soak, failover. Re-run with the agreed D-03 profile on the target hardware.
+
+## Map layers at a declared site volume (29 October 2026)
+
+Separate from the organisation tree volume above: `backend/src/test/java/ae/mover/MapScaleIT.java` loads **10,000 sites**
+in a 1° × 1° area, each with a registered 12-vertex polygon boundary and one exclusive resource, plus **2,000 active
+reservations** with their scope locks, then calls `GET /map/features` for one day as a user who sees every site
+(ALL scope). Same workstation, PostgreSQL 17.11 + PostGIS 3.5.7 in Docker, warm cache, 5 calls per viewport after a
+warm-up; times measured by the test's HTTP client in the same JVM (no nginx). `sh ops/test-backend.sh`.
+
+| Viewport | Sites returned | Boundaries sent | Response | Median | Max |
+|---|---:|---:|---:|---:|---:|
+| City, 0.1° × 0.1° | 100 | 100 | 103 KB | 17 ms | 19 ms |
+| District, 0.3° × 0.3° | 900 | 900 | 927 KB | 40 ms | 51 ms |
+| Region, 0.5° × 0.5° | 2,500 | 0 (markers only, > 1,500) | 1.7 MB | 57 ms | 64 ms |
+| Whole area, 1° × 1° | 5,000 (capped) | 0 | 3.4 MB | 144 ms | 151 ms |
+
+Loading the 10,000 sites, boundaries and reservations took 1.6 s. The viewport query uses both spatial indexes
+(`site_marker_idx`, `site_geometry_geom_idx`; asserted from the plan). Above 1,500 sites in one viewport the response
+carries markers only and a message asking to zoom in; above 5,000 the list is capped. These are single-user timings,
+not a capacity statement; the concurrent load test (PA-28/29) has not been repeated with map data.
+

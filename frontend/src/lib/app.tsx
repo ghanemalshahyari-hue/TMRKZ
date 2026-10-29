@@ -18,12 +18,26 @@ export const NAV: [View, string, string][] = [
   ['docs', 'download', 'التوثيق والتشغيل'],
 ];
 
+/** Selection carried from the map into the request form (validated again by the server). */
+export type WizardPrefill = {
+  ownerOrgId?: string;
+  resourceIds?: string[];
+  unit?: 'DAYS' | 'HOURS';
+  start?: string;
+  end?: string;
+  permanent?: boolean;
+  siteName?: string;
+};
+
 export type WizardRequest = {
   origin: 'MAP' | 'LIST';
   siteId?: string;
   requestId?: string;
   typeCode?: string;
   targetReservationId?: string;
+  prefill?: WizardPrefill;
+  /** drawer: docked beside the map, keeps map and selection visible; dialog: the full form. */
+  layout?: 'drawer' | 'dialog';
 };
 
 export type FlatOrg = OrgNode & { depth: number };
@@ -68,7 +82,7 @@ export function flattenOrgs(nodes: OrgNode[], depth = 0, out: FlatOrg[] = []): F
   return out;
 }
 
-/** Facility sites shown on the map/list: sites with a location and at least one bookable resource. */
+/** Sites that can be requested: visible (not tree context), active, with at least one bookable resource. */
 export function facilitySites(sites: Site[]): Site[] {
-  return sites.filter((s) => s.location && s.resources.length > 0 && s.status !== 'RETIRED').sort((a, b) => a.code.localeCompare(b.code));
+  return sites.filter((s) => s.view !== 'CONTEXT' && s.resources.length > 0 && s.status !== 'RETIRED').sort((a, b) => a.code.localeCompare(b.code));
 }

@@ -41,8 +41,9 @@ cat ops/test-env/.generated/user-password
 
 | المجموعة | الأمر | النتيجة الحالية |
 |---|---|---|
-| اختبارات القبول في الخادم (PostgreSQL حقيقي + HTTP) | `ops/test-backend.sh` | 54/54 ناجحة — AT-01…AT-36 |
-| رحلة القبول الكاملة عبر nginx | `node tests/acceptance/journey.mjs` | 29/29 فحصاً ناجحاً، بما فيها AT-29 (دون اعتماد خارجي) |
+| اختبارات القبول في الخادم (PostgreSQL + PostGIS حقيقي + HTTP) | `ops/test-backend.sh` | 70/70 ناجحة — AT-01…AT-36 ومعايير الخريطة وقياس 10,000 موقع |
+| رحلة القبول الكاملة عبر nginx | `node tests/acceptance/journey.mjs` | 40/40 فحصاً ناجحاً، بما فيها AT-29 (دون اعتماد خارجي) |
+| رحلة الخريطة في المتصفح (MAP-01…MAP-18) | `sh ops/test-env/up-offline.sh && node tests/acceptance/map-workspace.mjs` | 21/21 فحصاً ناجحاً في Edge دون اتصال بالإنترنت — [`docs/evidence/map/`](docs/evidence/map/) |
 | الاستعادة إلى بيئة نظيفة (AT-30) | `sh ops/verify-restore.sh` | ناجحة: 20 جدولاً متطابقاً والمرفقات مطابقة للبصمة |
 | الواجهة (أنواع + وحدات) | `cd frontend && npm test && npm run build` | 17/17 ناجحة |
 | قياس حمل استكشافي (D-03 مفتوح) | `ops/load/load-test.mjs` | انظر [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) |
@@ -134,7 +135,7 @@ Run the unified builder last so `dist/index.html` remains the unified prototype.
 
 ### Implementation direction
 
-Proposed architecture: React + TypeScript + Vite, Spring Boot with embedded Flowable Open Source, Keycloak, OpenFGA, PostgreSQL and optional PostGIS, local attachment storage, transactional outbox, and isolated Docker deployment. **Status:** the production modules now live in `backend/`, `frontend/`, `ops/` and `docs/` (sections above). Keycloak, OpenFGA and PostGIS were replaced, for recorded reasons, by a local identity adapter, in-process authorisation and plain PostgreSQL — see `docs/ARCHITECTURE_DECISIONS.md` (ADR-003, ADR-004, ADR-008).
+Proposed architecture: React + TypeScript + Vite, Spring Boot with embedded Flowable Open Source, Keycloak, OpenFGA, PostgreSQL and optional PostGIS, local attachment storage, transactional outbox, and isolated Docker deployment. **Status:** the production modules now live in `backend/`, `frontend/`, `ops/` and `docs/` (sections above). Keycloak (ADR-015) and PostGIS (ADR-017) are now in use; OpenFGA is still replaced, for recorded reasons, by in-process authorisation until step 3 — see `docs/ARCHITECTURE_DECISIONS.md` (ADR-004, ADR-008 superseded by ADR-017, ADR-003 superseded by ADR-015).
 
 Target record counts are approximately 7,000 organizational entities and 200,000 people; concurrent usage and performance objectives remain to be established.
 

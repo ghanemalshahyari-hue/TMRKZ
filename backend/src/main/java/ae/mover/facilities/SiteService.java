@@ -62,19 +62,28 @@ public class SiteService {
                                 Map<String, String> period, String status) {
     }
 
-    public record GeometryView(int version, String crs, String source, String validFrom, JsonNode geojson) {
+    public record GeometryView(int version, String type, String crs, String source, String validFrom, JsonNode geojson) {
     }
 
-    /** Site fields at top level plus geometry and occupancy history (matches the documented contract). */
+    /**
+     * Site fields at top level plus the current boundary, the path of parent sites, occupancy history and what the actor
+     * may do. The boundary is shown to anyone who may view the site; a site without a registered boundary says so
+     * ({@code boundaryStatus = NOT_REGISTERED}) and nothing is drawn in its place.
+     */
     public Map<String, Object> detailView(AccessContext ctx, UUID id) {
         SiteDetail d = detail(ctx, id);
         Map<String, Object> out = json.map(d.site());
         out.put("geometry", d.geometry());
+        out.put("boundaryStatus", d.geometry() == null || "Point".equals(d.geometry().type()) ? "NOT_REGISTERED" : "REGISTERED");
+        out.put("geometryVersion", d.geometryVersion());
         out.put("occupancy", d.occupancy());
+        out.put("path", path(ctx, id));
+        out.put("canManage", d.canManage());
         return out;
     }
 
-    public record SiteDetail(SiteView site, GeometryView geometry, List<OccupancyItem> occupancy) {
+    public record SiteDetail(SiteView site, GeometryView geometry, List<OccupancyItem> occupancy, Integer geometryVersion,
+                             boolean canManage) {
     }
 
     record SiteRow(UUID id, String code, String name, String kind, UUID parentId, String status, Integer capacity,
@@ -177,11 +186,14 @@ public class SiteService {
             throw ApiException.notFound();
         }
         boolean full = v == ViewLevel.FULL;
-        GeometryView geometry = jdbc.sql("""
-                select version, crs, source, valid_from, geojson::text as g from site_geometry_version
-                where site_id = :id and valid_to is null order by version desc limit 1""")
-                .param("id", id).query((rs, n) -> new GeometryView(rs.getInt("version"), rs.getString("crs"),
-                        rs.getString("source"), Db.iso(rs, "valid_from"), json.tree(rs.getString("g")))).optional().orElse(null);
+        Integer geometryVersion = jdbc.sql("select geometry_version from site where id = :id").param("id", id)
+                .query(Integer.class).optional().orElse(null);
+        GeometryView geometry = geometryVersion == null ? null : jdbc.sql("""
+                select version, geometry_type, crs, source, valid_from, geojson::text as g from site_geometry_version
+                where site_id = :id and version = :v""")
+                .param("id", id).param("v", geometryVersion).query((rs, n) -> new GeometryView(rs.getInt("version"),
+                        rs.getString("geometry_type"), rs.getString("crs"), rs.getString("source"), Db.iso(rs, "valid_from"),
+                        json.tree(rs.getString("g")))).optional().orElse(null);
         List<OccupancyItem> occupancy = jdbc.sql("""
                 select v.id, r.name, v.organization_id, o.name as org_name, v.period_start, v.period_end, v.status
                 from reservation v join resource r on r.id = v.resource_id join organization o on o.id = v.organization_id
@@ -193,7 +205,102 @@ public class SiteService {
                     return new OccupancyItem(rs.getString("id"), rs.getString("name"),
                             full ? Ref.of(Db.uuid(rs, "organization_id"), rs.getString("org_name")) : null, period, rs.getString("status"));
                 }).list();
-        return new SiteDetail(view(s, v, resourcesBySite().getOrDefault(s.id(), List.of())), full ? geometry : null, occupancy);
+        return new SiteDetail(view(s, v, resourcesBySite().getOrDefault(s.id(), List.of())), geometry, occupancy, geometryVersion,
+                BoundaryService.canManage(ctx, s.orgId()));
+    }
+
+    // ---- tree and search (lazy) ---------------------------------------------------------------------------
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record SiteNode(String id, String code, String name, String kind, String parentId, String view, int childCount,
+                           boolean hasMarker, boolean hasBoundary, int resourceCount, List<Ref> path) {
+    }
+
+    /**
+     * One level of the site tree: the roots (sites without a visible parent) or the children of one site. Ancestors
+     * outside the actor's scope appear only as navigation context (code and name), never with location or resources.
+     */
+    public List<SiteNode> children(AccessContext ctx, UUID parentId) {
+        List<SiteView> all = list(ctx);
+        Map<String, SiteView> byId = new HashMap<>();
+        all.forEach(s -> byId.put(s.id(), s));
+        if (parentId != null && !byId.containsKey(parentId.toString())) {
+            throw ApiException.notFound();
+        }
+        Map<String, Integer> childCounts = new HashMap<>();
+        all.forEach(s -> {
+            if (s.parentId() != null && byId.containsKey(s.parentId())) {
+                childCounts.merge(s.parentId(), 1, Integer::sum);
+            }
+        });
+        Set<String> bounded = boundedSites();
+        List<SiteNode> out = new ArrayList<>();
+        for (SiteView s : all) {
+            boolean root = s.parentId() == null || !byId.containsKey(s.parentId());
+            if (parentId == null ? root : parentId.toString().equals(s.parentId())) {
+                out.add(node(s, childCounts, bounded, null));
+            }
+        }
+        return out;
+    }
+
+    /** Search across every visible site (not only loaded branches), with the path of parent sites for each match. */
+    public List<SiteNode> search(AccessContext ctx, String q, int limit) {
+        String term = q == null ? "" : q.trim();
+        if (term.isEmpty()) {
+            return List.of();
+        }
+        List<SiteView> all = list(ctx);
+        Map<String, SiteView> byId = new HashMap<>();
+        all.forEach(s -> byId.put(s.id(), s));
+        Set<String> bounded = boundedSites();
+        String lower = term.toLowerCase(java.util.Locale.ROOT);
+        List<SiteNode> out = new ArrayList<>();
+        for (SiteView s : all) {
+            if (CONTEXT.equals(s.view())) {
+                continue;
+            }
+            if (s.name().contains(term) || s.code().toLowerCase(java.util.Locale.ROOT).contains(lower)) {
+                out.add(node(s, Map.of(), bounded, pathOf(byId, s)));
+                if (out.size() >= Math.max(1, Math.min(limit, 100))) {
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** Parent sites from the root down (visible sites and tree context only). */
+    public List<Ref> path(AccessContext ctx, UUID id) {
+        Map<String, SiteView> byId = new HashMap<>();
+        list(ctx).forEach(s -> byId.put(s.id(), s));
+        SiteView s = byId.get(id.toString());
+        return s == null ? List.of() : pathOf(byId, s);
+    }
+
+    private static List<Ref> pathOf(Map<String, SiteView> byId, SiteView s) {
+        List<Ref> path = new ArrayList<>();
+        String p = s.parentId();
+        Set<String> guard = new java.util.HashSet<>();
+        while (p != null && byId.containsKey(p) && guard.add(p)) {
+            SiteView a = byId.get(p);
+            path.add(0, Ref.of(UUID.fromString(a.id()), a.name()));
+            p = a.parentId();
+        }
+        return path;
+    }
+
+    private static SiteNode node(SiteView s, Map<String, Integer> childCounts, Set<String> bounded, List<Ref> path) {
+        boolean context = CONTEXT.equals(s.view());
+        return new SiteNode(s.id(), s.code(), s.name(), context ? null : s.kind(), s.parentId(), s.view(),
+                childCounts.getOrDefault(s.id(), 0), !context && s.location() != null, !context && bounded.contains(s.id()),
+                context ? 0 : s.resources().size(), path);
+    }
+
+    private Set<String> boundedSites() {
+        return new java.util.HashSet<>(jdbc.sql("""
+                select s.id::text from site s join site_geometry_version g on g.site_id = s.id and g.version = s.geometry_version
+                where g.geometry_type <> 'Point'""").query(String.class).list());
     }
 
     public record SiteInput(String code, String name, String kind, String parentId, String responsibleOrgId, Integer capacity,
@@ -218,9 +325,6 @@ public class SiteService {
             throw ApiException.validation("تعذر حفظ الموقع: الرمز مستخدم أو الموقع الأب غير صالح.");
         }
         setResponsibility(id, UUID.fromString(in.responsibleOrgId()), now);
-        if (in.location() != null) {
-            addGeometry(id, in.location(), now);
-        }
         audit.recordAs(ctx.actor(), "SITE_CREATED", "SITE", id.toString(), in.name(), Map.of("code", in.code()), null);
         return list(ctx).stream().filter(s -> s.id().equals(id.toString())).findFirst().orElseThrow();
     }
@@ -249,9 +353,6 @@ public class SiteService {
         UUID newOrg = UUID.fromString(in.responsibleOrgId());
         if (!newOrg.equals(current.orgId())) {
             setResponsibility(id, newOrg, now);
-        }
-        if (in.location() != null && (current.lat() == null || current.lat() != in.location().lat() || current.lng() != in.location().lng())) {
-            addGeometry(id, in.location(), now);
         }
         audit.recordAs(ctx.actor(), "SITE_UPDATED", "SITE", id.toString(), in.name(), Map.of("code", current.code()), null);
         return list(ctx).stream().filter(s -> s.id().equals(id.toString())).findFirst().orElseThrow();
@@ -303,7 +404,7 @@ public class SiteService {
     }
 
     /** MANAGE_FACILITIES over the administering organisation; configuration rights alone are not enough. */
-    private static void requireFacilityManager(AccessContext ctx, UUID orgId) {
+    static void requireFacilityManager(AccessContext ctx, UUID orgId) {
         boolean allowed = orgId == null
                 ? ctx.grants().stream().anyMatch(g -> g.has(Permission.MANAGE_FACILITIES) && g.isAll())
                 : ctx.canFor(Permission.MANAGE_FACILITIES, orgId);
@@ -327,17 +428,5 @@ public class SiteService {
                 .param("now", Db.ts(now)).param("s", siteId).update();
         jdbc.sql("insert into site_responsibility(id, site_id, organization_id, valid_from) values (:id, :s, :o, :now)")
                 .param("id", UUID.randomUUID()).param("s", siteId).param("o", orgId).param("now", Db.ts(now)).update();
-    }
-
-    private void addGeometry(UUID siteId, Location loc, Instant now) {
-        int next = jdbc.sql("select coalesce(max(version), 0) + 1 from site_geometry_version where site_id = :s")
-                .param("s", siteId).query(Integer.class).single();
-        // Previous geometry versions are kept untouched (append-only); the latest version is the current one.
-        Map<String, Object> geo = Map.of("type", "Point", "coordinates", List.of(loc.lng(), loc.lat()));
-        jdbc.sql("""
-                insert into site_geometry_version(id, site_id, version, geojson, crs, source, valid_from)
-                values (:id, :s, :v, cast(:g as jsonb), 'EPSG:4326', 'إدخال إداري', :now)""")
-                .param("id", UUID.randomUUID()).param("s", siteId).param("v", next).param("g", json.write(geo))
-                .param("now", Db.ts(now)).update();
     }
 }

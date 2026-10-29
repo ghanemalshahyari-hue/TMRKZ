@@ -6,6 +6,7 @@ import type {
   AuthStatus,
   AvailabilityCheck,
   AvailabilityGrid,
+  BoundaryVersion,
   Delegation,
   DecisionInput,
   DraftInput,
@@ -13,6 +14,8 @@ import type {
   ExportJob,
   FormSchema,
   FormVersion,
+  GeoJsonGeometry,
+  GeometryCheck,
   HrCanonical,
   HrEntity,
   HrField,
@@ -24,13 +27,16 @@ import type {
   HrStatus,
   HrTestResult,
   IdentityIssue,
+  ImportJob,
   Integration,
   Kpis,
+  MapContext,
   MapFeatures,
   MapPackage,
   Me,
   MyExecutionTask,
   Notification,
+  OrgBranch,
   OrgDetail,
   OrgImportPreview,
   OrgNode,
@@ -38,6 +44,7 @@ import type {
   Person,
   PolicyDraft,
   PolicyVersion,
+  RequestBoundaries,
   RequestDetail,
   RequestListItem,
   RequestType,
@@ -47,6 +54,7 @@ import type {
   SimulationResult,
   Site,
   SiteDetail,
+  SiteNode,
   StudioItem,
   SystemInfo,
   TaskItem,
@@ -110,7 +118,7 @@ export function onUnauthorized(fn: Listener): () => void {
   return () => unauthorizedListeners.delete(fn);
 }
 
-type RequestOptions = { body?: unknown; idempotencyKey?: string; form?: FormData; silent401?: boolean };
+type RequestOptions = { body?: unknown; idempotencyKey?: string; form?: FormData; silent401?: boolean; signal?: AbortSignal };
 
 export function newIdempotencyKey(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
@@ -138,8 +146,10 @@ async function call<T>(method: string, path: string, opts: RequestOptions = {}):
   }
   let res: Response;
   try {
-    res = await fetch(API_BASE + path, { method, headers, body, credentials: 'same-origin' });
-  } catch {
+    res = await fetch(API_BASE + path, { method, headers, body, credentials: 'same-origin', signal: opts.signal });
+  } catch (e) {
+    // A superseded request (newer viewport or period) is cancelled on purpose; callers ignore it.
+    if (opts.signal?.aborted || (e instanceof DOMException && e.name === 'AbortError')) throw e;
     throw new ApiError(0, { code: 'NETWORK', message: 'تعذر الوصول إلى الخادم. تحقق من الشبكة الداخلية.' });
   }
   if (res.status === 204) return undefined as T;
@@ -163,7 +173,27 @@ export const urls = {
   exportContent: (id: string) => `${API_BASE}/exports/${id}/content`,
   bpmn: (id: string) => `${API_BASE}/workflow-versions/${id}/bpmn`,
   mapContent: (pkg: MapPackage) => (pkg.contentUrl.startsWith('/') ? pkg.contentUrl : `${API_BASE}/map/packages/${pkg.id}/content`),
+  boundariesExport: () => `${API_BASE}/map/boundaries/export`,
 };
+
+/** Query of the map layers: viewport, period (half-open; open = no end), selected resources and organisation. */
+export type FeatureQuery = {
+  bbox?: string;
+  from?: string;
+  to?: string | null;
+  open?: boolean;
+  time?: string;
+  resourceIds?: string;
+  orgId?: string;
+  includeSubOrgs?: boolean;
+  packageId?: string;
+  zoom?: number;
+  siteIds?: string;
+};
+
+export function isAbort(e: unknown): boolean {
+  return e instanceof DOMException && e.name === 'AbortError';
+}
 
 export const api = {
   // session
@@ -176,6 +206,9 @@ export const api = {
 
   // organizations
   orgTree: () => get<OrgNode[]>('/organizations/tree'),
+  orgRoots: () => get<OrgBranch[]>('/organizations/roots'),
+  orgChildren: (id: string) => get<OrgBranch[]>(`/organizations/${id}/children`),
+  orgSearch: (q: string, signal?: AbortSignal) => get<OrgBranch[]>('/organizations/search' + query({ q }), { signal }),
   org: (id: string) => get<OrgDetail>(`/organizations/${id}`),
   people: (q: string) => get<Page<Person>>('/people' + query({ q, size: 50 })),
   identityIssues: () => get<IdentityIssue[]>('/identity-issues'),
@@ -192,8 +225,36 @@ export const api = {
   // facilities & map
   sites: () => get<Site[]>('/sites'),
   site: (id: string) => get<SiteDetail>(`/sites/${id}`),
-  mapPackages: () => get<MapPackage[]>('/map/packages'),
-  mapFeatures: (time: string, bbox?: string) => get<MapFeatures>('/map/features' + query({ time, bbox })),
+  siteTree: (parentId?: string | null) => get<SiteNode[]>('/sites/tree' + query({ parentId: parentId ?? undefined })),
+  siteSearch: (q: string, signal?: AbortSignal) => get<SiteNode[]>('/sites/search' + query({ q }), { signal }),
+  mapContext: () => get<MapContext>('/map/context'),
+  mapPackages: (all = false) => get<MapPackage[]>('/map/packages' + query({ all: all || undefined })),
+  mapFeatures: (q: FeatureQuery, signal?: AbortSignal) =>
+    get<MapFeatures>('/map/features' + query({ ...q, to: q.to ?? undefined, open: q.open || undefined }), { signal }),
+  uploadMapPackage: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return call<{ code: string; version: string; status: string; packages: MapPackage[]; checks: string[] }>('POST', '/map/packages', { form });
+  },
+  setPackageStatus: (code: string, version: string, status: 'ACTIVE' | 'DISABLED' | 'REJECTED', reason: string) =>
+    post<MapPackage[]>(`/map/packages/${encodeURIComponent(code)}/${encodeURIComponent(version)}/status`, { status, reason }),
+  geometryVersions: (siteId: string) => get<BoundaryVersion[]>(`/sites/${siteId}/geometry/versions`),
+  geometryVersion: (siteId: string, version: number) => get<BoundaryVersion>(`/sites/${siteId}/geometry/versions/${version}`),
+  validateGeometry: (siteId: string, geometry: GeoJsonGeometry, crs: string) =>
+    post<GeometryCheck>(`/sites/${siteId}/geometry/validate`, { geometry, crs }),
+  saveGeometry: (siteId: string, body: { geometry: GeoJsonGeometry; crs: string; expectedVersion: number; reason: string; method: 'DRAWN' | 'COORDINATES' }) =>
+    post<BoundaryVersion>(`/sites/${siteId}/geometry`, body),
+  importBoundaries: (file: File, crs?: string, targetSiteId?: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (crs) form.append('crs', crs);
+    if (targetSiteId) form.append('targetSiteId', targetSiteId);
+    return call<ImportJob>('POST', '/map/imports', { form });
+  },
+  importJob: (id: string) => get<ImportJob>(`/map/imports/${id}`),
+  publishImport: (id: string, reason: string) => post<ImportJob>(`/map/imports/${id}/publish`, { reason }),
+  cancelImport: (id: string) => post<ImportJob>(`/map/imports/${id}/cancel`),
+  requestBoundaries: (id: string, revision?: number) => get<RequestBoundaries>(`/requests/${id}/boundaries` + query({ revision })),
   availabilityGrid: (from: string, days = 7) => get<AvailabilityGrid>('/availability/grid' + query({ from, days })),
   availabilityCheck: (body: { resourceIds: string[]; start: string; end: string | null; excludeReservationId?: string | null }) =>
     post<AvailabilityCheck>('/availability/check', body),

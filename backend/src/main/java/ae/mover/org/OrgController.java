@@ -46,9 +46,19 @@ public class OrgController {
         return orgs.detail(access.context(actor), id);
     }
 
+    @GetMapping("/organizations/roots")
+    public List<OrganizationService.OrgBranch> roots(Actor actor) {
+        return orgs.roots(access.context(actor));
+    }
+
+    @GetMapping("/organizations/search")
+    public List<OrganizationService.OrgBranch> search(Actor actor, @RequestParam(required = false) String q) {
+        return orgs.search(access.context(actor), q);
+    }
+
     @GetMapping("/organizations/{id}/children")
-    public List<OrganizationService.OrgNode> children(Actor actor, @PathVariable UUID id) {
-        return orgs.children(access.context(actor), id);
+    public List<OrganizationService.OrgBranch> children(Actor actor, @PathVariable UUID id) {
+        return orgs.branchChildren(access.context(actor), id);
     }
 
     @GetMapping("/people")

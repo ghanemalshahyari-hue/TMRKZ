@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>حدود اختبار — المقر الإداري</name>
+    <Placemark>
+      <name>المقر الإداري</name>
+      <ExtendedData><Data name="site_code"><value>01</value></Data></ExtendedData>
+      <Polygon><outerBoundaryIs><LinearRing>
+        <coordinates>55.2762,25.2233,0 55.2779,25.2233,0 55.2781,25.2246,0 55.2766,25.2249,0 55.2762,25.2233,0</coordinates>
+      </LinearRing></outerBoundaryIs></Polygon>
+    </Placemark>
+  </Document>
+</kml>

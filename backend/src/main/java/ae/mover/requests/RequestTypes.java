@@ -26,7 +26,7 @@ public class RequestTypes {
         this.workflows = workflows;
     }
 
-    public record Type(String code, String name, String kind, boolean multiSites, boolean multiOrgs) {
+    public record Type(String code, String name, String kind, boolean multiSites, boolean multiOrgs, boolean openEndAllowed) {
         public boolean requiresTarget() {
             return !"NEW_RESERVATION".equals(kind);
         }
@@ -36,7 +36,7 @@ public class RequestTypes {
     }
 
     public record TypeView(String code, String name, String kind, boolean multiSites, boolean multiOrgs,
-                           boolean requiresTargetReservation, Map<String, Object> formVersion,
+                           boolean requiresTargetReservation, boolean openEndAllowed, Map<String, Object> formVersion,
                            Map<String, Object> workflowVersion) {
     }
 
@@ -44,17 +44,17 @@ public class RequestTypes {
         if (code == null) {
             throw ApiException.validation("نوع الطلب مطلوب.");
         }
-        return jdbc.sql("select code, name, kind, multi_sites, multi_orgs from request_type where code = :c and active")
+        return jdbc.sql("select code, name, kind, multi_sites, multi_orgs, open_end_allowed from request_type where code = :c and active")
                 .param("c", code)
                 .query((rs, n) -> new Type(rs.getString("code"), rs.getString("name"), rs.getString("kind"),
-                        rs.getBoolean("multi_sites"), rs.getBoolean("multi_orgs")))
+                        rs.getBoolean("multi_sites"), rs.getBoolean("multi_orgs"), rs.getBoolean("open_end_allowed")))
                 .optional().orElseThrow(() -> ApiException.validation("نوع الطلب غير معروف."));
     }
 
     public List<Type> all() {
-        return jdbc.sql("select code, name, kind, multi_sites, multi_orgs from request_type where active order by sort_order")
+        return jdbc.sql("select code, name, kind, multi_sites, multi_orgs, open_end_allowed from request_type where active order by sort_order")
                 .query((rs, n) -> new Type(rs.getString("code"), rs.getString("name"), rs.getString("kind"),
-                        rs.getBoolean("multi_sites"), rs.getBoolean("multi_orgs"))).list();
+                        rs.getBoolean("multi_sites"), rs.getBoolean("multi_orgs"), rs.getBoolean("open_end_allowed"))).list();
     }
 
     public List<TypeView> views() {
@@ -68,7 +68,7 @@ public class RequestTypes {
                         "stages", def.stages().stream().map(s -> new StageRef(s.key(), s.name())).toList());
             }
             JsonNode schema = form.schema();
-            return new TypeView(t.code(), t.name(), t.kind(), t.multiSites(), t.multiOrgs(), t.requiresTarget(),
+            return new TypeView(t.code(), t.name(), t.kind(), t.multiSites(), t.multiOrgs(), t.requiresTarget(), t.openEndAllowed(),
                     Map.of("id", form.id().toString(), "version", form.version(), "schema", schema), wfView);
         }).toList();
     }

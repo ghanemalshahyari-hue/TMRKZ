@@ -2,9 +2,10 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type React
 import { api, onUnauthorized } from './api/client';
 import type {Me, Notification, OrgNode, Permission, RequestType, Settings, Site } from './api/types';
 import { RequestWizard } from './components/RequestWizard';
-import { Icon, NoAccess } from './components/ui';
+import { Icon, NoAccess, ScreenBoundary } from './components/ui';
 import { AppContext, NAV, flattenOrgs, type AppContextValue, type View, type WizardRequest } from './lib/app';
 import { fullTime, todayDubai } from './lib/dates';
+import { clearMapContexts } from './lib/mapState';
 import { AuditPage } from './pages/AuditPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { DocsPage } from './pages/DocsPage';
@@ -62,6 +63,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
   const [wizard, setWizard] = useState<WizardRequest | null>(null);
+  const [wizardUpdate, setWizardUpdate] = useState<(WizardRequest & { key: number }) | null>(null);
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(null);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [mapDate, setMapDate] = useState(() => todayDubai());
@@ -144,6 +146,12 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     toast,
     openWizard: (w) => {
       if (!can('CREATE')) return toast('لا تملك صلاحية إنشاء الطلبات');
+      // A new map selection while a map draft is open is shown to the user as a change before it is applied.
+      if (wizard && wizard.layout === 'drawer' && w.prefill && !w.requestId && !wizard.requestId) {
+        setWizardUpdate({ ...w, key: Date.now() });
+        return;
+      }
+      setWizardUpdate(null);
       setWizard(w);
     },
     revision,
@@ -256,14 +264,14 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
           </div>
         </header>
         <main id="main" tabIndex={-1}>
-          {restriction(view, can, me.summaryOnly) ? <NoAccess /> : pages[view]()}
+          <ScreenBoundary resetKey={view}>{restriction(view, can, me.summaryOnly) ? <NoAccess /> : pages[view]()}</ScreenBoundary>
         </main>
         <footer className="app-footer">
           <span>MOVER / FACILITIES WORKSPACE</span>
           <span>إدارة مرافق وموافقات إدارية · خادم وقاعدة بيانات وسجل تدقيق داخل الشبكة</span>
         </footer>
       </div>
-      <RequestWizard request={wizard} onClose={() => setWizard(null)} />
+      <RequestWizard request={wizard} update={wizardUpdate} onUpdateHandled={() => setWizardUpdate(null)} onClose={() => (setWizard(null), setWizardUpdate(null))} />
       <div id="toast" className="toast" role="status" hidden={!toastMsg}>
         {toastMsg}
       </div>
@@ -278,6 +286,7 @@ function IdentitySwitch({ me, setMe }: { me: Me; setMe: (m: Me | null) => void; 
     try {
       target = (await api.logout()).redirect || '/';
     } finally {
+      clearMapContexts();
       setMe(null);
       window.location.assign(target);
     }

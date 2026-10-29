@@ -185,6 +185,24 @@ public class DecisionService {
         doc.put("resources", resourceNames);
         doc.put("period", json.map(data.path("period")));
         doc.put("subject", data.path("subject").asText());
+        StringBuilder boundaryLine = new StringBuilder();
+        if (data.path("boundaries").isArray()) {
+            List<Map<String, Object>> versions = new ArrayList<>();
+            for (JsonNode b : data.path("boundaries")) {
+                Map<String, Object> v = new LinkedHashMap<>();
+                v.put("siteCode", b.path("siteCode").asText());
+                v.put("version", b.path("version").isNumber() ? b.path("version").asInt() : null);
+                v.put("type", b.path("type").asText());
+                versions.add(v);
+                if (!boundaryLine.isEmpty()) {
+                    boundaryLine.append("، ");
+                }
+                boolean registered = "Polygon".equals(b.path("type").asText()) || "MultiPolygon".equals(b.path("type").asText());
+                boundaryLine.append(b.path("siteName").asText()).append(registered
+                        ? " — الإصدار " + b.path("version").asInt() : " — حدود غير مسجلة");
+            }
+            doc.put("boundaryVersions", versions);
+        }
         String sha = Hashing.sha256(json.canonical(doc));
         List<DocumentLine> lines = List.of(
                 new DocumentLine("رقم الطلب", (String) rev.get("number")),
@@ -194,6 +212,7 @@ public class DecisionService {
                 new DocumentLine("المرافق", String.join("، ", resourceNames)),
                 new DocumentLine("بداية الفترة", data.path("period").path("start").asText("")),
                 new DocumentLine("نهاية الفترة", data.path("period").path("end").isTextual() ? data.path("period").path("end").asText() : "مفتوحة"),
+                new DocumentLine("نسخ الحدود", boundaryLine.isEmpty() ? "غير مسجلة في هذه المراجعة" : boundaryLine.toString()),
                 new DocumentLine("بصمة المراجعة SHA-256", (String) rev.get("content_sha256")));
         return new Canonical(doc, sha, lines);
     }

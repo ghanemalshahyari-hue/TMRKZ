@@ -33,10 +33,19 @@ Last run (28 Oct 2026): 20/20 tables identical, 2/2 attachments identical — PA
 
 ## Upgrade and rollback
 
-1. `sh ops/backup.sh` and keep the backup until the upgrade is accepted.
+1. `sh ops/backup.sh` and keep the backup until the upgrade is accepted. Then `sh ops/upgrade-check.sh before`.
 2. Load the new images (offline bundle) and `docker compose up -d --no-build`. Flyway applies new migrations on
    start; migrations are forward-only and additive by policy.
-3. Verify `/api/v1/system/health`, sign in, run `tests/acceptance/journey.mjs` in a test environment.
+3. `sh ops/upgrade-check.sh after` — fails if any earlier site, boundary, request, revision, decision, approval
+   document, reservation, lock, attachment, audit or package row changed or vanished (columns added by the migration
+   are ignored). Verify `/api/v1/system/health`, sign in, run `tests/acceptance/journey.mjs` in a test environment.
+
+**Upgrading to the map workspace (V8, ADR-017).** The database image changes from `postgres:17.11-alpine` to
+`postgis/postgis:17-3.5-alpine`, the same PostgreSQL 17.11, so the existing volume is reused. V8 runs
+`create extension postgis`, which needs the schema owner or a superuser; with separated database roles a DBA creates
+the extension first. Existing point records stay points (no area is assumed for them); sites show «حدود الموقع غير
+مسجلة» until a boundary is imported or drawn. On a new, empty volume the image also creates its own optional
+extensions (topology, tiger geocoder) in the `mover` database; TMRKZ does not use them.
 4. **Rollback:** stop the stack, restore the pre-upgrade backup into a clean project (`ops/restore.sh`) with the
    previous image tags. Do not run an older image against a newer schema.
 
@@ -111,19 +120,59 @@ configuration changes never require data migration of in-flight requests.
   otherwise come only from memberships and responsibility seats.
 - Organisation structure comes from the HR mirror. The CSV import in «إعدادات النظام» remains for local organisations.
 
+## Map workspace: boundaries and map packages
+
+**Who may do what** (checked on the server): viewing the map needs VIEW, VIEW_SUMMARY or MANAGE_FACILITIES over the
+site; drawing, editing and importing boundaries need MANAGE_FACILITIES over the site's responsible organisation;
+uploading, activating and disabling map packages needs MANAGE_FACILITIES over the whole scope («مدير الخرائط»);
+exporting boundaries (GeoJSON) needs EXPORT; request badges and counts need a full VIEW grant.
+
+**Boundaries.** «استيراد حدود المواقع» accepts GeoJSON (`.geojson`, `.json`) and KML (`.kml`). Each shape names its site
+with `site_code` (GeoJSON property, KML `ExtendedData`); a file for one site can be imported from that site's panel. The
+CRS comes from the file (`crs` member; KML is WGS 84 by definition) or is chosen in the dialog: EPSG:4326/CRS84
+(longitude, latitude), EPSG:3857, EPSG:32640 or EPSG:32639. `urn:ogc:def:crs:EPSG::4326` is refused because it puts
+latitude first. The preview lists every shape with its linked site, type, vertices, area and current version; any
+problem rejects the whole file. Publishing needs a reason and creates one new version per site. A version saved
+elsewhere in the meantime aborts the publication (`GEOMETRY_STALE`). To import a Shapefile or GeoPackage, convert it on
+a workstation with GDAL, naming the source CRS explicitly, for example
+`ogr2ogr -f GeoJSON -s_srs EPSG:32640 -t_srs EPSG:4326 -lco RFC7946=YES sites.geojson sites.shp`, check `site_code`,
+then import the GeoJSON. «تحرير سجل الموقع — الحدود» draws or edits one site: click to draw, drag vertices, or type
+them in the table; «تراجع» undoes, «البدء برسم جديد» replaces, «إلغاء دون حفظ» discards everything.
+
+**Map packages.** Built-in packages live in `map-packages/` (image). «مدير الخرائط» uploads further packages as a ZIP
+with `manifest.json` and one background file at the root:
+
+```json
+{ "code": "campus-plan", "name": "مخطط المرفق", "version": "2026.11", "dataDate": "2026-11-01",
+  "source": "…", "license": "…", "attributionHtml": "…", "crs": "EPSG:4326 …", "kind": "FACILITY_PLAN",
+  "minZoom": 14, "maxZoom": 19, "coverage": { "minLat": 0, "minLng": 0, "maxLat": 0, "maxLng": 0 },
+  "files": [ { "role": "overlay", "format": "SVG_OVERLAY", "path": "plan.svg", "sha256": "…" } ] }
+```
+
+`kind` is ROADS, AERIAL or FACILITY_PLAN; `format` is SVG_OVERLAY or RASTER_IMAGE (PNG/JPEG), optionally with a GEOJSON
+`source` file. The package is checked (checksums, safe names, size and compression limits, SVG without scripts or
+external references), stored on the files volume, previewed by the manager and activated or disabled with a reason.
+PMTiles, MBTiles and XYZ tile sets are refused (no renderer). Uploaded packages are part of `ops/backup.sh` (files
+volume). Never upload imagery without a licence; the map states when no aerial imagery is installed.
+
 ## Acceptance test environment (fictional)
 
 `sh ops/test-env/up.sh` starts a separate compose project `tmrkz-test` with a fictional OpenLDAP (StartTLS, test CA),
 a fictional HR mirror, people, grants and facilities. Users and the generated shared password are listed in
-`ops/test-env/README.md`. Never point it at real data.
+`ops/test-env/README.md`. Never point it at real data. `sh ops/test-env/up-offline.sh` restarts the same project with an
+internal-only network (no internet egress; only the web entry point published) and checks that the backend cannot
+reach an external address. If the fictional directory is ever rebuilt, `sh ops/test-env/relink.sh` resets the
+fictional identity links (TMRKZ otherwise refuses, correctly, to link new directory accounts to linked HR records).
 
 ## Running the tests
 
 ```sh
-sh ops/test-backend.sh                                        # 54 backend acceptance tests on a throw-away PostgreSQL
+sh ops/test-backend.sh                                        # 70 backend acceptance tests on a throw-away PostgreSQL + PostGIS
 sh ops/test-env/up.sh && node tests/acceptance/journey.mjs     # real sign-in (Keycloak + LDAP) and the journey
 sh ops/test-env/check-untrusted-tls.sh                       # directory with an untrusted certificate is refused
 sh ops/test-env/clean-install.sh                             # empty database: first administrator and first configuration
+sh ops/test-env/up-offline.sh && (cd tests/acceptance && npm ci) && node tests/acceptance/map-workspace.mjs
+                                                              # MAP-01 … MAP-18 in Microsoft Edge, no internet egress
 (cd frontend && npm ci && npm test && npm run build)          # frontend unit tests and type-checked build
 python ops/tools/gen-openapi.py                               # regenerate docs/api/openapi.json from the controllers
 ```

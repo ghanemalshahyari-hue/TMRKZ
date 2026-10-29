@@ -26,6 +26,7 @@ import ae.mover.common.Db;
 import ae.mover.common.Json;
 import ae.mover.common.PageResult;
 import ae.mover.common.Ref;
+import ae.mover.facilities.BoundaryService;
 import ae.mover.forms.FormService;
 import ae.mover.workflow.WorkflowDefinition;
 import ae.mover.workflow.WorkflowService;
@@ -44,8 +45,11 @@ public class RequestViews {
     private final WorkflowService workflows;
     private final FormService forms;
 
+    private final BoundaryService boundaries;
+
     public RequestViews(JdbcClient jdbc, Json json, Clock clock, AccessService access, WorkflowService workflows,
-                        FormService forms) {
+                        FormService forms, BoundaryService boundaries) {
+        this.boundaries = boundaries;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -78,8 +82,10 @@ public class RequestViews {
     public record HistoryItem(String event, String actor, String at, String note) {
     }
 
+    /** boundaryVersions: the site boundary versions fixed by the signed document (absent for earlier documents). */
     public record ApprovalDocumentView(int revision, String sha256, String signatureMode, String signatureLabel,
-                                       String signerName, String signerRole, String signedAt) {
+                                       String signerName, String signerRole, String signedAt,
+                                       @JsonInclude(JsonInclude.Include.NON_NULL) JsonNode boundaryVersions) {
     }
 
     public record ReservationRef(String id, String resourceName, Period period, String status) {
@@ -205,6 +211,42 @@ public class RequestViews {
                             .add(new ResourceRef(rs.getString("id"), rs.getString("name"), rs.getString("site_id")));
                     return null;
                 }).list();
+        return out;
+    }
+
+    // ---- boundaries pinned in a revision ---------------------------------------------------------------
+
+    /**
+     * The site boundaries a revision was submitted with (immutable version rows), so reviewers and the approval document
+     * see what was decided even after the site record changes. A draft shows the current versions, marked as not pinned.
+     */
+    public Map<String, Object> boundaries(AccessContext ctx, UUID id, Integer revision) {
+        RequestScope scope = access.requestScope(id);
+        if (scope == null || ctx.viewLevel(scope) == ViewLevel.NONE) {
+            throw ApiException.notFound();
+        }
+        int current = jdbc.sql("select current_revision from request where id = :id").param("id", id).query(Integer.class).single();
+        int rev = revision == null ? current : revision;
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("requestId", id.toString());
+        out.put("revision", rev);
+        List<Map<String, Object>> snapshot;
+        if (rev <= 0) {
+            List<UUID> resources = jdbc.sql("select resource_id from request_resource where request_id = :id").param("id", id)
+                    .query(UUID.class).list();
+            snapshot = boundaries.snapshot(resources);
+            out.put("pinned", false);
+            out.put("recorded", true);
+        } else {
+            String data = jdbc.sql("select data::text from request_revision where request_id = :id and revision = :v")
+                    .param("id", id).param("v", rev).query(String.class).optional().orElseThrow(ApiException::notFound);
+            JsonNode node = json.tree(data).path("boundaries");
+            snapshot = new ArrayList<>();
+            node.forEach(b -> snapshot.add(json.map(b)));
+            out.put("pinned", true);
+            out.put("recorded", node.isArray());
+        }
+        out.put("boundaries", boundaries.pinned(snapshot));
         return out;
     }
 
@@ -376,11 +418,15 @@ public class RequestViews {
     }
 
     private ApprovalDocumentView approvalDocument(UUID requestId, boolean full) {
-        return jdbc.sql("select * from approval_document where request_id = :id order by revision desc limit 1")
+        return jdbc.sql("select *, canonical::text as doc from approval_document where request_id = :id order by revision desc limit 1")
                 .param("id", requestId)
-                .query((rs, n) -> new ApprovalDocumentView(rs.getInt("revision"), rs.getString("sha256"),
-                        rs.getString("signature_mode"), signatureLabel(rs.getString("signature_mode")),
-                        full ? rs.getString("signer_name") : "صاحب الاعتماد", rs.getString("signer_role"), Db.iso(rs, "signed_at")))
+                .query((rs, n) -> {
+                    JsonNode versions = json.tree(rs.getString("doc")).path("boundaryVersions");
+                    return new ApprovalDocumentView(rs.getInt("revision"), rs.getString("sha256"),
+                            rs.getString("signature_mode"), signatureLabel(rs.getString("signature_mode")),
+                            full ? rs.getString("signer_name") : "صاحب الاعتماد", rs.getString("signer_role"), Db.iso(rs, "signed_at"),
+                            versions.isArray() ? versions : null);
+                })
                 .optional().orElse(null);
     }
 

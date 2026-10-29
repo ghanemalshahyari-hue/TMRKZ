@@ -1,11 +1,21 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
-import type { AvailabilityGrid, MapFeature, ReservationItem } from '../api/types';
-import { MapView, type MapMode } from '../components/MapView';
+import type { AvailabilityGrid, GridCell, MapFeature, ReservationItem } from '../api/types';
+import { StaticMap } from '../components/map/StaticMap';
 import { Heading } from '../components/ui';
 import { facilitySites, useApp } from '../lib/app';
 import { addDays, dayLabel, dubaiISO, fullDate, todayDubai } from '../lib/dates';
 import { RESERVATION_STATUS } from '../lib/labels';
+
+const CELL_LABEL: Record<GridCell, string> = {
+  FREE: 'متاح',
+  PARTIAL: 'إشغال جزئي',
+  BUSY: 'غير متاح',
+  PENDING: 'طلب قيد المراجعة',
+  NO_RESOURCES: 'لا موارد للطلب',
+};
+const CELL_CLASS: Record<GridCell, string> = { FREE: 'free', PARTIAL: 'partial', BUSY: '', PENDING: 'pending', NO_RESOURCES: 'none' };
+const CELL_SYMBOL: Record<GridCell, string> = { FREE: '', PARTIAL: '◐', BUSY: '✕', PENDING: '⏳', NO_RESOURCES: '–' };
 
 export function CalendarPage() {
   const app = useApp();
@@ -15,7 +25,6 @@ export function CalendarPage() {
   const [grid, setGrid] = useState<AvailabilityGrid | null>(null);
   const [features, setFeatures] = useState<MapFeature[]>([]);
   const [reservations, setReservations] = useState<ReservationItem[]>([]);
-  const [mode, setMode] = useState<MapMode>('availability');
   const [error, setError] = useState<string | null>(null);
   const day = grid?.days[dayIndex] ?? addDays(weekStart, dayIndex);
 
@@ -32,7 +41,7 @@ export function CalendarPage() {
 
   useEffect(() => {
     api
-      .mapFeatures(dubaiISO(day))
+      .mapFeatures({ from: dubaiISO(day), to: dubaiISO(addDays(day, 1)) })
       .then((d) => setFeatures(d.features))
       .catch(() => setFeatures([]));
     app.setMapDate(day);
@@ -76,7 +85,7 @@ export function CalendarPage() {
       {error && <div className="note red" style={{ marginBottom: 15 }}>{error}</div>}
       <div className="calendar-layout">
         <div className="stack">
-          <MapView className="calendar-map" features={features} selectedSiteId={selected} onSelect={setSelectedSiteId} mode={mode} onModeChange={setMode} />
+          <StaticMap className="calendar-map" features={features} selectedSiteId={selected} onSelect={setSelectedSiteId} label="خريطة إشغال اليوم المختار" />
           <section className="card">
             <div className="column-heading flex spread">
               <h3>جدول إشغال المرافق</h3>
@@ -103,11 +112,12 @@ export function CalendarPage() {
                           role="button"
                           tabIndex={0}
                           className={'time-cell ' + (dayIndex === i && selected === row.siteId ? 'active' : '')}
-                          aria-label={s.name + ' ' + dayLabel(grid!.days[i]) + ' ' + (c === 'BUSY' ? 'محجوز' : c === 'PENDING' ? 'طلب قيد المراجعة' : 'متاح')}
+                          aria-label={s.name + ' ' + dayLabel(grid!.days[i]) + ' ' + CELL_LABEL[c]}
+                          title={CELL_LABEL[c]}
                           onClick={() => pick(row.siteId, i)}
                           onKeyDown={(e) => e.key === 'Enter' && pick(row.siteId, i)}
                         >
-                          <span className={'booking-line ' + (c === 'PENDING' ? 'pending' : c === 'FREE' ? 'free' : '')} />
+                          <span className={'booking-line ' + CELL_CLASS[c]}>{CELL_SYMBOL[c]}</span>
                         </div>
                       ))}
                     </Fragment>

@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "crs": { "type": "name", "properties": { "name": "EPSG:4326" } },
+  "features": [
+    { "type": "Feature", "properties": { "site_code": "04", "name": "شكل صالح" },
+      "geometry": { "type": "Polygon", "coordinates": [[[55.2823, 25.1885], [55.2838, 25.1885], [55.2838, 25.1896], [55.2823, 25.1896], [55.2823, 25.1885]]] } },
+    { "type": "Feature", "properties": { "site_code": "03", "name": "شكل يتقاطع مع نفسه" },
+      "geometry": { "type": "Polygon", "coordinates": [[[55.3560, 25.2205], [55.3580, 25.2220], [55.3580, 25.2205], [55.3560, 25.2220], [55.3560, 25.2205]]] } }
+  ]
+}

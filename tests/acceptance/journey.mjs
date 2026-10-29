@@ -171,8 +171,9 @@ const sites = (await requester.get('/sites')).body;
 const service = sites.find((s) => s.code === '02');
 ok(!!service, 'requester sees «مركز الخدمات» on the map directory');
 const resource = service.resources.find((r) => r.parentResourceId === null);
-const features = (await requester.get('/map/features?time=' + encodeURIComponent(new Date().toISOString()))).body;
-ok(features.coverage.covered === true && features.features.some((f) => f.siteId === service.id), 'map layer lists the facility with local coverage');
+// coverage is computed for an actual viewport (ADR-017): here the regional extent of the fictional facilities
+const features = (await requester.get('/map/features?bbox=55.25,25.15,55.40,25.25&zoom=12&time=' + encodeURIComponent(new Date().toISOString()))).body;
+ok(features.coverage.status === 'FULL' && features.features.some((f) => f.siteId === service.id), 'map layer lists the facility with local coverage');
 
 const types = (await requester.get('/request-types')).body;
 const temp = types.find((t) => t.code === 'TEMP_OCCUPANCY');

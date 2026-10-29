@@ -34,6 +34,7 @@ import ae.mover.common.ErrorCode;
 import ae.mover.common.Hashing;
 import ae.mover.common.Json;
 import ae.mover.common.Times;
+import ae.mover.facilities.BoundaryService;
 import ae.mover.forms.FormSchemas;
 import ae.mover.forms.FormService;
 import ae.mover.forms.RuleLanguage.Problem;
@@ -66,11 +67,13 @@ public class RequestService {
     private final OutboxService outbox;
     private final IdempotencyService idempotency;
     private final RequestViews views;
+    private final BoundaryService boundaries;
 
     public RequestService(JdbcClient jdbc, Json json, Clock clock, AccessService access, RequestTypes types,
                           FormService forms, WorkflowService workflows, PolicyService policies,
                           ReservationService reservations, RuntimeService runtime, TaskSync taskSync,
-                          AuditService audit, OutboxService outbox, IdempotencyService idempotency, RequestViews views) {
+                          AuditService audit, OutboxService outbox, IdempotencyService idempotency, RequestViews views,
+                          BoundaryService boundaries) {
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -86,6 +89,7 @@ public class RequestService {
         this.outbox = outbox;
         this.idempotency = idempotency;
         this.views = views;
+        this.boundaries = boundaries;
     }
 
     /** Working copy of a request held in {@code request.draft}. */
@@ -379,6 +383,8 @@ public class RequestService {
                     problems.add(new Problem("period", "حدد بداية الفترة."));
                 } else if (end != null && !end.isAfter(start)) {
                     problems.add(new Problem("period", "نهاية الفترة يجب أن تكون بعد بدايتها."));
+                } else if (end == null && !type.openEndAllowed()) {
+                    problems.add(new Problem("period", "هذا النوع من الطلبات لا يسمح باستخدام مفتوح المدة؛ حدد نهاية الفترة."));
                 }
             }
             case "EXTENSION" -> {
@@ -457,6 +463,8 @@ public class RequestService {
                         "fileName", rs.getString("file_name"), "sha256", rs.getString("sha256"))).list());
         data.put("formVersionId", formVersionId.toString());
         data.put("workflowVersionId", wfVersion.toString());
+        // Boundary versions the reviewers decide on; a later edit of the site record does not change this revision.
+        data.put("boundaries", boundaries.snapshot(d.resourceIds()));
         String sha = Hashing.sha256(json.canonical(data));
 
         // D-06: on resubmission decide which earlier stage approvals remain valid.
@@ -538,7 +546,7 @@ public class RequestService {
                                        WorkflowDefinition def) {
         Map<String, Object> prev = jdbc.sql("select data::text from request_revision where request_id = :r and revision = :v")
                 .param("r", requestId).param("v", previous).query(String.class).optional().map(json::map).orElse(Map.of());
-        for (String key : List.of("period", "resourceIds", "ownerOrgId", "participantOrgIds", "targetReservationId")) {
+        for (String key : List.of("period", "resourceIds", "ownerOrgId", "participantOrgIds", "targetReservationId", "boundaries")) {
             if (!sameValue(prev.get(key), data.get(key))) {
                 return List.of();
             }

@@ -81,13 +81,14 @@ document hash, time) using `MOVER_ATTESTATION_KEY`. The UI and API label it «ت
 `PKI`: provider interface with no provider connected; it fails closed with `503 SIGNATURE_PROVIDER_UNAVAILABLE` and
 records nothing (AT-27).
 
-## ADR-008 Plain PostgreSQL instead of PostGIS — Provisional (D-01, D-07)
+## ADR-008 Plain PostgreSQL instead of PostGIS — Superseded by ADR-017 (2026-10-29)
 
 Sites carry a point location and append-only `site_geometry_version` GeoJSON with an explicit CRS label. The map
 needs only bounding-box filtering of a few thousand points, which plain columns handle. PostGIS (and a decision on
 the organisation's coordinate reference, D-01) should be introduced when real boundary geometries are imported.
+*Superseded:* boundaries are now registered and imported, so PostGIS is in use (ADR-017).
 
-## ADR-009 Local map packages — Accepted
+## ADR-009 Local map packages — Accepted; amended by ADR-017 (review, activation, managed packages)
 
 `map-packages/<name>/manifest.json` declares source, licence, attribution, coverage, CRS, version and per-file
 SHA-256. On start-up the backend registers packages whose checksums verify; the UI draws only installed packages and
@@ -224,3 +225,53 @@ Owner decisions after the review of `c96cb4b`.
   assigned to that person. With none or several it waits for the organisation's access managers, who assign it from a
   searchable, paged list of authorised people (`/task-reassignments`). Candidates are scanned in keyset pages with no cap
   before the scope check. An assigned task can be decided only by its assignee.
+
+## ADR-017 Administrative map workspace on PostGIS; registered boundaries only — Accepted (2026-10-29)
+
+Owner's completion brief `docs/MAP_WORKSPACE_COMPLETION_AR.md` (MAP-01 … MAP-18). Supersedes ADR-008 and amends ADR-009.
+
+- **Database.** Image `postgis/postgis:17-3.5-alpine` (PostgreSQL 17.11, PostGIS 3.5.7, GEOS 3.14.1, PROJ 9.8.1 with
+  network access disabled). Same PostgreSQL release as the earlier `postgres:17.11-alpine`, so an existing volume is
+  upgraded in place; migration V8 creates the extension (owner or superuser needed — with separated roles the DBA runs
+  `create extension postgis` before migrating). Proven on the acceptance environment's V7 data: every one of the 130
+  earlier rows unchanged (`ops/upgrade-check.sh`, `ops/sql/upgrade-rows.sql`).
+- **Marker ≠ boundary.** `site.lat/lng` stays the display marker (indexed `site.marker`). A boundary is a
+  `site_geometry_version` of type Polygon or MultiPolygon in EPSG:4326, GeoJSON axis order (x = longitude,
+  y = latitude), with its original input, original CRS, transformation, reason, author and import job. Legacy point
+  rows stay points ("حدود الموقع غير مسجلة"); nothing is ever generated around a point, and the fixed-offset shapes of
+  the earlier map are removed.
+- **Versions and concurrency.** Versions are append-only. `site.geometry_version` is compared and set under a row lock:
+  a save based on another version is refused with `GEOMETRY_STALE` (409) and nothing is overwritten.
+- **Input.** GeoJSON and KML only (Shapefile/GeoPackage are converted outside with an explicit CRS). The CRS comes from
+  the file or an explicit declaration — never from the numbers. Supported: EPSG:4326/CRS84, 3857, 32639, 32640;
+  `urn:ogc:def:crs:EPSG::4326` (latitude first) is refused as ambiguous. Validity, transformation and area are computed
+  in PostGIS; invalid shapes are reported (self-intersection, nested shells, holes outside) and never repaired. An
+  import is previewed with a per-shape report and published as a whole or not at all.
+- **Drawing.** Leaflet stays; Leaflet-Geoman **Free 2.20.2 (MIT)** is loaded on demand for free features only (draw a
+  polygon by clicks, drag vertices). Undo, start-over, coordinate entry and a vertex table are implemented in the
+  application, so no dragging is required (WCAG 2.2 2.5.7). The editor is a separate mode bound to the site it was
+  opened for; selecting or panning never edits a record.
+- **Map contract.** `/map/features` takes the viewport (`bbox`, `zoom`), a half-open period (`from`, `to`) or an open
+  one (`open=true`), selected resources, an organisation (with or without sub-organisations) and the selected
+  background. It returns visible sites only, their current boundary and version, each resource's state for the period
+  (FREE, BLOCKED from X/I scope locks with handover, SHARED_IN_USE), site availability FREE/PARTIAL/BUSY/NO_RESOURCES,
+  occupants (all, not the first), responsibility vs use relations, and the request layer only for a full VIEW grant.
+  Coverage is computed for that viewport, zoom and package (FULL, PARTIAL with fraction, NONE, ZOOM_OUT_OF_RANGE).
+  Above 1,500 sites in a viewport boundaries are omitted, above 5,000 the list is capped, with a message.
+- **Trees.** Organisation and site trees load one level at a time (`/organizations/roots`, `/{id}/children`,
+  `/sites/tree`) and search the whole permitted scope with paths (`/organizations/search`, `/sites/search`); no people
+  are loaded for the map. Out-of-scope items answer exactly like missing ones.
+- **Requests.** A map request opens a drawer beside the map, prefilled with organisation, resources and period; the
+  drawer can be minimised and a later map selection is shown as a difference before it is applied. Each submitted
+  revision stores the boundary versions of its sites; the approval document names them, and later edits of the site
+  record do not change what the request, the reviewer and the document show. Final approval keeps the atomic conflict
+  check of ADR-006. Request types say whether open-ended use is allowed (`request_type.open_end_allowed`).
+- **Packages.** Built-in packages ship in the image; further packages are uploaded as a ZIP with `manifest.json`
+  (source, licence, date, coverage, zoom range, CRS, version, SHA-256 per file) by a map manager (facilities
+  administration over the whole scope), read in memory with size, entry-count and ratio limits and flat safe names,
+  checked per renderer (SVG without scripts, handlers or external references; PNG/JPEG by signature), stored on the
+  files volume, previewed by the manager only, then activated or disabled with a reason. PMTiles, MBTiles and XYZ have
+  no renderer and are refused. No aerial imagery is installed; the map says so instead of offering it.
+- **Session.** The map remembers per person only identifiers and view settings (never data), validates them against the
+  server on return, and forgets them at sign-out; the module-level package cache was removed.
+

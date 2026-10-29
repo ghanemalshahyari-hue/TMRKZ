@@ -19,9 +19,16 @@ services:
     volumes:
       - ./ops/test-env/.generated/certs:/container/service/slapd/assets/certs
       - ./ops/test-env/.generated/ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom
+      # directory data survives container re-creation, so the fictional accounts keep their entryUUID (identity links)
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
     networks: [internal]
 
   keycloak:
     depends_on:
       openldap:
         condition: service_started
+
+volumes:
+  ldap-data:
+  ldap-config:

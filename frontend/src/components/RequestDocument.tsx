@@ -245,6 +245,17 @@ export function RequestDocument({
             {sig.signatureMode === 'PKI' ? sig.signatureLabel : SIGNATURE_DISCLAIMER}
             <br />
             <span className="latin tiny">SHA-256 {sig.sha256.slice(0, 24)}…</span>
+            {sig.boundaryVersions && sig.boundaryVersions.length > 0 && (
+              <>
+                <br />
+                <span className="document-boundaries">
+                  نسخ الحدود في المستند:{' '}
+                  {sig.boundaryVersions
+                    .map((b) => b.siteCode + ' — ' + (b.type === 'Polygon' || b.type === 'MultiPolygon' ? 'الإصدار ' + b.version : 'غير مسجلة'))
+                    .join('، ')}
+                </span>
+              </>
+            )}
           </small>
         </div>
       )}

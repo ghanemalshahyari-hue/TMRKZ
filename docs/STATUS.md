@@ -37,11 +37,20 @@ Date: 29 October 2026 · Version 1.0.0
   - Review fixes (ADR-016) — TNQL's two sign-in paths on one page (automatic through Keycloak, manual username and
     password checked by the directory over TLS), `auth_time` required on every sign-in, a limited first-administrator
     path proven by a clean installation, and task assignment with access-manager choice and uncapped candidate scans.
-  - Steps 3–7 open — OpenFGA and the permissions studio, PostGIS boundaries and the map manager, visual rule editor,
-    DSS signatures and seals, isolated bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
+  - Step 4 done — administrative map workspace (ADR-017, `docs/MAP_WORKSPACE_COMPLETION_AR.md`): PostGIS boundaries
+    with versions, provenance and conflict refusal; GeoJSON/KML import with preview and whole-file publication;
+    drawing and editing (Leaflet-Geoman Free, vertex table, coordinate entry); the map-first workspace with
+    organisation and site trees loaded per level, real backgrounds and layers, coverage per viewport, period and
+    resource availability with partial occupancy, a request drawer that keeps the selection, boundary versions pinned in
+    revisions and approval documents; the map package manager; the fabricated shapes around points removed. MAP-01 …
+    MAP-18 pass (backend and Edge browser, acceptance environment without internet egress). Migrated in place from the
+    earlier release's data with every earlier row unchanged.
+  - Steps 3, 5–7 open — OpenFGA and the permissions studio, visual rule editor, DSS signatures and seals, isolated
+    bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
 
-Test evidence: 54 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
-17 frontend tests — see `TRACEABILITY.md`.
+Test evidence: 70 backend acceptance tests on PostgreSQL + PostGIS (including the map criteria and a 10,000-site
+measurement), 21 browser checks for MAP-01 … MAP-18 in Microsoft Edge, a 40-check end-to-end journey through nginx, a
+restore verification, an upgrade check of earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
 
 ## Known limitations
 
@@ -49,13 +58,15 @@ Test evidence: 54 backend acceptance tests, a 29-check end-to-end journey throug
 |---|---|---|
 | Studio UI | Rule conditions (`visibleWhen`, `requiredWhen`, stage `condition`, `affectsStages`) are validated and enforced by the server but edited through the API; the studio shows that a condition exists. | Add a structured rule editor. |
 | Shared resources | Resources with policy `SHARED` take no exclusive locks; capacity accounting is not implemented. | Define capacity rules, then add a capacity check in the same transaction. |
-| Geometry | Points only, plain PostgreSQL; no boundary polygons or spatial index (ADR-008). | Introduce PostGIS with the CRS decision (D-01). |
+| Geometry | PostGIS boundaries (ADR-017). Import accepts GeoJSON and KML; Shapefile and GeoPackage are converted outside the application with an explicit CRS. Supported CRS: EPSG:4326/CRS84, 3857, 32639, 32640. | Add further formats or CRS only with converters and tests; organisation CRS decision D-01. |
+| Map backgrounds | Renderers for SVG and PNG/JPEG overlays georeferenced by corner bounds. No aerial imagery is installed (the map says so). PMTiles, MBTiles and XYZ tiles are refused at upload. | Install licensed enterprise packages through the map manager; a tile renderer needs its own decision (D-07). |
+| Map volume | 10,000 sites: city viewport 17 ms, district (900 sites) 40 ms; above 1,500 sites in one viewport only markers are sent, above 5,000 the list is capped with a message (`PERFORMANCE.md`). | Clustering if enterprise data needs it. |
 | Audit | Append-only at database level; no cryptographic hash chain. Database superusers can still alter data. | Optional sealing job and separation of the DB owner from the application role in production. |
 | Database roles | The application connects as the schema owner. | Production: separate migration owner and a restricted runtime role (documented in OPERATIONS). |
 | Malware scanning | Built-in checks (type sniffing, EICAR, macros, active PDF content); no AV engine. | Connect an internal scanner (e.g. ClamAV) behind `ContentInspector`. |
 | Notifications | In-app only. | Correspondence connector after D-04. |
 | SLA timers | Overdue review tasks are detected every minute and notified; no automatic escalation/reassignment. | Add escalation rules to the workflow definition. |
-| Org tree UI | The tree endpoint returns the whole visible tree (7,000 nodes ≈ 1.5 MB, ~0.1 s); the UI renders it fully. | Switch the tree to lazy loading via `/organizations/{id}/children` for very large structures. |
+| Org tree UI | The map uses lazily loaded organisation and site trees with search (ADR-017). The organisation page and the request form's organisation list still load the whole visible tree (7,000 nodes ≈ 1.5 MB, ~0.1 s). | Move those two screens to the lazy endpoints. |
 | High availability | Single instance per service in compose; no HA or failover tested. | Out of scope until D-03/D-05 targets are set. |
 
 ## Integrations not connected (never simulated as connected)
@@ -73,13 +84,13 @@ Test evidence: 54 backend acceptance tests, a 29-check end-to-end journey throug
 
 | ID | Decision | Current handling |
 |---|---|---|
-| D-01 | Coordinate reference / format | Generic import with explicit CRS label; demo uses EPSG:4326 points; nothing inferred from wording. |
+| D-01 | Coordinate reference / format | Boundaries stored in EPSG:4326 (GeoJSON order); input CRS from the file or an explicit declaration (4326, 3857, 32639, 32640), transformed in PostGIS; nothing inferred from numbers or wording. |
 | D-02 | Internal attestation vs PKI | Internal attestation in force and labelled as such; PKI mode wired to fail closed. |
 | D-03 | Concurrency, rates, file sizes | Exploratory measurement only (`PERFORMANCE.md`); attachment limit 10 MB by policy. |
 | D-04 | Identity, structure, correspondence systems | Local adapter + file import; other connectors NOT_CONNECTED. |
 | D-05 | RPO/RTO, retention, SLAs | Backup/restore tooling and a measured restore; no time objective promised. |
 | D-06 | Invalidation of approvals on field changes | Per-field policy (descriptive / restart named stages / full re-approval); structural changes always full. |
-| D-07 | Aerial imagery sources | Only the installed illustrative basemap; no imagery fabricated or fetched. |
+| D-07 | Aerial imagery sources | Only installed packages: the illustrative regional road map; packages uploaded and reviewed through the map manager. No imagery fabricated or fetched; «لم تثبت حزمة صور جوية» is shown. |
 | D-08 | Parent resource booking | Explicit resources with hierarchical scope locks (parent blocks children, siblings independent). |
 | D-09 | Execution/receipt stages and owners | Configurable execution templates per workflow; demo defaults declared in the workflow definition. |
 

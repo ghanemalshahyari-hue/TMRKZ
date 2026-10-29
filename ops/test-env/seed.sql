@@ -14,7 +14,7 @@ insert into hr_sync_run(id, source_id, mapping_version_id, trigger, status, star
 values (md5('t:run')::uuid, md5('t:source')::uuid, md5('t:mapping')::uuid, 'SCHEDULED', 'SUCCEEDED', now(), now(),
         '{"note": "fictional test data"}') on conflict do nothing;
 insert into hr_snapshot(id, run_id, mapping_version_id, status, unit_count, person_count, active_unit_count, active_person_count, published_at)
-values (md5('t:snapshot')::uuid, md5('t:run')::uuid, md5('t:mapping')::uuid, 'PUBLISHED', 5, 11, 5, 11, now()) on conflict do nothing;
+values (md5('t:snapshot')::uuid, md5('t:run')::uuid, md5('t:mapping')::uuid, 'PUBLISHED', 8, 11, 8, 11, now()) on conflict do nothing;
 
 insert into hr_unit(snapshot_id, external_id, code, name, parent_external_id, status_raw, active)
 select md5('t:snapshot')::uuid, x, c, n, p, '1', true from (values
@@ -22,7 +22,11 @@ select md5('t:snapshot')::uuid, x, c, n, p, '1', true from (values
   ('T-GA', 'GA', 'الإدارة العامة', 'T-ORG'),
   ('T-SS', 'SS', 'الخدمات المشتركة', 'T-ORG'),
   ('T-IT', 'IT', 'إدارة التقنية', 'T-ORG'),
-  ('T-PM', 'PM', 'إدارة المشاريع', 'T-ORG')) v(x, c, n, p)
+  ('T-PM', 'PM', 'إدارة المشاريع', 'T-ORG'),
+  -- a deeper branch, for choosing an organisation far down the tree (MAP-01)
+  ('T-PM-1', 'PM-1', 'قسم مشاريع المباني', 'T-PM'),
+  ('T-PM-1-1', 'PM-1-1', 'وحدة الصيانة الإدارية', 'T-PM-1'),
+  ('T-PM-1-1-1', 'PM-1-1-1', 'فريق مرافق الشمال', 'T-PM-1-1')) v(x, c, n, p)
 on conflict do nothing;
 
 insert into organization(id, code, name, parent_id, status, valid_from, source, source_external_id)
@@ -70,7 +74,9 @@ insert into t_sites values
   ('05', 'مركز التدريب الإداري', 'قاعات تدريب', '00', 'SS', 80, 25.176, 55.330),
   ('06', 'مكتب التقنية', 'مكاتب مشتركة', '00', 'IT', 35, 25.239, 55.325),
   ('07', 'مركز الدعم', 'مرفق دعم إداري', '00', 'IT', 30, 25.198, 55.365),
-  ('08', 'مبنى الخدمات الغربية', 'مبنى خدمات', '00', 'SS', 55, 25.211, 55.247);
+  ('08', 'مبنى الخدمات الغربية', 'مبنى خدمات', '00', 'SS', 55, 25.211, 55.247),
+  ('10', 'مستودع اللوازم الشمالي', 'مستودع إداري', null, 'PM-1-1-1', null, 25.252, 55.301),
+  ('11', 'المبنى المشترك', 'مبنى مشترك', null, 'SS', null, 25.196, 55.3005);
 
 insert into site(id, code, name, kind, parent_id, capacity, lat, lng)
 select md5('t:site:' || code)::uuid, code, name, kind, case when parent is null then null else md5('t:site:' || parent)::uuid end,
@@ -79,18 +85,19 @@ on conflict do nothing;
 insert into site_responsibility(id, site_id, organization_id, valid_from)
 select md5('t:resp:' || code)::uuid, md5('t:site:' || code)::uuid, md5('t:org:T-' || org)::uuid, '2026-01-01T00:00:00Z' from t_sites
 on conflict do nothing;
-insert into site_geometry_version(id, site_id, version, geojson, crs, source, valid_from)
-select md5('t:geo:' || code)::uuid, md5('t:site:' || code)::uuid, 1,
-       jsonb_build_object('type', 'Point', 'coordinates', jsonb_build_array(lng, lat)), 'EPSG:4326',
-       'بيانات اختبار افتراضية', '2026-01-01T00:00:00Z' from t_sites
-on conflict do nothing;
+-- No boundaries are seeded: markers only. Boundaries are imported or drawn through the application (map journey).
 insert into resource(id, site_id, code, name, kind, policy, parent_resource_id, capacity)
 select md5('t:res:R-' || code)::uuid, md5('t:site:' || code)::uuid, 'R-' || code, name, kind, 'EXCLUSIVE', null, capacity
 from t_sites where parent is not null
 on conflict do nothing;
 insert into resource(id, site_id, code, name, kind, policy, parent_resource_id, capacity) values
   (md5('t:res:R-05A')::uuid, md5('t:site:05')::uuid, 'R-05A', 'قاعة التدريب أ', 'قاعة تدريب', 'EXCLUSIVE', md5('t:res:R-05')::uuid, 40),
-  (md5('t:res:R-05B')::uuid, md5('t:site:05')::uuid, 'R-05B', 'قاعة التدريب ب', 'قاعة تدريب', 'EXCLUSIVE', md5('t:res:R-05')::uuid, 40)
+  (md5('t:res:R-05B')::uuid, md5('t:site:05')::uuid, 'R-05B', 'قاعة التدريب ب', 'قاعة تدريب', 'EXCLUSIVE', md5('t:res:R-05')::uuid, 40),
+  (md5('t:res:R-10')::uuid, md5('t:site:10')::uuid, 'R-10', 'مستودع اللوازم الشمالي', 'مستودع', 'EXCLUSIVE', null, null),
+  -- shared building: shared use by several organisations, with independent exclusive rooms (MAP-10)
+  (md5('t:res:R-11')::uuid, md5('t:site:11')::uuid, 'R-11', 'استخدام المبنى المشترك', 'استخدام مشترك', 'SHARED', null, null),
+  (md5('t:res:R-11A')::uuid, md5('t:site:11')::uuid, 'R-11A', 'مكتب الاستقبال', 'مكتب', 'EXCLUSIVE', md5('t:res:R-11')::uuid, null),
+  (md5('t:res:R-11B')::uuid, md5('t:site:11')::uuid, 'R-11B', 'القاعة متعددة الاستخدام', 'قاعة', 'EXCLUSIVE', md5('t:res:R-11')::uuid, null)
 on conflict do nothing;
 
 -- ---- grants (dated memberships) --------------------------------------------------------------------------------
@@ -101,6 +108,15 @@ on conflict do nothing;
 insert into membership(id, person_id, organization_id, role_code, site_scope_id, valid_from) values
   (md5('t:m:t.limited:05')::uuid, md5('t:person:t.limited')::uuid, md5('t:org:T-SS')::uuid, 'LIMITED_VIEWER', md5('t:site:05')::uuid, '2026-01-01T00:00:00Z'),
   (md5('t:m:t.limited:08')::uuid, md5('t:person:t.limited')::uuid, md5('t:org:T-SS')::uuid, 'LIMITED_VIEWER', md5('t:site:08')::uuid, '2026-01-01T00:00:00Z')
+on conflict do nothing;
+
+-- a second organisation using the shared building: a requester of IT with a role scoped to site 11 (MAP-10)
+insert into role_def(code, name, permissions, scope, summary_only, sort_order)
+values ('SHARED_SITE_REQUESTER', 'مقدم طلب في موقع مشترك', '{VIEW,CREATE,EDIT}', 'SITE', false, 20)
+on conflict do nothing;
+insert into membership(id, person_id, organization_id, role_code, site_scope_id, valid_from)
+values (md5('t:m:t.requester2:11')::uuid, md5('t:person:t.requester2')::uuid, md5('t:org:T-IT')::uuid, 'SHARED_SITE_REQUESTER',
+        md5('t:site:11')::uuid, '2026-01-01T00:00:00Z')
 on conflict do nothing;
 
 commit;

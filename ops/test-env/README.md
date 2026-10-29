@@ -28,6 +28,21 @@ the account to the fictional HR record whose domain account equals the login nam
 | `t.auditor` | Auditor | GA |
 | `t.unlinked` | In the directory only: sign-in is refused and queued for an access manager | — |
 
+`t.requester2` also holds «مقدم طلب في موقع مشترك», a role scoped to the shared building (site 11), so a second
+organisation can use it. Sites: `00` main campus (no parent) with sub-sites `01`–`08`; `10` a main site of the remote
+branch «فريق مرافق الشمال» (إدارة المشاريع ‹ قسم مشاريع المباني ‹ وحدة الصيانة الإدارية); `11` a shared main building with a
+shared resource and two exclusive rooms. No boundaries are seeded: they are imported or drawn through the application
+(`tests/acceptance/fixtures/`).
+
+```sh
+sh ops/test-env/up-offline.sh                # same project without internet egress (internal-only network)
+node tests/acceptance/map-workspace.mjs      # MAP-01 … MAP-18 in Microsoft Edge (cd tests/acceptance && npm ci first)
+sh ops/test-env/relink.sh                    # only after rebuilding the fictional directory: reset fictional links
+```
+
+The browser test uploads a fictional facility plan package (`fixtures/campus-plan`, CC0) through the map manager and
+disables the copies of earlier runs.
+
 All users share the password in `ops/test-env/.generated/user-password`. The directory administrator password and the
 test CA are also there. Everything under `.generated/` is git-ignored and is regenerated if deleted. To stop, run
 `docker compose -p tmrkz-test -f docker-compose.yml -f ops/test-env/compose.directory.yml -f ops/test-env/compose.data.yml down` (add `-v` to delete the data).

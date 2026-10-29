@@ -2,7 +2,7 @@
 services:
   # Fictional organisations, HR mirror rows, people, grants and facilities (runs once the backend has migrated).
   test-seed:
-    image: postgres:17.11-alpine
+    image: postgis/postgis:17-3.5-alpine
     restart: "no"
     depends_on:
       backend:

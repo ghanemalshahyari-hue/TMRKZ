@@ -12,7 +12,7 @@ Cloudflare script) is the visual reference:
 - The DOM structure and class names of each screen mirror the prototype's render functions (sidebar, header, map card,
   wizard, review desk, calendar, studios, permissions matrix, settings, audit).
 - Font: Noto Sans Arabic (OFL) served from `/fonts/NotoSansArabic.ttf`. Map: Leaflet 1.9.4 from npm with the local SVG
-  basemap (from `GET /api/v1/map/packages`, fallback `/map/basemap.svg`).
+  basemap (from `GET /api/v1/map/context`; no fallback image — a missing package is stated, ADR-017).
 
 ## Offline / isolation
 
@@ -30,6 +30,29 @@ attribution anchor links (not fetched) and React error-doc URLs. nginx sends a C
   shown with explicit guidance.
 - Counts and notifications use 30 s short polling through scoped endpoints, so revoked access stops updates immediately.
 - Times are stored/sent as UTC and displayed in `Asia/Dubai`; period ends are exclusive.
+
+## Map workspace (ADR-017)
+
+- `pages/MapPage.tsx` composes the workspace: context bar (organisation, site, period, background; tools collapsible),
+  browse panel (`map/BrowseTrees.tsx`: organisation and site trees loaded per level, search across the permitted scope),
+  the map (`map/MapCanvas.tsx`), and the details panel (`map/SiteDetailPanel.tsx`) or, for an authorised manager, the
+  boundary editor (`map/BoundaryEditor.tsx`). Imports and map packages: `map/MapAdmin.tsx`; backgrounds, layers,
+  legend and coverage: `map/MapPanels.tsx`; review and calendar maps: `map/StaticMap.tsx`.
+- `MapCanvas` draws only what the server returned: registered Polygon/MultiPolygon boundaries and markers. A site
+  without a boundary keeps a dashed marker and «حدود غير مسجلة». Sites and zones (sub-sites) have their own panes,
+  visibility, opacity and order. The view changes only on the user's own pan/zoom or an explicit fit (selection,
+  «ملاءمة الاختيار»); data never moves the map.
+- Viewport requests are debounced by the map (300 ms), the previous request is aborted and a late answer is ignored
+  (sequence number). A failed refresh switches every colour to the neutral «تعذر التحديث» state.
+- Every colour has a symbol and a name (`lib/mapState.ts`): متاح ✓, إشغال جزئي ◐, غير متاح ✕, قيد المراجعة ⏳, معتمد ✓,
+  and the neutral state. Request badges appear only when the server says the role may see requests.
+- A request started on the map opens `RequestWizard` as a drawer beside the map, prefilled from the selection; it can be
+  minimised («تصغير والعودة للخريطة») and a later map selection is shown as a difference before it is applied.
+- Leaflet-Geoman Free is loaded on demand (separate chunk) and attached to the existing map; the vertex table,
+  coordinate entry, click-to-add, undo and start-over make dragging optional.
+- The last map context (identifiers, period, view, background, layers — no data) is kept per person in
+  `localStorage`, validated against the server on return and cleared at sign-out. `ScreenBoundary` keeps a screen
+  failure from blanking the whole application.
 
 ## Commands
 

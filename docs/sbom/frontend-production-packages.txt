@@ -1,7 +1,92 @@
 mover-frontend@1.0.0 C:\Users\ADMIN\Desktop\TMRKZ\frontend
+├── @geoman-io/leaflet-geoman-free@2.20.2
+| ├── @turf/boolean-contains@7.4.0
+| | ├── @turf/bbox@7.4.0
+| | | ├── @turf/helpers@7.4.0 deduped
+| | | ├── @turf/meta@7.4.0 deduped
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | └── tslib@2.8.1 deduped
+| | ├── @turf/boolean-point-in-polygon@7.4.0
+| | | ├── @turf/helpers@7.4.0 deduped
+| | | ├── @turf/invariant@7.4.0 deduped
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | ├── point-in-polygon-hao@1.2.4
+| | | | └── robust-predicates@3.0.3
+| | | └── tslib@2.8.1 deduped
+| | ├── @turf/boolean-point-on-line@7.4.0
+| | | ├── @turf/helpers@7.4.0 deduped
+| | | ├── @turf/invariant@7.4.0 deduped
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | └── tslib@2.8.1 deduped
+| | ├── @turf/helpers@7.4.0
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | └── tslib@2.8.1 deduped
+| | ├── @turf/invariant@7.4.0
+| | | ├── @turf/helpers@7.4.0 deduped
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | └── tslib@2.8.1 deduped
+| | ├── @turf/line-split@7.4.0 deduped
+| | ├── @types/geojson@7946.0.16
+| | └── tslib@2.8.1
+| ├── @turf/kinks@7.4.0
+| | ├── @turf/helpers@7.4.0 deduped
+| | ├── @types/geojson@7946.0.16 deduped
+| | └── tslib@2.8.1 deduped
+| ├── @turf/line-intersect@7.4.0
+| | ├── @turf/helpers@7.4.0 deduped
+| | ├── @types/geojson@7946.0.16 deduped
+| | ├── robust-predicates@2.0.4
+| | ├── tinyqueue@2.0.3
+| | └── tslib@2.8.1 deduped
+| ├── @turf/line-split@7.4.0
+| | ├── @turf/bbox@7.4.0 deduped
+| | ├── @turf/geojson-rbush@7.4.0
+| | | ├── @turf/bbox@7.4.0 deduped
+| | | ├── @turf/helpers@7.4.0 deduped
+| | | ├── @turf/meta@7.4.0 deduped
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | ├── rbush@3.0.1
+| | | | └── quickselect@2.0.0
+| | | └── tslib@2.8.1 deduped
+| | ├── @turf/helpers@7.4.0 deduped
+| | ├── @turf/invariant@7.4.0 deduped
+| | ├── @turf/line-intersect@7.4.0 deduped
+| | ├── @turf/line-segment@7.4.0
+| | | ├── @turf/helpers@7.4.0 deduped
+| | | ├── @turf/invariant@7.4.0 deduped
+| | | ├── @turf/meta@7.4.0 deduped
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | └── tslib@2.8.1 deduped
+| | ├── @turf/meta@7.4.0
+| | | ├── @turf/helpers@7.4.0 deduped
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | └── tslib@2.8.1 deduped
+| | ├── @turf/nearest-point-on-line@7.4.0
+| | | ├── @turf/distance@7.4.0
+| | | | ├── @turf/helpers@7.4.0 deduped
+| | | | ├── @turf/invariant@7.4.0 deduped
+| | | | ├── @types/geojson@7946.0.16 deduped
+| | | | └── tslib@2.8.1 deduped
+| | | ├── @turf/helpers@7.4.0 deduped
+| | | ├── @turf/invariant@7.4.0 deduped
+| | | ├── @turf/meta@7.4.0 deduped
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | └── tslib@2.8.1 deduped
+| | ├── @turf/truncate@7.4.0
+| | | ├── @turf/helpers@7.4.0 deduped
+| | | ├── @turf/meta@7.4.0 deduped
+| | | ├── @types/geojson@7946.0.16 deduped
+| | | └── tslib@2.8.1 deduped
+| | ├── @types/geojson@7946.0.16 deduped
+| | └── tslib@2.8.1 deduped
+| ├── leaflet@1.9.4 deduped
+| ├── lodash@4.18.1
+| └── polyclip-ts@0.16.8
+│   ├── bignumber.js@9.3.1
+│   └── splaytree-ts@1.0.2
 ├── leaflet@1.9.4
-├─┬ react-dom@19.3.1
-│ ├── react@19.3.1 deduped
-│ └── scheduler@0.28.0
+├── react-dom@19.3.1
+| ├── react@19.3.1 deduped
+| └── scheduler@0.28.0
 └── react@19.3.1
 

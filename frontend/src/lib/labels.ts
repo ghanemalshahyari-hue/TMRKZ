@@ -1,6 +1,4 @@
 import type {
-  Administrative,
-  Availability,
   ChangePolicy,
   FieldKind,
   OrgFrom,
@@ -19,20 +17,6 @@ export const STATUS: Record<RequestStatus, [string, string]> = {
   APPROVED: ['معتمد', 'green'],
   REJECTED: ['مرفوض', 'red'],
   CLOSED: ['مغلق', 'blue'],
-};
-
-export const COLORS = { free: '#439b7e', pending: '#d4a04d', busy: '#c77770', none: '#9daea3' };
-
-export const AVAILABILITY: Record<Availability, { label: string; color: string; pill: string }> = {
-  FREE: { label: 'متاح', color: COLORS.free, pill: 'green' },
-  PENDING: { label: 'طلب قيد المراجعة', color: COLORS.pending, pill: 'orange' },
-  BUSY: { label: 'محجوز', color: COLORS.busy, pill: 'red' },
-};
-
-export const ADMINISTRATIVE: Record<Administrative, { label: string; color: string }> = {
-  APPROVED: { label: 'حجز معتمد', color: COLORS.free },
-  PENDING: { label: 'طلب قيد المراجعة', color: COLORS.pending },
-  NONE: { label: 'دون طلب قائم', color: COLORS.none },
 };
 
 export const PERMISSIONS: Permission[] = [

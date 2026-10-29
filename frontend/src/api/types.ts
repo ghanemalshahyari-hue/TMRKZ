@@ -22,7 +22,11 @@ export type Page<T> = { items: T[]; page: number; size: number; total: number };
 export type RequestStatus = 'DRAFT' | 'SUBMITTED' | 'RETURNED' | 'REJECTED' | 'APPROVED' | 'CLOSED';
 export type RequestKind = 'NEW_RESERVATION' | 'EXTENSION' | 'MODIFICATION' | 'CANCELLATION' | 'EVACUATION';
 export type ViewLevel = 'FULL' | 'SUMMARY' | 'CONTEXT';
-export type Availability = 'FREE' | 'PENDING' | 'BUSY';
+/** Site availability for a period: BUSY only when every requested resource is blocked; PARTIAL when some are. */
+export type Availability = 'FREE' | 'PARTIAL' | 'BUSY' | 'NO_RESOURCES';
+/** Calendar grid cell (day): availability, or PENDING when a request is under review and nothing blocks. */
+export type GridCell = Availability | 'PENDING';
+export type ResourceStateName = 'FREE' | 'BLOCKED' | 'SHARED_IN_USE';
 export type Administrative = 'APPROVED' | 'PENDING' | 'NONE';
 
 export type RuleOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'empty' | 'notEmpty';
@@ -131,10 +135,18 @@ export type Site = {
   view: ViewLevel;
 };
 export type OccupancyItem = { reservationId: string; resourceName: string; org?: Ref; period: Period; status: string };
+export type GeometryType = 'Point' | 'Polygon' | 'MultiPolygon';
+export type GeoJsonGeometry = { type: GeometryType; coordinates: unknown };
 export type SiteDetail = Site & {
-  geometry: { version: number; crs: string; source: string; validFrom: string; geojson: unknown } | null;
+  geometry: { version: number; type: GeometryType; crs: string; source: string; validFrom: string; geojson: GeoJsonGeometry } | null;
+  boundaryStatus: 'REGISTERED' | 'NOT_REGISTERED';
+  geometryVersion: number | null;
   occupancy: OccupancyItem[];
+  path: Ref[];
+  canManage: boolean;
 };
+export type PackageKind = 'ROADS' | 'AERIAL' | 'FACILITY_PLAN' | 'SOURCE_DATA';
+export type PackageStatus = 'PENDING_REVIEW' | 'ACTIVE' | 'DISABLED' | 'REJECTED' | 'RETIRED';
 export type MapPackage = {
   id: string;
   code: string;
@@ -146,32 +158,154 @@ export type MapPackage = {
   crs: string;
   version: string;
   dataDate: string;
-  format: 'SVG_OVERLAY' | 'GEOJSON';
+  format: 'SVG_OVERLAY' | 'RASTER_IMAGE' | 'GEOJSON';
+  role: 'overlay' | 'source';
+  kind: PackageKind;
+  minZoom?: number;
+  maxZoom?: number;
+  status: PackageStatus;
+  storage: 'BUILTIN' | 'MANAGED';
+  sha256?: string;
+  statusReason?: string;
   contentUrl: string;
+};
+export type ResourceState = {
+  id: string;
+  code: string;
+  name: string;
+  label: string;
+  kind: string;
+  policy: 'EXCLUSIVE' | 'SHARED';
+  parentResourceId?: string;
+  state: ResourceStateName;
+  reason?: string;
+  pending?: boolean;
+  handoverMinutes?: number;
 };
 export type MapFeature = {
   siteId: string;
   code: string;
   name: string;
-  lat: number;
-  lng: number;
+  kind: string;
+  parentId: string | null;
+  view: ViewLevel;
+  lat: number | null;
+  lng: number | null;
+  boundary: { version: number; type: GeometryType; geojson: GeoJsonGeometry; simplified: boolean } | null;
+  boundaryStatus: 'REGISTERED' | 'NOT_REGISTERED';
   availability: Availability;
   administrative: Administrative;
-  occupantOrg?: Ref;
-  pendingCount: number;
-  parentId: string | null;
+  pendingCount?: number;
+  responsibleOrg?: Ref;
+  occupants?: Ref[];
+  relations?: ('RESPONSIBLE' | 'OCCUPANT')[];
+  resources: ResourceState[];
+  requestsVisible: boolean;
 };
+export type CoverageStatus = 'FULL' | 'PARTIAL' | 'NONE' | 'NO_PACKAGE' | 'ZOOM_OUT_OF_RANGE' | 'UNKNOWN';
+export type Coverage = { status: CoverageStatus; message: string | null; fraction?: number; packageId?: string; packageName?: string };
 export type MapFeatures = {
   asOf: string;
+  period: { start: string; end: string | null };
   dataVersion: string;
-  coverage: { covered: boolean; packageIds: string[]; message: string | null };
+  coverage: Coverage;
   features: MapFeature[];
 };
-export type AvailabilityGrid = { days: string[]; rows: { siteId: string; cells: Availability[] }[] };
+export type MapContext = {
+  extent?: [number, number, number, number];
+  siteCount: number;
+  backgrounds: MapPackage[];
+  aerialInstalled: boolean;
+  canManagePackages: boolean;
+  canEditBoundaries: boolean;
+  canExport: boolean;
+  timezone: string;
+};
+export type OrgBranch = { id: string; code: string; name: string; parentId: string | null; childCount: number; siteCount: number; path?: Ref[] };
+export type SiteNode = {
+  id: string;
+  code: string;
+  name: string;
+  kind?: string;
+  parentId: string | null;
+  view: ViewLevel;
+  childCount: number;
+  hasMarker: boolean;
+  hasBoundary: boolean;
+  resourceCount: number;
+  path?: Ref[];
+};
+export type GeometryCheck = {
+  valid: boolean;
+  type?: string;
+  vertices: number;
+  areaM2?: number;
+  problems: string[];
+  normalized?: GeoJsonGeometry;
+  bbox?: number[];
+  crs?: string;
+  transform?: string;
+};
+export type BoundaryVersion = {
+  siteId: string;
+  version: number;
+  type: GeometryType;
+  crs: string;
+  source: string;
+  format: string;
+  originalCrs?: string;
+  transform?: string;
+  reason?: string;
+  createdBy?: Ref;
+  createdAt: string;
+  importJobId?: string;
+  geojson?: GeoJsonGeometry;
+  areaM2?: number;
+};
+export type ImportFeature = {
+  index: number;
+  siteCode?: string;
+  label?: string;
+  siteId?: string;
+  siteName?: string;
+  type?: string;
+  vertices: number;
+  areaM2?: number;
+  currentVersion?: number;
+  problems: string[];
+  geojson?: GeoJsonGeometry;
+};
+export type ImportJob = {
+  id: string;
+  fileName: string;
+  format: 'GEOJSON' | 'KML';
+  declaredCrs?: string;
+  fileCrs?: string;
+  effectiveCrs?: string;
+  axisOrder: string;
+  status: 'PREVIEWED' | 'REJECTED' | 'PUBLISHED' | 'CANCELLED';
+  publishable: boolean;
+  fileProblems: string[];
+  features: ImportFeature[];
+  createdAt: string;
+  decidedAt?: string;
+  reason?: string;
+};
+export type PinnedBoundary = {
+  siteId: string;
+  siteCode: string;
+  siteName: string;
+  version: number | null;
+  type: GeometryType | 'NONE';
+  geojson: GeoJsonGeometry | null;
+  currentVersion: number | null;
+};
+export type RequestBoundaries = { requestId: string; revision: number; pinned: boolean; recorded: boolean; boundaries: PinnedBoundary[] };
+export type AvailabilityGrid = { days: string[]; rows: { siteId: string; cells: GridCell[] }[] };
 export type AvailabilityCheck = {
   available: boolean;
   conflicts: { resourceId: string; resourceName: string }[];
-  pendingRequests: number;
+  pendingRequests: number | null;
   note: string;
 };
 
@@ -239,6 +373,7 @@ export type RequestType = {
   multiSites: boolean;
   multiOrgs: boolean;
   requiresTargetReservation: boolean;
+  openEndAllowed: boolean;
   formVersion: { id: string; version: number; schema: FormSchema };
   workflowVersion: { id: string; version: number; name: string; stages: { key: string; name: string }[] } | null;
 };
@@ -322,6 +457,7 @@ export type RequestDetail = RequestListItem & {
     signerName: string;
     signerRole: string;
     signedAt: string;
+    boundaryVersions?: { siteCode: string; version: number | null; type: string }[];
   } | null;
   reservations: { id: string; resourceName: string; period: Period; status: string }[];
   executionTasks: ExecutionTask[];

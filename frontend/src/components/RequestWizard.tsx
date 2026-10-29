@@ -56,7 +56,17 @@ export function fieldRequired(f: FormField, ctx: RuleContext): boolean {
   return f.required || (!!f.requiredWhen && evaluateRule(f.requiredWhen, ctx));
 }
 
-export function RequestWizard({ request, onClose }: { request: WizardRequest | null; onClose: () => void }) {
+export function RequestWizard({
+  request,
+  update,
+  onUpdateHandled,
+  onClose,
+}: {
+  request: WizardRequest | null;
+  update?: (WizardRequest & { key: number }) | null;
+  onUpdateHandled?: () => void;
+  onClose: () => void;
+}) {
   const app = useApp();
   const { requestTypes, sites, orgs, me, settings } = app;
   const [w, setW] = useState<WizardState | null>(null);
@@ -67,6 +77,9 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
   const [check, setCheck] = useState<AvailabilityCheck | null>(null);
   const [uploading, setUploading] = useState(false);
   const submitKey = useRef(newIdempotencyKey());
+  const [minimized, setMinimized] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [pending, setPending] = useState<WizardRequest | null>(null);
 
   const facilities = useMemo(() => facilitySites(sites), [sites]);
   const resourceOptions = useMemo(
@@ -100,6 +113,9 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
     setStep(1);
     setError('');
     setCheck(null);
+    setMinimized(false);
+    setExpanded(false);
+    setPending(null);
     submitKey.current = newIdempotencyKey();
     const defaultOrg = (me.primaryOrg && creatableOrgs.find((o) => o.id === me.primaryOrg!.id)?.id) || creatableOrgs[0]?.id || '';
     if (request.requestId) {
@@ -114,10 +130,17 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
     }
     const site = request.siteId ? sites.find((s) => s.id === request.siteId) : undefined;
     const primary = site ? site.resources.find((r) => !r.parentResourceId) ?? site.resources[0] : undefined;
+    const pf = request.prefill;
+    const reservationTypes = requestTypes.filter((t) => t.kind === 'NEW_RESERVATION');
     const typeCode =
-      request.typeCode ?? requestTypes.find((t) => t.kind === 'NEW_RESERVATION')?.code ?? requestTypes[0]?.code ?? '';
-    const unit: Unit = settings?.defaultUnit ?? 'DAYS';
+      request.typeCode ??
+      (pf?.permanent ? reservationTypes.find((t) => t.openEndAllowed)?.code : undefined) ??
+      reservationTypes[0]?.code ??
+      requestTypes[0]?.code ??
+      '';
+    const unit: Unit = pf?.unit ?? settings?.defaultUnit ?? 'DAYS';
     const startDay = addDays(todayDubai(), 1);
+    const prefOrg = pf?.ownerOrgId && creatableOrgs.some((o) => o.id === pf.ownerOrgId) ? pf.ownerOrgId : defaultOrg;
     setW({
       requestId: null,
       version: null,
@@ -125,15 +148,15 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
       revision: 0,
       origin: request.origin,
       typeCode,
-      ownerOrgId: defaultOrg,
+      ownerOrgId: prefOrg,
       participantOrgIds: [],
       infoOrgIds: [],
-      resourceIds: primary ? [primary.id] : [],
+      resourceIds: pf?.resourceIds?.length ? pf.resourceIds : primary ? [primary.id] : [],
       subject: '',
       unit,
-      start: unit === 'HOURS' ? startDay + 'T09:00' : startDay,
-      end: unit === 'HOURS' ? addDays(startDay, 2) + 'T17:00' : addDays(startDay, 2),
-      permanent: false,
+      start: pf?.start ?? (unit === 'HOURS' ? startDay + 'T09:00' : startDay),
+      end: pf?.permanent ? '' : pf?.end ?? (unit === 'HOURS' ? addDays(startDay, 2) + 'T17:00' : addDays(startDay, 2)),
+      permanent: !!pf?.permanent,
       values: {},
       targetReservationId: request.targetReservationId ?? null,
       attachments: [],
@@ -142,6 +165,14 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request]);
+
+  useEffect(() => {
+    if (!update || !w) return;
+    setPending(update);
+    setMinimized(false);
+    onUpdateHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [update?.key]);
 
   const type: RequestType | undefined = requestTypes.find((t) => t.code === w?.typeCode);
 
@@ -307,7 +338,7 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
       app.toast('حُفظت المسودة في الخادم');
       app.bump();
       onClose();
-      location.hash = 'requests';
+      if (request?.layout !== 'drawer') location.hash = 'requests';
     } catch (e) {
       setError(explain(e));
     } finally {
@@ -327,7 +358,7 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
       app.setSelectedRequestId(submitted.id);
       app.bump();
       onClose();
-      location.hash = 'requests';
+      if (request?.layout !== 'drawer') location.hash = 'requests';
     } catch (e) {
       setError(explain(e));
       if ((e as ApiError).status !== 0) submitKey.current = newIdempotencyKey();
@@ -561,6 +592,7 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
                 <small>
                   {resource.parentResourceId ? resource.kind : site.kind}
                   {resource.policy === 'SHARED' ? ' · مشترك' : ''}
+                  {resource.parentResourceId ? ' · مورد فرعي' : ''}
                 </small>
               </span>
             </label>
@@ -591,7 +623,7 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
             />
           </label>
         </div>
-        {kind === 'NEW_RESERVATION' && (
+        {kind === 'NEW_RESERVATION' && type?.openEndAllowed !== false && (
           <label className="check-label">
             <input type="checkbox" checked={w.permanent} onChange={(e) => set({ permanent: e.target.checked })} />
             استخدام دائم — فترة مفتوحة النهاية بقرار موثق
@@ -642,6 +674,7 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
               ['الفترة', fullTime(startISO) + ' ← ' + (endISO ? fullTime(endISO) : needsEnd ? '—' : 'دون نهاية')],
               ['المبرر', String(w.values.reason ?? '')],
               ['الإصدارات', 'النموذج ' + form.version + ' / التدفق ' + (type?.workflowVersion?.version ?? '—')],
+              ['نسخ الحدود', 'تُثبَّت نسخ حدود المواقع السارية عند الإرسال، ويراجعها أصحاب القرار كما هي'],
             ] as [string, string][]
           ).map(([k, v]) => (
             <div className="key-value" key={k}>
@@ -676,18 +709,101 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
       </>
     );
 
-  return (
-    <Dialog open onClose={onClose} className="large-dialog">
+  const pendingDiff: [string, string, string][] = [];
+  if (pending?.prefill) {
+    const pf = pending.prefill;
+    if (pf.ownerOrgId && pf.ownerOrgId !== w.ownerOrgId && creatableOrgs.some((o) => o.id === pf.ownerOrgId))
+      pendingDiff.push(['الجهة', orgName(w.ownerOrgId), orgName(pf.ownerOrgId)]);
+    const nextRes = pf.resourceIds ?? [];
+    if (nextRes.join(',') !== w.resourceIds.join(','))
+      pendingDiff.push(['الموارد', w.resourceIds.map(resourceLabel).join('، ') || '—', nextRes.map(resourceLabel).join('، ') || '—']);
+    const nextPeriod = (pf.start ?? '') + ' ← ' + (pf.permanent ? 'مفتوحة' : pf.end ?? '');
+    const curPeriod = w.start + ' ← ' + (w.permanent ? 'مفتوحة' : w.end);
+    if (nextPeriod !== curPeriod) pendingDiff.push(['الفترة', curPeriod, nextPeriod]);
+  }
+  const applyPending = () => {
+    const pf = pending?.prefill;
+    if (pf) {
+      setCheck(null);
+      set({
+        ownerOrgId: pf.ownerOrgId && creatableOrgs.some((o) => o.id === pf.ownerOrgId) ? pf.ownerOrgId : w.ownerOrgId,
+        resourceIds: pf.resourceIds?.length ? pf.resourceIds : w.resourceIds,
+        unit: pf.unit ?? w.unit,
+        start: pf.start ?? w.start,
+        end: pf.permanent ? '' : pf.end ?? w.end,
+        permanent: !!pf.permanent,
+      });
+    }
+    setPending(null);
+  };
+  const banner = pending && (
+    <div className="note orange selection-change" role="alertdialog" aria-label="تغيير الاختيار من الخريطة">
+      <b>تغيّر اختيارك على الخريطة. أثره على هذه المسودة غير المحفوظة:</b>
+      {pendingDiff.length ? (
+        <ul>
+          {pendingDiff.map(([k, a, b]) => (
+            <li key={k}>
+              {k}: {a} ← <b>{b}</b>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>لا فرق عن المسودة الحالية.</p>
+      )}
+      <div className="flex">
+        <button className="button compact primary" onClick={applyPending} disabled={!pendingDiff.length}>
+          تطبيق على المسودة
+        </button>
+        <button className="button compact" onClick={() => setPending(null)}>
+          إبقاء المسودة كما هي
+        </button>
+      </div>
+    </div>
+  );
+
+  const drawer = request.layout === 'drawer' && !expanded;
+  if (drawer && minimized)
+    return (
+      <div className="request-drawer minimized" role="region" aria-label="طلب قيد الإعداد">
+        <span>
+          <b>طلب قيد الإعداد</b>
+          <small>
+            {w.resourceIds.map(resourceLabel).join('، ') || 'دون موارد'} · {w.start} ← {w.permanent ? 'مفتوحة' : w.end}
+          </small>
+        </span>
+        <button className="button compact primary" onClick={() => setMinimized(false)}>
+          متابعة الطلب
+        </button>
+      </div>
+    );
+
+  const body = (
+    <>
       <div className="dialog-head">
         <div>
           <span className="eyebrow">NEW / ADMINISTRATIVE REQUEST</span>
           <h2>{w.requestId && w.status !== 'DRAFT' ? 'تعديل وإعادة تقديم' : w.requestId ? 'استكمال مسودة' : 'طلب إداري جديد'}</h2>
           <small>{w.requestId ? 'مراجعة ' + w.revision + ' · تحفظ في قاعدة بيانات الخادم' : 'يحفظ في قاعدة بيانات الخادم عند المسودة أو الإرسال'}</small>
         </div>
-        <button className="icon-button" onClick={onClose} aria-label="إغلاق الطلب">
-          <Icon name="close" />
-        </button>
+        <span className="drawer-buttons">
+          {request.layout === 'drawer' && (
+            <>
+              <button className="button compact ghost" onClick={() => (setExpanded((v) => !v), setMinimized(false))}>
+                {expanded ? 'عرض بجوار الخريطة' : 'توسيع النموذج'}
+              </button>
+              {!expanded && (
+                <button className="button compact ghost" onClick={() => setMinimized(true)}>
+                  تصغير والعودة للخريطة
+                </button>
+              )}
+            </>
+          )}
+          <button className="icon-button" onClick={onClose} aria-label="إغلاق الطلب دون حفظ">
+            <Icon name="close" />
+          </button>
+        </span>
       </div>
+      {banner}
       <div className="wizard-steps">
         {STEPS.map((n, i) => (
           <div key={n} className={'wizard-step ' + (step === i + 1 ? 'active' : step > i + 1 ? 'done' : '')}>
@@ -714,6 +830,17 @@ export function RequestWizard({ request, onClose }: { request: WizardRequest | n
           {busy ? 'جارٍ الحفظ…' : step === 4 ? 'إرسال الطلب' : 'التالي ←'}
         </button>
       </div>
+    </>
+  );
+  if (drawer)
+    return (
+      <aside className="request-drawer" role="dialog" aria-modal="false" aria-label="طلب إداري من الخريطة">
+        {body}
+      </aside>
+    );
+  return (
+    <Dialog open onClose={onClose} className="large-dialog">
+      {body}
     </Dialog>
   );
 }

@@ -14,7 +14,7 @@ mkdir -p "$OUT/images"
 # Build only: the directory settings are required at run time, not to build images.
 LDAP_URL="${LDAP_URL:-build-only}" LDAP_BIND_DN="${LDAP_BIND_DN:-build-only}" LDAP_BIND_CREDENTIAL="${LDAP_BIND_CREDENTIAL:-build-only}" \
   LDAP_USERS_DN="${LDAP_USERS_DN:-build-only}" docker compose build backend web keycloak
-IMAGES="mover/backend:1.0.0 mover/web:1.0.0 tmrkz/keycloak:26.7.5-1 postgres:17.11-alpine"
+IMAGES="mover/backend:1.0.0 mover/web:1.0.0 tmrkz/keycloak:26.7.5-1 postgis/postgis:17-3.5-alpine"
 for img in $IMAGES; do
   file="$OUT/images/$(echo "$img" | tr '/:' '__').tar"
   echo "[bundle] saving $img"

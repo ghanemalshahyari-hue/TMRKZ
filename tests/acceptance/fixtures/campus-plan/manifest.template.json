@@ -1,0 +1,16 @@
+{
+  "code": "campus-plan-test",
+  "name": "مخطط المرفق — بيئة القبول",
+  "version": "2026.10-test",
+  "dataDate": "2026-10-29",
+  "source": "رسم توضيحي لبيئة القبول (tests/acceptance/fixtures/campus-plan)",
+  "license": "CC0-1.0 — بيانات اختبار افتراضية",
+  "attributionHtml": "مخطط افتراضي لبيئة القبول",
+  "crs": "EPSG:4326 (WGS 84 lon/lat) — overlay georeferenced by corner bounds",
+  "kind": "FACILITY_PLAN",
+  "minZoom": 14,
+  "maxZoom": 19,
+  "coverage": { "minLat": 25.170, "minLng": 55.290, "maxLat": 25.215, "maxLng": 55.345 },
+  "note": "Fictional plan for the acceptance environment only; it does not describe any real site.",
+  "files": [ { "role": "overlay", "format": "SVG_OVERLAY", "path": "plan.svg", "sha256": "__SHA256__" } ]
+}

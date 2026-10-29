@@ -116,10 +116,10 @@ class AdministrationAcceptanceIT extends IntegrationTest {
     void mapCoverage() {
         Api req = login("req");
         JsonNode inside = req.get("/map/features?bbox=55.25,25.15,55.40,25.25").body();
-        assertThat(inside.path("coverage").path("covered").asBoolean()).isTrue();
+        assertThat(inside.path("coverage").path("status").asText()).isEqualTo("FULL");
         JsonNode outside = req.get("/map/features?bbox=46.5,24.5,46.9,24.9").body();
-        assertThat(outside.path("coverage").path("covered").asBoolean()).isFalse();
-        assertThat(outside.path("coverage").path("message").asText()).contains("خارج حزم الخرائط المثبتة");
+        assertThat(outside.path("coverage").path("status").asText()).isEqualTo("NONE");
+        assertThat(outside.path("coverage").path("message").asText()).contains("خارج تغطية");
         JsonNode packages = req.get("/map/packages").body();
         assertThat(packages.size()).isGreaterThanOrEqualTo(1);
         assertThat(packages.get(0).path("license").asText()).isNotBlank();

@@ -8,7 +8,9 @@ Verify licences of the exact installed versions before production approval.
 
 | Component | Version | Licence | Use |
 |---|---|---|---|
-| PostgreSQL (image `postgres:17.11-alpine`) | 17.11 | PostgreSQL Licence | Database; `btree_gist` contrib extension |
+| PostgreSQL (image `postgis/postgis:17-3.5-alpine`) | 17.11 | PostgreSQL Licence | Database; `btree_gist` contrib extension |
+| PostGIS (same image) | 3.5.7 | GPL-2.0-or-later (a separate database extension; TMRKZ calls it through SQL) | Site boundaries, spatial index, validity, transformation |
+| GEOS / PROJ (same image) | 3.14.1 / 9.8.1 | LGPL-2.1 / MIT | Geometry operations; coordinate transformations (network disabled) |
 | Eclipse Temurin JRE (image) | 25.0.1_8 | GPL-2.0 with Classpath Exception | Java runtime |
 | nginx (image `nginx:1.28.3-alpine`) | 1.28.3 | BSD-2-Clause | Web entry point and reverse proxy |
 | Alpine Linux (base layers) | 3.2x | Various (mostly MIT/GPL) | Container base |
@@ -27,6 +29,8 @@ Verify licences of the exact installed versions before production approval.
 | Spring Security Crypto | 7.0.8 | Apache-2.0 | BCrypt password hashing |
 | React / React DOM | 19.3.1 | MIT | User interface |
 | Leaflet | 1.9.4 | BSD-2-Clause (`assets/leaflet-license.txt`) | Map rendering |
+| Leaflet-Geoman Free `@geoman-io/leaflet-geoman-free` | 2.20.2 | MIT | Drawing and vertex editing of site boundaries (free features only; loaded on demand) |
+| Geoman dependencies: lodash, @turf/* (7.4.0), polyclip-ts, splaytree-ts, robust-predicates, tinyqueue, quickselect, tslib | see SBOM | MIT; splaytree-ts BSD-3-Clause; robust-predicates Unlicense; tinyqueue/quickselect ISC; tslib 0BSD | Geometry helpers used by Geoman |
 | Noto Sans Arabic | — | SIL OFL 1.1 (`FONT-LICENSE.txt`) | Arabic typeface, served locally |
 | Regional basemap (`map-packages/regional-basemap-2026.10`) | 2026.10 | ODbL 1.0 — © OpenStreetMap contributors, OpenMapTiles, OpenFreeMap | Illustrative background; attribution shown on the map |
 
@@ -40,6 +44,7 @@ Verify licences of the exact installed versions before production approval.
 | TypeScript | 5.9.3 | Apache-2.0 |
 | Vitest | 3.2.7 | MIT |
 | JUnit 5, AssertJ (tests) | via Spring Boot BOM | EPL-2.0 / Apache-2.0 |
+| playwright-core (browser acceptance tests, `tests/acceptance`) | 1.64.1 | Apache-2.0 — drives the locally installed Microsoft Edge; no browser download |
 
 ## Data and content
 

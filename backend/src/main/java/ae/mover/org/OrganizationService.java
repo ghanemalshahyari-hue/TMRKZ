@@ -144,13 +144,135 @@ public class OrganizationService {
         return ids;
     }
 
-    public List<OrgNode> children(AccessContext ctx, UUID id) {
+    // ---- lazy tree for the map workspace ----------------------------------------------------------------------
+
+    /** One node of the lazily loaded organisation tree: no members, no people, only counts and the path. */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    public record OrgBranch(String id, String code, String name, String parentId, int childCount, int siteCount, List<Ref> path) {
+    }
+
+    private static void requireOrgReader(AccessContext ctx) {
         ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_ACCESS, Permission.MANAGE_FACILITIES, Permission.CONFIGURE);
+    }
+
+    /** Top of the visible tree: organisations whose parent is not visible to the actor. */
+    public List<OrgBranch> roots(AccessContext ctx) {
+        requireOrgReader(ctx);
         Set<UUID> visible = visibleOrgs(ctx);
-        return jdbc.sql("select id, code, name, parent_id, status from organization where parent_id = :id order by code")
-                .param("id", id).query((rs, n) -> new OrgNode(rs.getString("id"), rs.getString("code"), rs.getString("name"),
-                        rs.getString("parent_id"), rs.getString("status"), List.of(), 0, 0)).list()
-                .stream().filter(o -> visible == null || visible.contains(UUID.fromString(o.id()))).toList();
+        List<Map<String, Object>> rows = jdbc.sql("""
+                select o.id, o.code, o.name, o.parent_id from organization o where o.status = 'ACTIVE'
+                  and (o.parent_id is null or :all or o.id = any(string_to_array(:ids, ',')::uuid[]))
+                order by o.code""").param("all", visible == null).param("ids", visible == null ? "" : Db.ids(visible))
+                .query().listOfRows();
+        List<UUID> roots = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            UUID id = (UUID) r.get("id");
+            UUID parent = (UUID) r.get("parent_id");
+            boolean visibleSelf = visible == null || visible.contains(id);
+            boolean parentVisible = parent != null && (visible == null || visible.contains(parent));
+            if (visibleSelf && !parentVisible && (visible != null || parent == null)) {
+                roots.add(id);
+            }
+        }
+        return branches(roots, visible, false);
+    }
+
+    /** Children of one visible organisation (lazy), with child and site counts. */
+    public List<OrgBranch> branchChildren(AccessContext ctx, UUID id) {
+        requireOrgReader(ctx);
+        Set<UUID> visible = visibleOrgs(ctx);
+        if (visible != null && !visible.contains(id)) {
+            throw ApiException.notFound();
+        }
+        List<UUID> kids = jdbc.sql("select id from organization where parent_id = :id and status = 'ACTIVE' order by code")
+                .param("id", id).query(UUID.class).list().stream().filter(k -> visible == null || visible.contains(k)).toList();
+        return branches(kids, visible, false);
+    }
+
+    /** Search across the whole permitted tree (not only expanded branches); each match carries its path. */
+    public List<OrgBranch> search(AccessContext ctx, String q) {
+        requireOrgReader(ctx);
+        String term = q == null ? "" : q.trim();
+        if (term.length() < 2) {
+            return List.of();
+        }
+        Set<UUID> visible = visibleOrgs(ctx);
+        List<UUID> hits = jdbc.sql("""
+                select id from organization where status = 'ACTIVE' and (name ilike :t or code ilike :t)
+                  and (:all or id = any(string_to_array(:ids, ',')::uuid[]))
+                order by length(name), name limit 30""")
+                .param("t", "%" + term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%")
+                .param("all", visible == null).param("ids", visible == null ? "" : Db.ids(visible)).query(UUID.class).list();
+        return branches(hits, visible, true);
+    }
+
+    /**
+     * The organisation and, when asked, its visible descendants — for filtering facilities by responsibility or use.
+     * An organisation outside the actor's tree gives the same answer as one that does not exist.
+     */
+    public Set<UUID> requireVisibleBranch(AccessContext ctx, UUID id, boolean includeDescendants) {
+        Set<UUID> visible = visibleOrgs(ctx);
+        boolean exists = jdbc.sql("select count(*) from organization where id = :id").param("id", id).query(Integer.class).single() > 0;
+        if (!exists || (visible != null && !visible.contains(id))) {
+            throw ApiException.notFound();
+        }
+        if (!includeDescendants) {
+            return Set.of(id);
+        }
+        Set<UUID> out = new java.util.HashSet<>(jdbc.sql("""
+                with recursive down(id) as (select id from organization where id = :id
+                  union all select o.id from organization o join down on o.parent_id = down.id)
+                select id from down""").param("id", id).query(UUID.class).list());
+        if (visible != null) {
+            out.retainAll(visible);
+        }
+        return out;
+    }
+
+    private List<OrgBranch> branches(List<UUID> ids, Set<UUID> visible, boolean withPath) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        String csv = Db.ids(ids);
+        Map<UUID, Integer> kids = new HashMap<>();
+        jdbc.sql("""
+                select parent_id, id from organization where status = 'ACTIVE' and parent_id = any(string_to_array(:ids, ',')::uuid[])""")
+                .param("ids", csv).query((rs, n) -> {
+                    UUID child = Db.uuid(rs, "id");
+                    if (visible == null || visible.contains(child)) {
+                        kids.merge(Db.uuid(rs, "parent_id"), 1, Integer::sum);
+                    }
+                    return null;
+                }).list();
+        Map<UUID, Integer> sitesBy = new HashMap<>();
+        jdbc.sql("""
+                select organization_id, count(*) as n from site_responsibility
+                where valid_to is null and organization_id = any(string_to_array(:ids, ',')::uuid[]) group by organization_id""")
+                .param("ids", csv).query((rs, n) -> sitesBy.put(Db.uuid(rs, "organization_id"), rs.getInt("n"))).list();
+        Map<UUID, Map<String, Object>> rows = new HashMap<>();
+        jdbc.sql("select id, code, name, parent_id from organization where id = any(string_to_array(:ids, ',')::uuid[])")
+                .param("ids", csv).query().listOfRows().forEach(r -> rows.put((UUID) r.get("id"), r));
+        List<OrgBranch> out = new ArrayList<>();
+        for (UUID id : ids) {
+            Map<String, Object> r = rows.get(id);
+            List<Ref> path = null;
+            if (withPath) {
+                path = new ArrayList<>();
+                for (Map<String, Object> a : jdbc.sql("""
+                        with recursive up(id, name, parent_id, depth) as (
+                          select id, name, parent_id, 0 from organization where id = :id
+                          union all select o.id, o.name, o.parent_id, up.depth + 1 from organization o join up on o.id = up.parent_id)
+                        select id, name from up where depth > 0 order by depth desc""").param("id", id).query().listOfRows()) {
+                    if (visible == null || visible.contains((UUID) a.get("id"))) {
+                        path.add(Ref.of((UUID) a.get("id"), (String) a.get("name")));
+                    }
+                }
+            }
+            out.add(new OrgBranch(id.toString(), (String) r.get("code"), (String) r.get("name"),
+                    r.get("parent_id") == null ? null : r.get("parent_id").toString(), kids.getOrDefault(id, 0),
+                    sitesBy.getOrDefault(id, 0), path));
+        }
+        return out;
     }
 
     public OrgDetail detail(AccessContext ctx, UUID id) {

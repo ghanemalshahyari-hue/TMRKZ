@@ -28,6 +28,9 @@ if [ -n "$(docker volume ls -q --filter name="^${PROJECT}_db-data$")" ]; then
 fi
 
 dc up -d db
+# A clean volume is initialised first (the PostGIS image runs its init scripts on a temporary server, then restarts):
+# wait for the end of initialisation, not only for the first accepted connection.
+until dc logs db 2>/dev/null | grep -q "PostgreSQL init process complete"; do sleep 2; done
 until dc exec -T db pg_isready -U mover -d mover >/dev/null 2>&1; do sleep 2; done
 sleep 2
 echo "[restore] database"

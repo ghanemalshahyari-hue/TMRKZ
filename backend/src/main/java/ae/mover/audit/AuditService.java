@@ -106,5 +106,15 @@ public class AuditService {
             Map.entry("ORG_IMPORT_PREVIEWED", "معاينة استيراد الهيكل"),
             Map.entry("ORG_IMPORT_COMMITTED", "اعتماد استيراد الهيكل"),
             Map.entry("MAP_PACKAGE_INSTALLED", "تثبيت حزمة خرائط"),
+            Map.entry("MAP_PACKAGE_UPLOADED", "رفع حزمة خرائط للمراجعة"),
+            Map.entry("MAP_PACKAGE_ACTIVATED", "تفعيل حزمة خرائط"),
+            Map.entry("MAP_PACKAGE_DISABLED", "تعطيل حزمة خرائط"),
+            Map.entry("MAP_PACKAGE_REJECTED", "رفض حزمة خرائط"),
+            Map.entry("SITE_BOUNDARY_PUBLISHED", "نشر إصدار حدود موقع"),
+            Map.entry("MAP_IMPORT_PREVIEWED", "معاينة استيراد حدود"),
+            Map.entry("MAP_IMPORT_REJECTED", "رفض ملف حدود"),
+            Map.entry("MAP_IMPORT_PUBLISHED", "نشر حدود مستوردة"),
+            Map.entry("MAP_IMPORT_CANCELLED", "إلغاء استيراد حدود"),
+            Map.entry("MAP_BOUNDARIES_EXPORTED", "تصدير حدود المواقع"),
             Map.entry("DEMO_DATA_SEEDED", "تهيئة بيانات تجريبية"));
 }

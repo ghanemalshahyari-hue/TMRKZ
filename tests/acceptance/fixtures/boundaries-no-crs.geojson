@@ -1,0 +1,7 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "site_code": "04" },
+      "geometry": { "type": "Polygon", "coordinates": [[[55.2823, 25.1885], [55.2838, 25.1885], [55.2838, 25.1896], [55.2823, 25.1896], [55.2823, 25.1885]]] } }
+  ]
+}

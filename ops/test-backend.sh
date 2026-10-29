@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Runs the backend acceptance suite against a throw-away PostgreSQL container (no JDK needed on the host).
+# Runs the backend acceptance suite against a throw-away PostgreSQL + PostGIS container (no JDK needed on the host).
 # Usage: ops/test-backend.sh
 set -eu
 export MSYS_NO_PATHCONV=1
@@ -9,7 +9,7 @@ PG=mover-test-pg
 docker network create "$NET" >/dev/null 2>&1 || true
 docker rm -f "$PG" >/dev/null 2>&1 || true
 docker run -d --name "$PG" --network "$NET" -e POSTGRES_DB=mover_test -e POSTGRES_USER=mover -e POSTGRES_PASSWORD=devpass \
-  postgres:17.11-alpine >/dev/null
+  postgis/postgis:17-3.5-alpine >/dev/null
 until docker exec "$PG" pg_isready -U mover -d mover_test >/dev/null 2>&1; do sleep 1; done
 sleep 2
 status=0

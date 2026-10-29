@@ -1,0 +1,13 @@
+# Acceptance environment ONLY: the same stack with no route to the internet (MAP-18 / PA-27). Every service stays on
+# the internal network, which is made internal-only; the web entry point alone is also attached to a published network.
+# This shows that the journey needs nothing outside the stack. It is not proof of host isolation in production:
+# docs/INSTALL_AIRGAPPED.md describes the host egress controls. Used by ops/test-env/up-offline.sh.
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  edge:
+    driver: bridge
+services:
+  web:
+    networks: [internal, edge]

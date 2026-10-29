@@ -3,6 +3,7 @@ package ae.mover.requests;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.ContentDisposition;
@@ -80,6 +81,11 @@ public class RequestController {
     @GetMapping("/requests/{id}")
     public RequestViews.RequestDetail detail(Actor actor, @PathVariable UUID id) {
         return views.detail(access.context(actor), id);
+    }
+
+    @GetMapping("/requests/{id}/boundaries")
+    public Map<String, Object> boundaries(Actor actor, @PathVariable UUID id, @RequestParam(required = false) Integer revision) {
+        return views.boundaries(access.context(actor), id, revision);
     }
 
     @PatchMapping("/requests/{id}/draft")

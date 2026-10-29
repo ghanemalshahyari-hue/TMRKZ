@@ -5,8 +5,10 @@
 name: tmrkz-mover
 
 services:
+  # PostgreSQL 17.11 with PostGIS 3.5 (site boundaries, ADR-017). Same major version and data directory format as the
+  # earlier postgres:17.11-alpine image, so an existing volume is upgraded in place by the V8 migration.
   db:
-    image: postgres:17.11-alpine
+    image: postgis/postgis:17-3.5-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: mover
@@ -68,7 +70,7 @@ services:
 
   # One-shot: the identity provider's own database and role in the same PostgreSQL server (separate owner).
   db-init:
-    image: postgres:17.11-alpine
+    image: postgis/postgis:17-3.5-alpine
     restart: "no"
     depends_on:
       db:

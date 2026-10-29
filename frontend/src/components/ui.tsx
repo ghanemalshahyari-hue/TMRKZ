@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { Component, useEffect, useRef, type ErrorInfo, type ReactNode } from 'react';
 import { ICONS } from '../icons';
 import { STATUS } from '../lib/labels';
 import type { RequestStatus } from '../api/types';
@@ -163,4 +163,31 @@ export function download(name: string, data: string, type = 'application/json') 
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(u), 700);
+}
+
+/** Keeps a failure inside one screen: the rest of the workspace stays usable and nothing is silently retried. */
+export class ScreenBoundary extends Component<{ children: ReactNode; resetKey: string }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('screen error', error, info.componentStack);
+  }
+  componentDidUpdate(prev: { resetKey: string }) {
+    if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null });
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <section className="card padding" role="alert">
+        <h2>تعذر عرض هذه الشاشة</h2>
+        <p className="micro muted">لم يُحفظ أي إجراء جزئي. أعد تحميل الصفحة؛ إن تكرر الخطأ فأبلغ الدعم الفني مع الوقت.</p>
+        <p className="micro latin">{this.state.error.message}</p>
+        <button className="button" onClick={() => window.location.reload()}>
+          إعادة تحميل الصفحة
+        </button>
+      </section>
+    );
+  }
 }

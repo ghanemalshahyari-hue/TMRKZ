@@ -6,8 +6,9 @@
 sh ops/airgap-bundle.sh            # → offline-bundle/mover-1.0.0/
 ```
 
-The bundle contains the three runtime images saved with `docker save` (`mover/backend:1.0.0`, `mover/web:1.0.0`,
-`postgres:17.11-alpine`) with their image IDs, `docker-compose.yml`, `.env.example`, operational scripts, the local
+The bundle contains the runtime images saved with `docker save` (`mover/backend:1.0.0`, `mover/web:1.0.0`,
+`tmrkz/keycloak:26.7.5-1`, `postgis/postgis:17-3.5-alpine` — PostgreSQL 17.11 with PostGIS 3.5, GEOS and PROJ, whose
+coordinate transformations run locally with network access disabled) with their image IDs, `docker-compose.yml`, `.env.example`, operational scripts, the local
 map packages, all documentation, and a `SHA256SUMS` manifest. Build-only images (Maven, Node) are not needed in the
 isolated network. Transfer the directory through the organisation's approved media/transfer process.
 
@@ -54,6 +55,10 @@ Synchronise host clocks with the internal time source; containers inherit the ho
 
 ## 6. Map packages
 
-Place additional packages under `map-packages/<name>/` with a `manifest.json` (source, licence, attribution,
-coverage, CRS, version, data date, files with SHA-256) and rebuild/restart the backend image, or mount the directory at
-`/opt/mover/map-packages`. Packages whose checksums do not match are refused and logged.
+Built-in packages are under `map-packages/<name>/` with a `manifest.json` (source, licence, attribution, coverage,
+zoom range, kind, CRS, version, data date, files with SHA-256); rebuild/restart the backend image to add one, or mount
+the directory at `/opt/mover/map-packages`. Packages whose checksums do not match are refused and logged.
+
+Normally an authorised map manager uploads packages from the map («مدير الخرائط»): they are checked, wait for review,
+can be previewed, and are activated or disabled with a recorded reason (`docs/OPERATIONS.md`). Nothing is downloaded by
+the server; there is no network source to configure. Aerial imagery appears only when a licensed package is installed.

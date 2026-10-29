@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import ae.mover.common.Json;
-import ae.mover.facilities.MapService;
+import ae.mover.facilities.MapPackageService;
 import ae.mover.forms.FormService;
 import ae.mover.policy.PolicyService;
 import ae.mover.workflow.WorkflowService;
@@ -35,10 +35,10 @@ public class Bootstrap implements ApplicationRunner {
     private final PolicyService policies;
     private final FormService forms;
     private final WorkflowService workflows;
-    private final MapService maps;
+    private final MapPackageService maps;
 
     public Bootstrap(JdbcClient jdbc, Json json, TransactionTemplate tx, PolicyService policies,
-                     FormService forms, WorkflowService workflows, MapService maps) {
+                     FormService forms, WorkflowService workflows, MapPackageService maps) {
         this.jdbc = jdbc;
         this.json = json;
         this.tx = tx;
@@ -55,7 +55,7 @@ public class Bootstrap implements ApplicationRunner {
             seedRoles();
             seedRequestTypes();
         });
-        maps.installLocalPackages();
+        maps.installBuiltin();
     }
 
     // ---- baseline configuration -----------------------------------------------------------------------

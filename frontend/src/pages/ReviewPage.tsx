@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
-import type { MapFeature, RequestDetail, RequestListItem } from '../api/types';
+import type { MapFeature, RequestBoundaries, RequestDetail, RequestListItem } from '../api/types';
 import { DecisionDialog, type DecisionTarget } from '../components/DecisionDialog';
-import { MapView, type MapMode } from '../components/MapView';
+import { StaticMap } from '../components/map/StaticMap';
 import { RequestDocument } from '../components/RequestDocument';
 import { Heading, StatusPill } from '../components/ui';
 import { useApp } from '../lib/app';
@@ -14,7 +14,7 @@ export function ReviewPage() {
   const [list, setList] = useState<RequestListItem[] | null>(null);
   const [detail, setDetail] = useState<RequestDetail | null>(null);
   const [features, setFeatures] = useState<MapFeature[]>([]);
-  const [mode, setMode] = useState<MapMode>('availability');
+  const [pinned, setPinned] = useState<RequestBoundaries | null>(null);
   const [decision, setDecision] = useState<DecisionTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,15 +42,36 @@ export function ReviewPage() {
     };
   }, [current?.id, revision]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // map of the request's facilities on its start day (prototype sets mapDate from the request)
+  // the request's sites for its period, drawn with the boundary versions recorded in the revision under review
   useEffect(() => {
     if (!detail) return;
-    const siteIds = new Set(detail.resources.map((x) => x.siteId));
-    api
-      .mapFeatures(detail.period.start)
-      .then((d) => setFeatures(d.features.filter((f) => siteIds.has(f.siteId))))
-      .catch(() => setFeatures([]));
+    let live = true;
+    const siteIds = [...new Set(detail.resources.map((x) => x.siteId))];
+    Promise.all([
+      api.mapFeatures({ siteIds: siteIds.join(','), from: detail.period.start, to: detail.period.end, open: detail.period.end === null }).catch(() => null),
+      api.requestBoundaries(detail.id).catch(() => null),
+    ]).then(([d, b]) => {
+      if (!live) return;
+      setPinned(b);
+      const byId = new Map((b?.boundaries ?? []).map((x) => [x.siteId, x]));
+      setFeatures(
+        (d?.features ?? []).map((f) => {
+          const p = byId.get(f.siteId);
+          if (!p || !b?.pinned) return f;
+          const registered = p.type === 'Polygon' || p.type === 'MultiPolygon';
+          return {
+            ...f,
+            boundary: registered && p.geojson && p.version != null ? { version: p.version, type: p.type as 'Polygon', geojson: p.geojson, simplified: false } : null,
+            boundaryStatus: registered ? 'REGISTERED' : 'NOT_REGISTERED',
+          };
+        }),
+      );
+    });
+    return () => {
+      live = false;
+    };
   }, [detail]);
+  const changed = (pinned?.boundaries ?? []).filter((b) => b.version != null && b.currentVersion != null && b.currentVersion !== b.version);
 
   const submitted = list?.filter((r) => r.status === 'SUBMITTED').length ?? 0;
 
@@ -100,14 +121,32 @@ export function ReviewPage() {
                   onChanged={(r) => r && setDetail(r)}
                 />
               </article>
-              <MapView
+              <StaticMap
                 className="document-map"
                 features={features}
                 selectedSiteId={detail.resources[0]?.siteId ?? null}
                 onSelect={(id) => app.toast((features.find((f) => f.siteId === id)?.name ?? '') + ' · مرفق وارد في الطلب')}
-                mode={mode}
-                onModeChange={setMode}
+                label="مواقع الطلب بحدودها المسجلة في المراجعة"
+                caption={pinned ? (pinned.pinned ? 'الحدود كما في المراجعة ' + pinned.revision : 'الحدود الحالية — تُثبَّت عند الإرسال') : undefined}
               />
+              {pinned && (
+                <section className="card padding pinned-boundaries" aria-label="نسخ الحدود في الطلب">
+                  <h3>نسخ الحدود {pinned.pinned ? 'المسجلة في المراجعة ' + pinned.revision : 'الحالية (مسودة)'}</h3>
+                  <ul>
+                    {pinned.boundaries.map((b) => (
+                      <li key={b.siteId}>
+                        <b>{b.siteName}</b> —{' '}
+                        {b.type === 'Polygon' || b.type === 'MultiPolygon' ? 'الإصدار ' + b.version : 'حدود غير مسجلة وقت الإرسال'}
+                        {b.currentVersion != null && b.version != null && b.currentVersion !== b.version && (
+                          <span className="pill orange">عُدّلت حدود السجل لاحقاً (الإصدار الحالي {b.currentVersion}) — الطلب يبقى على نسخته</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  {!pinned.recorded && <p className="micro muted">هذه المراجعة سابقة لتسجيل نسخ الحدود.</p>}
+                  {changed.length > 0 && <p className="micro muted">المستند والقرار يعتمدان النسخة المسجلة في المراجعة، لا الإصدار الأحدث.</p>}
+                </section>
+              )}
             </>
           ) : (
             <section className="card empty">{list === null ? 'جارٍ التحميل…' : 'لا توجد طلبات ضمن النطاق'}</section>

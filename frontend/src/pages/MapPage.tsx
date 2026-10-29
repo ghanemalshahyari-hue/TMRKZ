@@ -1,202 +1,590 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
-import type { MapFeatures, ReservationItem, Availability } from '../api/types';
-import { MapView, featureColor, type MapMode } from '../components/MapView';
-import { Heading, Icon, Pill, Stat } from '../components/ui';
-import { facilitySites, useApp } from '../lib/app';
-import { AVAILABILITY } from '../lib/labels';
-import { addDays, dubaiISO, fullDate } from '../lib/dates';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type L from 'leaflet';
+import { api, isAbort, urls, type ApiError } from '../api/client';
+import type { ImportJob, MapContext, MapFeature, MapFeatures, MapPackage, SiteDetail } from '../api/types';
+import { BoundaryEditor } from '../components/map/BoundaryEditor';
+import { OrgTree, SiteTree } from '../components/map/BrowseTrees';
+import { ImportDialog, PackageManager } from '../components/map/MapAdmin';
+import { MapCanvas, featureBounds, type FitTarget, type Viewport } from '../components/map/MapCanvas';
+import { BackgroundPanel, CoverageNote, LayersPanel, Legend } from '../components/map/MapPanels';
+import { SiteDetailPanel, type SiteAction } from '../components/map/SiteDetailPanel';
+import { useApp } from '../lib/app';
+import { fullDate, fullTime } from '../lib/dates';
+import {
+  AVAILABILITY_STYLE,
+  DEFAULT_LAYERS,
+  defaultPeriod,
+  loadMapContext,
+  periodQuery,
+  saveMapContext,
+  switchPeriodMode,
+  type LayerSettings,
+  type MapMode,
+  type MapPeriod,
+  type SavedMapContext,
+} from '../lib/mapState';
 
+type OrgFilter = { id: string; name: string; includeSub: boolean };
+
+function periodSummary(p: MapPeriod): string {
+  const q = periodQuery(p);
+  if (!q) return 'فترة غير مكتملة';
+  if (p.mode === 'OPEN') return 'من ' + fullTime(q.from) + ' — مفتوحة المدة';
+  return (p.mode === 'HOURS' ? fullTime(q.from) + ' ← ' + fullTime(q.to) : fullDate(q.from) + ' ← ' + fullDate(q.to) + ' (غير مشمول)');
+}
+
+/**
+ * The map is the workspace: choose an organisation or a site, a period and resources, read availability, and start a
+ * request in a drawer without losing the selection. Every layer comes from the server for the current viewport and
+ * period; a failed refresh shows a neutral state instead of the previous answer.
+ */
 export function MapPage() {
   const app = useApp();
-  const { sites, mapDate, setMapDate, selectedSiteId, setSelectedSiteId, summaryOnly, revision } = app;
+  const { me, selectedSiteId, setSelectedSiteId, revision, requestTypes, can } = app;
+  const saved = useRef<SavedMapContext>(loadMapContext(me.id));
+  const [ctx, setCtx] = useState<MapContext | null>(null);
+  const [ctxError, setCtxError] = useState<string | null>(null);
+  const [org, setOrg] = useState<OrgFilter | null>(saved.current.org ?? null);
+  const [period, setPeriod] = useState<MapPeriod>(() => saved.current.period ?? defaultPeriod());
+  const [mode, setMode] = useState<MapMode>(saved.current.mode ?? 'availability');
+  const [layers, setLayers] = useState<LayerSettings>(() => ({ ...DEFAULT_LAYERS, ...(saved.current.layers ?? {}) }));
+  const [tab, setTab] = useState<'orgs' | 'sites'>(saved.current.tab ?? 'sites');
+  const [toolsCollapsed, setToolsCollapsed] = useState(saved.current.toolsCollapsed ?? false);
+  const [statsOpen, setStatsOpen] = useState(false);
+  const [viewport, setViewport] = useState<Viewport | null>(null);
   const [data, setData] = useState<MapFeatures | null>(null);
-  const [reservations, setReservations] = useState<ReservationItem[]>([]);
-  const [mode, setMode] = useState<MapMode>('availability');
-  const [orgFilter, setOrgFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | Availability>('all');
-  const [query, setQuery] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [stale, setStale] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [background, setBackground] = useState<MapPackage | null>(null);
+  const [previewPkg, setPreviewPkg] = useState<MapPackage | null>(null);
+  const [panel, setPanel] = useState<'bg' | 'layers' | null>(null);
+  const [site, setSite] = useState<SiteDetail | null>(null);
+  const [siteFeature, setSiteFeature] = useState<MapFeature | null>(null);
+  const [siteLoading, setSiteLoading] = useState(false);
+  const [siteError, setSiteError] = useState<string | null>(null);
+  const [resources, setResources] = useState<string[]>([]);
+  const [fit, setFit] = useState<FitTarget | null>(null);
+  const [reveal, setReveal] = useState<{ ids: string[]; key: number } | null>(null);
+  const [map, setMap] = useState<L.Map | null>(null);
+  /** The site whose record is being edited; fixed when the editor opens, whatever is selected afterwards. */
+  const [editingSite, setEditingSite] = useState<SiteDetail | null>(null);
+  const editing = !!editingSite;
+  const [importFor, setImportFor] = useState<{ id: string; name: string } | null | false>(false);
+  const [packagesOpen, setPackagesOpen] = useState(false);
+  const [localRevision, setLocalRevision] = useState(0);
+  const seq = useRef(0);
+  const revealed = useRef<string | null>(null);
+  const viewRef = useRef<SavedMapContext['view']>(saved.current.view);
 
+  const pq = periodQuery(period);
+
+  // remember the context of this person only (identifiers and view, never data)
+  useEffect(() => {
+    saveMapContext(me.id, {
+      org: org ?? undefined,
+      siteId: selectedSiteId ?? undefined,
+      period,
+      view: viewRef.current,
+      packageId: background?.id ?? null,
+      layers,
+      mode,
+      tab,
+      toolsCollapsed,
+    });
+  }, [me.id, org, selectedSiteId, period, background?.id, layers, mode, tab, toolsCollapsed, viewport]);
+
+  // context: extent of what this person may see, installed backgrounds, rights
   useEffect(() => {
     let live = true;
     api
-      .mapFeatures(dubaiISO(mapDate))
-      .then((d) => live && (setData(d), setError(null)))
-      .catch((e: Error) => live && setError(e.message));
-    api
-      .reservations({ status: 'ACTIVE', from: dubaiISO(mapDate), to: dubaiISO(addDays(mapDate, 1)) })
-      .then((r) => live && setReservations(r))
-      .catch(() => live && setReservations([]));
+      .mapContext()
+      .then((c) => {
+        if (!live) return;
+        setCtx(c);
+        setCtxError(null);
+        setBackground((cur) => {
+          if (cur && c.backgrounds.some((b) => b.id === cur.id)) return cur;
+          const wanted = saved.current.packageId;
+          if (wanted === null && saved.current.packageId !== undefined) return null;
+          return c.backgrounds.find((b) => b.id === wanted) ?? c.backgrounds.find((b) => b.kind === 'ROADS') ?? c.backgrounds[0] ?? null;
+        });
+      })
+      .catch((e: Error) => live && setCtxError(e.message));
     return () => {
       live = false;
     };
-  }, [mapDate, revision]);
+  }, [revision, localRevision]);
 
-  const siteById = useMemo(() => new Map(sites.map((s) => [s.id, s])), [sites]);
-  const orgOptions = useMemo(() => {
-    const m = new Map<string, string>();
-    facilitySites(sites).forEach((s) => s.responsibleOrg && m.set(s.responsibleOrg.id, s.responsibleOrg.name));
-    return [...m.entries()];
-  }, [sites]);
+  // restore a saved site selection only if it is still visible
+  useEffect(() => {
+    if (!selectedSiteId && saved.current.siteId) setSelectedSiteId(saved.current.siteId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const features = useMemo(
-    () =>
-      (data?.features ?? []).filter((f) => {
-        const site = siteById.get(f.siteId);
-        if (orgFilter !== 'all' && site?.responsibleOrg?.id !== orgFilter) return false;
-        if (statusFilter !== 'all' && f.availability !== statusFilter) return false;
-        if (query && !(f.name + ' ' + (site?.responsibleOrg?.name ?? '')).includes(query)) return false;
-        return true;
-      }),
-    [data, siteById, orgFilter, statusFilter, query],
+  // viewport layers: debounced by the map, previous request cancelled, late answers ignored
+  useEffect(() => {
+    if (!viewport || !pq) return;
+    const id = ++seq.current;
+    const ctl = new AbortController();
+    setLoading(true);
+    api
+      .mapFeatures(
+        {
+          bbox: viewport.bbox,
+          zoom: Math.round(viewport.zoom * 2) / 2,
+          from: pq.from,
+          to: pq.to,
+          open: pq.open,
+          orgId: org?.id,
+          includeSubOrgs: org ? org.includeSub : undefined,
+          resourceIds: resources.length ? resources.join(',') : undefined,
+          packageId: background?.id,
+        },
+        ctl.signal,
+      )
+      .then((d) => {
+        if (id !== seq.current) return;
+        setData(d);
+        setStale(null);
+        setNotice((d as MapFeatures & { limits?: { message?: string } }).limits?.message ?? null);
+      })
+      .catch((e: ApiError) => {
+        if (isAbort(e) || id !== seq.current) return;
+        if (e.status === 404 && org) {
+          setOrg(null);
+          setNotice('الجهة المختارة لم تعد ضمن نطاقك؛ أزيل مرشح الجهة.');
+          return;
+        }
+        setStale(e.message);
+      })
+      .finally(() => id === seq.current && setLoading(false));
+    return () => ctl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport?.bbox, viewport?.zoom, pq?.from, pq?.to, pq?.open, org?.id, org?.includeSub, resources.join(','), background?.id, revision, localRevision]);
+
+  // the selected site: record, path, and resource states for the period wherever the viewport is
+  useEffect(() => {
+    if (!selectedSiteId) {
+      setSite(null);
+      setSiteFeature(null);
+      return;
+    }
+    let live = true;
+    setSiteLoading(true);
+    api
+      .site(selectedSiteId)
+      .then((s) => {
+        if (!live) return;
+        setSite(s);
+        setSiteError(null);
+        if (revealed.current !== s.id) {
+          revealed.current = s.id;
+          setReveal({ ids: s.path.map((p) => p.id), key: Date.now() });
+        }
+      })
+      .catch((e: ApiError) => {
+        if (!live) return;
+        setSite(null);
+        if (e.status === 404) {
+          setSelectedSiteId(null);
+          setNotice('الموقع المحفوظ لم يعد ضمن نطاقك.');
+        } else setSiteError(e.message);
+      })
+      .finally(() => live && setSiteLoading(false));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSiteId, revision, localRevision, data?.asOf]);
+
+  useEffect(() => {
+    if (!selectedSiteId || !pq) return;
+    const ctl = new AbortController();
+    setSiteLoading(true);
+    api
+      .mapFeatures({ siteIds: selectedSiteId, from: pq.from, to: pq.to, open: pq.open, resourceIds: resources.length ? resources.join(',') : undefined }, ctl.signal)
+      .then((d) => {
+        setSiteFeature(d.features[0] ?? null);
+        setSiteError(null);
+      })
+      .catch((e: Error) => !isAbort(e) && setSiteError(e.message))
+      .finally(() => !ctl.signal.aborted && setSiteLoading(false));
+    return () => ctl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSiteId, pq?.from, pq?.to, pq?.open, resources.join(','), revision, localRevision, data?.asOf]);
+
+  // default resource choice: the site's main resource; the user changes it in the detail panel
+  const lastSite = useRef<string | null>(null);
+  useEffect(() => {
+    if (!siteFeature || lastSite.current === siteFeature.siteId) return;
+    lastSite.current = siteFeature.siteId;
+    const main = siteFeature.resources.find((r) => !r.parentResourceId) ?? siteFeature.resources[0];
+    setResources(main ? [main.id] : []);
+  }, [siteFeature]);
+
+  const select = useCallback(
+    (id: string | null, fitTo: boolean) => {
+      setSelectedSiteId(id);
+      if (id !== lastSite.current) setResources([]);
+      if (!id || !fitTo) return;
+      api
+        .mapFeatures({ siteIds: id, time: new Date().toISOString() })
+        .then((d) => {
+          const b = d.features[0] ? featureBounds(d.features[0]) : null;
+          if (b) setFit({ bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]], key: Date.now(), maxZoom: 17 });
+          else setNotice('لا يوجد للموقع علامة أو حدود على الخريطة.');
+        })
+        .catch(() => undefined);
+    },
+    [setSelectedSiteId],
   );
 
-  const selected = features.find((f) => f.siteId === selectedSiteId) ?? features[0];
-  useEffect(() => {
-    if (selected && selected.siteId !== selectedSiteId) setSelectedSiteId(selected.siteId);
-  }, [selected, selectedSiteId, setSelectedSiteId]);
-  const site = selected ? siteById.get(selected.siteId) : undefined;
-  const parent = site?.parentId ? siteById.get(site.parentId) : undefined;
-  const a = selected ? AVAILABILITY[selected.availability] : null;
-  const visibleIds = new Set(features.map((f) => f.siteId));
+  const onViewport = useCallback((v: Viewport) => {
+    viewRef.current = { center: v.center, zoom: v.zoom };
+    setViewport(v);
+  }, []);
+
+  const features = data?.features ?? [];
+  const counts = useMemo(() => {
+    const c = { FREE: 0, PARTIAL: 0, BUSY: 0, NO_RESOURCES: 0 } as Record<string, number>;
+    features.forEach((f) => (c[f.availability] = (c[f.availability] ?? 0) + 1));
+    return c;
+  }, [features]);
+
+  const creatable = can('CREATE');
+  const act = async (a: SiteAction) => {
+    if (!site) return;
+    if (a.kind === 'FIT') {
+      const f = siteFeature ?? features.find((x) => x.siteId === site.id);
+      const b = f ? featureBounds(f) : null;
+      if (b) setFit({ bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]], key: Date.now(), maxZoom: 17 });
+      return;
+    }
+    if (a.kind === 'EDIT_BOUNDARY') return setEditingSite(site);
+    if (a.kind === 'IMPORT_BOUNDARY') return setImportFor({ id: site.id, name: site.name });
+    if (a.kind === 'CHANGE') {
+      try {
+        const d = await api.changeRequest(a.reservationId, a.typeCode);
+        app.openWizard({ origin: 'MAP', requestId: d.id, layout: 'drawer' });
+      } catch (e) {
+        app.toast((e as Error).message);
+      }
+      return;
+    }
+    const unit = period.mode === 'HOURS' ? 'HOURS' : 'DAYS';
+    app.openWizard({
+      origin: 'MAP',
+      siteId: site.id,
+      layout: 'drawer',
+      prefill: {
+        ownerOrgId: org?.id,
+        resourceIds: resources,
+        unit,
+        start: period.start,
+        end: a.open || period.mode === 'OPEN' ? '' : period.end,
+        permanent: a.open || period.mode === 'OPEN',
+        siteName: site.name,
+      },
+    });
+  };
+
+  const onImported = (job: ImportJob) => {
+    app.toast('نُشرت حدود ' + job.features.length + ' موقع بإصدارات جديدة');
+    setLocalRevision((r) => r + 1);
+  };
+
+  const setMode2 = (m: PeriodMode2) => setPeriod((p) => switchPeriodMode(p, m));
+
+  if (ctxError) return <div className="note red">{ctxError}</div>;
+
+  const shownBackground = background;
+  const initialExtent = ctx?.extent ?? null;
 
   return (
-    <>
-      <Heading
-        en="FACILITIES / MAP WORKSPACE"
-        title="المكان، والطلب، في سياق واحد"
-        description="اختر المرفق من الخريطة، واستعرض إتاحته أو ابدأ طلباً إدارياً عليه."
-        actions={
-          <Pill tone="green" dot>
-            {data ? 'بيانات الخادم · ' + fullDate(data.asOf) : 'جارٍ التحميل'}
-          </Pill>
-        }
-      />
-      <div className="stats">
-        <Stat value={features.length} label="مرافق في نطاق العرض" icon="building" />
-        <Stat value={features.filter((f) => f.availability === 'FREE').length} label="متاحة في اليوم المختار" icon="pin" />
-        <Stat value={app.counts.submitted} label="طلبات قيد المراجعة" icon="file" />
-        <Stat value={reservations.filter((r) => visibleIds.has(r.resource.siteId)).length} label="حجوزات معتمدة" icon="check" />
-      </div>
-      <div className="card filterbar">
-        <label>
-          الجهة
-          <select value={orgFilter} onChange={(e) => setOrgFilter(e.target.value)}>
-            <option value="all">جميع الجهات</option>
-            {orgOptions.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          اليوم
-          <input type="date" value={mapDate} onChange={(e) => e.target.value && setMapDate(e.target.value)} aria-label="تاريخ الخريطة" />
-        </label>
-        <label>
-          الإتاحة
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'all' | Availability)}>
-            <option value="all">الكل</option>
-            <option value="FREE">متاح</option>
-            <option value="PENDING">طلب معلّق</option>
-            <option value="BUSY">محجوز</option>
-          </select>
-        </label>
-        <span className="grow" />
-        <span className="micro muted">الموقع دائم · الحجوزات مرتبطة بفترات</span>
-      </div>
-      {error && <div className="note red" style={{ marginBottom: 15 }}>{error}</div>}
-      <div className="workspace">
-        <MapView
-          features={features}
-          selectedSiteId={selected?.siteId ?? null}
-          onSelect={setSelectedSiteId}
-          mode={mode}
-          onModeChange={setMode}
-          coverageMessage={data && !data.coverage.covered ? data.coverage.message : null}
-        />
-        <aside className="card site-aside">
-          <div className="flex spread">
-            <h3>دليل المرافق</h3>
-            <span className="pill">{features.length}</span>
-          </div>
-          <div className="search-box">
-            <Icon name="search" />
-            <input placeholder="ابحث عن مرفق…" aria-label="البحث في المرافق" value={query} onChange={(e) => setQuery(e.target.value)} />
-          </div>
-          <div className="site-list">
-            {features.length ? (
-              features.map((f) => {
-                const s = siteById.get(f.siteId);
-                const c = featureColor(f, 'availability');
-                return (
-                  <button key={f.siteId} className={'site-row ' + (selected?.siteId === f.siteId ? 'active' : '')} onClick={() => setSelectedSiteId(f.siteId)}>
-                    <span>{f.code}</span>
-                    <div>
-                      <b>{f.name}</b>
-                      <small>{summaryOnly || !s?.responsibleOrg ? 'مرفق ضمن نطاق العرض' : s.responsibleOrg.name}</small>
-                    </div>
-                    <i className="dot" style={{ color: c.color }} title={c.label} />
-                  </button>
-                );
-              })
-            ) : (
-              <div className="empty">{data ? 'لا توجد مرافق مطابقة' : 'جارٍ التحميل…'}</div>
+    <div className="map-workspace">
+      <section className="card context-bar" aria-label="سياق العرض">
+        <div className="context-summary">
+          <span>
+            <small>الجهة</small>
+            <b>{org ? org.name + (org.includeSub ? ' (مع الفروع)' : '') : 'كل الجهات المسموحة'}</b>
+            {org && (
+              <button className="link-button text-link" onClick={() => setOrg(null)}>
+                إزالة
+              </button>
             )}
-          </div>
-          <div className="site-detail">
-            {selected && a ? (
-              <>
-                <div className="flex spread">
-                  <span className="eyebrow">FACILITY / {selected.code}</span>
-                  <span className={'pill ' + a.pill}>{a.label}</span>
-                </div>
-                <h2>{selected.name}</h2>
-                <p className="muted micro">
-                  {summaryOnly || !site?.responsibleOrg ? 'بيانات مختصرة' : site.responsibleOrg.name}
-                  {!summaryOnly && selected.occupantOrg ? ' · الشاغل: ' + selected.occupantOrg.name : ''}
-                </p>
-                <dl className="meta-grid">
-                  <div>
-                    <dt>الموقع الرئيسي</dt>
-                    <dd>{parent?.name ?? 'مجمع المؤسسة'}</dd>
-                  </div>
-                  <div>
-                    <dt>التصنيف</dt>
-                    <dd>{site?.kind ?? '—'}</dd>
-                  </div>
-                  <div>
-                    <dt>السعة</dt>
-                    <dd>{site?.capacity != null ? site.capacity + ' شخصاً' : '—'}</dd>
-                  </div>
-                  <div>
-                    <dt>تاريخ العرض</dt>
-                    <dd>{fullDate(dubaiISO(mapDate))}</dd>
-                  </div>
-                </dl>
-                {site && site.resources.length > 1 && (
-                  <p className="micro muted" style={{ marginBottom: 10 }}>
-                    موارد قابلة للحجز: {site.resources.map((r) => r.label || r.name).join('، ')}
-                  </p>
-                )}
-                {!summaryOnly && (
-                  <button className="button primary full" disabled={!app.can('CREATE')} onClick={() => app.openWizard({ origin: 'MAP', siteId: selected.siteId })}>
-                    ＋ طلب على هذا المرفق
-                  </button>
-                )}
-                <p className="micro muted" style={{ marginTop: 10 }}>
-                  البرتقالي طلب معلّق؛ الحجز النهائي يبدأ بالاعتماد.
-                  {selected.pendingCount > 0 ? ' طلبات معلّقة على المرفق: ' + selected.pendingCount + '.' : ''}
-                </p>
-              </>
-            ) : (
-              <p className="micro muted">غيّر التصفية لعرض المرافق.</p>
+          </span>
+          <span>
+            <small>الموقع</small>
+            <b>{site ? site.name : 'لم يُختر'}</b>
+          </span>
+          <span>
+            <small>الفترة</small>
+            <b>{periodSummary(period)}</b>
+          </span>
+          <span>
+            <small>الخلفية</small>
+            <b>{shownBackground ? shownBackground.name : 'دون خلفية'}</b>
+          </span>
+          <button className="button compact ghost" onClick={() => setToolsCollapsed((v) => !v)} aria-expanded={!toolsCollapsed}>
+            {toolsCollapsed ? 'إظهار أدوات الفترة' : 'طي الأدوات'}
+          </button>
+        </div>
+        {!toolsCollapsed && (
+          <div className="period-tools" role="group" aria-label="الفترة">
+            <div className="segmented" role="radiogroup" aria-label="نوع الفترة">
+              {(
+                [
+                  ['HOURS', 'بالساعات'],
+                  ['DAYS', 'بالأيام'],
+                  ['OPEN', 'مفتوحة المدة'],
+                ] as [PeriodMode2, string][]
+              ).map(([m, l]) => (
+                <button key={m} role="radio" aria-checked={period.mode === m} className={period.mode === m ? 'active' : ''} onClick={() => setMode2(m)}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <label>
+              {period.mode === 'OPEN' ? 'من' : 'البداية'}
+              <input
+                type={period.mode === 'HOURS' ? 'datetime-local' : 'date'}
+                value={period.mode === 'HOURS' ? period.start : period.start.slice(0, 10)}
+                onChange={(e) => e.target.value && setPeriod({ ...period, start: e.target.value })}
+                aria-label="بداية الفترة"
+              />
+            </label>
+            {period.mode !== 'OPEN' && (
+              <label>
+                النهاية (غير مشمولة)
+                <input
+                  type={period.mode === 'HOURS' ? 'datetime-local' : 'date'}
+                  value={period.mode === 'HOURS' ? period.end : period.end.slice(0, 10)}
+                  onChange={(e) => e.target.value && setPeriod({ ...period, end: e.target.value })}
+                  aria-label="نهاية الفترة"
+                />
+              </label>
             )}
+            {!pq && <span className="micro note red">الفترة غير صحيحة: النهاية يجب أن تكون بعد البداية.</span>}
+            <span className="micro muted">التوقيت: {ctx?.timezone ?? 'Asia/Dubai'} · الفترات نصف مفتوحة [البداية، النهاية)</span>
           </div>
+        )}
+      </section>
+
+      <div className={'stats-strip ' + (statsOpen ? 'open' : '')}>
+        <button className="link-button text-link" onClick={() => setStatsOpen((v) => !v)} aria-expanded={statsOpen}>
+          {statsOpen ? 'إخفاء الملخص' : 'ملخص نطاق العرض'}
+        </button>
+        {statsOpen && (
+          <span className="micro">
+            {features.length} موقع في نافذة العرض · {AVAILABILITY_STYLE.FREE.symbol} متاح {counts.FREE} · {AVAILABILITY_STYLE.PARTIAL.symbol} جزئي {counts.PARTIAL} ·{' '}
+            {AVAILABILITY_STYLE.BUSY.symbol} غير متاح {counts.BUSY} · طلبات قيد المراجعة لك: {app.counts.submitted}
+          </span>
+        )}
+      </div>
+      {notice && (
+        <div className="note orange map-notice" role="status">
+          {notice}{' '}
+          <button className="link-button text-link" onClick={() => setNotice(null)}>
+            إخفاء
+          </button>
+        </div>
+      )}
+
+      <div className={'map-grid ' + (editing ? 'editing ' : '') + (editing || selectedSiteId ? 'with-detail' : '')}>
+        <aside className="card browse-panel" aria-label="التصفح">
+          <div className="tabs" role="tablist">
+            <button role="tab" aria-selected={tab === 'orgs'} className={tab === 'orgs' ? 'active' : ''} onClick={() => setTab('orgs')}>
+              الجهات
+            </button>
+            <button role="tab" aria-selected={tab === 'sites'} className={tab === 'sites' ? 'active' : ''} onClick={() => setTab('sites')}>
+              المواقع
+            </button>
+          </div>
+          {tab === 'orgs' ? (
+            <OrgTree
+              selectedId={org?.id ?? null}
+              includeSub={org?.includeSub ?? true}
+              onSelect={(o) => (o ? setOrg({ ...o, includeSub: org?.includeSub ?? true }) : setOrg(null))}
+              onIncludeSub={(v) => org && setOrg({ ...org, includeSub: v })}
+              revision={revision}
+            />
+          ) : (
+            <SiteTree selectedId={selectedSiteId} onSelect={(id) => select(id, true)} revision={revision + localRevision} revealPath={reveal} />
+          )}
+          {org && (
+            <div className="org-sites">
+              <h3>مواقع مرتبطة بـ«{org.name}» في نافذة العرض</h3>
+              {features.length === 0 && <p className="micro muted">{loading ? 'جارٍ التحميل…' : 'لا مواقع ضمن نافذة العرض؛ حرّك الخريطة أو كبّر النطاق.'}</p>}
+              <ul>
+                {features.map((f) => (
+                  <li key={f.siteId}>
+                    <button className={'site-row ' + (selectedSiteId === f.siteId ? 'active' : '')} onClick={() => select(f.siteId, true)}>
+                      <span>{f.code}</span>
+                      <div>
+                        <b>{f.name}</b>
+                        <small>
+                          {(f.relations ?? []).map((r) => (r === 'RESPONSIBLE' ? 'الجهة مسؤولة' : 'الجهة شاغلة في الفترة')).join(' · ')}
+                        </small>
+                      </div>
+                      <i className="dot" style={{ color: AVAILABILITY_STYLE[f.availability].color }} title={AVAILABILITY_STYLE[f.availability].label} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </aside>
+
+        <div className="map-column">
+          {ctx ? (
+            <MapCanvas
+              className="workspace-map"
+              features={features}
+              stale={!!stale}
+              selectedSiteId={selectedSiteId}
+              onSelect={(id) => select(id, false)}
+              mode={mode}
+              background={shownBackground}
+              layers={layers}
+              initialView={saved.current.view ?? null}
+              initialExtent={initialExtent}
+              onViewport={onViewport}
+              fitTarget={fit}
+              onMap={setMap}
+              hiddenSiteId={editingSite?.id ?? null}
+            >
+              <div className="map-toolbar">
+                <div className="map-mode" role="radiogroup" aria-label="وضع الألوان">
+                  <button role="radio" aria-checked={mode === 'availability'} className={mode === 'availability' ? 'active' : ''} onClick={() => setMode('availability')}>
+                    الإتاحة للفترة
+                  </button>
+                  <button role="radio" aria-checked={mode === 'requests'} className={mode === 'requests' ? 'active' : ''} onClick={() => setMode('requests')}>
+                    حالة الطلبات
+                  </button>
+                </div>
+                <div className="map-tools text-tools">
+                  <button className="button compact" aria-expanded={panel === 'bg'} onClick={() => setPanel(panel === 'bg' ? null : 'bg')}>
+                    الخلفية
+                  </button>
+                  <button className="button compact" aria-expanded={panel === 'layers'} onClick={() => setPanel(panel === 'layers' ? null : 'layers')}>
+                    الطبقات
+                  </button>
+                  <button className={'button compact ' + (layers.labels ? 'pressed' : '')} aria-pressed={layers.labels} onClick={() => setLayers({ ...layers, labels: !layers.labels })}>
+                    الأسماء
+                  </button>
+                  <button
+                    className="button compact"
+                    onClick={() => {
+                      const f = selectedSiteId ? siteFeature : null;
+                      const list = f ? [f] : features;
+                      const all = list.map((x) => featureBounds(x)).filter(Boolean) as L.LatLngBounds[];
+                      if (!all.length && initialExtent) {
+                        setFit({ bounds: [[initialExtent[1], initialExtent[0]], [initialExtent[3], initialExtent[2]]], key: Date.now() });
+                        return;
+                      }
+                      if (!all.length) return;
+                      const b = all.reduce((acc, x) => acc.extend(x), all[0].pad(0));
+                      setFit({ bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]], key: Date.now(), maxZoom: 17 });
+                    }}
+                  >
+                    ملاءمة الاختيار
+                  </button>
+                  <button className="icon-button" onClick={() => map?.zoomIn()} aria-label="تكبير الخريطة">
+                    ＋
+                  </button>
+                  <button className="icon-button" onClick={() => map?.zoomOut()} aria-label="تصغير الخريطة">
+                    −
+                  </button>
+                </div>
+              </div>
+              {panel === 'bg' && (
+                <BackgroundPanel
+                  context={ctx}
+                  selected={background}
+                  preview={previewPkg}
+                  onSelect={(p) => {
+                    setBackground(p);
+                    setPanel(null);
+                  }}
+                  onManage={() => (setPanel(null), setPackagesOpen(true))}
+                />
+              )}
+              {panel === 'layers' && <LayersPanel layers={layers} onChange={setLayers} canSeeRequests={can('VIEW')} />}
+              <Legend mode={mode} stale={!!stale} />
+              <CoverageNote coverage={stale ? null : data?.coverage ?? null} background={shownBackground} />
+              {(loading || stale) && (
+                <div className={'map-status ' + (stale ? 'error' : '')} role="status">
+                  {stale ? 'تعذر تحديث الخريطة: ' + stale + ' — الألوان محايدة حتى ينجح التحديث.' : 'جارٍ تحديث البيانات من الخادم…'}
+                </div>
+              )}
+            </MapCanvas>
+          ) : (
+            <section className="card map-card workspace-map empty">جارٍ تحميل سياق الخريطة…</section>
+          )}
+          <div className="map-admin-links">
+            {ctx?.canEditBoundaries && (
+              <button className="button compact ghost" onClick={() => setImportFor(null)}>
+                استيراد حدود المواقع
+              </button>
+            )}
+            {ctx?.canManagePackages && (
+              <button className="button compact ghost" onClick={() => setPackagesOpen(true)}>
+                مدير الخرائط
+              </button>
+            )}
+            {ctx?.canExport && (
+              <a className="button compact ghost" href={urls.boundariesExport()}>
+                تصدير الحدود المسموحة (GeoJSON)
+              </a>
+            )}
+            {data && <span className="micro muted">بيانات الخادم · {fullTime(data.asOf)}</span>}
+          </div>
+        </div>
+
+        {editingSite && map ? (
+          <BoundaryEditor
+            key={editingSite.id}
+            map={map}
+            site={editingSite}
+            onCancel={() => setEditingSite(null)}
+            onDone={(v) => {
+              app.toast('حُفظت حدود «' + editingSite.name + '» بالإصدار ' + v);
+              setEditingSite(null);
+              setLocalRevision((r) => r + 1);
+            }}
+          />
+        ) : selectedSiteId ? (
+          <SiteDetailPanel
+            site={site}
+            feature={siteFeature}
+            loading={siteLoading}
+            error={siteError}
+            period={period}
+            selectedResources={resources}
+            onToggleResource={(id, on) => setResources((cur) => (on ? [...new Set([...cur, id])] : cur.filter((x) => x !== id)))}
+            onAction={act}
+            canCreate={creatable}
+            requestTypes={requestTypes}
+            onClose={() => select(null, false)}
+          />
+        ) : null}
       </div>
-    </>
+
+      <ImportDialog open={importFor !== false} targetSite={importFor || null} onClose={() => setImportFor(false)} onPublished={onImported} />
+      <PackageManager
+        open={packagesOpen}
+        onClose={() => setPackagesOpen(false)}
+        onChanged={() => setLocalRevision((r) => r + 1)}
+        onPreview={(p) => {
+          setPreviewPkg(p);
+          setBackground(p);
+          setPackagesOpen(false);
+          setFit({ bounds: [[p.coverage.minLat, p.coverage.minLng], [p.coverage.maxLat, p.coverage.maxLng]], key: Date.now() });
+        }}
+      />
+    </div>
   );
 }
+
+type PeriodMode2 = MapPeriod['mode'];
