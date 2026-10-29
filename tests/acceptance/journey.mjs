@@ -3,15 +3,22 @@
 // map selection, data + period, submit, return, edit + resubmit, approvals, signed approval, reservation,
 // info copy, execution/receipt tasks, closure with history kept. Also checks AT-29 (no external runtime requests).
 //
-// Usage: MOVER_URL=http://localhost:8088 MOVER_DEMO_PASSWORD=... node tests/acceptance/journey.mjs
-// Requires the fictional demo dataset (MOVER_DEMO_SEED=true).
+// Usage: sh ops/test-env/up.sh && node tests/acceptance/journey.mjs
+// Runs against the acceptance test environment (fictional directory, HR mirror and facilities). Every actor signs in
+// through the real path: TMRKZ → Keycloak sign-in page → LDAP → TMRKZ callback. Transitions after sign-in use the API;
+// the browser-driven journey (PA-25/26) is a separate test.
+
+import { readFileSync } from 'node:fs';
 
 const BASE = process.env.MOVER_URL ?? 'http://localhost:8088';
-const PASSWORD = process.env.MOVER_DEMO_PASSWORD;
-if (!PASSWORD) {
-  console.error('Set MOVER_DEMO_PASSWORD (see .env)');
-  process.exit(2);
-}
+const PASSWORD = process.env.TMRKZ_TEST_PASSWORD ?? (() => {
+  try {
+    return readFileSync(new URL('../../ops/test-env/.generated/user-password', import.meta.url), 'utf8').trim();
+  } catch {
+    console.error('Start the test environment first (sh ops/test-env/up.sh) or set TMRKZ_TEST_PASSWORD.');
+    process.exit(2);
+  }
+})();
 
 let failures = 0;
 const ok = (cond, label, extra = '') => {
@@ -21,11 +28,48 @@ const ok = (cond, label, extra = '') => {
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** Cookies of one browser (all on the same origin: TMRKZ and Keycloak under /auth). */
+class Jar {
+  constructor() { this.cookies = new Map(); }
+  take(res) {
+    for (const c of res.headers.getSetCookie()) {
+      const pair = c.split(';')[0];
+      const i = pair.indexOf('=');
+      const name = pair.slice(0, i);
+      const value = pair.slice(i + 1);
+      if (!value || /max-age=0/i.test(c)) this.cookies.delete(name);
+      else this.cookies.set(name, value);
+    }
+  }
+  header() { return [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; '); }
+}
+
+/** The browser sign-in: TMRKZ start → Keycloak form → directory check → TMRKZ callback. Nothing is injected. */
+async function browserSignIn(username, password) {
+  const jar = new Jar();
+  const go = async (url, init = {}) => {
+    const res = await fetch(url.startsWith('http') ? url : BASE + url, { redirect: 'manual', ...init, headers: { ...(init.headers ?? {}), Cookie: jar.header() } });
+    jar.take(res);
+    return res;
+  };
+  let res = await go('/api/v1/auth/oidc/start');
+  if (res.status !== 302) throw new Error('sign-in did not start: ' + res.status);
+  res = await go(res.headers.get('location'));
+  const html = await res.text();
+  const action = html.match(/<form[^>]*id="kc-form-login"[^>]*action="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&');
+  if (!action) throw new Error('provider sign-in form not found');
+  res = await go(action, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ username, password, credentialId: '' }) });
+  if (res.status !== 302) return { signedIn: false, page: await res.text(), jar, loginPage: html };
+  res = await go(res.headers.get('location'));
+  return { signedIn: jar.cookies.has('MOVER_SESSION'), location: res.headers.get('location'), jar, loginPage: html };
+}
+
 class Session {
   constructor(user) { this.user = user; this.cookie = ''; }
   async login() {
-    const r = await this.call('POST', '/auth/login', { username: this.user, password: PASSWORD });
-    if (r.status !== 200) throw new Error(`login ${this.user}: ${r.status} ${JSON.stringify(r.body)}`);
+    const r = await browserSignIn(this.user, PASSWORD);
+    if (!r.signedIn) throw new Error(`sign-in ${this.user} failed: ${r.location ?? 'no redirect'}`);
+    this.cookie = 'MOVER_SESSION=' + r.jar.cookies.get('MOVER_SESSION');
     return this;
   }
   async call(method, path, body, headers = {}) {
@@ -74,11 +118,29 @@ const dubaiMidnight = (y, m, d) => new Date(Date.UTC(y, m - 1, d) - 4 * 3600 * 1
   ok(font.status === 200, 'Arabic font served locally');
 }
 
+// ---- Enterprise sign-in (PA-07 through the real provider and directory) -------------------------------
+{
+  const local = await fetch(BASE + '/api/v1/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'mover' }, body: '{"username":"x","password":"y"}' });
+  const demo = await fetch(BASE + '/api/v1/auth/demo-users');
+  ok(local.status === 401 && demo.status === 401, 'no local password or demo sign-in exists');
+  const status = await (await fetch(BASE + '/api/v1/auth/status')).json();
+  ok(status.configured && status.reachable, 'identity provider configured and reachable');
+  const good = await browserSignIn('t.requester', PASSWORD);
+  ok(good.loginPage.includes('TMRKZ') && good.loginPage.includes('dir="rtl"') && !/https?:\/\/(?!localhost)/.test(good.loginPage.match(/<link[^>]+>/g)?.join('') ?? ''),
+    'provider sign-in page carries the TMRKZ theme with local assets');
+  ok(good.signedIn && good.location === '/', 'directory password accepted; TMRKZ session opened');
+  const wrong = await browserSignIn('t.requester', PASSWORD + 'x');
+  ok(!wrong.signedIn && !wrong.jar.cookies.has('MOVER_SESSION') && wrong.page.includes('tm-alert'), 'wrong password refused by the directory; no session');
+  const unlinked = await browserSignIn('t.unlinked', PASSWORD);
+  ok(!unlinked.signedIn && unlinked.location === '/#auth-error=IDENTITY_NOT_LINKED&reason=NO_MATCH',
+    'directory account without an HR record is refused and queued', unlinked.location);
+}
+
 // ---- Journey -----------------------------------------------------------------------------------------
-const requester = await user('requester');
-const facilities = await user('facilities');
-const manager = await user('manager');
-const approver = await user('approver');
+const requester = await user('t.requester');
+const facilities = await user('t.facilities');
+const manager = await user('t.manager');
+const approver = await user('t.approver');
 
 const sites = (await requester.get('/sites')).body;
 const service = sites.find((s) => s.code === '02');
@@ -144,7 +206,7 @@ t = await taskOf(approver);
 const doc = (await approver.get(`/tasks/${t.id}/approval-document`)).body;
 ok(doc.sha256?.length === 64 && doc.signatureLabel.includes('ليس توقيعاً رقمياً'), 'approval document hashed; attestation not labelled as PKI');
 const signKey = key();
-const decision = { decision: 'APPROVE', expectedRevision: 2, signature: { password: PASSWORD, confirm: true } };
+const decision = { decision: 'APPROVE', expectedRevision: 2, signature: { confirm: true } };
 const approved = await approver.post(`/tasks/${t.id}/decision`, decision, signKey);
 ok(approved.body.status === 'APPROVED', 'final approval recorded');
 ok(approved.body.reservations.length === 1 && approved.body.reservations[0].status === 'ACTIVE', 'reservation created atomically with the approval');

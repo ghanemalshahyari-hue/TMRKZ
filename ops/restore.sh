@@ -12,7 +12,9 @@ PORT="${3:-8088}"
 dc() { MOVER_HTTP_PORT="$PORT" docker compose -p "$PROJECT" "$@"; }
 sha() { (sha256sum "$1" 2>/dev/null || shasum -a 256 "$1") | cut -d' ' -f1; }
 
-for f in db.dump files.tgz map-packages.tgz fingerprint.txt; do
+FILES="db.dump files.tgz map-packages.tgz fingerprint.txt"
+[ -f "$SRC/keycloak.dump" ] && FILES="$FILES keycloak.dump identity-fingerprint.txt"
+for f in $FILES; do
   expected="$(grep "\"$f\"" "$SRC/manifest.json" | sed 's/.*: "\([0-9a-f]*\)".*/\1/')"
   actual="$(sha "$SRC/$f")"
   if [ "$expected" != "$actual" ]; then echo "[restore] checksum mismatch for $f — aborting"; exit 1; fi
@@ -30,6 +32,12 @@ until dc exec -T db pg_isready -U mover -d mover >/dev/null 2>&1; do sleep 2; do
 sleep 2
 echo "[restore] database"
 dc exec -T db pg_restore -U mover -d mover --no-owner --exit-on-error < "$SRC/db.dump"
+
+if [ -f "$SRC/keycloak.dump" ]; then
+  echo "[restore] identity database"
+  dc run --rm db-init >/dev/null
+  dc exec -T db pg_restore -U mover -d keycloak --no-owner --role=keycloak --exit-on-error < "$SRC/keycloak.dump"
+fi
 
 echo "[restore] files"
 dc create backend >/dev/null 2>&1 || true

@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,112 +19,73 @@ import ae.mover.common.ApiException;
 import ae.mover.common.Db;
 import ae.mover.common.ErrorCode;
 import ae.mover.common.Hashing;
-import io.micrometer.core.instrument.MeterRegistry;
 
-/** Local identity adapter: username/password with server-side sessions (see ADR-003). */
+/**
+ * Server-side sessions for enterprise sign-in (ADR-015). TMRKZ verifies no passwords: the identity provider
+ * authenticates, TMRKZ links the identity and issues an opaque HttpOnly session whose SHA-256 alone is stored.
+ * Authorisation is evaluated from the database on every request, so a withdrawn right stops the next action without
+ * waiting for any token to expire.
+ */
 @Service
 public class AuthService {
-
-    private static final String DUMMY_HASH = new BCryptPasswordEncoder(12).encode("not-a-real-password");
 
     private final JdbcClient jdbc;
     private final Clock clock;
     private final SecurityProperties props;
-    private final DemoProperties demo;
     private final AuditService audit;
-    private final MeterRegistry meters;
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(12);
     private final SecureRandom random = new SecureRandom();
 
-    public AuthService(JdbcClient jdbc, Clock clock, SecurityProperties props, DemoProperties demo,
-                       AuditService audit, MeterRegistry meters) {
+    public AuthService(JdbcClient jdbc, Clock clock, SecurityProperties props, AuditService audit) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.props = props;
-        this.demo = demo;
         this.audit = audit;
-        this.meters = meters;
     }
 
     public record LoginResult(String token, Actor actor) {
     }
 
-    public String hash(String password) {
-        return encoder.encode(password);
-    }
-
-    @Transactional(noRollbackFor = ApiException.class)
-    public LoginResult login(String username, String password, String ip, String userAgent) {
-        if (username == null || password == null || username.isBlank() || password.isEmpty()) {
-            throw invalidCredentials();
+    /** Opens a session for a linked, active person after a verified sign-in at {@code authenticatedAt}. */
+    @Transactional
+    public LoginResult issueSession(UUID personId, String issuer, String idToken, Instant authenticatedAt, String ip, String userAgent) {
+        Map<String, Object> p = jdbc.sql("select id, username, display_name, status from person where id = :id")
+                .param("id", personId).query().listOfRows().stream().findFirst()
+                .orElseThrow(() -> new ApiException(ErrorCode.IDENTITY_NOT_LINKED, "لا يوجد سجل شخص مرتبط بهذا الحساب."));
+        if (!"ACTIVE".equals(p.get("status"))) {
+            throw new ApiException(ErrorCode.IDENTITY_NOT_LINKED, "سجل الشخص غير نشط في مصدر الموارد البشرية.");
         }
         Instant now = clock.instant();
-        Optional<Map<String, Object>> row = jdbc.sql("""
-                select id, username, display_name, password_hash, status, failed_logins, locked_until
-                from person where lower(username) = lower(:u) for update""")
-                .param("u", username.trim())
-                .query().listOfRows().stream().findFirst();
-        if (row.isEmpty() || row.get().get("password_hash") == null) {
-            encoder.matches(password, DUMMY_HASH); // equalise timing for unknown users
-            meters.counter("mover.auth.failures", "reason", "unknown").increment();
-            throw invalidCredentials();
-        }
-        Map<String, Object> p = row.get();
-        UUID personId = (UUID) p.get("id");
-        if (!"ACTIVE".equals(p.get("status"))) {
-            meters.counter("mover.auth.failures", "reason", "disabled").increment();
-            throw invalidCredentials();
-        }
-        Instant lockedUntil = Db.toInstant(p.get("locked_until"));
-        if (lockedUntil != null && lockedUntil.isAfter(now)) {
-            meters.counter("mover.auth.failures", "reason", "locked").increment();
-            throw new ApiException(ErrorCode.UNAUTHENTICATED,
-                    "تم إيقاف الدخول مؤقتاً بعد محاولات متكررة. حاول لاحقاً أو تواصل مع مدير النظام.");
-        }
-        if (!encoder.matches(password, (String) p.get("password_hash"))) {
-            int failures = ((Number) p.get("failed_logins")).intValue() + 1;
-            Instant lock = failures >= props.maxFailedLogins() ? now.plus(Duration.ofMinutes(props.lockMinutes())) : null;
-            jdbc.sql("update person set failed_logins = :f, locked_until = :l where id = :id")
-                    .param("f", lock != null ? 0 : failures).param("l", Db.ts(lock)).param("id", personId).update();
-            meters.counter("mover.auth.failures", "reason", "password").increment();
-            audit.system("LOGIN_FAILED", "PERSON", personId.toString(), (String) p.get("display_name"),
-                    Map.of("locked", lock != null));
-            throw invalidCredentials();
-        }
-        jdbc.sql("update person set failed_logins = 0, locked_until = null where id = :id").param("id", personId).update();
-        Actor actor = new Actor(personId, (String) p.get("username"), (String) p.get("display_name"), null);
-        String token = createSession(personId, ip, userAgent, now);
-        audit.recordAs(actor, "LOGIN", "PERSON", personId.toString(), actor.displayName(), Map.of(), null);
-        return new LoginResult(token, new Actor(personId, actor.username(), actor.displayName(), Hashing.sha256(token)));
-    }
-
-    @Transactional
-    public LoginResult demoSwitch(String username, String ip, String userAgent) {
-        if (!demo.mode()) {
-            throw ApiException.notFound();
-        }
-        Map<String, Object> p = jdbc.sql("select id, username, display_name from person where username = :u and status = 'ACTIVE'")
-                .param("u", username).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
-        UUID personId = (UUID) p.get("id");
-        Actor actor = new Actor(personId, (String) p.get("username"), (String) p.get("display_name"), null);
-        String token = createSession(personId, ip, userAgent, clock.instant());
-        audit.recordAs(actor, "DEMO_SWITCH", "PERSON", personId.toString(), actor.displayName(),
-                Map.of("note", "تبديل مستخدم في وضع العرض التجريبي"), null);
-        return new LoginResult(token, new Actor(personId, actor.username(), actor.displayName(), Hashing.sha256(token)));
-    }
-
-    private String createSession(UUID personId, String ip, String userAgent, Instant now) {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
         jdbc.sql("""
-                insert into user_session(id, person_id, created_at, last_seen_at, expires_at, client_ip, user_agent)
-                values (:id, :p, :now, :now, :exp, :ip, :ua)""")
+                insert into user_session(id, person_id, created_at, last_seen_at, expires_at, client_ip, user_agent,
+                                         authenticated_at, issuer, id_token)
+                values (:id, :p, :now, :now, :exp, :ip, :ua, :auth, :iss, :tok)""")
                 .param("id", Hashing.sha256(token)).param("p", personId).param("now", Db.ts(now))
                 .param("exp", Db.ts(now.plus(Duration.ofHours(props.sessionAbsoluteHours()))))
                 .param("ip", ip).param("ua", userAgent == null ? null : userAgent.substring(0, Math.min(200, userAgent.length())))
+                .param("auth", Db.ts(authenticatedAt == null ? now : authenticatedAt)).param("iss", issuer).param("tok", idToken)
                 .update();
-        return token;
+        Actor actor = new Actor(personId, (String) p.get("username"), (String) p.get("display_name"), Hashing.sha256(token));
+        audit.recordAs(actor, "LOGIN", "PERSON", personId.toString(), actor.displayName(), Map.of("issuer", String.valueOf(issuer)), null);
+        return new LoginResult(token, actor);
+    }
+
+    /** Records a fresh interactive authentication (step-up) on an existing session of the same person. */
+    @Transactional
+    public void markReauthenticated(String sessionId, UUID personId, Instant authTime, String idToken) {
+        int n = jdbc.sql("update user_session set authenticated_at = :t, id_token = :tok where id = :id and person_id = :p")
+                .param("t", Db.ts(authTime)).param("tok", idToken).param("id", sessionId).param("p", personId).update();
+        if (n == 0) {
+            throw new ApiException(ErrorCode.IDENTITY_SIGN_IN_FAILED, "إعادة التحقق تخص حساباً أو جلسة أخرى.");
+        }
+    }
+
+    /** When the session's person last authenticated interactively. */
+    public Optional<Instant> authenticatedAt(String sessionId) {
+        return jdbc.sql("select authenticated_at from user_session where id = :id").param("id", sessionId)
+                .query().listOfRows().stream().findFirst().map(r -> Db.toInstant(r.get("authenticated_at")));
     }
 
     /** Resolves a cookie token to an actor. Expired, idle or disabled sessions resolve to empty. */
@@ -153,33 +113,19 @@ public class AuthService {
         return found.stream().findFirst();
     }
 
+    /** Ends the session; returns the ID token so the provider session can be ended too. */
     @Transactional
-    public void logout(Actor actor) {
-        if (actor != null && actor.sessionId() != null) {
-            jdbc.sql("delete from user_session where id = :id").param("id", actor.sessionId()).update();
-            audit.recordAs(actor, "LOGOUT", "PERSON", actor.personId().toString(), actor.displayName(), Map.of(), null);
+    public String logout(Actor actor) {
+        if (actor == null || actor.sessionId() == null) {
+            return null;
         }
-    }
-
-    /** Re-authentication used for the internal approval attestation. */
-    public boolean verifyPassword(UUID personId, String password) {
-        if (password == null || password.isEmpty()) {
-            return false;
-        }
-        String hash = jdbc.sql("select password_hash from person where id = :id and status = 'ACTIVE'")
-                .param("id", personId).query(String.class).optional().orElse(null);
-        if (hash == null) {
-            encoder.matches(password, DUMMY_HASH);
-            return false;
-        }
-        return encoder.matches(password, hash);
+        String idToken = jdbc.sql("delete from user_session where id = :id returning id_token").param("id", actor.sessionId())
+                .query(String.class).optional().orElse(null);
+        audit.recordAs(actor, "LOGOUT", "PERSON", actor.personId().toString(), actor.displayName(), Map.of(), null);
+        return idToken;
     }
 
     public Duration sessionLifetime() {
         return Duration.ofHours(props.sessionAbsoluteHours());
-    }
-
-    private ApiException invalidCredentials() {
-        return new ApiException(ErrorCode.UNAUTHENTICATED, "اسم المستخدم أو كلمة المرور غير صحيحة.");
     }
 }

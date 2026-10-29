@@ -1,0 +1,111 @@
+dn: ou=people,dc=tmrkz,dc=test
+objectClass: organizationalUnit
+ou: people
+
+dn: uid=t.admin,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.admin
+cn: Test Administrator
+sn: Administrator
+givenName: Test
+employeeNumber: T-0001
+userPassword: __PASSWORD__
+
+dn: uid=t.requester,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.requester
+cn: Test Requester
+sn: Requester
+givenName: Test
+employeeNumber: T-0002
+userPassword: __PASSWORD__
+
+dn: uid=t.requester2,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.requester2
+cn: Test Requester IT
+sn: Requester
+givenName: Test
+employeeNumber: T-0003
+userPassword: __PASSWORD__
+
+dn: uid=t.facilities,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.facilities
+cn: Test Facilities Reviewer
+sn: Reviewer
+givenName: Test
+employeeNumber: T-0004
+userPassword: __PASSWORD__
+
+dn: uid=t.manager,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.manager
+cn: Test Manager
+sn: Manager
+givenName: Test
+employeeNumber: T-0005
+userPassword: __PASSWORD__
+
+dn: uid=t.manager.it,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.manager.it
+cn: Test Manager IT
+sn: Manager
+givenName: Test
+employeeNumber: T-0006
+userPassword: __PASSWORD__
+
+dn: uid=t.manager.ga,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.manager.ga
+cn: Test Manager GA
+sn: Manager
+givenName: Test
+employeeNumber: T-0007
+userPassword: __PASSWORD__
+
+dn: uid=t.approver,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.approver
+cn: Test Approver
+sn: Approver
+givenName: Test
+employeeNumber: T-0008
+userPassword: __PASSWORD__
+
+dn: uid=t.approver2,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.approver2
+cn: Test Deputy Approver
+sn: Approver
+givenName: Test
+employeeNumber: T-0009
+userPassword: __PASSWORD__
+
+dn: uid=t.limited,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.limited
+cn: Test Limited Viewer
+sn: Viewer
+givenName: Test
+employeeNumber: T-0010
+userPassword: __PASSWORD__
+
+dn: uid=t.auditor,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.auditor
+cn: Test Auditor
+sn: Auditor
+givenName: Test
+employeeNumber: T-0011
+userPassword: __PASSWORD__
+
+dn: uid=t.unlinked,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.unlinked
+cn: Test Directory Only
+sn: Unlinked
+givenName: Test
+employeeNumber: T-0999
+userPassword: __PASSWORD__

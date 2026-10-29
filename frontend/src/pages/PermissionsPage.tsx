@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Permission, RoleDef, Scope } from '../api/types';
 import { Heading, Icon } from '../components/ui';
+import { IdentityIssues } from '../components/IdentityIssues';
 import { useApp } from '../lib/app';
 import { PERMISSIONS, PERMISSION_NAMES, SCOPES } from '../lib/labels';
 
@@ -115,26 +116,7 @@ export function PermissionsPage() {
           <p className="micro muted" style={{ margin: '10px 0 15px' }}>
             دور «{limited?.name ?? 'اطلاع محدود'}» يعرض المرافق دون الجهة الشاغلة أو المرفقات؛ تُحذف الحقول من استجابة الخادم أصلاً.
           </p>
-          {app.me.demoMode ? (
-            <button
-              className="button"
-              onClick={async () => {
-                try {
-                  const demo = await api.demoUsers();
-                  const target = demo.users.find((u) => u.roleName === limited?.name)?.username ?? 'limited';
-                  await api.demoSwitch(target);
-                  await app.refreshMe();
-                  location.hash = 'map';
-                } catch (e) {
-                  app.toast((e as Error).message);
-                }
-              }}
-            >
-              تجربة الاطلاع المحدود
-            </button>
-          ) : (
-            <span className="micro muted">التجربة بالدور متاحة في وضع العرض فقط.</span>
-          )}
+          <span className="micro muted">تُعاين البيانات المختصرة بالدخول بحساب يحمل هذا الدور؛ لا يوجد تبديل مستخدمين في النظام.</span>
         </section>
         <section className="card padding">
           <h3>سياسة تغيير التبعية</h3>
@@ -158,6 +140,7 @@ export function PermissionsPage() {
           </ul>
           <p className="micro muted">تُقيّم الصلاحيات من قاعدة البيانات عند كل طلب، ولا تعتمد على رمز جلسة قديم.</p>
         </section>
+        {app.can('MANAGE_ACCESS') && <IdentityIssues />}
       </div>
     </>
   );

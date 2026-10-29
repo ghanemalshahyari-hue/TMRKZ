@@ -29,11 +29,15 @@ Date: 29 October 2026 · Version 1.0.0
     grant ending and task realignment on transfer or departure, administration panel (PA-01…PA-06, PA-09).
     The connection to the enterprise Oracle is not made: it needs the address, a read-only account and the approved
     mapping.
-  - Steps 2b–7 open — Keycloak/LDAP and removal of demo sign-in, OpenFGA and the permissions studio, PostGIS
-    boundaries and the map manager, visual rule editor, DSS signatures and seals, isolated bundle with UI and load
-    acceptance. See the PA matrix in `TRACEABILITY.md`.
+  - Step 2b done — enterprise sign-in only (ADR-015): Keycloak 26.7.5 federating LDAP read-only over StartTLS with
+    certificate validation, OIDC Authorization Code + PKCE with browser-bound single-use state, identity linking on
+    the HR domain account with a review list for anything ambiguous, step-up before approval, and the TMRKZ sign-in
+    theme. The local password form, the demo switch and the demo data are gone from the production build; fictional
+    users and data live in the separate test environment `ops/test-env` (PA-07, PA-08).
+  - Steps 3–7 open — OpenFGA and the permissions studio, PostGIS boundaries and the map manager, visual rule editor,
+    DSS signatures and seals, isolated bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
 
-Test evidence: 42 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
+Test evidence: 46 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
 17 frontend tests — see `TRACEABILITY.md`.
 
 ## Known limitations
@@ -55,7 +59,7 @@ Test evidence: 42 backend acceptance tests, a 29-check end-to-end journey throug
 
 | Connector | Status | Note |
 |---|---|---|
-| Enterprise identity (OIDC/LDAP) | NOT_CONNECTED | Local identity adapter in use (ADR-003). |
+| Enterprise identity (Keycloak + LDAP) | Tested with the fictional directory of the test environment | Production needs the enterprise LDAP URL, a read-only bind account, the users' DN and the CA (ADR-015). |
 | Organisation structure | FILE_IMPORT | Validated import with preview; automatic sync waits for D-04. |
 | HR source (organisations and people) | NOT_CONNECTED until a sync succeeds | Read-only Oracle mirror implemented and tested on fictional views (ADR-014); enterprise address, account and mapping pending. |
 | Correspondence | NOT_CONNECTED | No external message is sent or claimed. |

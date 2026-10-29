@@ -22,9 +22,10 @@ sha256sum -c SHA256SUMS            # integrity of every transferred file
 sh install.sh                       # loads images, creates .env with random secrets, starts the stack
 ```
 
-`install.sh` runs `ops/init-env.sh` without `--demo`, so no fictional data and no demo user switching are enabled.
-Create the first administrator by inserting a person and a `SYSTEM_ADMIN` membership (see OPERATIONS §User
-administration) or run once with `--demo` in a non-production evaluation environment only.
+`install.sh` runs `ops/init-env.sh`, which generates the secrets. Before the first start, fill in the directory
+settings (`LDAP_*`) and place the organisation's CA in `ops/keycloak/truststores/` (see OPERATIONS §Sign-in). There is
+no demo mode, user switch or local password in the build; the first administrator receives a `SYSTEM_ADMIN`
+membership once their HR record is mirrored.
 
 ## 3. Network and TLS
 

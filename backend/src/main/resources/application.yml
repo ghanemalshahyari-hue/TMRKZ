@@ -61,15 +61,23 @@ mover:
     secure-cookie: ${MOVER_SECURE_COOKIE:false}
     max-failed-logins: 5
     lock-minutes: 15
-  demo:
-    mode: ${MOVER_DEMO_MODE:false}
-    seed: ${MOVER_DEMO_SEED:false}
-    password: ${MOVER_DEMO_PASSWORD:}
   outbox:
     enabled: ${MOVER_OUTBOX_ENABLED:true}
     poll-ms: 2000
 
 tmrkz:
+  oidc:
+    # Public realm URL (appears as "iss" in tokens and serves the browser) and the same realm on the internal network.
+    issuer: ${TMRKZ_OIDC_ISSUER:}
+    internal-base-url: ${TMRKZ_OIDC_INTERNAL_URL:}
+    client-id: ${TMRKZ_OIDC_CLIENT_ID:tmrkz-web}
+    client-secret: ${TMRKZ_OIDC_CLIENT_SECRET:}
+    redirect-uri: ${TMRKZ_OIDC_REDIRECT_URI:}
+    post-logout-redirect-uri: ${TMRKZ_OIDC_POST_LOGOUT_REDIRECT_URI:}
+    # First sign-in links on DOMAIN_ACCOUNT (preferred_username = HR domain account, as TNQL) or EMPLOYEE_NUMBER.
+    link-key: ${TMRKZ_OIDC_LINK_KEY:DOMAIN_ACCOUNT}
+    enterprise-key-claim: ${TMRKZ_OIDC_EMPLOYEE_NUMBER_CLAIM:employee_number}
+    reauth-max-age-seconds: ${TMRKZ_REAUTH_MAX_AGE_SECONDS:300}
   hr:
     # Protects stored HR source credentials; TMRKZ's own key, never another application's.
     settings-key: ${TMRKZ_HR_SETTINGS_KEY:}

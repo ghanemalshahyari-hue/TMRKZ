@@ -33,12 +33,14 @@ public class IntegrationService {
     private final Json json;
     private final Clock clock;
     private final AuditService audit;
+    private final ae.mover.security.OidcClient oidc;
 
-    public IntegrationService(JdbcClient jdbc, Json json, Clock clock, AuditService audit) {
+    public IntegrationService(JdbcClient jdbc, Json json, Clock clock, AuditService audit, ae.mover.security.OidcClient oidc) {
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
         this.audit = audit;
+        this.oidc = oidc;
     }
 
     public record Connector(String code, String name, String status, String description, Map<String, Object> lastRun) {
@@ -47,8 +49,7 @@ public class IntegrationService {
     public List<Connector> list(AccessContext ctx) {
         ctx.require(Permission.CONFIGURE);
         return List.of(
-                new Connector("IDENTITY", "الدخول المؤسسي (OIDC/LDAP)", "NOT_CONNECTED",
-                        "الدخول الحالي محلي بكلمات مرور وجلسات خادم. موصل الهوية المؤسسية ينتظر تحديد النظام وعقده (D-04).", null),
+                identityConnector(),
                 new Connector("ORG_STRUCTURE", "الهيكل التنظيمي", "FILE_IMPORT",
                         "استيراد ملف (رمز، اسم، رمز الجهة الأم) مع تحقق ومعاينة قبل الحفظ. المزامنة الآلية غير مربوطة.",
                         lastRun("ORG_STRUCTURE")),
@@ -59,6 +60,17 @@ public class IntegrationService {
                         "القرار D-02 مفتوح. نمط PKI يرفض الاعتماد برسالة واضحة حتى ربط مزود الشهادات.", null),
                 new Connector("MALWARE_SCAN", "فحص المرفقات", "BUILT_IN",
                         "فحص مدمج للنوع الفعلي والتوقيعات المعروفة (EICAR، الماكرو، محتوى PDF النشط). ماسح خارجي غير مربوط.", null));
+    }
+
+    /** Enterprise sign-in as measured: configured, provider answering, and at least one linked sign-in recorded. */
+    private Connector identityConnector() {
+        boolean configured = oidc.configured();
+        boolean reachable = configured && oidc.reachable();
+        long linked = jdbc.sql("select count(*) from identity_link").query(Long.class).single();
+        String status = !configured ? "NOT_CONNECTED" : reachable && linked > 0 ? "CONNECTED" : "CONFIGURED";
+        return new Connector("IDENTITY", "الدخول المؤسسي (Keycloak + LDAP)", status,
+                !configured ? "مزود الهوية غير مهيأ؛ لا يوجد دخول بديل."
+                        : (reachable ? "مزود الهوية يستجيب" : "مزود الهوية لا يستجيب الآن") + "؛ حسابات مربوطة: " + linked + ".", null);
     }
 
     /**

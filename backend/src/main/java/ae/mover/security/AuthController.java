@@ -1,107 +1,147 @@
 package ae.mover.security;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import ae.mover.access.AccessContext;
 import ae.mover.access.AccessService;
 import ae.mover.access.Grant;
+import ae.mover.common.ApiException;
 import ae.mover.common.Ref;
 import ae.mover.policy.PolicyService;
 import jakarta.servlet.http.HttpServletRequest;
 
+/**
+ * Enterprise sign-in only (ADR-015): the browser is sent to the identity provider and comes back to the callback,
+ * which links the identity and opens a server-side session. There is no local password form, demo switch or any other
+ * fallback; when the provider is not configured or unreachable the sign-in page says so.
+ */
 @RestController
 @RequestMapping("/api/v1")
 public class AuthController {
 
+    static final String OIDC_COOKIE = "TMRKZ_OIDC";
+    private static final String OIDC_PATH = "/api/v1/auth/oidc";
+
     private final AuthService auth;
+    private final OidcClient oidc;
+    private final IdentityService identities;
     private final AccessService access;
     private final JdbcClient jdbc;
     private final SecurityProperties props;
-    private final DemoProperties demo;
     private final PolicyService policies;
     private final Clock clock;
 
-    public AuthController(AuthService auth, AccessService access, JdbcClient jdbc, SecurityProperties props,
-                          DemoProperties demo, PolicyService policies, Clock clock) {
+    public AuthController(AuthService auth, OidcClient oidc, IdentityService identities, AccessService access, JdbcClient jdbc,
+                          SecurityProperties props, PolicyService policies, Clock clock) {
         this.auth = auth;
+        this.oidc = oidc;
+        this.identities = identities;
         this.access = access;
         this.jdbc = jdbc;
         this.props = props;
-        this.demo = demo;
         this.policies = policies;
         this.clock = clock;
     }
 
-    public record LoginInput(String username, String password) {
+    /** Public: whether enterprise sign-in is configured and its provider answers (for a clear sign-in page). */
+    @GetMapping("/auth/status")
+    public Map<String, Object> status() {
+        boolean configured = oidc.configured();
+        return Map.of("provider", "OIDC", "configured", configured, "reachable", configured && oidc.reachable());
     }
 
-    public record DemoSwitchInput(String username) {
+    @GetMapping("/auth/oidc/start")
+    public ResponseEntity<Void> start(@RequestParam(name = "return", required = false) String returnTo) {
+        try {
+            OidcClient.Started s = oidc.start("LOGIN", returnTo, null);
+            return redirect(s.redirectUrl(), browserCookie(s.browserBinding(), 600));
+        } catch (ApiException e) {
+            return redirect(errorTarget(e), null);
+        }
     }
 
-    @PostMapping("/auth/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody LoginInput in, HttpServletRequest request) {
-        AuthService.LoginResult r = auth.login(in.username(), in.password(), request.getRemoteAddr(), request.getHeader("User-Agent"));
-        return withCookie(r);
+    public record ReauthInput(String returnTo) {
     }
 
-    @PostMapping("/auth/demo-switch")
-    public ResponseEntity<Map<String, Object>> demoSwitch(@RequestBody DemoSwitchInput in, HttpServletRequest request) {
-        AuthService.LoginResult r = auth.demoSwitch(in.username(), request.getRemoteAddr(), request.getHeader("User-Agent"));
-        return withCookie(r);
+    /** Step-up before a sensitive action: the provider asks for the credentials again (prompt=login, max_age=0). */
+    @PostMapping("/auth/reauth")
+    public ResponseEntity<Map<String, Object>> reauth(Actor actor, @RequestBody(required = false) ReauthInput in) {
+        OidcClient.Started s = oidc.start("REAUTH", in == null ? "/" : in.returnTo(), actor.sessionId());
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, browserCookie(s.browserBinding(), 600).toString())
+                .body(Map.of("redirect", s.redirectUrl()));
     }
 
-    private ResponseEntity<Map<String, Object>> withCookie(AuthService.LoginResult r) {
-        ResponseCookie cookie = ResponseCookie.from(SessionFilter.COOKIE, r.token()).httpOnly(true)
-                .secure(props.secureCookie()).sameSite("Strict").path("/").maxAge(auth.sessionLifetime()).build();
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(me(r.actor()));
+    @GetMapping("/auth/oidc/callback")
+    public ResponseEntity<Void> callback(@RequestParam(required = false) String code, @RequestParam(required = false) String state,
+                                         @RequestParam(required = false) String error,
+                                         @CookieValue(name = OIDC_COOKIE, required = false) String browser,
+                                         HttpServletRequest request) {
+        ResponseCookie clear = browserCookie("", 0);
+        if (error != null) {
+            return redirect("/#auth-error=PROVIDER_" + safeCode(error), clear);
+        }
+        try {
+            OidcClient.Identity id = oidc.complete(code, state, browser);
+            UUID person = identities.resolve(id);
+            if ("REAUTH".equals(id.purpose())) {
+                auth.markReauthenticated(id.sessionId(), person, id.authTime(), id.idToken());
+                return redirect(id.returnTo() + (id.returnTo().contains("#") ? "" : "#reauthenticated"), clear);
+            }
+            AuthService.LoginResult r = auth.issueSession(person, id.issuer(), id.idToken(), id.authTime(),
+                    request.getRemoteAddr(), request.getHeader("User-Agent"));
+            ResponseCookie session = ResponseCookie.from(SessionFilter.COOKIE, r.token()).httpOnly(true)
+                    .secure(props.secureCookie()).sameSite("Strict").path("/").maxAge(auth.sessionLifetime()).build();
+            return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, id.returnTo())
+                    .header(HttpHeaders.SET_COOKIE, session.toString()).header(HttpHeaders.SET_COOKIE, clear.toString()).build();
+        } catch (ApiException e) {
+            return redirect(errorTarget(e), clear);
+        }
     }
 
     @PostMapping("/auth/logout")
-    public ResponseEntity<Void> logout(Actor actor) {
-        auth.logout(actor);
+    public ResponseEntity<Map<String, Object>> logout(Actor actor) {
+        String idToken = auth.logout(actor);
         ResponseCookie cookie = ResponseCookie.from(SessionFilter.COOKIE, "").httpOnly(true).secure(props.secureCookie())
                 .sameSite("Strict").path("/").maxAge(0).build();
-        return ResponseEntity.noContent().header(HttpHeaders.SET_COOKIE, cookie.toString()).build();
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(Map.of("redirect", oidc.endSessionUrl(idToken)));
     }
 
-    @GetMapping("/auth/demo-users")
-    public Map<String, Object> demoUsers() {
-        if (!demo.mode()) {
-            return Map.of("enabled", false, "users", List.of());
-        }
-        List<Map<String, Object>> users = jdbc.sql("""
-                select distinct on (p.username) p.username, p.display_name, r.name as role_name, o.name as org_name, r.sort_order
-                from person p join membership m on m.person_id = p.id and m.valid_from <= now() and (m.valid_to is null or m.valid_to > now())
-                join role_def r on r.code = m.role_code join organization o on o.id = m.organization_id
-                where p.username is not null and p.status = 'ACTIVE' order by p.username, r.sort_order""")
-                .query((rs, n) -> {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("username", rs.getString("username"));
-                    m.put("displayName", rs.getString("display_name"));
-                    m.put("roleName", rs.getString("role_name"));
-                    m.put("orgName", rs.getString("org_name"));
-                    m.put("order", rs.getInt("sort_order"));
-                    return m;
-                }).list();
-        List<Map<String, Object>> sorted = new ArrayList<>(users);
-        sorted.sort((a, b) -> Integer.compare((Integer) a.get("order"), (Integer) b.get("order")));
-        sorted.forEach(m -> m.remove("order"));
-        return Map.of("enabled", true, "users", sorted);
+    // ---- identities waiting for an access manager ---------------------------------------------------------------
+
+    @GetMapping("/identity-issues")
+    public List<Map<String, Object>> identityIssues(Actor actor) {
+        return identities.issues(access.context(actor));
     }
+
+    @PostMapping("/identity-issues/{id}/resolve")
+    public ResponseEntity<Void> resolveIdentityIssue(Actor actor, @PathVariable UUID id, @RequestBody IdentityService.ResolveInput in) {
+        identities.resolveIssue(access.context(actor), id, in);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ---- current person -------------------------------------------------------------------------------------------
 
     @GetMapping("/me")
     public Map<String, Object> me(Actor actor) {
@@ -120,7 +160,6 @@ public class AuthController {
         me.put("permissions", ctx.permissions());
         me.put("summaryOnly", ctx.summaryOnly());
         me.put("grants", grants(ctx));
-        me.put("demoMode", demo.mode());
         me.put("serverTime", clock.instant().toString());
         me.put("timezone", policies.settings().timezone());
         return me;
@@ -149,6 +188,31 @@ public class AuthController {
             out.add(m);
         }
         return out;
+    }
+
+    // ---- helpers --------------------------------------------------------------------------------------------------
+
+    private ResponseCookie browserCookie(String value, long maxAge) {
+        // Lax: the provider sends the browser back with a top-level navigation that may cross sites.
+        return ResponseCookie.from(OIDC_COOKIE, value).httpOnly(true).secure(props.secureCookie()).sameSite("Lax")
+                .path(OIDC_PATH).maxAge(maxAge).build();
+    }
+
+    private static ResponseEntity<Void> redirect(String location, ResponseCookie cookie) {
+        ResponseEntity.BodyBuilder b = ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, location);
+        if (cookie != null) {
+            b.header(HttpHeaders.SET_COOKIE, cookie.toString());
+        }
+        return b.build();
+    }
+
+    private static String errorTarget(ApiException e) {
+        Object reason = e.details() == null ? null : e.details().get("reason");
+        return "/#auth-error=" + e.code().name() + (reason == null ? "" : "&reason=" + URLEncoder.encode(String.valueOf(reason), StandardCharsets.UTF_8));
+    }
+
+    private static String safeCode(String error) {
+        return error.replaceAll("[^A-Za-z_]", "").toUpperCase(java.util.Locale.ROOT);
     }
 
     static String initials(String name) {

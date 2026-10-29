@@ -18,6 +18,9 @@ Verify licences of the exact installed versions before production approval.
 | Flyway (community) | 11.14.1 | Apache-2.0 | Schema migrations |
 | PostgreSQL JDBC driver | 42.7.14 | BSD-2-Clause | Database access |
 | Oracle JDBC thin driver `com.oracle.database.jdbc:ojdbc10` | 19.27.0.0 | Oracle Free Use Terms and Conditions (FUTC) | Read-only HR views |
+| Nimbus JOSE + JWT `com.nimbusds:nimbus-jose-jwt` | 10.3 | Apache-2.0 | Verifying OpenID Connect ID tokens |
+| Keycloak (image `quay.io/keycloak/keycloak`) | 26.7.5 | Apache-2.0 | Identity provider (OIDC, LDAP federation) |
+| OpenLDAP (image `osixia/openldap`, test environment only) | 1.5.0 | OpenLDAP Public License; image MIT | Fictional directory for acceptance tests |
 | Jackson 2 / Jackson 3 | 2.21.7 / 3.1.7 | Apache-2.0 | JSON |
 | Apache Tomcat (embedded) | 11.0.27 | Apache-2.0 | HTTP server |
 | Micrometer + Prometheus registry | 1.16.8 | Apache-2.0 | Local metrics |

@@ -1,0 +1,160 @@
+{
+  "realm": "tmrkz",
+  "enabled": true,
+  "displayName": "TMRKZ",
+  "loginTheme": "tmrkz",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["ar"],
+  "defaultLocale": "ar",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "editUsernameAllowed": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": true,
+  "verifyEmail": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 43200,
+  "accessTokenLifespan": 300,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "clients": [
+    {
+      "clientId": "tmrkz-web",
+      "name": "TMRKZ",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${TMRKZ_OIDC_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "consentRequired": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "redirectUris": ["${TMRKZ_PUBLIC_URL}/api/v1/auth/oidc/callback"],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${TMRKZ_PUBLIC_URL}/",
+        "use.refresh.tokens": "false",
+        "backchannel.logout.session.required": "true"
+      },
+      "defaultClientScopes": ["profile"],
+      "optionalClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "employee number",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "employee_number",
+            "claim.name": "employee_number",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    }
+  ],
+  "components": {
+    "org.keycloak.storage.UserStorageProvider": [
+      {
+        "name": "enterprise-directory",
+        "providerId": "ldap",
+        "subComponents": {
+          "org.keycloak.storage.ldap.mappers.LDAPStorageMapper": [
+            {
+              "name": "username",
+              "providerId": "user-attribute-ldap-mapper",
+              "config": {
+                "ldap.attribute": ["${LDAP_USERNAME_ATTRIBUTE:uid}"],
+                "user.model.attribute": ["username"],
+                "read.only": ["true"],
+                "always.read.value.from.ldap": ["false"],
+                "is.mandatory.in.ldap": ["true"]
+              }
+            },
+            {
+              "name": "first name",
+              "providerId": "user-attribute-ldap-mapper",
+              "config": {
+                "ldap.attribute": ["givenName"],
+                "user.model.attribute": ["firstName"],
+                "read.only": ["true"],
+                "always.read.value.from.ldap": ["true"],
+                "is.mandatory.in.ldap": ["false"]
+              }
+            },
+            {
+              "name": "last name",
+              "providerId": "user-attribute-ldap-mapper",
+              "config": {
+                "ldap.attribute": ["sn"],
+                "user.model.attribute": ["lastName"],
+                "read.only": ["true"],
+                "always.read.value.from.ldap": ["true"],
+                "is.mandatory.in.ldap": ["false"]
+              }
+            },
+            {
+              "name": "employee number",
+              "providerId": "user-attribute-ldap-mapper",
+              "config": {
+                "ldap.attribute": ["${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:employeeNumber}"],
+                "user.model.attribute": ["employee_number"],
+                "read.only": ["true"],
+                "always.read.value.from.ldap": ["true"],
+                "is.mandatory.in.ldap": ["false"]
+              }
+            }
+          ]
+        },
+        "config": {
+          "enabled": ["true"],
+          "priority": ["0"],
+          "editMode": ["READ_ONLY"],
+          "vendor": ["${LDAP_VENDOR:other}"],
+          "connectionUrl": ["${LDAP_URL}"],
+          "startTls": ["${LDAP_START_TLS:true}"],
+          "useTruststoreSpi": ["always"],
+          "authType": ["simple"],
+          "bindDn": ["${LDAP_BIND_DN}"],
+          "bindCredential": ["${LDAP_BIND_CREDENTIAL}"],
+          "usersDn": ["${LDAP_USERS_DN}"],
+          "usernameLDAPAttribute": ["${LDAP_USERNAME_ATTRIBUTE:uid}"],
+          "rdnLDAPAttribute": ["${LDAP_USERNAME_ATTRIBUTE:uid}"],
+          "uuidLDAPAttribute": ["${LDAP_UUID_ATTRIBUTE:entryUUID}"],
+          "userObjectClasses": ["${LDAP_USER_OBJECT_CLASSES:inetOrgPerson}"],
+          "searchScope": ["2"],
+          "pagination": ["true"],
+          "connectionPooling": ["${LDAP_CONNECTION_POOLING:false}"],
+          "connectionTimeout": ["5000"],
+          "readTimeout": ["10000"],
+          "importEnabled": ["true"],
+          "syncRegistrations": ["false"],
+          "trustEmail": ["false"],
+          "validatePasswordPolicy": ["false"],
+          "allowKerberosAuthentication": ["false"],
+          "useKerberosForPasswordAuthentication": ["false"],
+          "fullSyncPeriod": ["-1"],
+          "changedSyncPeriod": ["-1"],
+          "cachePolicy": ["DEFAULT"]
+        }
+      }
+    ]
+  }
+}

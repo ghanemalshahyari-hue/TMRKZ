@@ -3,11 +3,11 @@ import type {
   ApprovalDocument,
   Attachment,
   AuditEvent,
+  AuthStatus,
   AvailabilityCheck,
   AvailabilityGrid,
   Delegation,
   DecisionInput,
-  DemoUsers,
   DraftInput,
   ExecutionTask,
   ExportJob,
@@ -23,6 +23,7 @@ import type {
   HrSourceInput,
   HrStatus,
   HrTestResult,
+  IdentityIssue,
   Integration,
   Kpis,
   MapFeatures,
@@ -166,16 +167,17 @@ export const urls = {
 
 export const api = {
   // session
-  login: (username: string, password: string) => call<Me>('POST', '/auth/login', { body: { username, password }, silent401: true }),
-  logout: () => post<void>('/auth/logout'),
-  demoUsers: () => call<DemoUsers>('GET', '/auth/demo-users', { silent401: true }),
-  demoSwitch: (username: string) => post<Me>('/auth/demo-switch', { username }),
+  authStatus: () => call<AuthStatus>('GET', '/auth/status', { silent401: true }),
+  logout: () => post<{ redirect: string }>('/auth/logout'),
+  reauth: (returnTo: string) => post<{ redirect: string }>('/auth/reauth', { returnTo }),
   me: () => call<Me>('GET', '/me', { silent401: true }),
 
   // organizations
   orgTree: () => get<OrgNode[]>('/organizations/tree'),
   org: (id: string) => get<OrgDetail>(`/organizations/${id}`),
   people: (q: string) => get<Page<Person>>('/people' + query({ q, size: 50 })),
+  identityIssues: () => get<IdentityIssue[]>('/identity-issues'),
+  resolveIdentityIssue: (id: string, personId: string | null, reason: string) => post<void>(`/identity-issues/${id}/resolve`, { personId, reason }),
   createMembership: (body: { personId: string; organizationId: string; roleCode: string; positionTitle?: string; siteScopeId?: string | null; validFrom: string; validTo?: string | null }) =>
     post<unknown>('/memberships', body),
   endMembership: (id: string, reason: string, endAt?: string) => post<unknown>(`/memberships/${id}/end`, { reason, endAt }),

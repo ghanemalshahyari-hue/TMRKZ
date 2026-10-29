@@ -11,8 +11,8 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
   const app = useApp();
   const [note, setNote] = useState('');
   const [reasonCode, setReasonCode] = useState<ReasonCode>('INCOMPLETE_DATA');
-  const [password, setPassword] = useState('');
   const [ack, setAck] = useState(false);
+  const [reauth, setReauth] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [doc, setDoc] = useState<ApprovalDocument | null>(null);
@@ -24,8 +24,8 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
 
   useEffect(() => {
     setNote('');
-    setPassword('');
     setAck(false);
+    setReauth(false);
     setError('');
     setDoc(null);
     key.current = newIdempotencyKey();
@@ -44,7 +44,7 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
   const apply = async () => {
     const trimmed = note.trim();
     if (decision !== 'APPROVE' && trimmed.length < 5) return setError('اكتب سبباً من 5 أحرف على الأقل.');
-    if (needsSignature && !pki && (!password || !ack)) return setError('أدخل كلمة المرور وأكّد الاعتماد للتوثيق الداخلي.');
+    if (needsSignature && !pki && !ack) return setError('أكّد الاعتماد للتوثيق الداخلي.');
     setBusy(true);
     setError('');
     try {
@@ -55,7 +55,7 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
           note: trimmed || undefined,
           reasonCode: decision === 'RETURN' ? reasonCode : undefined,
           expectedRevision: r.revision,
-          signature: needsSignature ? { password, confirm: ack } : undefined,
+          signature: needsSignature ? { confirm: ack } : undefined,
         },
         key.current,
       );
@@ -74,6 +74,7 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
       const err = e as ApiError;
       if (err.code === 'RESERVATION_CONFLICT')
         setError('تعذر تثبيت الحجز: ' + err.message + ' لم يُسجل القرار ولم يُنشأ أي حجز جزئي. يمكن إرجاع الطلب لتعديل الفترة.');
+      else if (err.code === 'REAUTHENTICATION_REQUIRED') setReauth(true);
       else if (err.code === 'STALE_REVISION') setError('تغيّر الطلب منذ فتحه (' + err.message + '). أعد تحميل الطلب ثم راجع النسخة الأحدث.');
       else setError(err.message);
       // A definitive server answer consumed nothing, so allow a fresh attempt. After a network failure the
@@ -129,10 +130,25 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
               <div className="note orange">نمط التوقيع المهيأ «توقيع بشهادة (PKI)» غير مربوط بمزود شهادات بعد (القرار D-02). لن يُسجل اعتماد دون توقيع صحيح.</div>
             ) : (
               <>
-                <label className="field">
-                  <span>كلمة المرور لتأكيد هوية المعتمد</span>
-                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" />
-                </label>
+                {reauth && (
+                  <div className="note orange" role="alert" style={{ marginBottom: 10 }}>
+                    يتطلب الاعتماد تحققاً حديثاً من هويتك لدى مزود الهوية. لم يُسجل أي قرار.
+                    <div style={{ marginTop: 8 }}>
+                      <button
+                        className="button compact"
+                        onClick={async () => {
+                          try {
+                            window.location.assign((await api.reauth('/' + window.location.hash)).redirect);
+                          } catch (e) {
+                            setError((e as Error).message);
+                          }
+                        }}
+                      >
+                        إعادة التحقق من الهوية
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <label className="check-label">
                   <input type="checkbox" checked={ack} onChange={(e) => setAck(e.target.checked)} />
                   أؤكد اعتماد المراجعة {doc?.revision ?? r.revision} كما هي معروضة

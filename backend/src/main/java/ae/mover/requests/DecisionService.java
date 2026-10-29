@@ -279,7 +279,7 @@ public class DecisionService {
         String mode = policies.settings().signatureMode();
         if ("APPROVE".equals(decision) && t.finalStage() && t.requiresSignature() && policies.settings().signatureRequired()) {
             doc = canonical(requestIdValue, currentRevision);
-            signed = signatures.sign(mode, ctx.personId(), grant.roleName(), doc.sha256(), now, in.signature());
+            signed = signatures.sign(mode, ctx.personId(), ctx.actor().sessionId(), grant.roleName(), doc.sha256(), now, in.signature());
         }
 
         jdbc.sql("""

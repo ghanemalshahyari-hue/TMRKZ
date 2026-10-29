@@ -26,6 +26,14 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' "${TARGET}-backend-1" 2>
 done
 
 docker compose -p "$TARGET" exec -T db psql -U mover -d mover -At -f - < ops/sql/fingerprint.sql > "$BACKUP/fingerprint.restored.txt"
+if [ -f "$BACKUP/keycloak.dump" ]; then
+  docker compose -p "$TARGET" exec -T db psql -U mover -d keycloak -At -c "select 'realms', count(*) from realm union all select 'users', count(*) from user_entity union all select 'clients', count(*) from client" > "$BACKUP/identity-fingerprint.restored.txt"
+  if diff -q "$BACKUP/identity-fingerprint.txt" "$BACKUP/identity-fingerprint.restored.txt" >/dev/null; then
+    echo "[verify] identity realm, users and clients identical"
+  else
+    echo "[verify] identity database differs after restore"; diff "$BACKUP/identity-fingerprint.txt" "$BACKUP/identity-fingerprint.restored.txt" || true; exit 1
+  fi
+fi
 # The restored application registers nothing new on start-up (map packages are already installed), so every
 # fingerprint must match exactly.
 if diff "$BACKUP/fingerprint.txt" "$BACKUP/fingerprint.restored.txt"; then

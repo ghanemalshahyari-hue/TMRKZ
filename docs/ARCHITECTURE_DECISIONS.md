@@ -24,7 +24,7 @@ Modules are Java packages with service façades: `security` (identity adapter), 
 PostgreSQL features (range types, exclusion constraints, recursive CTEs, row locks) that should stay visible in the
 code. Flyway owns the business schema; Flowable creates its own `ACT_*` tables in the same database.
 
-## ADR-003 Local identity with server-side sessions — Provisional (D-04)
+## ADR-003 Local identity with server-side sessions — Superseded by ADR-015 (2026-10-29)
 
 Proposed: Keycloak. Chosen: the `security` module is a local identity adapter (BCrypt passwords, account lock-out,
 opaque session token in an `HttpOnly; SameSite=Strict` cookie, only its SHA-256 stored server-side, idle and absolute
@@ -164,3 +164,33 @@ mapping to the reference files are in `docs/TNQL_COMPATIBILITY.md`.
   a run that finds the lock taken is SKIPPED; a run left RUNNING after a crash is closed as INTERRUPTED.
 - **Testing.** The acceptance suite runs this exact code against fictional views behind a SELECT-only login role. The
   connection to the enterprise Oracle is a separate, still-open integration step.
+
+## ADR-015 Enterprise sign-in through Keycloak federating LDAP; no local or demo sign-in — Accepted (2026-10-29)
+
+Supersedes ADR-003 (local identity adapter). Owner decision: Keycloak with LDAP; one production configuration.
+
+- **Flow.** The backend runs the OpenID Connect Authorization Code flow with PKCE (S256) as a confidential client
+  (`OidcClient`). Each attempt is single use, expires in ten minutes and is bound to the starting browser by an HttpOnly
+  `TMRKZ_OIDC` cookie (SameSite=Lax, path limited to the callback). The ID token is verified against the provider's
+  published keys, issuer, audience/azp, expiry and the attempt's nonce. The browser never holds provider tokens; TMRKZ
+  issues its own opaque HttpOnly session as before, and authorisation is still evaluated from the database on every
+  request, so revocation needs no token expiry.
+- **Directory.** Keycloak federates the enterprise LDAP read-only (`editMode READ_ONLY`), verifies passwords there,
+  uses StartTLS or LDAPS with certificate validation against the CA folder mounted as its truststore, and applies brute-
+  force lockout (5 failures, increasing wait up to 15 minutes). TMRKZ stores no passwords.
+- **Linking.** `identity_link (issuer, subject)` → person. First sign-in links automatically only on a stable key
+  matching exactly one active HR person while the HR mirror is within its age policy: `DOMAIN_ACCOUNT` (default, as
+  TNQL: the directory login equals the HR domain account) or `EMPLOYEE_NUMBER` (a directory attribute mapped to the
+  `employee_number` claim). No key, no match, several matches, an inactive record, a stale mirror or a person already
+  linked records an `identity_link_issue` for an access manager, who links or dismisses it with a reason. A directory
+  account grants no business right by itself.
+- **No fallback.** The local password form, the demo user switch, the demo flag and the demo dataset are removed from
+  the production build. When the provider is not configured or does not answer, the sign-in page says so. Fictional
+  directory users and data exist only in the separate test environment (`ops/test-env`, compose project `tmrkz-test`).
+- **Step-up for approval.** The internal attestation requires an interactive authentication at the provider within
+  `TMRKZ_REAUTH_MAX_AGE_SECONDS` (default 300). Otherwise the decision is refused with `REAUTHENTICATION_REQUIRED`,
+  nothing is recorded, and the UI starts a step-up (`prompt=login`, `max_age=0`) for the same session and person.
+- **Deployment.** `tmrkz/keycloak:26.7.5-1` is built from the pinned `quay.io/keycloak/keycloak:26.7.5` with the TMRKZ
+  theme baked in (Arabic RTL, local font and assets). The realm (`ops/keycloak/realm/tmrkz-realm.json`) is imported on
+  first start with values from the environment. Keycloak has its own database and owner in the same PostgreSQL server.
+  It is reached through the web entry point under `/auth`; the admin console and the master realm are not served there.

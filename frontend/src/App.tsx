@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, onUnauthorized } from './api/client';
-import type { DemoUser, Me, Notification, OrgNode, Permission, RequestType, Settings, Site } from './api/types';
+import type {Me, Notification, OrgNode, Permission, RequestType, Settings, Site } from './api/types';
 import { RequestWizard } from './components/RequestWizard';
 import { Icon, NoAccess } from './components/ui';
 import { AppContext, NAV, flattenOrgs, type AppContextValue, type View, type WizardRequest } from './lib/app';
@@ -52,7 +52,7 @@ export function App() {
   }, []);
 
   if (checking) return <div className="login-shell"><div className="empty">جارٍ التحقق من الجلسة…</div></div>;
-  if (!me) return <LoginPage onLogin={setMe} />;
+  if (!me) return <LoginPage />;
   return <Workspace me={me} setMe={setMe} />;
 }
 
@@ -181,7 +181,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     <AppContext.Provider value={ctx}>
       <div className="demo-ribbon">
         <span>
-          <i /> {me.demoMode ? 'بيئة تجربة · بيانات وجهات ومرافق افتراضية · الحفظ في قاعدة بيانات الخادم' : 'MOVER · تشغيل داخل شبكة معزولة'}
+          <i /> TMRKZ · تشغيل داخل شبكة معزولة
         </span>
         <a href="#docs">التوثيق والتشغيل ↖</a>
         <a href="/docs/handoff/START_HERE.md">حزمة التسليم الأصلية ↓</a>
@@ -271,56 +271,17 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
   );
 }
 
-/** Keeps the prototype's «تجربة الدور» control: demo users in demo mode, otherwise the signed-in identity + logout. */
-function IdentitySwitch({ me, setMe, onSwitched, toast }: { me: Me; setMe: (m: Me | null) => void; onSwitched: () => void; toast: (m: string) => void }) {
-  const [users, setUsers] = useState<DemoUser[]>([]);
-  useEffect(() => {
-    if (!me.demoMode) return;
-    api
-      .demoUsers()
-      .then((d) => setUsers(d.enabled ? d.users : []))
-      .catch(() => setUsers([]));
-  }, [me.demoMode]);
-
+/** The signed-in identity and logout (which also ends the identity provider's session). */
+function IdentitySwitch({ me, setMe }: { me: Me; setMe: (m: Me | null) => void; onSwitched: () => void; toast: (m: string) => void }) {
   const logout = async () => {
+    let target = '/';
     try {
-      await api.logout();
+      target = (await api.logout()).redirect || '/';
     } finally {
       setMe(null);
+      window.location.assign(target);
     }
   };
-
-  if (me.demoMode && users.length) {
-    return (
-      <div className="role-switch">
-        <label htmlFor="demoRole">تجربة الدور</label>
-        <select
-          id="demoRole"
-          value={me.username}
-          onChange={async (e) => {
-            const v = e.target.value;
-            if (v === '__logout') return logout();
-            try {
-              const next = await api.demoSwitch(v);
-              setMe(next);
-              onSwitched();
-              toast('تم الدخول بحساب تجريبي: ' + next.displayName + ' — ' + (next.primaryRole?.name ?? ''));
-            } catch (err) {
-              toast((err as Error).message);
-            }
-          }}
-        >
-          {!users.some((u) => u.username === me.username) && <option value={me.username}>{me.displayName}</option>}
-          {users.map((u) => (
-            <option key={u.username} value={u.username}>
-              {u.roleName} — {u.displayName}
-            </option>
-          ))}
-          <option value="__logout">تسجيل الخروج</option>
-        </select>
-      </div>
-    );
-  }
   return (
     <div className="role-switch">
       <label>{me.primaryRole?.name ?? 'المستخدم'}</label>

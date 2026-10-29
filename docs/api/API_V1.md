@@ -51,10 +51,13 @@ type RuleOp = 'eq'|'neq'|'gt'|'gte'|'lt'|'lte'|'in'|'empty'|'notEmpty';
 
 | Method & path | Body | Response |
 |---|---|---|
-| `POST /auth/login` | `{ username, password }` | `Me` |
-| `POST /auth/logout` | – | 204 |
-| `GET /auth/demo-users` | – | `{ enabled: boolean, users: { username, displayName, roleName, orgName }[] }` (empty unless demo mode) |
-| `POST /auth/demo-switch` | `{ username }` | `Me` — only when `MOVER_DEMO_MODE=true`; 404 otherwise |
+| `GET /auth/status` | – | `{ provider: 'OIDC', configured, reachable }` (public) |
+| `GET /auth/oidc/start?return=/path` | – | 302 to the identity provider; sets the browser-binding cookie (public) |
+| `GET /auth/oidc/callback?code&state` | – | 302 to `return` with the session cookie, or to `/#auth-error=CODE[&reason=…]` (public) |
+| `POST /auth/reauth` | `{ returnTo }` | `{ redirect }` — step-up at the provider before a sensitive action |
+| `POST /auth/logout` | – | `{ redirect }` — the provider's end-session address |
+| `GET /identity-issues` | – | sign-ins waiting for an access manager (MANAGE_ACCESS; source ids only with VIEW_SOURCE_IDENTIFIERS) |
+| `POST /identity-issues/{id}/resolve` | `{ personId?, reason }` | 204 — link to an active person, or dismiss |
 | `GET /me` | – | `Me` |
 | `GET /me/capabilities` | – | `{ permissions: Permission[], grants: Grant[] }` |
 
@@ -66,7 +69,6 @@ type Me = {
   permissions: Permission[];          // union of active grants
   summaryOnly: boolean;               // every VIEW grant is summary-only
   grants: Grant[];
-  demoMode: boolean;
   serverTime: string; timezone: string;
 };
 type Grant = {
@@ -257,7 +259,7 @@ type VersionInfo = { id: string; version: number; status: 'DRAFT'|'PUBLISHED'|'R
 | `GET /integrations` | `{ code, name, status: 'NOT_CONNECTED'|'FILE_IMPORT'|'BUILT_IN', description, lastRun: { id, status, startedAt, stats }|null }[]` |
 | `POST /integrations/org-structure/preview` | `{ rows: { code, name, parentCode|null }[] }` → `{ runId, valid, errors: { row, code, message }[], summary: { create, update, unchanged } }` |
 | `POST /integrations/org-structure/runs/{runId}/commit` | applies a valid preview |
-| `GET /system/info` | `{ version, timezone, serverTime, demoMode, database: 'UP', outboxPending, mapPackages }` |
+| `GET /system/info` | `{ version, timezone, serverTime, database: 'UP', outboxPending, mapPackages }` |
 
 ```ts
 type Settings = { multiSites: boolean; multiOrgs: boolean; signatureRequired: boolean;

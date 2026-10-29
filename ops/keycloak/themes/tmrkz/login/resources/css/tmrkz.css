@@ -1,0 +1,121 @@
+/* TMRKZ sign-in. Palette after TNQL's rendered sign-in: cream ground, dark brown ink, gold hairlines.
+   Contrast (WCAG 2.2): ink #2e2618 on #fdfbf6 ≈ 14.9:1; muted #6b5f49 on #fdfbf6 ≈ 6.0:1; button text #fff on #6e471d ≈ 8.3:1;
+   error #8a2c1c on #fbeeea ≈ 7.6:1; focus ring #8a6a2f ≥ 3:1 against the card. */
+@font-face {
+  font-family: 'TMRKZ Arabic';
+  src: url('../fonts/arabic.ttf') format('truetype');
+  font-display: swap;
+}
+
+:root {
+  --ground: #fdfbf6;
+  --card: #fffdf8;
+  --ink: #2e2618;
+  --muted: #6b5f49;
+  --gold: #b8975a;
+  --gold-soft: #e9dcc0;
+  --button: #6e471d;
+  --button-hover: #5a3915;
+  --focus: #8a6a2f;
+  --error-ink: #8a2c1c;
+  --error-bg: #fbeeea;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; min-height: 100%; }
+
+.tm-body {
+  min-height: 100dvh;
+  font: 15px/1.8 'TMRKZ Arabic', Tahoma, Arial, sans-serif;
+  color: var(--ink);
+  background: var(--ground);
+}
+
+/* Still background: soft gold light, no motion and no remote image. */
+.tm-backdrop {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(900px 420px at 85% -10%, #f3e8d1 0, transparent 70%),
+    radial-gradient(700px 380px at 10% 110%, #efe4cc 0, transparent 70%),
+    var(--ground);
+  z-index: 0;
+}
+
+.tm-shell {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+}
+
+.tm-card {
+  width: min(440px, 100%);
+  background: var(--card);
+  border: 1px solid var(--gold-soft);
+  border-top: 3px solid var(--gold);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(46, 38, 24, .10);
+  padding: 30px 28px 22px;
+}
+
+.tm-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+.tm-mark {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: linear-gradient(135deg, #c9ab70, #8f6a2f);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35);
+}
+.tm-brand-text strong { display: block; font: 700 19px/1.2 Arial, sans-serif; letter-spacing: 2px; direction: ltr; text-align: right; }
+.tm-brand-text small { color: var(--muted); font-size: 12px; }
+
+h1 { font-size: 21px; margin: 0 0 14px; font-weight: 700; }
+
+.tm-form { display: grid; gap: 14px; }
+.tm-field { display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.tm-field input {
+  width: 100%;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid #d8ccb2;
+  border-radius: 9px;
+  padding: 11px 12px;
+}
+.tm-field input[aria-invalid="true"] { border-color: var(--error-ink); }
+.tm-password { position: relative; display: block; }
+.tm-password input { padding-left: 76px; }
+.tm-reveal {
+  position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
+  font: inherit; font-size: 12px; color: var(--ink);
+  background: #f6efe0; border: 1px solid #e3d6ba; border-radius: 7px; padding: 4px 10px; cursor: pointer;
+}
+
+.tm-submit {
+  margin-top: 4px;
+  font: inherit; font-weight: 700; font-size: 15px;
+  color: #fff;
+  background: var(--button);
+  border: 0; border-radius: 9px; padding: 12px; cursor: pointer;
+}
+.tm-submit:hover { background: var(--button-hover); }
+
+input:focus-visible, button:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.tm-alert { border-radius: 9px; padding: 10px 12px; font-size: 13px; border: 1px solid transparent; }
+.tm-alert-error { color: var(--error-ink); background: var(--error-bg); border-color: #efcfc6; }
+.tm-alert-warning { color: #6b4b10; background: #fbf3df; border-color: #ecdcae; }
+.tm-alert-info, .tm-alert-success { color: #3f5a2a; background: #f1f5ea; border-color: #d9e4c8; }
+
+.tm-foot { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--gold-soft); font-size: 12px; color: var(--muted); }
+.tm-foot p { margin: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

@@ -10,28 +10,19 @@
 ## التشغيل السريع
 
 ```sh
-sh ops/init-env.sh --demo        # ينشئ ‎.env بأسرار عشوائية وبيانات عرض افتراضية (يطبع كلمة مرور العرض)
-docker compose up -d --build     # قاعدة البيانات + الخادم + الواجهة
-# افتح http://localhost:8088
+sh ops/test-env/up.sh            # بيئة الاختبار: TMRKZ + Keycloak + دليل LDAP افتراضي + بيانات افتراضية
+cat ops/test-env/.generated/user-password
+# افتح http://localhost:8088 واختر «الدخول بالحساب المؤسسي»
 ```
 
-حسابات العرض (كلمة المرور في `.env` ← `MOVER_DEMO_PASSWORD`):
-
-| المستخدم | الدور | الجهة |
-|---|---|---|
-| `admin` | مدير النظام | الإدارة العامة |
-| `requester` / `requester2` | مقدم الطلب | الخدمات المشتركة / إدارة التقنية |
-| `facilities` | مراجع المرافق | الخدمات المشتركة |
-| `manager` / `manager_it` / `manager_ga` | مدير الجهة | حسب الجهة |
-| `approver` / `approver2` | صاحب الاعتماد | الإدارة العامة |
-| `limited` | اطلاع محدود (ملخص فقط، المرافق 02/05/08) | الخدمات المشتركة |
-| `auditor` | مدقق السجلات | الإدارة العامة |
-
-في وضع العرض (`MOVER_DEMO_MODE=true`) يتيح رأس الصفحة «تجربة الدور» للتبديل بين هذه الحسابات كما في التصور.
-**أوقف وضع العرض وبيانات العرض في أي بيئة تحتوي بيانات حقيقية.**
+لا يوجد في النظام وضع عرض ولا تبديل مستخدمين ولا دخول محلي بكلمة مرور: الدخول عبر Keycloak الذي يتحقق من كلمة المرور
+في الدليل المؤسسي (LDAP)، ثم يُربط الحساب بسجل الموارد البشرية. حسابات بيئة الاختبار الافتراضية (كلمة مرور واحدة مولدة
+محلياً) مدرجة في [`ops/test-env/README.md`](ops/test-env/README.md): ‎`t.requester`، ‎`t.facilities`، ‎`t.manager`،
+‎`t.approver`، ‎`t.admin`، ‎`t.limited`، ‎`t.auditor`… وفي بيئة الإنتاج تُضبط بيانات الدليل في ‎`.env`
+(انظر [`docs/OPERATIONS.md`](docs/OPERATIONS.md)).
 
 رحلة مقترحة: من الخريطة اختر «مركز الخدمات» ← «طلب على هذا المرفق» ← أكمل الطلب وأرسله (يظهر برتقالياً دون حجز)
-← `facilities` يوافق ← `manager` يرجع بسبب ← `requester` يعدل ويعيد التقديم ← `manager` يوافق ← `approver` يعتمد
+← `t.facilities` يوافق ← `t.manager` يرجع بسبب ← `t.requester` يعدل ويعيد التقديم ← `t.manager` يوافق ← `t.approver` يعتمد
 مع التوثيق الداخلي ← يُثبت الحجز ذرياً ← مهام التسليم والاستلام ← إغلاق الملف مع بقاء الحجز والسجل.
 
 ## ما الذي بُني
@@ -50,7 +41,7 @@ docker compose up -d --build     # قاعدة البيانات + الخادم + 
 
 | المجموعة | الأمر | النتيجة الحالية |
 |---|---|---|
-| اختبارات القبول في الخادم (PostgreSQL حقيقي + HTTP) | `ops/test-backend.sh` | 42/42 ناجحة — AT-01…AT-36 |
+| اختبارات القبول في الخادم (PostgreSQL حقيقي + HTTP) | `ops/test-backend.sh` | 46/46 ناجحة — AT-01…AT-36 |
 | رحلة القبول الكاملة عبر nginx | `node tests/acceptance/journey.mjs` | 29/29 فحصاً ناجحاً، بما فيها AT-29 (دون اعتماد خارجي) |
 | الاستعادة إلى بيئة نظيفة (AT-30) | `sh ops/verify-restore.sh` | ناجحة: 20 جدولاً متطابقاً والمرفقات مطابقة للبصمة |
 | الواجهة (أنواع + وحدات) | `cd frontend && npm test && npm run build` | 17/17 ناجحة |
@@ -76,7 +67,7 @@ resources, configurable request forms and approval workflows, conflict-free rese
 authority, a production audit trail, and air-gapped Docker deployment. It implements the handoff package in
 `handoff/` and reproduces the approved prototype (`dist/prototype.html`) exactly.
 
-**Run:** `sh ops/init-env.sh --demo && docker compose up -d --build`, then open `http://localhost:8088`.
+**Run (fictional test environment):** `sh ops/test-env/up.sh`, then open `http://localhost:8088` and sign in through Keycloak with a user from `ops/test-env/README.md`. Production: `sh ops/init-env.sh`, fill in the directory settings (`docs/OPERATIONS.md`), then `docker compose up -d --build`.
 
 **Key guarantees (all covered by automated tests against real PostgreSQL):**
 - A pending request never blocks a facility; the reservation is created only by the final approval, atomically with

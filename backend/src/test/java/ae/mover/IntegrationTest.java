@@ -44,13 +44,12 @@ import ae.mover.workflow.WorkflowService;
         "mover.storage.root=${java.io.tmpdir}/mover-test-files",
         "mover.map.root=../map-packages",
         "mover.signature.attestation-key=test-attestation-key-0123456789abcdef-0123",
-        "mover.demo.mode=false",
-        "mover.demo.seed=false",
         "mover.outbox.enabled=false",
         "tmrkz.hr.settings-key=test-hr-settings-key-0123456789abcdef-0123",
         "tmrkz.hr.scheduler-enabled=false"})
 public abstract class IntegrationTest {
 
+    /** Kept in the signature payload only to show that a password is ignored: TMRKZ verifies no passwords. */
     protected static final String PASSWORD = "Test#Pass-2026";
     protected static final ObjectMapper JSON = new ObjectMapper();
 
@@ -70,7 +69,6 @@ public abstract class IntegrationTest {
     protected OutboxProcessor outbox;
 
     protected final String sfx = UUID.randomUUID().toString().substring(0, 8);
-    private static String passwordHash;
 
     // ---- fixtures -----------------------------------------------------------------------------------
 
@@ -105,13 +103,10 @@ public abstract class IntegrationTest {
     }
 
     protected UUID person(String username, String role, UUID org, UUID siteScope) {
-        if (passwordHash == null) {
-            passwordHash = auth.hash(PASSWORD);
-        }
         UUID id = UUID.randomUUID();
-        jdbc.sql("insert into person(id, employee_no, display_name, username, password_hash) values (:id, :e, :n, :u, :h)")
+        jdbc.sql("insert into person(id, employee_no, display_name, username) values (:id, :e, :n, :u)")
                 .param("id", id).param("e", "T-" + username + "-" + sfx).param("n", "شخص " + username)
-                .param("u", username + "-" + sfx).param("h", passwordHash).update();
+                .param("u", username + "-" + sfx).update();
         membership(id, role, org, siteScope);
         return id;
     }
@@ -218,12 +213,19 @@ public abstract class IntegrationTest {
         }
     }
 
+    /**
+     * A session for a fixture person, opened through the same {@link AuthService#issueSession} that the OIDC callback
+     * uses after a verified sign-in (test set-up only; sign-in itself is covered by {@code EnterpriseSignInIT}).
+     */
     protected Api login(String username) {
+        UUID person = jdbc.sql("select id from person where username = :u").param("u", username + "-" + sfx)
+                .query(UUID.class).single();
+        AuthService.LoginResult r = auth.issueSession(person, "test-issuer", null, Instant.now(), "127.0.0.1", "acceptance-test");
         Api api = new Api();
-        Res r = api.post("/auth/login", Map.of("username", username + "-" + sfx, "password", PASSWORD));
-        if (r.status() != 200) {
-            throw new IllegalStateException("login failed for " + username + ": " + r);
-        }
+        java.net.HttpCookie cookie = new java.net.HttpCookie(ae.mover.security.SessionFilter.COOKIE, r.token());
+        cookie.setPath("/");
+        cookie.setVersion(0);
+        ((CookieManager) api.http.cookieHandler().orElseThrow()).getCookieStore().add(URI.create("http://localhost:" + port), cookie);
         return api;
     }
 

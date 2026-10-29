@@ -27,3 +27,5 @@ backups/
 offline-bundle/
 .idea/
 .vscode/
+# Acceptance test environment: generated test CA, keys and passwords
+ops/test-env/.generated/

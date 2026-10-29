@@ -64,6 +64,12 @@
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- Verifies OpenID Connect ID tokens (signature from the provider's published keys, issuer, audience, nonce). -->
+    <dependency>
+      <groupId>com.nimbusds</groupId>
+      <artifactId>nimbus-jose-jwt</artifactId>
+      <version>10.3</version>
+    </dependency>
     <!-- Oracle JDBC thin driver for the read-only HR views. The 19c line connects to Oracle Database 11.2 through 21c,
          the widest range while the HR server version is unconfirmed. Oracle Free Use Terms and Conditions (FUTC). -->
     <dependency>

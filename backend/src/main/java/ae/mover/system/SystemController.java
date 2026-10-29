@@ -36,7 +36,6 @@ import ae.mover.policy.PolicyService;
 import ae.mover.policy.Settings;
 import ae.mover.reports.ReportService;
 import ae.mover.security.Actor;
-import ae.mover.security.DemoProperties;
 
 /** Policies, integrations, audit, indicators, exports, notifications and system information. */
 @RestController
@@ -51,12 +50,10 @@ public class SystemController {
     private final JdbcClient jdbc;
     private final Json json;
     private final Clock clock;
-    private final DemoProperties demo;
     private final String version;
 
     public SystemController(AccessService access, PolicyService policies, IntegrationService integrations,
-                            ReportService reports, OutboxProcessor outbox, JdbcClient jdbc, Json json, Clock clock,
-                            DemoProperties demo, @Value("${mover.version:1.0.0}") String version) {
+                            ReportService reports, OutboxProcessor outbox, JdbcClient jdbc, Json json, Clock clock, @Value("${mover.version:1.0.0}") String version) {
         this.access = access;
         this.policies = policies;
         this.integrations = integrations;
@@ -65,7 +62,6 @@ public class SystemController {
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
-        this.demo = demo;
         this.version = version;
     }
 
@@ -249,7 +245,6 @@ public class SystemController {
         m.put("version", version);
         m.put("timezone", policies.settings().timezone());
         m.put("serverTime", clock.instant().toString());
-        m.put("demoMode", demo.mode());
         m.put("database", jdbc.sql("select 1").query(Integer.class).single() == 1 ? "UP" : "DOWN");
         m.put("outboxPending", outbox.pending());
         m.put("mapPackages", jdbc.sql("select count(*) from map_package where status = 'ACTIVE'").query(Long.class).single());

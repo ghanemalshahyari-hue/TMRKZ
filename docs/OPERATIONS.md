@@ -56,7 +56,13 @@ configuration changes never require data migration of in-flight requests.
 
 ## Secrets and key rotation
 
-- `.env` holds `MOVER_DB_PASSWORD`, `MOVER_ATTESTATION_KEY`, optional demo password; permissions 600; never committed.
+- `.env` holds `MOVER_DB_PASSWORD`, `MOVER_ATTESTATION_KEY`, `TMRKZ_HR_SETTINGS_KEY`, `TMRKZ_OIDC_CLIENT_SECRET`,
+  `TMRKZ_KEYCLOAK_DB_PASSWORD`, `TMRKZ_KEYCLOAK_ADMIN_PASSWORD` and the directory settings; permissions 600; never committed.
+- Keys restored with a backup: `MOVER_ATTESTATION_KEY` (re-verifies attestation evidence), `TMRKZ_HR_SETTINGS_KEY`
+  (decrypts the stored HR source password), `TMRKZ_OIDC_CLIENT_SECRET` (the realm's client secret) and the Keycloak and
+  database passwords. They are not in the backup set: keep them in the organisation's key vault and restore `.env`
+  from there before running `ops/restore.sh`. A backup contains the business database, the identity database
+  (`keycloak.dump`), attachments and map packages, each with a SHA-256 in `manifest.json`.
 - Rotating `MOVER_ATTESTATION_KEY` affects only new attestations. Keep the retired key in the organisation's key
   vault to re-verify evidence on historical approval documents.
 - Production hardening: create a restricted runtime database role (DML on business tables, no DDL, no `TRUNCATE`)
@@ -77,28 +83,46 @@ configuration changes never require data migration of in-flight requests.
   last runs. Raw source identifiers in run issues are shown only to holders of VIEW_SOURCE_IDENTIFIERS.
 - Migration from TNQL: see `docs/TNQL_COMPATIBILITY.md`. Re-enter the password in TMRKZ; never copy TNQL's token or key.
 
-## User administration
+## Sign-in (Keycloak + enterprise directory)
 
-- People, memberships (dated) and delegations are managed in «الهيكل التنظيمي» by `CONFIGURE` holders; ending a
-  membership withdraws access immediately and is audited (open tasks stay with the remaining role holders).
-- Initial administrator in a non-demo installation:
+- Fill in `.env`: `LDAP_URL` (`ldaps://…`, or `ldap://…` with `LDAP_START_TLS=true`), `LDAP_BIND_DN` and
+  `LDAP_BIND_CREDENTIAL` (a read-only service account), `LDAP_USERS_DN`, and optionally `LDAP_USERNAME_ATTRIBUTE`
+  (default `uid`; `sAMAccountName` for Active Directory with `LDAP_VENDOR=ad`, `LDAP_UUID_ATTRIBUTE=objectGUID`,
+  `LDAP_USER_OBJECT_CLASSES=person, organizationalPerson, user`). Put the organisation's CA certificates (PEM) in
+  `ops/keycloak/truststores/`. Certificate validation is never disabled.
+- `TMRKZ_PUBLIC_URL` is the address users open (behind the organisation's TLS proxy in production, then set
+  `MOVER_SECURE_COOKIE=true`). The realm is created from these values on the first start only; later changes are made
+  in the Keycloak administration console.
+- The administration console is not served through the web entry point. Reach it from the host only, for example
+  `docker compose exec keycloak /opt/keycloak/bin/kcadm.sh …`, or a temporary SSH tunnel to `keycloak:8080/auth/admin/`.
+  The bootstrap account `tmrkz-bootstrap` uses `TMRKZ_KEYCLOAK_ADMIN_PASSWORD`: replace it with a named administrator
+  after the first start.
+- First sign-in links a person automatically only when the directory login equals exactly one active HR domain account
+  (`TMRKZ_OIDC_LINK_KEY=DOMAIN_ACCOUNT`), or, with `EMPLOYEE_NUMBER`, when the directory attribute mapped to the
+  `employee_number` claim equals the HR employee number. Anything else appears under «الهيكل التنظيمي» → sign-ins
+  waiting for review, where a MANAGE_ACCESS holder links or dismisses it with a reason.
+- Business rights come only from memberships and responsibility seats. Give the first administrator a `SYSTEM_ADMIN`
+  membership by SQL once their HR record is mirrored:
   ```sql
-  -- inside: docker compose exec db psql -U mover -d mover
-  -- password hash: generate a BCrypt hash with the organisation's approved tool
-  insert into person(id, employee_no, display_name, username, password_hash)
-    values (gen_random_uuid(), 'E-0001', 'مدير النظام', 'admin', '<bcrypt-hash>');
-  insert into organization(id, code, name) values (gen_random_uuid(), 'ORG', 'المؤسسة');
-  insert into membership(id, person_id, organization_id, role_code, valid_from)
-    select gen_random_uuid(), p.id, o.id, 'SYSTEM_ADMIN', now() from person p, organization o
-    where p.username = 'admin' and o.code = 'ORG';
+  -- docker compose exec db psql -U mover -d mover
+  insert into membership(id, person_id, organization_id, role_code, valid_from, follows_affiliation)
+  select gen_random_uuid(), p.id, a.organization_id, 'SYSTEM_ADMIN', now(), false
+  from person p join affiliation a on a.person_id = p.id and a.valid_to is null where p.employee_no = '<employee number>';
   ```
-- Organisation structure in bulk: «إعدادات النظام» → import (CSV: `code,name,parentCode`) with preview before commit.
+- Organisation structure comes from the HR mirror. The CSV import in «إعدادات النظام» remains for local organisations.
+
+## Acceptance test environment (fictional)
+
+`sh ops/test-env/up.sh` starts a separate compose project `tmrkz-test` with a fictional OpenLDAP (StartTLS, test CA),
+a fictional HR mirror, people, grants and facilities. Users and the generated shared password are listed in
+`ops/test-env/README.md`. Never point it at real data.
 
 ## Running the tests
 
 ```sh
-sh ops/test-backend.sh                                        # 42 backend acceptance tests on a throw-away PostgreSQL
-MOVER_DEMO_PASSWORD=... node tests/acceptance/journey.mjs      # end-to-end journey through the web entry point
+sh ops/test-backend.sh                                        # 46 backend acceptance tests on a throw-away PostgreSQL
+sh ops/test-env/up.sh && node tests/acceptance/journey.mjs     # real sign-in (Keycloak + LDAP) and the journey
+sh ops/test-env/check-untrusted-tls.sh                       # directory with an untrusted certificate is refused
 (cd frontend && npm ci && npm test && npm run build)          # frontend unit tests and type-checked build
 python ops/tools/gen-openapi.py                               # regenerate docs/api/openapi.json from the controllers
 ```

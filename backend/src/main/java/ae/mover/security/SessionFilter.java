@@ -33,9 +33,9 @@ public class SessionFilter extends OncePerRequestFilter {
     public static final String ACTOR_ATTRIBUTE = "mover.actor";
     private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS");
     private static final Set<String> PUBLIC = Set.of(
-            "POST /api/v1/auth/login",
-            "GET /api/v1/auth/demo-users",
-            "POST /api/v1/auth/demo-switch",
+            "GET /api/v1/auth/status",
+            "GET /api/v1/auth/oidc/start",
+            "GET /api/v1/auth/oidc/callback",
             "GET /api/v1/system/health",
             "GET /api/v1/openapi.json");
 

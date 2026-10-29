@@ -59,13 +59,11 @@ export type Me = {
   permissions: Permission[];
   summaryOnly: boolean;
   grants: Grant[];
-  demoMode: boolean;
   serverTime: string;
   timezone: string;
 };
 
-export type DemoUser = { username: string; displayName: string; roleName: string; orgName: string };
-export type DemoUsers = { enabled: boolean; users: DemoUser[] };
+export type AuthStatus = { provider: 'OIDC'; configured: boolean; reachable: boolean };
 
 // ---------- organizations ----------
 export type OrgNode = {
@@ -372,7 +370,7 @@ export type DecisionInput = {
   note?: string;
   reasonCode?: ReasonCode;
   expectedRevision: number;
-  signature?: { password: string; confirm: boolean };
+  signature?: { confirm: boolean };
 };
 
 // ---------- reservations & execution ----------
@@ -418,7 +416,6 @@ export type SystemInfo = {
   version: string;
   timezone: string;
   serverTime: string;
-  demoMode: boolean;
   database: string;
   outboxPending: number;
   mapPackages: number;
@@ -546,3 +543,13 @@ export type HrMappingVersion = {
   problems?: string[];
 };
 export type HrTestResult = { ok: boolean; databaseVersion?: string; unitColumns?: number; personColumns?: number; failure?: string; message?: string; elapsedMs: number };
+
+export type IdentityIssue = {
+  id: string;
+  displayName: string | null;
+  reason: 'NO_KEY' | 'NO_MATCH' | 'AMBIGUOUS' | 'INACTIVE' | 'STALE_SOURCE' | 'ALREADY_LINKED';
+  attempts: number;
+  lastSeenAt: string;
+  claimedKey?: string;
+  subject?: string;
+};
