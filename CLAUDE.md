@@ -35,3 +35,8 @@ Before changing behaviour, read `docs/STATUS.md` (delivered, limits, open decisi
 Before implementing further administrative features, read `docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md`. It records the owner’s new choices for hourly read-only Oracle HR synchronization compatible with TNQL, Keycloak/LDAP, OpenFGA, scoped independent edit and approval rights, administrative facilities geometry, certificate-based signatures and electronic seals, and one production runtime configuration. These are implementation requirements, not a claim that the current build already meets them. The original administrative scope exclusions remain in force.
 
 `docs/ui/INTERFACE_OPTIONS.fragment.html` is a self-contained inline design reference containing three administrative layouts and fictional facilities; it is not a production application or a substitute for the current frontend. The full-page styles and carousel use the visualization host runtime. Preserve existing code, follow the new acceptance checklist, and update status/traceability with measured evidence as work completes. Update ADRs when changes are implemented; retain the history of the existing choices.
+
+## Map workspace completion — 2026-10-29
+
+For the owner's report that the map is incomplete, read `docs/MAP_WORKSPACE_COMPLETION_AR.md` alongside the administrative production brief before implementing step 4. It records the source review at `93f3570`, the required administrative map journey, removal of fabricated boundaries, real geometry and background-layer management, and MAP-01…MAP-18 acceptance checks. Preserve the ongoing identity/permissions work and the scope exclusions above. This document is a completion requirement, not a claim that the map has been implemented or tested.
+
