@@ -107,3 +107,12 @@
 .resource-form h4{margin:0 0 8px;font-size:13px}
 .resource-form .check-label{display:flex;align-items:center;gap:8px;font-size:12px;line-height:1.6}
 .resource-form .check-label input{width:auto;flex:0 0 auto;margin:0}
+
+/* certificate signature and seal (ADR-020) */
+.pki-sign{margin:4px 0 12px}
+.signature-checks li{display:block;font-size:12px;line-height:1.6}
+.signature-checks li.bad{color:var(--red)}
+.document-signature{font-size:11px}
+.document-verification.good{color:var(--green)}
+.document-verification.bad{color:var(--red)}
+

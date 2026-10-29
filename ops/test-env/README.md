@@ -32,7 +32,12 @@ the account to the fictional HR record whose domain account equals the login nam
 organisation can use it. `t.manager` is also «مسؤول صلاحيات الجهة» for SS: in «مركز الصلاحيات» they may grant
 «مقدم الطلب», «اطلاع محدود» and «مقدم طلب في موقع مشترك» inside SS only. `t.manager.it` holds a summary view whose scope
 is SS (with branches) AND the shared building — an example of an explicit intersection. `t.admin` is the global access
-manager (drafts, publication, rollback, rebuild). Sites: `00` main campus (no parent) with sub-sites `01`–`08`; `10` a main site of the remote
+manager (drafts, publication, rollback, rebuild).
+
+Certificate signatures use a fictional signing PKI generated once under `.generated/signing/` (`signing-pki.sh`):
+`t.approver` has a valid certificate, `t.approver2` a revoked one, and «الإدارة العامة» a seal. Switch «نمط التوقيع» to
+PKI in الإعدادات (as `t.admin`) to sign approvals with them; switch back to «توثيق داخلي» before running the map and
+journey suites. The CRL is valid for 30 days: delete `.generated/signing/` to regenerate the whole test PKI. Sites: `00` main campus (no parent) with sub-sites `01`–`08`; `10` a main site of the remote
 branch «فريق مرافق الشمال» (إدارة المشاريع ‹ قسم مشاريع المباني ‹ وحدة الصيانة الإدارية); `11` a shared main building with a
 shared resource and two exclusive rooms. No boundaries are seeded: they are imported or drawn through the application
 (`tests/acceptance/fixtures/`).

@@ -110,3 +110,10 @@ tmrkz:
     poll-ms: 2000
     reconcile-ms: 300000
     sync-enabled: ${TMRKZ_OPENFGA_SYNC_ENABLED:true}
+  signing:
+    # Certificate signatures and seals (ADR-020): NONE (PKI mode fails closed) or PKCS12_DIRECTORY (mounted key stores).
+    provider: ${TMRKZ_SIGNING_PROVIDER:NONE}
+    keystore-dir: ${TMRKZ_SIGNING_KEYSTORE_DIR:/etc/tmrkz/signing/keystores}
+    keystore-password-file: ${TMRKZ_SIGNING_KEYSTORE_PASSWORD_FILE:/etc/tmrkz/signing/keystore-password}
+    trust-dir: ${TMRKZ_SIGNING_TRUST_DIR:/etc/tmrkz/signing/trust}
+    crl-dir: ${TMRKZ_SIGNING_CRL_DIR:/etc/tmrkz/signing/crl}

@@ -21,6 +21,8 @@ fi
 mkdir -p "$G/truststore" && cp "$G/certs/ca.crt" "$G/truststore/tmrkz-test-ca.pem"
 sed "s/__PASSWORD__/$(cat "$G/user-password")/" ops/test-env/ldap/people.ldif > "$G/ldap/50-people.ldif"
 
+. ops/test-env/signing-pki.sh
+
 sh ops/init-env.sh >/dev/null
 export TEST_LDAP_ADMIN_PASSWORD="$(cat "$G/ldap-admin-password")"
 export LDAP_URL="ldap://openldap:389"

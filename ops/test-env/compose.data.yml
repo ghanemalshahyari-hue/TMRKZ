@@ -13,3 +13,15 @@ services:
       - ./ops/test-env/seed.sql:/seed.sql:ro
     entrypoint: ["psql", "-h", "db", "-U", "mover", "-d", "mover", "-v", "ON_ERROR_STOP=1", "-q", "-f", "/seed.sql"]
     networks: [internal]
+
+  # Certificate signature and seal with the fictional signing PKI (ops/test-env/signing-pki.sh). Production configures
+  # the organisation's provider instead (docs/OPERATIONS.md).
+  backend:
+    environment:
+      TMRKZ_SIGNING_PROVIDER: PKCS12_DIRECTORY
+    volumes:
+      - ./ops/test-env/.generated/signing/keystores:/etc/tmrkz/signing/keystores:ro
+      - ./ops/test-env/.generated/signing/keystore-password:/etc/tmrkz/signing/keystore-password:ro
+      - ./ops/test-env/.generated/signing/trust:/etc/tmrkz/signing/trust:ro
+      - ./ops/test-env/.generated/signing/crl:/etc/tmrkz/signing/crl:ro
+

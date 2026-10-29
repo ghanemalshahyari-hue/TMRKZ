@@ -106,11 +106,11 @@ export function SettingsPage() {
           <label className="setting-row">
             <span>
               <b>نمط التوقيع</b>
-              <small>القرار D-02 مفتوح؛ لا يوصف التوثيق الداخلي بأنه توقيع بشهادة</small>
+              <small>التوقيع بالشهادة يتطلب مزود توقيع مربوطاً (حالته في التكاملات)؛ لا يوصف التوثيق الداخلي بأنه توقيع بشهادة</small>
             </span>
             <select value={s?.signatureMode ?? 'INTERNAL_ATTESTATION'} disabled={!s || busy} onChange={(e) => saveSetting({ signatureMode: e.target.value as Settings['signatureMode'] })}>
               <option value="INTERNAL_ATTESTATION">توثيق داخلي</option>
-              <option value="PKI">توقيع بشهادة — غير مربوط</option>
+              <option value="PKI">توقيع بشهادة المعتمد وختم الجهة (PKI)</option>
             </select>
           </label>
           <div className="setting-row">

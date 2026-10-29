@@ -1,0 +1,33 @@
+{
+  "run": "2026-10-29T09:37:50.324Z",
+  "results": [
+    {
+      "id": "SIGN-01",
+      "title": "The approver signs with the certificate, the organisation seal is added, both validate, the decision publishes them",
+      "result": "PASS",
+      "detail": "MV-2026-0098: موقع ومختوم ومنشور ومتحقق منه"
+    },
+    {
+      "id": "SIGN-02",
+      "title": "An approver whose certificate is revoked is refused; nothing is approved",
+      "result": "PASS",
+      "detail": "MV-2026-0099: شهادة ملغاة ← رفض، الطلب قيد المراجعة"
+    }
+  ],
+  "setupApiCalls": [
+    "policy draft PKI: 200",
+    "policy publish PKI: 200",
+    "create توقيع بالشهادة 62516: 200",
+    "submit توقيع بالشهادة 62516: 200",
+    "decide facilities_review: 200",
+    "decide org_approval: 200",
+    "create شهادة ملغاة 62516: 200",
+    "submit شهادة ملغاة 62516: 200",
+    "decide facilities_review: 200",
+    "decide org_approval: 200",
+    "policy draft INTERNAL_ATTESTATION: 200",
+    "policy publish INTERNAL_ATTESTATION: 200"
+  ],
+  "externalRequests": [],
+  "consoleErrors": []
+}

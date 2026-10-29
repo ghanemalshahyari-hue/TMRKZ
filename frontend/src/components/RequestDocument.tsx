@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api, newIdempotencyKey, urls } from '../api/client';
-import type { ExecutionTask, MyTask, RequestDetail, StageView } from '../api/types';
+import type { ApprovalVerification, ExecutionTask, MyTask, RequestDetail, StageView } from '../api/types';
 import { useApp } from '../lib/app';
 import { fullDate, fullTime } from '../lib/dates';
 import { RESERVATION_STATUS, SIGNATURE_DISCLAIMER, TASK_STATE } from '../lib/labels';
@@ -127,6 +127,19 @@ export function RequestDocument({
   const reason = (r.values?.reason as string | undefined) ?? '';
   const sig = r.approvalDocument;
   const [closing, setClosing] = useState(false);
+  const [verification, setVerification] = useState<ApprovalVerification | null>(null);
+  const [verifying, setVerifying] = useState(false);
+
+  const verify = async () => {
+    setVerifying(true);
+    try {
+      setVerification(await api.verifyApprovalDocument(r.id));
+    } catch (e) {
+      app.toast((e as Error).message);
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const close = async () => {
     setClosing(true);
@@ -245,6 +258,31 @@ export function RequestDocument({
             {sig.signatureMode === 'PKI' ? sig.signatureLabel : SIGNATURE_DISCLAIMER}
             <br />
             <span className="latin tiny">SHA-256 {sig.sha256.slice(0, 24)}…</span>
+            {sig.signatures && sig.signatures.length > 0 && (
+              <>
+                {sig.signatures.map((s) => (
+                  <span key={s.kind} className="document-signature">
+                    <br />
+                    {s.kind === 'PERSON' ? 'توقيع المعتمد' : 'ختم الجهة'}: {s.subject} — صادرة من {s.issuer} ·{' '}
+                    {s.indication === 'TOTAL_PASSED' ? 'تحقق ناجح عند التوقيع' : s.indication}
+                  </span>
+                ))}
+                <br />
+                <button className="button compact" disabled={verifying} onClick={verify} style={{ marginTop: 6 }}>
+                  {verifying ? 'جارٍ التحقق…' : 'تحقق من التوقيع والختم الآن'}
+                </button>
+                {verification && (
+                  <span className={'document-verification ' + (verification.passed ? 'good' : 'bad')} role="status">
+                    <br />
+                    {verification.passed ? '✓ التوقيع والختم صالحان الآن' : '✗ التحقق لم ينجح'}
+                    {verification.signatures
+                      ?.filter((x) => !x.passed)
+                      .map((x) => ' · ' + (x.reason ?? x.indication))
+                      .join('')}
+                  </span>
+                )}
+              </>
+            )}
             {sig.boundaryVersions && sig.boundaryVersions.length > 0 && (
               <>
                 <br />

@@ -23,6 +23,9 @@ Verify licences of the exact installed versions before production approval.
 | Nimbus JOSE + JWT `com.nimbusds:nimbus-jose-jwt` | 10.3 | Apache-2.0 | Verifying OpenID Connect ID tokens |
 | Keycloak (image `quay.io/keycloak/keycloak`) | 26.7.5 | Apache-2.0 | Identity provider (OIDC, LDAP federation) |
 | OpenFGA (image `openfga/openfga`) | 1.8.16 | Apache-2.0 | Authorisation decisions (co-decider, ADR-018) |
+| Digital Signature Service (`eu.europa.ec.joinup.sd-dss`: dss-jades, dss-validation, dss-token, …) | 6.5.1 | LGPL-2.1 | Certificate signature and seal of approval documents, validation (ADR-020) |
+| Bouncy Castle (`bcprov`, `bcpkix`, `bcutil` jdk18on) | 1.86 | MIT | Cryptography used by DSS |
+| jose4j | 0.9.7 | Apache-2.0 | JSON Web Signature used by DSS JAdES |
 | OpenLDAP (image `osixia/openldap`, test environment only) | 1.5.0 | OpenLDAP Public License; image MIT | Fictional directory for acceptance tests |
 | Jackson 2 / Jackson 3 | 2.21.7 / 3.1.7 | Apache-2.0 | JSON |
 | Apache Tomcat (embedded) | 11.0.27 | Apache-2.0 | HTTP server |

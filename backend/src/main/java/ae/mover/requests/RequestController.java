@@ -44,9 +44,11 @@ public class RequestController {
     private final DecisionService decisions;
     private final ExecutionService execution;
     private final AttachmentService attachments;
+    private final ae.mover.signing.SigningJobs signingJobs;
 
     public RequestController(AccessService access, RequestTypes types, RequestService requests, RequestViews views,
-                             DecisionService decisions, ExecutionService execution, AttachmentService attachments) {
+                             DecisionService decisions, ExecutionService execution, AttachmentService attachments,
+                             ae.mover.signing.SigningJobs signingJobs) {
         this.access = access;
         this.types = types;
         this.requests = requests;
@@ -54,6 +56,7 @@ public class RequestController {
         this.decisions = decisions;
         this.execution = execution;
         this.attachments = attachments;
+        this.signingJobs = signingJobs;
     }
 
     @GetMapping("/request-types")
@@ -141,9 +144,36 @@ public class RequestController {
         return decisions.approvalDocument(access.context(actor), id);
     }
 
+    /** Re-validates the certificate signature and seal of the request's approval document now. */
+    @GetMapping("/requests/{id}/approval-document/verification")
+    public java.util.Map<String, Object> verifyApprovalDocument(Actor actor, @PathVariable UUID id) {
+        return views.verifyApprovalDocument(access.context(actor), id);
+    }
+
+    public record SigningInput(Integer expectedRevision) {
+    }
+
+    /** Certificate signature of the approval document (PKI mode), before the decision publishes it. */
+    @PostMapping("/tasks/{id}/signing")
+    public ae.mover.signing.SigningJobs.JobView sign(Actor actor, @PathVariable UUID id, @RequestBody SigningInput in) {
+        return decisions.signForTask(access.context(actor), id, in == null ? null : in.expectedRevision());
+    }
+
     @PostMapping("/tasks/{id}/decision")
     public RequestViews.RequestDetail decide(Actor actor, @PathVariable UUID id, @RequestBody DecisionInput in,
                                              @RequestHeader(value = "Idempotency-Key", required = false) String key) {
-        return decisions.decide(access.context(actor), id, in, key);
+        try {
+            return decisions.decide(access.context(actor), id, in, key);
+        } catch (ae.mover.common.ApiException e) {
+            // a signature that this decision could not publish stays on record, marked unpublished with the reason
+            if (in != null && in.signingJobId() != null && e.code() != ae.mover.common.ErrorCode.SIGNATURE_REQUIRED) {
+                try {
+                    signingJobs.unpublished(UUID.fromString(in.signingJobId()), e.code().name() + ": " + e.getMessage());
+                } catch (IllegalArgumentException ignored) {
+                    // not an identifier: nothing to record
+                }
+            }
+            throw e;
+        }
     }
 }

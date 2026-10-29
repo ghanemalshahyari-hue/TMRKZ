@@ -1,5 +1,7 @@
 import type {
   AccessExplain,
+  ApprovalVerification,
+  SigningJob,
   AccessPolicyVersion,
   ApiErrorBody,
   AuthzStatus,
@@ -326,6 +328,8 @@ export const api = {
   tasks: () => get<TaskItem[]>('/tasks'),
   approvalDocument: (taskId: string) => get<ApprovalDocument>(`/tasks/${taskId}/approval-document`),
   decide: (taskId: string, body: DecisionInput, key: string) => post<RequestDetail>(`/tasks/${taskId}/decision`, body, key),
+  signTask: (taskId: string, expectedRevision: number) => post<SigningJob>(`/tasks/${taskId}/signing`, { expectedRevision }),
+  verifyApprovalDocument: (requestId: string) => get<ApprovalVerification>(`/requests/${requestId}/approval-document/verification`),
 
   // reservations & execution
   reservations: (p: { from?: string; to?: string; resourceId?: string; status?: string } = {}) => get<ReservationItem[]>('/reservations' + query(p)),

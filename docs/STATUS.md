@@ -58,8 +58,13 @@ Date: 29 October 2026 · Version 1.0.0
     (blocking or independent, re-locking existing bookings or refusing the change) and an optional shared-use limit
     enforced atomically at approval (ADR-019), with «إعداد الموارد وعلاقاتها» in the site panel. Open in step 5:
     explicit migration of running requests to a new version.
-  - Steps 6–7 open — DSS signatures and seals, isolated bundle with UI and load acceptance. See the PA matrix in
-    `TRACEABILITY.md`.
+  - Step 6 done for the mechanism (ADR-020): in PKI mode the approval document is signed by the approver's
+    certificate and sealed by the organisation (DSS 6.5.1, JAdES), validated against trust anchors and in-network CRLs
+    (revoked, expired, untrusted refused), outside the decision transaction; the decision publishes it only if the
+    approval and the reservations commit, otherwise the attempt is kept as unpublished. "Verify now" re-validates a
+    published document. Proven with a fictional PKI; the enterprise provider, its certificates and a TSA are not
+    connected.
+  - Step 7 open — isolated bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
 
 Test evidence: backend acceptance tests on PostgreSQL + PostGIS with OpenFGA in the loop (including the map criteria,
 a 10,000-site measurement and the authorisation suite), 21 browser checks for MAP-01 … MAP-18 and 6 for the permissions
@@ -92,7 +97,7 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
 | Organisation structure | FILE_IMPORT | Validated import with preview; automatic sync waits for D-04. |
 | HR source (organisations and people) | NOT_CONNECTED until a sync succeeds | Read-only Oracle mirror implemented and tested on fictional views (ADR-014); enterprise address, account and mapping pending. |
 | Correspondence | NOT_CONNECTED | No external message is sent or claimed. |
-| PKI signature provider | NOT_CONNECTED | PKI mode fails closed (`SIGNATURE_PROVIDER_UNAVAILABLE`). |
+| PKI signature provider | Tested with the fictional PKI of the test environment; enterprise provider NOT_CONNECTED | Production needs the provider (HSM or signing service), the approvers' and seals' certificates, the CA chain and the CRL distribution; a TSA for B-T signatures. PKI mode fails closed until then. |
 | Malware scanner | BUILT_IN only | See limitations. |
 
 ## Open decisions (from the handoff) and how the build handles them
@@ -100,7 +105,7 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
 | ID | Decision | Current handling |
 |---|---|---|
 | D-01 | Coordinate reference / format | Boundaries stored in EPSG:4326 (GeoJSON order); input CRS from the file or an explicit declaration (4326, 3857, 32639, 32640), transformed in PostGIS; nothing inferred from numbers or wording. |
-| D-02 | Internal attestation vs PKI | Internal attestation in force and labelled as such; PKI mode wired to fail closed. |
+| D-02 | Internal attestation vs PKI | Owner chose certificate signature + seal (§2). PKI mode implemented with DSS (ADR-020) and proven with a test PKI; internal attestation remains selectable and labelled as such until the enterprise provider is connected. |
 | D-03 | Concurrency, rates, file sizes | Exploratory measurement only (`PERFORMANCE.md`); attachment limit 10 MB by policy. |
 | D-04 | Identity, structure, correspondence systems | Local adapter + file import; other connectors NOT_CONNECTED. |
 | D-05 | RPO/RTO, retention, SLAs | Backup/restore tooling and a measured restore; no time objective promised. |

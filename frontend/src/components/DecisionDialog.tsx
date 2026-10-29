@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError, api, newIdempotencyKey } from '../api/client';
-import type { ApprovalDocument, DecisionKind, MyTask, ReasonCode, RequestDetail } from '../api/types';
+import type { ApprovalDocument, DecisionKind, MyTask, ReasonCode, RequestDetail, SigningJob } from '../api/types';
 import { useApp } from '../lib/app';
 import { REASON_CODES, SIGNATURE_DISCLAIMER } from '../lib/labels';
 import { Dialog, DialogHead } from './ui';
@@ -17,6 +17,7 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [doc, setDoc] = useState<ApprovalDocument | null>(null);
+  const [job, setJob] = useState<SigningJob | null>(null);
   // one key per opened decision so a retried click after a lost response replays instead of duplicating
   const key = useRef(newIdempotencyKey());
 
@@ -29,6 +30,7 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
     setReauth(false);
     setError('');
     setDoc(null);
+    setJob(null);
     key.current = newIdempotencyKey();
     if (target && target.decision === 'APPROVE' && target.task.final && target.task.requiresSignature) {
       api
@@ -42,10 +44,25 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
   const { request: r, task, decision } = target;
   const title = decision === 'RETURN' ? 'إرجاع للتعديل' : decision === 'REJECT' ? 'رفض الطلب' : task.final ? 'اعتماد الطلب' : 'تسجيل الموافقة';
 
+  // PKI: the approver's certificate and the organisation's seal sign the frozen document first; nothing is decided yet
+  const sign = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      setJob(await api.signTask(task.taskId, r.revision));
+    } catch (e) {
+      const err = e as ApiError;
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const apply = async () => {
     const trimmed = note.trim();
     if (decision !== 'APPROVE' && trimmed.length < 5) return setError('اكتب سبباً من 5 أحرف على الأقل.');
     if (needsSignature && !pki && !ack) return setError('أكّد الاعتماد للتوثيق الداخلي.');
+    if (needsSignature && pki && job?.status !== 'SIGNED') return setError('وقّع المستند بشهادتك أولاً.');
     setBusy(true);
     setError('');
     try {
@@ -56,7 +73,8 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
           note: trimmed || undefined,
           reasonCode: decision === 'RETURN' ? reasonCode : undefined,
           expectedRevision: r.revision,
-          signature: needsSignature ? { confirm: ack } : undefined,
+          signature: needsSignature ? { confirm: pki ? true : ack } : undefined,
+          signingJobId: needsSignature && pki ? job?.id : undefined,
         },
         key.current,
       );
@@ -74,7 +92,11 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
     } catch (e) {
       const err = e as ApiError;
       if (err.code === 'RESERVATION_CONFLICT')
-        setError('تعذر تثبيت الحجز: ' + err.message + ' لم يُسجل القرار ولم يُنشأ أي حجز جزئي. يمكن إرجاع الطلب لتعديل الفترة.');
+        setError(
+          'تعذر تثبيت الحجز: ' + err.message + ' لم يُسجل القرار ولم يُنشأ أي حجز جزئي' +
+            (pki ? '، ولم يُنشر التوقيع (سُجل كتوقيع غير منشور)' : '') +
+            '. يمكن إرجاع الطلب لتعديل الفترة.',
+        );
       else if (err.code === 'REAUTHENTICATION_REQUIRED') setReauth(true);
       else if (err.code === 'STALE_REVISION') setError('تغيّر الطلب منذ فتحه (' + err.message + '). أعد تحميل الطلب ثم راجع النسخة الأحدث.');
       else setError(err.message);
@@ -116,7 +138,7 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
                 {doc.lines.map((l) => (
                   <div key={l.label} className="key-value">
                     <span>{l.label}</span>
-                    <b style={{ maxWidth: '70%' }}>{l.value}</b>
+                    <b style={{ maxWidth: '70%', overflowWrap: 'anywhere' }}>{l.value}</b>
                   </div>
                 ))}
                 <div className="key-value">
@@ -128,7 +150,30 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
               </div>
             )}
             {pki ? (
-              <div className="note orange">نمط التوقيع المهيأ «توقيع بشهادة (PKI)» غير مربوط بمزود شهادات بعد (القرار D-02). لن يُسجل اعتماد دون توقيع صحيح.</div>
+              <div className="pki-sign">
+                {!job ? (
+                  <>
+                    <p className="micro muted">
+                      يوقّع المستند أعلاه بشهادتك لدى مزود التوقيع، ثم يُختم بختم جهتك، ويُتحقق من الاثنين (سلسلة الثقة، الصلاحية، الإلغاء) قبل
+                      الاعتماد. لا يُسجل قرار ولا حجز في هذه الخطوة.
+                    </p>
+                    <button className="button" disabled={busy || !doc} onClick={sign}>
+                      {busy ? 'جارٍ التوقيع والتحقق…' : 'التوقيع بشهادتي وختم الجهة'}
+                    </button>
+                  </>
+                ) : (
+                  <ul className="test-list signature-checks">
+                    {job.signatures.map((s) => (
+                      <li key={s.kind} className={s.indication === 'TOTAL_PASSED' ? '' : 'bad'}>
+                        <b>{s.kind === 'PERSON' ? 'توقيع المعتمد' : 'ختم الجهة'}</b> — {s.subject}
+                        <div className="micro muted">
+                          {s.indication === 'TOTAL_PASSED' ? 'تحقق ناجح' : s.indication + (s.subIndication ? ' / ' + s.subIndication : '')} · صادرة من {s.issuer}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             ) : (
               <>
                 {reauth && app.me.signInMethod === 'DIRECTORY' && (
@@ -182,10 +227,16 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
               </>
             )}
             <div className="signature-preview">
-              <span className="eyebrow">SIGNATURE / {pki ? 'PKI — NOT CONNECTED' : 'INTERNAL ATTESTATION'}</span>
+              <span className="eyebrow">SIGNATURE / {pki ? 'JAdES — CERTIFICATE + SEAL' : 'INTERNAL ATTESTATION'}</span>
               <span className="signature-name">{app.me.displayName}</span>
               <br />
-              <small>{pki ? 'يتطلب مزود شهادات معتمداً.' : SIGNATURE_DISCLAIMER + '. يرتبط بالبصمة والمراجعة ووقت الخادم.'}</small>
+              <small>
+                {pki
+                  ? job?.status === 'SIGNED'
+                    ? 'موقّع ومختوم ومتحقق منه؛ يُنشر مع القرار فقط إذا ثبت الحجز.'
+                    : 'توقيع رقمي بشهادة المعتمد وختم الجهة.'
+                  : SIGNATURE_DISCLAIMER + '. يرتبط بالبصمة والمراجعة ووقت الخادم.'}
+              </small>
             </div>
           </>
         )}
@@ -194,8 +245,8 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
         </div>
       </div>
       <div className="dialog-actions">
-        <button className="button primary" disabled={busy} onClick={apply}>
-          {busy ? 'جارٍ التسجيل…' : 'تأكيد القرار'}
+        <button className="button primary" disabled={busy || (needsSignature && pki && job?.status !== 'SIGNED')} onClick={apply}>
+          {busy ? 'جارٍ التسجيل…' : needsSignature && pki ? 'نشر التوقيع والاعتماد' : 'تأكيد القرار'}
         </button>
         <button className="button" onClick={onClose}>
           إلغاء

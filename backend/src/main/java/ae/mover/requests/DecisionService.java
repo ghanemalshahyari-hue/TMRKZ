@@ -30,6 +30,8 @@ import ae.mover.common.ApiException;
 import ae.mover.common.Db;
 import ae.mover.common.ErrorCode;
 import ae.mover.common.Hashing;
+import ae.mover.signing.ApprovalSigner;
+import ae.mover.signing.SigningJobs;
 import ae.mover.common.Json;
 import ae.mover.common.Times;
 import ae.mover.outbox.OutboxService;
@@ -69,12 +71,14 @@ public class DecisionService {
     private final OutboxService outbox;
     private final IdempotencyService idempotency;
     private final RequestViews views;
+    private final ApprovalSigner signer;
+    private final SigningJobs signingJobs;
 
     public DecisionService(JdbcClient jdbc, Json json, Clock clock, AccessService access, TaskService taskService,
                            RuntimeService runtime, TaskSync taskSync, WorkflowService workflows,
                            WorkflowRuntime workflowRuntime, ReservationService reservations, PolicyService policies,
                            SignatureService signatures, AuditService audit, OutboxService outbox,
-                           IdempotencyService idempotency, RequestViews views) {
+                           IdempotencyService idempotency, RequestViews views, ApprovalSigner signer, SigningJobs signingJobs) {
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -91,6 +95,8 @@ public class DecisionService {
         this.outbox = outbox;
         this.idempotency = idempotency;
         this.views = views;
+        this.signer = signer;
+        this.signingJobs = signingJobs;
     }
 
     public record TaskItem(String id, String requestId, String requestNumber, String requestType, String stageKey,
@@ -230,6 +236,102 @@ public class DecisionService {
         return new ApprovalDocumentPreview(t.revision(), c.sha256(), mode, RequestViews.signatureLabel(mode), c.lines());
     }
 
+    // ---- certificate signing (PKI mode, ADR-020) ----------------------------------------------------
+
+    /**
+     * Freezes the approval document of the task's current revision in a signing job, has the approver's certificate and
+     * the organisation's seal sign it, and validates both — outside any database transaction. Nothing is decided here:
+     * the decision publishes the signature later, after checking permission, revision and availability again.
+     * Repeating the call for the same frozen document returns the job already signed.
+     */
+    public SigningJobs.JobView signForTask(AccessContext ctx, UUID taskId, Integer expectedRevision) {
+        String mode = policies.settings().signatureMode();
+        if (!"PKI".equals(mode)) {
+            throw ApiException.validation("التوقيع بالشهادة غير مفعل؛ وضع التوثيق الحالي: " + RequestViews.signatureLabel(mode) + ".");
+        }
+        TaskRow t = task(taskId, false);
+        Map<String, Object> req = jdbc.sql("select status, current_revision from request where id = :id")
+                .param("id", t.requestId()).query().singleRow();
+        RequestScope scope = access.requestScope(t.requestId());
+        if (ctx.viewLevel(scope) == ViewLevel.NONE && ctx.taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage()).isEmpty()) {
+            throw ApiException.notFound();
+        }
+        if (!"OPEN".equals(t.status()) || !"SUBMITTED".equals(req.get("status"))) {
+            throw new ApiException(ErrorCode.TASK_ALREADY_COMPLETED, "هذه المهمة لم تعد مفتوحة؛ ربما أُنجزت أو أُغلقت وفق سياسة المرحلة.");
+        }
+        if (!t.finalStage() || !t.requiresSignature() || !policies.settings().signatureRequired()) {
+            throw ApiException.validation("هذه المرحلة لا تتطلب توقيعاً بالشهادة.");
+        }
+        Grant grant = ctx.taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage())
+                .orElseThrow(() -> ApiException.forbidden("لا تملك حالياً صفة هذه المهمة أو نطاقها."));
+        if (!ctx.assignedToMe(t.assignedPersonId(), t.awaitingAssignment())) {
+            throw ApiException.forbidden("المهمة مسندة إلى شخص آخر أو بانتظار الإسناد.");
+        }
+        ctx.confirmTask(t.roleCode(), t.targetOrgId(), scope, Permission.REVIEW, Permission.APPROVE);
+        int current = ((Number) req.get("current_revision")).intValue();
+        if (expectedRevision == null || expectedRevision != current || t.revision() != current) {
+            throw ApiException.staleRevision();
+        }
+        if (!signer.provider().available()) {
+            throw new ApiException(ErrorCode.SIGNATURE_PROVIDER_UNAVAILABLE,
+                    "مزود التوقيع بالشهادة غير متاح: " + signer.provider().problem() + " لم يُوقع شيء ولم يُسجل اعتماد.",
+                    Map.of("provider", signer.provider().name()));
+        }
+        Canonical doc = canonical(t.requestId(), current);
+        java.util.Optional<SigningJobs.Job> existing = signingJobs.live(taskId, ctx.personId(), current, doc.sha256());
+        if (existing.isPresent() && !"PENDING".equals(existing.get().status())) {
+            return signingJobs.view(existing.get().id());
+        }
+        String employeeNo = jdbc.sql("select employee_no from person where id = :id").param("id", ctx.personId()).query(String.class).single();
+        String orgCode = jdbc.sql("select code from organization where id = :id").param("id", grant.orgId()).query(String.class).single();
+        UUID jobId = existing.map(SigningJobs.Job::id).orElseGet(() -> signingJobs.create(t.requestId(), current, taskId,
+                ctx.personId(), grant.orgId(), doc.sha256(), doc.document(), signer.provider().name()));
+        Instant now = clock.instant();
+        ApprovalSigner.Outcome outcome = signer.sign(json.canonical(doc.document()).getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                employeeNo, orgCode, now);
+        signingJobs.record(jobId, outcome, ctx.personId());
+        audit.recordAs(ctx.actor(), outcome.ok() ? "APPROVAL_DOCUMENT_SIGNED" : "APPROVAL_SIGNING_REFUSED", "REQUEST",
+                t.requestId().toString(), null, outcome.ok()
+                        ? Map.of("signingJobId", jobId.toString(), "sha256", doc.sha256(), "revision", current)
+                        : Map.of("signingJobId", jobId.toString(), "failure", outcome.failureCode()), null);
+        if (!outcome.ok()) {
+            ErrorCode code = "PROVIDER_UNAVAILABLE".equals(outcome.failureCode()) || "SIGNING_FAILED".equals(outcome.failureCode())
+                    ? ErrorCode.SIGNATURE_PROVIDER_UNAVAILABLE : ErrorCode.SIGNATURE_CERTIFICATE_REJECTED;
+            throw new ApiException(code, outcome.failureMessage() + " لم يُسجل اعتماد.",
+                    Map.of("signingJobId", jobId.toString(), "failure", outcome.failureCode()));
+        }
+        return signingJobs.view(jobId);
+    }
+
+    /** The certificate signature of this task's document, checked inside the decision transaction before publication. */
+    private SigningJobs.Job signedJob(AccessContext ctx, TaskRow t, int revision, Canonical doc, String jobId) {
+        if (!signer.provider().available()) {
+            throw new ApiException(ErrorCode.SIGNATURE_PROVIDER_UNAVAILABLE,
+                    "مزود التوقيع بالشهادة غير متاح: " + signer.provider().problem() + " لم يُسجل الاعتماد.",
+                    Map.of("provider", signer.provider().name()));
+        }
+        if (jobId == null || jobId.isBlank()) {
+            throw new ApiException(ErrorCode.SIGNATURE_REQUIRED, "وقّع مستند الاعتماد بشهادتك أولاً، ثم أكد الاعتماد.");
+        }
+        SigningJobs.Job job;
+        try {
+            job = signingJobs.lock(UUID.fromString(jobId));
+        } catch (IllegalArgumentException e) {
+            throw ApiException.validation("معرف التوقيع غير صحيح.");
+        }
+        if (!job.signerPersonId().equals(ctx.personId()) || !job.taskId().equals(t.id())) {
+            throw ApiException.forbidden("هذا التوقيع لا يخص هذه المهمة أو هذا المعتمد.");
+        }
+        if (job.revision() != revision || !job.documentSha256().equals(doc.sha256())) {
+            throw new ApiException(ErrorCode.STALE_REVISION,
+                    "تغير مستند الاعتماد بعد التوقيع؛ لا يُنشر التوقيع على نسخة أخرى. وقّع النسخة الحالية من جديد.");
+        }
+        if (!"SIGNED".equals(job.status())) {
+            throw new ApiException(ErrorCode.SIGNATURE_REQUIRED, "التوقيع غير صالح للنشر (" + job.status() + ").");
+        }
+        return job;
+    }
+
     // ---- decide -----------------------------------------------------------------------------------
 
     @Transactional
@@ -307,10 +409,19 @@ public class DecisionService {
         // Signature is produced before anything is written, so a provider failure leaves no trace of approval.
         Canonical doc = null;
         SignatureService.Signed signed = null;
+        SigningJobs.Job signingJob = null;
         String mode = policies.settings().signatureMode();
         if ("APPROVE".equals(decision) && t.finalStage() && t.requiresSignature() && policies.settings().signatureRequired()) {
             doc = canonical(requestIdValue, currentRevision);
-            signed = signatures.sign(mode, ctx.personId(), ctx.actor().sessionId(), grant.roleName(), doc.sha256(), now, in.signature());
+            if ("PKI".equals(mode)) {
+                if (in.signature() == null || !Boolean.TRUE.equals(in.signature().confirm())) {
+                    throw new ApiException(ErrorCode.SIGNATURE_REQUIRED, "أكد الاعتماد لإتمام التوثيق.");
+                }
+                signingJob = signedJob(ctx, t, currentRevision, doc, in.signingJobId());
+                signed = new SignatureService.Signed("PKI", "signing-job:" + signingJob.id());
+            } else {
+                signed = signatures.sign(mode, ctx.personId(), ctx.actor().sessionId(), grant.roleName(), doc.sha256(), now, in.signature());
+            }
         }
 
         jdbc.sql("""
@@ -367,12 +478,17 @@ public class DecisionService {
         }
         jdbc.sql("""
                 insert into approval_document(id, request_id, revision, decision_id, canonical, sha256, signature_mode,
-                    signer_person_id, signer_name, signer_role, signed_at, evidence)
-                values (:id, :req, :rev, :dec, cast(:doc as jsonb), :sha, :mode, :pid, :pname, :role, :now, :ev)""")
+                    signer_person_id, signer_name, signer_role, signed_at, evidence, signing_job_id)
+                values (:id, :req, :rev, :dec, cast(:doc as jsonb), :sha, :mode, :pid, :pname, :role, :now, :ev, :job)""")
                 .param("id", UUID.randomUUID()).param("req", requestIdValue).param("rev", currentRevision)
                 .param("dec", decisionId).param("doc", json.write(doc.document())).param("sha", doc.sha256())
                 .param("mode", signed.mode()).param("pid", ctx.personId()).param("pname", ctx.actor().displayName())
-                .param("role", grant.roleName()).param("now", Db.ts(now)).param("ev", signed.evidence()).update();
+                .param("role", grant.roleName()).param("now", Db.ts(now)).param("ev", signed.evidence())
+                .param("job", signingJob == null ? null : signingJob.id()).update();
+        if (signingJob != null) {
+            // published only if the rest of this transaction (reservations included) commits
+            signingJobs.published(signingJob.id(), decisionId, now);
+        }
         audit.record(ctx.actor(), capacity, "APPROVAL_SIGNED", "REQUEST", requestIdValue.toString(), number,
                 Map.of("sha256", doc.sha256(), "signatureMode", signed.mode(),
                         "label", RequestViews.signatureLabel(signed.mode())), null, currentRevision);

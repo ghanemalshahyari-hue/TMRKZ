@@ -34,13 +34,16 @@ public class IntegrationService {
     private final Clock clock;
     private final AuditService audit;
     private final ae.mover.security.OidcClient oidc;
+    private final ae.mover.signing.SigningProvider signing;
 
-    public IntegrationService(JdbcClient jdbc, Json json, Clock clock, AuditService audit, ae.mover.security.OidcClient oidc) {
+    public IntegrationService(JdbcClient jdbc, Json json, Clock clock, AuditService audit, ae.mover.security.OidcClient oidc,
+                              ae.mover.signing.SigningProvider signing) {
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
         this.audit = audit;
         this.oidc = oidc;
+        this.signing = signing;
     }
 
     public record Connector(String code, String name, String status, String description, Map<String, Object> lastRun) {
@@ -56,10 +59,25 @@ public class IntegrationService {
                 hrConnector(),
                 new Connector("CORRESPONDENCE", "المراسلات", "NOT_CONNECTED",
                         "الإشعارات داخل النظام فقط. لا يُرسل أي إشعار خارجي ولا يُدّعى تسليمه.", null),
-                new Connector("SIGNATURE_PKI", "التوقيع الرقمي بشهادة", "NOT_CONNECTED",
-                        "القرار D-02 مفتوح. نمط PKI يرفض الاعتماد برسالة واضحة حتى ربط مزود الشهادات.", null),
+                signingConnector(),
                 new Connector("MALWARE_SCAN", "فحص المرفقات", "BUILT_IN",
                         "فحص مدمج للنوع الفعلي والتوقيعات المعروفة (EICAR، الماكرو، محتوى PDF النشط). ماسح خارجي غير مربوط.", null));
+    }
+
+    /**
+     * Certificate signing as measured: CONNECTED once a document has been signed and published through the configured
+     * provider, CONFIGURED when the provider is usable but has not signed yet, NOT_CONNECTED otherwise (PKI mode then
+     * refuses approvals). The test environment's provider is fictional and is named as such by its folder, not here.
+     */
+    private Connector signingConnector() {
+        if (!signing.available()) {
+            return new Connector("SIGNATURE_PKI", "التوقيع الرقمي بشهادة وختم الجهة", "NOT_CONNECTED",
+                    signing.problem() + " نمط PKI يرفض الاعتماد برسالة واضحة.", null);
+        }
+        long published = jdbc.sql("select count(*) from signing_job where status = 'PUBLISHED'").query(Long.class).single();
+        return new Connector("SIGNATURE_PKI", "التوقيع الرقمي بشهادة وختم الجهة", published > 0 ? "CONNECTED" : "CONFIGURED",
+                "المزود " + signing.name() + " · شهادات جذر موثوقة: " + signing.trustAnchors().size() + " · قوائم إلغاء: "
+                        + signing.revocationLists().size() + " · مستندات منشورة بتوقيع وختم: " + published + ".", null);
     }
 
     /** Enterprise sign-in as measured: configured, provider answering, and at least one linked sign-in recorded. */

@@ -461,6 +461,7 @@ export type RequestDetail = RequestListItem & {
     signerRole: string;
     signedAt: string;
     boundaryVersions?: { siteCode: string; version: number | null; type: string }[];
+    signatures?: SignatureEvidence[];
   } | null;
   reservations: { id: string; resourceName: string; period: Period; status: string }[];
   executionTasks: ExecutionTask[];
@@ -511,6 +512,41 @@ export type DecisionInput = {
   reasonCode?: ReasonCode;
   expectedRevision: number;
   signature?: { confirm: boolean };
+  signingJobId?: string;
+};
+
+export type SignatureEvidence = {
+  kind: 'PERSON' | 'SEAL';
+  subject: string;
+  issuer: string;
+  serial: string;
+  notBefore: string;
+  notAfter: string;
+  signingTime: string;
+  indication: string;
+  subIndication: string | null;
+};
+export type SigningJob = {
+  id: string;
+  status: 'PENDING' | 'SIGNED' | 'FAILED' | 'PUBLISHED' | 'UNPUBLISHED';
+  revision: number;
+  documentSha256: string;
+  provider: string;
+  signerName: string;
+  failureCode: string | null;
+  failureMessage: string | null;
+  signedAt: string | null;
+  signatures: SignatureEvidence[];
+};
+export type ApprovalVerification = {
+  revision: number;
+  sha256: string;
+  signatureMode: SignatureMode;
+  verifiable: boolean;
+  message?: string;
+  validatedAt?: string;
+  passed?: boolean;
+  signatures?: { role: string; subject: string; issuer: string; signingTime: string; indication: string; subIndication: string | null; passed: boolean; reason: string | null }[];
 };
 
 // ---------- reservations & execution ----------

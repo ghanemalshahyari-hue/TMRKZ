@@ -33,8 +33,9 @@ public final class Commands {
     public record SignatureInput(String password, Boolean confirm) {
     }
 
+    /** {@code signingJobId}: the certificate signature produced for this task (PKI mode), published by the decision. */
     public record DecisionInput(String decision, String note, String reasonCode, Integer expectedRevision,
-                                SignatureInput signature) {
+                                SignatureInput signature, String signingJobId) {
     }
 
     public record CloseInput(String note) {

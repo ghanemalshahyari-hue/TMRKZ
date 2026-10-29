@@ -22,6 +22,8 @@ import ae.mover.access.RequestScope;
 import ae.mover.access.ViewLevel;
 import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
+import ae.mover.signing.ApprovalSigner;
+import ae.mover.signing.SigningJobs;
 import ae.mover.common.Db;
 import ae.mover.common.Json;
 import ae.mover.common.PageResult;
@@ -46,10 +48,14 @@ public class RequestViews {
     private final FormService forms;
 
     private final BoundaryService boundaries;
+    private final ApprovalSigner signer;
+    private final SigningJobs signingJobs;
 
     public RequestViews(JdbcClient jdbc, Json json, Clock clock, AccessService access, WorkflowService workflows,
-                        FormService forms, BoundaryService boundaries) {
+                        FormService forms, BoundaryService boundaries, ApprovalSigner signer, SigningJobs signingJobs) {
         this.boundaries = boundaries;
+        this.signer = signer;
+        this.signingJobs = signingJobs;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -83,9 +89,11 @@ public class RequestViews {
     }
 
     /** boundaryVersions: the site boundary versions fixed by the signed document (absent for earlier documents). */
+    /** signatures: the certificate signature and seal as validated when produced (PKI mode, full view only). */
     public record ApprovalDocumentView(int revision, String sha256, String signatureMode, String signatureLabel,
                                        String signerName, String signerRole, String signedAt,
-                                       @JsonInclude(JsonInclude.Include.NON_NULL) JsonNode boundaryVersions) {
+                                       @JsonInclude(JsonInclude.Include.NON_NULL) JsonNode boundaryVersions,
+                                       @JsonInclude(JsonInclude.Include.NON_NULL) List<SigningJobs.Signature> signatures) {
     }
 
     public record ReservationRef(String id, String resourceName, Period period, String status) {
@@ -424,17 +432,61 @@ public class RequestViews {
                 .param("id", requestId)
                 .query((rs, n) -> {
                     JsonNode versions = json.tree(rs.getString("doc")).path("boundaryVersions");
+                    UUID job = Db.uuid(rs, "signing_job_id");
                     return new ApprovalDocumentView(rs.getInt("revision"), rs.getString("sha256"),
                             rs.getString("signature_mode"), signatureLabel(rs.getString("signature_mode")),
                             full ? rs.getString("signer_name") : "صاحب الاعتماد", rs.getString("signer_role"), Db.iso(rs, "signed_at"),
-                            versions.isArray() ? versions : null);
+                            versions.isArray() ? versions : null, full && job != null ? signingJobs.view(job).signatures() : null);
                 })
                 .optional().orElse(null);
     }
 
+    /** Re-validates the published certificate signature and seal of a request's approval document now (full view). */
+    public Map<String, Object> verifyApprovalDocument(AccessContext ctx, UUID requestId) {
+        RequestScope scope = access.requestScope(requestId);
+        if (ctx.viewLevel(scope) != ViewLevel.FULL) {
+            throw ApiException.notFound();
+        }
+        ctx.confirmView(scope, ViewLevel.FULL);
+        Map<String, Object> d = jdbc.sql("""
+                select id, revision, sha256, signature_mode, signing_job_id from approval_document where request_id = :id
+                order by revision desc limit 1""").param("id", requestId).query().listOfRows().stream().findFirst()
+                .orElseThrow(ApiException::notFound);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("revision", d.get("revision"));
+        out.put("sha256", d.get("sha256"));
+        out.put("signatureMode", d.get("signature_mode"));
+        UUID jobId = (UUID) d.get("signing_job_id");
+        if (jobId == null) {
+            out.put("verifiable", false);
+            out.put("message", "المستند موثق داخلياً وليس موقعاً بشهادة؛ لا توجد توقيعات للتحقق منها.");
+            return out;
+        }
+        byte[] signed = jdbc.sql("select signed_document from signing_job where id = :id").param("id", jobId).query(byte[].class).single();
+        Map<String, String> certs = signingJobs.certificates(jobId);
+        List<ApprovalSigner.Check> checks = signer.validate(signed, certs.get("PERSON"), certs.get("SEAL"));
+        signingJobs.report(jobId, checks, ctx.personId(), clock.instant());
+        out.put("verifiable", true);
+        out.put("validatedAt", clock.instant().toString());
+        out.put("passed", checks.size() == 2 && checks.stream().allMatch(ApprovalSigner.Check::passed));
+        out.put("signatures", checks.stream().map(c -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("role", c.role());
+            m.put("subject", c.subject());
+            m.put("issuer", c.issuer());
+            m.put("signingTime", c.signingTime() == null ? null : c.signingTime().toString());
+            m.put("indication", c.indication());
+            m.put("subIndication", c.subIndication());
+            m.put("passed", c.passed());
+            m.put("reason", c.reason());
+            return m;
+        }).toList());
+        return out;
+    }
+
     public static String signatureLabel(String mode) {
         return "PKI".equals(mode)
-                ? "توقيع رقمي بشهادة (مزود PKI)"
+                ? "توقيع رقمي بشهادة المعتمد وختم الجهة (JAdES)"
                 : "توثيق داخلي بإعادة التحقق من هوية المعتمد — ليس توقيعاً رقمياً بشهادة";
     }
 

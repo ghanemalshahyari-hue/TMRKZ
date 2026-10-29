@@ -73,7 +73,7 @@ half-open; equal end/start do not overlap unless a handover buffer is configured
 reservations use an unbounded range, never an artificial far date. Shared-policy resources take no exclusive locks;
 capacity rules for shared resources are an open item (see STATUS).
 
-## ADR-007 Approval signing modes kept separate — Provisional (D-02)
+## ADR-007 Approval signing modes kept separate — Provisional (D-02); PKI mode implemented by ADR-020
 
 `INTERNAL_ATTESTATION` (default): the approver re-enters their password; the server computes the SHA-256 of a
 canonical approval document bound to the revision hash and stores an HMAC evidence over (mode, person, capacity,
@@ -352,3 +352,38 @@ resource, not a fixed rule for all sites"; "no default capacity") and §9. Amend
   limit as unavailable with the reason.
 - **Interface.** «إعداد الموارد وعلاقاتها» in the site panel (facility managers): resources with policy, handover,
   relation and limit; add a resource; edit with server-side refusal shown in place.
+
+## ADR-020 Certificate signature of the approver and seal of the organisation with DSS — Accepted (2026-10-29)
+
+Owner decisions in `docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md` §2 ("digital signature with a certificate and an
+electronic seal, both verifiable") and §10. Implements the PKI mode of ADR-007; internal attestation stays available
+and is never labelled as a certificate signature.
+
+- **Library.** Digital Signature Service 6.5.1 (European Commission, LGPL-2.1): `dss-jades`, `dss-validation`,
+  `dss-token`, `dss-utils-apache-commons`, `dss-crl-parser-x509crl`, `dss-policy-jaxb` (BouncyCastle 1.86, jose4j). DSS is
+  neither a certificate nor a trust provider nor an HSM.
+- **Format.** The canonical approval document (the same canonical JSON whose SHA-256 the document carries) is signed as
+  JAdES-BASELINE-B, JSON serialisation, enveloping: first the approver's certificate, then the organisation's seal as a
+  parallel signature, so adding the seal leaves the person's signature intact. JSON is used rather than PAdES because
+  the document is canonical JSON and Arabic text in a generated PDF would need a shaping engine the stack does not have.
+- **Validation.** Both signatures are validated with DSS's default policy against the organisation's trust anchors and
+  the CRLs distributed inside the network (no OCSP, AIA or other network access). Only `TOTAL_PASSED` is accepted;
+  revoked, expired (checked before signing), untrusted and missing certificates are refused with an Arabic reason.
+  Every validation (at signing and each later "verify now") is kept in `validation_report`; the evidence of each
+  signature (certificate, subject, issuer, serial, validity, indication) in `signature_evidence`; both append-only.
+- **Transactions.** Signing is outside the decision transaction (§10): `POST /tasks/{id}/signing` checks the task as a
+  decision would, freezes the document in a `signing_job` (idempotent per person, task, revision and document hash),
+  has the provider sign, validates, and records the outcome in its own transaction. The decision
+  (`signingJobId`) re-checks permission, assignment, revision and the frozen hash inside the transaction that commits
+  the decision, the reservations, Flowable, the audit and the outbox; the job becomes PUBLISHED only if that commits.
+  If the decision fails (e.g. a reservation conflict), the job is recorded UNPUBLISHED with the reason and no approval
+  document exists. A signature of another revision or task is never published. A provider outage stops the approval
+  with `SIGNATURE_PROVIDER_UNAVAILABLE`; there is no fallback to the internal attestation.
+- **Provider.** `SigningProvider` hands DSS keys without exporting them. `PKCS12_DIRECTORY` (key stores
+  `person-<employeeNo>.p12` and `seal-<organisationCode>.p12`, one password from a secret file, CA and CRLs in mounted
+  folders) serves the acceptance environment and organisations with soft certificates. An enterprise HSM or signing
+  service (PKCS#11 or remote) is a further implementation of the same interface once its details are known.
+- **Not done.** No time-stamp authority (signatures are B-level with the signing time claimed by the server; a TSA
+  inside the network would make them B-T). No OCSP. No assessment against the UAE Trusted List or TDRA guidance —
+  that depends on the enterprise provider's services and policy. The fictional test PKI proves the mechanism, not a
+  trust level.
