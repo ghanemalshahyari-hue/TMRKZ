@@ -194,3 +194,6 @@ Supersedes ADR-003 (local identity adapter). Owner decision: Keycloak with LDAP;
   theme baked in (Arabic RTL, local font and assets). The realm (`ops/keycloak/realm/tmrkz-realm.json`) is imported on
   first start with values from the environment. Keycloak has its own database and owner in the same PostgreSQL server.
   It is reached through the web entry point under `/auth`; the admin console and the master realm are not served there.
+- **One sign-in page.** Opening TMRKZ without a session goes straight to the provider's sign-in page, which holds the
+  username and password, laid out like the TNQL sign-in page. TMRKZ shows its own page, in the same design, only when
+  sign-in cannot start or was refused, with the reason and a way back.

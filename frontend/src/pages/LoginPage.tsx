@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { AuthStatus } from '../api/types';
-import { Icon } from '../components/ui';
+import '../styles/signin.css';
 
 /** Messages for the error the server put in the address after a refused sign-in (never a fallback sign-in). */
 const ERRORS: Record<string, string> = {
-  IDENTITY_NOT_LINKED: 'تحقق مزود الهوية من حسابك، لكنه غير مربوط بسجل في الموارد البشرية.',
-  IDENTITY_SIGN_IN_FAILED: 'لم يكتمل الدخول. ابدأ من جديد من هذه الصفحة.',
-  IDENTITY_PROVIDER_UNAVAILABLE: 'مزود الهوية غير متاح الآن. لا يوجد دخول بديل؛ حاول لاحقاً أو أبلغ الدعم الفني.',
+  IDENTITY_NOT_LINKED: 'تحقق الدليل المؤسسي من حسابك، لكنه غير مربوط بسجل في الموارد البشرية.',
+  IDENTITY_SIGN_IN_FAILED: 'لم يكتمل الدخول. أعد المحاولة.',
+  IDENTITY_PROVIDER_UNAVAILABLE: 'خدمة الدخول المؤسسي غير متاحة الآن. لا يوجد دخول بديل؛ حاول لاحقاً أو أبلغ الدعم الفني.',
   IDENTITY_PROVIDER_NOT_CONFIGURED: 'الدخول المؤسسي غير مهيأ في هذه البيئة. أبلغ مدير النظام.',
-  PROVIDER_ACCESS_DENIED: 'رفض مزود الهوية إتمام الدخول.',
+  PROVIDER_ACCESS_DENIED: 'رفضت خدمة الدخول إتمام العملية.',
 };
 const REASONS: Record<string, string> = {
   NO_MATCH: 'لم يُعثر على سجلك في الموارد البشرية؛ أُحيل الطلب إلى مسؤول الصلاحيات في جهتك.',
@@ -29,78 +29,86 @@ function readError(hash: string): string | null {
 }
 
 /**
- * Enterprise sign-in only: the button sends the browser to the organisation's identity provider (passwords are checked by
- * the directory there, never here). The current address is kept so the person returns to the screen they asked for.
+ * Without a session the application goes straight to the sign-in page (username and password, checked by the
+ * organisation's directory). This TMRKZ page appears only when sign-in cannot start or was refused, in the same design,
+ * with the reason and a way back to the sign-in page.
  */
 export function LoginPage() {
   const [status, setStatus] = useState<AuthStatus | null>(null);
   const [error] = useState(() => readError(window.location.hash));
+  const startUrl = '/api/v1/auth/oidc/start?return=' + encodeURIComponent('/' + (error ? '' : window.location.hash));
 
   useEffect(() => {
     api
       .authStatus()
-      .then(setStatus)
+      .then((s) => {
+        setStatus(s);
+        if (!error && s.configured && s.reachable) window.location.replace(startUrl);
+      })
       .catch(() => setStatus({ provider: 'OIDC', configured: false, reachable: false }));
     if (error) history.replaceState(null, '', window.location.pathname);
-  }, [error]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const returnTo = '/' + (error ? '' : window.location.hash);
   const ready = !!status?.configured && status.reachable;
+  const message = error ?? (status && !ready ? (status.configured ? ERRORS.IDENTITY_PROVIDER_UNAVAILABLE : ERRORS.IDENTITY_PROVIDER_NOT_CONFIGURED) : null);
 
   return (
-    <div className="login-shell">
-      <div className="login-layout">
-        <section className="login-visual card" aria-hidden="true">
-          <div className="login-visual-grid" />
-          <div className="login-visual-content">
-            <span className="eyebrow">TMRKZ PLATFORM</span>
-            <h2>منصة إدارية للمرافق والحجوزات والموافقات</h2>
-            <p className="micro">
-              تشغيل داخلي آمن، صلاحيات مفصولة، وسير عمل واضح من الطلب حتى الاعتماد النهائي دون تعارض في الحجوزات.
-            </p>
-            <ul className="login-highlights">
-              <li>خريطة مرافق موحّدة مع التحقق من الإتاحة</li>
-              <li>موافقات متسلسلة ومتوازية بسجل تدقيق كامل</li>
-              <li>دخول مؤسسي وجلسات خادم داخل بيئة تشغيل معزولة</li>
-            </ul>
-          </div>
-        </section>
-        <div className="card login-card">
-          <div className="login-brand">
-            <span className="brand-logo">
-              <Icon name="map" />
-            </span>
-            <span>
-              <strong>
-                TMRKZ<span>.</span>
-              </strong>
-              <small>المواقع · المرافق · الإجراءات</small>
-            </span>
-          </div>
-          <span className="eyebrow">SIGN IN / ENTERPRISE IDENTITY</span>
-          <h1>تسجيل الدخول</h1>
-          <p className="micro muted login-note">
-            يتم الدخول بحسابك في الدليل المؤسسي. تُدار الجلسة في الخادم وتُقيّم الصلاحيات عند كل إجراء وفق جهتك وانتمائك الوظيفي.
-          </p>
-          {error && (
-            <div className="note red" role="alert" style={{ marginBottom: 14 }}>
-              {error}
+    <div className="tm" dir="rtl">
+      <section className="tm-shell">
+        <div className="tm-backdrop" aria-hidden="true" />
+        <main className="tm-main">
+          <div className="tm-card">
+            <h1 className="tm-logo">
+              <span className="tm-mark" aria-hidden="true">
+                <svg viewBox="0 0 48 48" width="48" height="48">
+                  <path d="M24 4 41 14v20L24 44 7 34V14Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round" />
+                  <path d="M24 13c-4.4 0-8 3.4-8 7.8C16 27 24 35 24 35s8-8 8-14.2C32 16.4 28.4 13 24 13Zm0 11a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4Z" fill="currentColor" />
+                </svg>
+              </span>
+              <span className="tm-word">TMRKZ</span>
+            </h1>
+            <p className="tm-sub">المواقع · المرافق · الإجراءات الإدارية</p>
+            <span className="tm-rule" aria-hidden="true" />
+            <div className="tm-messages" role="status" aria-live="polite">
+              {message && (
+                <div className={'tm-alert ' + (error ? 'tm-alert-error' : 'tm-alert-warning')}>
+                  <span>{message}</span>
+                </div>
+              )}
             </div>
-          )}
-          {status && !ready && (
-            <div className="note orange" role="status" style={{ marginBottom: 14 }}>
-              {status.configured ? ERRORS.IDENTITY_PROVIDER_UNAVAILABLE : ERRORS.IDENTITY_PROVIDER_NOT_CONFIGURED}
-            </div>
-          )}
-          <a
-            className={'button primary full' + (ready ? '' : ' disabled')}
-            href={ready ? '/api/v1/auth/oidc/start?return=' + encodeURIComponent(returnTo) : undefined}
-            aria-disabled={!ready}
-          >
-            {status ? 'الدخول بالحساب المؤسسي' : 'جارٍ التحقق من مزود الهوية…'}
-          </a>
-        </div>
-      </div>
+            {!message && <p className="tm-help">جارٍ فتح صفحة الدخول…</p>}
+            {message && (
+              <a className="tm-submit" href={ready ? startUrl : undefined} aria-disabled={!ready} onClick={(e) => !ready && e.preventDefault()}>
+                <span className="tm-submit-label">{ready ? 'العودة إلى تسجيل الدخول' : 'خدمة الدخول غير متاحة'}</span>
+              </a>
+            )}
+            <p className="tm-foot">بيئة تشغيل داخلية معزولة · TMRKZ</p>
+          </div>
+        </main>
+        <aside className="tm-board" aria-label="إرشادات الدخول">
+          <header className="tm-board-head">
+            <strong>إرشادات الدخول</strong>
+            <small>نظام المواقع والمرافق والإجراءات الإدارية</small>
+          </header>
+          <article className="tm-note">
+            <span className="tm-note-meta">الحساب</span>
+            <b>استخدم حسابك في الدليل المؤسسي</b>
+            <p>اسم المستخدم وكلمة المرور نفسها المستخدمة في أجهزة العمل. يتحقق منها الدليل المؤسسي، ولا يحفظها النظام.</p>
+          </article>
+          <article className="tm-note">
+            <span className="tm-note-meta">الصلاحيات</span>
+            <b>الصلاحيات من جهتك</b>
+            <p>تُمنح الصلاحيات وفق انتمائك الوظيفي والمسؤوليات المعتمدة، ولا تُمنح بمجرد امتلاك حساب.</p>
+          </article>
+          <article className="tm-note">
+            <span className="tm-note-meta">الحماية</span>
+            <b>حماية الحساب</b>
+            <p>يُوقف الدخول مؤقتاً بعد محاولات خاطئة متكررة. لا تشارك كلمة المرور، وسجّل الخروج عند الانتهاء.</p>
+          </article>
+          <footer className="tm-board-foot">التشغيل داخل الشبكة الداخلية فقط</footer>
+        </aside>
+      </section>
     </div>
   );
 }
