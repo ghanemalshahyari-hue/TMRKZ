@@ -30,6 +30,8 @@ public enum ErrorCode {
     DIRECTORY_UNAVAILABLE(503),
     DIRECTORY_TLS_FAILED(503),
     SIGN_IN_THROTTLED(429),
+    AUTHZ_UNAVAILABLE(503),
+    AUTHZ_SYNC_PENDING(503),
     INTERNAL_ERROR(500);
 
     private final int status;

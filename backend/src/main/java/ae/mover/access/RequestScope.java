@@ -15,7 +15,8 @@ public record RequestScope(
         Set<UUID> participantOrgs,
         Set<UUID> infoOrgs,
         Set<UUID> resourceOrgs,
-        Set<UUID> siteIds) {
+        Set<UUID> siteIds,
+        Set<UUID> resourceIds) {
 
     public Set<UUID> relatedOrgs() {
         java.util.HashSet<UUID> all = new java.util.HashSet<>();

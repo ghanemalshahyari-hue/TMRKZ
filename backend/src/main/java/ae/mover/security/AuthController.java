@@ -273,6 +273,7 @@ public class AuthController {
             m.put("roleName", g.roleName());
             m.put("permissions", g.permissions());
             m.put("scope", g.scope());
+            m.put("all", g.isAll());
             m.put("summaryOnly", g.summaryOnly());
             m.put("organization", Ref.of(g.orgId(), g.orgName()));
             m.put("site", Ref.of(g.siteId(), g.siteName()));

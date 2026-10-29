@@ -1,0 +1,43 @@
+{
+  "run": "2026-10-29T08:45:01.547Z",
+  "results": [
+    {
+      "id": "STUDIO-01",
+      "title": "Global manager sees the published version, the matrix and a working decision service",
+      "result": "PASS",
+      "ms": 216
+    },
+    {
+      "id": "STUDIO-02",
+      "title": "Grants read as plain Arabic scopes, including an AND scope",
+      "result": "PASS",
+      "ms": 1376
+    },
+    {
+      "id": "STUDIO-03",
+      "title": "Explanation lists each action with its reasons; the decision service agrees on every row",
+      "result": "PASS",
+      "ms": 541
+    },
+    {
+      "id": "STUDIO-04",
+      "title": "Draft, impact and discard: nothing changes before publication",
+      "result": "PASS",
+      "ms": 1035
+    },
+    {
+      "id": "STUDIO-05",
+      "title": "An organisation access manager sees the policy read-only",
+      "result": "PASS",
+      "ms": 18
+    },
+    {
+      "id": "STUDIO-06",
+      "title": "The manager cannot grant beyond their authority; inside it the grant is created and ended",
+      "result": "PASS",
+      "ms": 1687
+    }
+  ],
+  "externalRequests": [],
+  "consoleErrors": []
+}

@@ -44,7 +44,8 @@ export type Grant = {
   roleCode: string;
   roleName: string;
   permissions: Permission[];
-  scope: Scope;
+  scope: Scope | 'CUSTOM';
+  all?: boolean;
   summaryOnly: boolean;
   organization: Ref | null;
   site: Ref | null;
@@ -106,7 +107,7 @@ export type Delegation = {
   revokedAt: string | null;
   active: boolean;
 };
-export type RoleDef = { code: string; name: string; permissions: Permission[]; scope: Scope; summaryOnly: boolean; system: boolean };
+export type RoleDef = { code: string; name: string; permissions: Permission[]; scope: Scope; summaryOnly: boolean; system: boolean; grantableRoles: string[]; policyVersion: number | null };
 
 // ---------- facilities & map ----------
 export type Resource = {
@@ -690,3 +691,101 @@ export type IdentityIssue = {
   claimedKey?: string;
   subject?: string;
 };
+
+// ---- permissions studio (ADR-018) ----------------------------------------------------------------------------------
+export type PolicyRole = {
+  code: string;
+  name: string;
+  permissions: Permission[];
+  scope: Scope;
+  summaryOnly: boolean;
+  system: boolean;
+  grantableRoles: string[];
+  sortOrder: number;
+};
+export type AccessPolicyVersion = {
+  id: string;
+  version: number;
+  status: 'DRAFT' | 'PUBLISHED' | 'SUPERSEDED' | 'DISCARDED';
+  note: string | null;
+  createdBy: Ref | null;
+  createdAt: string;
+  publishedBy: Ref | null;
+  publishedAt: string | null;
+  restoredFromVersion: number | null;
+  basedOnVersion: number | null;
+  fgaModelId: string | null;
+  roles: PolicyRole[];
+};
+export type PolicyProblem = { level: 'ERROR' | 'WARNING'; role: string; message: string };
+export type RoleImpact = {
+  code: string;
+  name: string;
+  change: 'ADDED' | 'CHANGED' | 'UNCHANGED';
+  added: Permission[];
+  removed: Permission[];
+  scopeFrom: Scope | null;
+  scopeTo: Scope;
+  summaryFrom: boolean | null;
+  summaryTo: boolean;
+  grantableAdded: string[];
+  grantableRemoved: string[];
+  memberships: number;
+  delegations: number;
+  seats: number;
+  persons: number;
+};
+export type PolicyImpact = { draftVersion: number; publishedVersion: number; roles: RoleImpact[]; problems: PolicyProblem[]; publishable: boolean };
+export type GrantTargetKind = 'ORGANIZATION' | 'SITE' | 'RESOURCE';
+export type GrantTargetView = { kind: GrantTargetKind; id: string; name: string; includeDescendants: boolean };
+export type GrantView = {
+  id: string;
+  person: { id: string; displayName: string; employeeNo: string };
+  role: { code: string; name: string };
+  organization: Ref;
+  positionTitle: string | null;
+  scopeMode: 'ROLE' | 'CUSTOM';
+  all: boolean;
+  combine: 'AND' | 'OR';
+  targets: GrantTargetView[];
+  scopeText: string;
+  validFrom: string;
+  validTo: string | null;
+  active: boolean;
+  grantedBy: Ref | null;
+  endedReason: string | null;
+};
+export type GrantScopeInput = {
+  mode: 'ROLE' | 'CUSTOM';
+  all?: boolean;
+  combine?: 'AND' | 'OR';
+  targets?: { kind: GrantTargetKind; id: string; includeDescendants: boolean }[];
+};
+export type ExplainReason = { role: string; organization: string; scope: string; validTo: string | null; via: string | null };
+export type ExplainVerdict = { allowed: boolean; reasons: ExplainReason[] };
+export type ExplainAction = { action: Permission; published: ExplainVerdict; draft: ExplainVerdict | null; openfga: boolean | null; changed: boolean };
+export type AccessExplain = {
+  person: { id: string; displayName: string; employeeNo: string; status: string };
+  target: { organization: Ref | null; site: Ref | null; resource: Ref | null; meaning: string };
+  draftVersion: number | null;
+  openfgaAvailable: boolean;
+  actions: ExplainAction[];
+};
+export type AuthzStatus = {
+  configured: boolean;
+  reachable: boolean;
+  storeId: string | null;
+  modelId: string | null;
+  modelHash: string | null;
+  appliedSeq: number;
+  latestSeq: number;
+  pendingChanges: number;
+  tuples: number;
+  lastSuccessAt: string | null;
+  lastDurationMs: number | null;
+  lastError: string | null;
+  lastErrorAt: string | null;
+  rebuiltTuples?: number;
+  rebuildMs?: number;
+};
+

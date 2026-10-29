@@ -499,7 +499,7 @@ public class BoundaryService {
         Map<String, Object> j = jdbc.sql("select *, report::text as r, candidates::text as c from map_import_job where id = :id")
                 .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         if (!ctx.personId().equals(j.get("created_by"))
-                && ctx.grants().stream().noneMatch(g -> g.has(Permission.MANAGE_FACILITIES) && g.isAll())) {
+                && !ctx.canEverywhere(Permission.MANAGE_FACILITIES)) {
             throw ApiException.notFound();
         }
         JsonNode report = json.tree((String) j.get("r"));
@@ -539,7 +539,7 @@ public class BoundaryService {
                         + "from map_import_job where id = :id for update").param("id", id).query().listOfRows().stream().findFirst()
                 .orElseThrow(ApiException::notFound);
         if (!ctx.personId().equals(j.get("created_by"))
-                && ctx.grants().stream().noneMatch(g -> g.has(Permission.MANAGE_FACILITIES) && g.isAll())) {
+                && !ctx.canEverywhere(Permission.MANAGE_FACILITIES)) {
             throw ApiException.notFound();
         }
         if (!"PREVIEWED".equals(j.get("status"))) {

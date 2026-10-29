@@ -33,6 +33,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      openfga:
+        condition: service_healthy
     environment:
       MOVER_DB_URL: jdbc:postgresql://db:5432/mover
       MOVER_DB_USER: mover
@@ -63,6 +65,9 @@ services:
       LDAP_EMPLOYEE_NUMBER_ATTRIBUTE: ${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:-employeeNumber}
       LDAP_USER_OBJECT_CLASS: ${LDAP_USER_OBJECT_CLASS:-inetOrgPerson}
       TMRKZ_LDAP_CA_DIR: /etc/tmrkz/ldap-ca
+      # Authorisation decisions are confirmed by TMRKZ's own OpenFGA (ADR-018); without it sensitive actions are refused.
+      TMRKZ_OPENFGA_API_URL: http://openfga:8080
+      TMRKZ_OPENFGA_API_TOKEN: ${TMRKZ_OPENFGA_API_TOKEN:?set TMRKZ_OPENFGA_API_TOKEN in .env; run ops/init-env.sh}
     volumes:
       - files:/var/lib/mover
       - ${TMRKZ_TRUSTSTORE_DIR:-./ops/keycloak/truststores}:/etc/tmrkz/ldap-ca:ro
@@ -78,6 +83,7 @@ services:
     environment:
       MOVER_DB_PASSWORD: ${MOVER_DB_PASSWORD}
       TMRKZ_KEYCLOAK_DB_PASSWORD: ${TMRKZ_KEYCLOAK_DB_PASSWORD:?set TMRKZ_KEYCLOAK_DB_PASSWORD in .env; run ops/init-env.sh}
+      TMRKZ_OPENFGA_DB_PASSWORD: ${TMRKZ_OPENFGA_DB_PASSWORD:?set TMRKZ_OPENFGA_DB_PASSWORD in .env; run ops/init-env.sh}
     volumes:
       - ./ops/db/init-databases.sh:/init-databases.sh:ro
     entrypoint: ["sh", "/init-databases.sh"]
@@ -127,6 +133,42 @@ services:
       timeout: 5s
       retries: 30
       start_period: 40s
+
+  # Authorisation decision service (OpenFGA 1.8.16), TMRKZ's own store in its own database. Not published on any host
+  # port; only the backend calls it, with a preshared key. The playground is disabled.
+  openfga-migrate:
+    image: openfga/openfga:v1.8.16
+    restart: "no"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    command: ["migrate"]
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:${TMRKZ_OPENFGA_DB_PASSWORD}@db:5432/openfga?sslmode=disable
+    networks: [internal]
+
+  openfga:
+    image: openfga/openfga:v1.8.16
+    restart: unless-stopped
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+    command: ["run"]
+    environment:
+      OPENFGA_DATASTORE_ENGINE: postgres
+      OPENFGA_DATASTORE_URI: postgres://openfga:${TMRKZ_OPENFGA_DB_PASSWORD}@db:5432/openfga?sslmode=disable
+      OPENFGA_AUTHN_METHOD: preshared
+      OPENFGA_AUTHN_PRESHARED_KEYS: ${TMRKZ_OPENFGA_API_TOKEN}
+      OPENFGA_PLAYGROUND_ENABLED: "false"
+      OPENFGA_LOG_FORMAT: json
+      OPENFGA_LOG_LEVEL: warn
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/grpc_health_probe", "-addr=127.0.0.1:8081"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   web:
     image: mover/web:1.0.0

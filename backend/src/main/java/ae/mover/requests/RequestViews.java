@@ -225,6 +225,7 @@ public class RequestViews {
         if (scope == null || ctx.viewLevel(scope) == ViewLevel.NONE) {
             throw ApiException.notFound();
         }
+        ctx.confirmView(scope, ctx.viewLevel(scope));
         int current = jdbc.sql("select current_revision from request where id = :id").param("id", id).query(Integer.class).single();
         int rev = revision == null ? current : revision;
         Map<String, Object> out = new LinkedHashMap<>();
@@ -258,6 +259,7 @@ public class RequestViews {
         if (level == ViewLevel.NONE) {
             throw ApiException.notFound();
         }
+        ctx.confirmView(scope, level);
         boolean full = level == ViewLevel.FULL;
         Map<String, Object> r = jdbc.sql("""
                 select r.*, r.draft::text as draft_text, t.name as type_name, t.kind, o.name as owner_name,
@@ -311,7 +313,7 @@ public class RequestViews {
         boolean editable = ctx.mayModify((UUID) r.get("created_by"), (UUID) r.get("owner_org_id"), status);
         List<ExecutionTaskView> exec = executionTasks(ctx, id, scope);
         boolean canClose = "APPROVED".equals(status) && exec.stream().allMatch(e -> "DONE".equals(e.status()))
-                && (creator || ctx.grants().stream().anyMatch(g -> g.has(Permission.REVIEW) && g.covers(scope.relatedOrgs(), scope.siteIds())));
+                && (creator || ctx.grants().stream().anyMatch(g -> g.has(Permission.REVIEW) && g.coversRequest(scope)));
 
         UUID targetId = (UUID) r.get("target_reservation_id");
         TargetReservation target = targetId == null ? null : jdbc.sql("""

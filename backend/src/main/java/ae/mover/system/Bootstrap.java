@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import ae.mover.authz.AccessPolicyService;
 import ae.mover.common.Json;
 import ae.mover.facilities.MapPackageService;
 import ae.mover.forms.FormService;
@@ -36,9 +37,10 @@ public class Bootstrap implements ApplicationRunner {
     private final FormService forms;
     private final WorkflowService workflows;
     private final MapPackageService maps;
+    private final AccessPolicyService accessPolicies;
 
     public Bootstrap(JdbcClient jdbc, Json json, TransactionTemplate tx, PolicyService policies,
-                     FormService forms, WorkflowService workflows, MapPackageService maps) {
+                     FormService forms, WorkflowService workflows, MapPackageService maps, AccessPolicyService accessPolicies) {
         this.jdbc = jdbc;
         this.json = json;
         this.tx = tx;
@@ -46,6 +48,7 @@ public class Bootstrap implements ApplicationRunner {
         this.forms = forms;
         this.workflows = workflows;
         this.maps = maps;
+        this.accessPolicies = accessPolicies;
     }
 
     @Override
@@ -55,6 +58,7 @@ public class Bootstrap implements ApplicationRunner {
             seedRoles();
             seedRequestTypes();
         });
+        accessPolicies.ensureInitialVersion();
         maps.installBuiltin();
     }
 

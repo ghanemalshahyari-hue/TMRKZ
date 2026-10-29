@@ -112,9 +112,11 @@ public class AttachmentService {
                 select a.*, r.number from attachment a join request r on r.id = a.request_id where a.id = :id""")
                 .param("id", attachmentId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         UUID requestId = (UUID) a.get("request_id");
-        if (ctx.viewLevel(access.requestScope(requestId)) != ViewLevel.FULL) {
+        ae.mover.access.RequestScope scope = access.requestScope(requestId);
+        if (ctx.viewLevel(scope) != ViewLevel.FULL) {
             throw ApiException.notFound();
         }
+        ctx.confirmView(scope, ViewLevel.FULL);
         if (!"CLEAN".equals(a.get("scan_status")) || a.get("storage_key") == null) {
             throw new ApiException(ErrorCode.ATTACHMENT_NOT_READY, "المرفق غير متاح: لم يجتز الفحص أو ما زال قيد المعالجة.");
         }

@@ -107,6 +107,7 @@ public class ExecutionService {
             }
             throw ApiException.forbidden("هذه المهمة مسندة إلى دور أو جهة أخرى.");
         }
+        ctx.confirmTask((String) t.get("role_code"), (UUID) t.get("target_org_id"), scope, Permission.EXECUTE);
         if (!"OPEN".equals(t.get("status")) || !"APPROVED".equals(t.get("request_status"))) {
             throw ApiException.validation("المهمة مكتملة أو الطلب ليس في مرحلة التنفيذ.");
         }
@@ -163,7 +164,7 @@ public class ExecutionService {
             throw ApiException.notFound();
         }
         boolean allowed = ctx.personId().equals(r.get("created_by"))
-                || ctx.grants().stream().anyMatch(g -> g.has(Permission.REVIEW) && g.covers(scope.relatedOrgs(), scope.siteIds()));
+                || ctx.grants().stream().anyMatch(g -> g.has(Permission.REVIEW) && g.coversRequest(scope));
         if (!allowed) {
             throw ApiException.forbidden();
         }

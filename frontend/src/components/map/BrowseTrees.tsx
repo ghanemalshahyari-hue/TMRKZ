@@ -45,12 +45,14 @@ export function OrgTree({
   onSelect,
   onIncludeSub,
   revision,
+  subOption = true,
 }: {
   selectedId: string | null;
   includeSub: boolean;
   onSelect: (org: { id: string; name: string } | null) => void;
   onIncludeSub: (v: boolean) => void;
   revision: number;
+  subOption?: boolean;
 }) {
   const [roots, setRoots] = useState<OrgBranch[] | null>(null);
   const [kids, setKids] = useState<Loaded<OrgBranch>>({});
@@ -133,7 +135,7 @@ export function OrgTree({
         <Icon name="search" />
         <input placeholder="ابحث عن جهة في كل الفروع المسموحة…" aria-label="البحث في الجهات" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      {selectedId && (
+      {selectedId && subOption && (
         <label className="check-label tree-option">
           <input type="checkbox" checked={includeSub} onChange={(e) => onIncludeSub(e.target.checked)} />
           تشمل الفروع التابعة

@@ -21,6 +21,9 @@ echo "[backup] identity database → $OUT/keycloak.dump"
 dc exec -T db pg_dump -U mover -d keycloak -Fc --no-owner > "$OUT/keycloak.dump"
 dc exec -T db psql -U mover -d keycloak -At -c "select 'realms', count(*) from realm union all select 'users', count(*) from user_entity union all select 'clients', count(*) from client" > "$OUT/identity-fingerprint.txt"
 
+echo "[backup] authorisation database → $OUT/openfga.dump"
+dc exec -T db pg_dump -U mover -d openfga -Fc --no-owner > "$OUT/openfga.dump"
+
 echo "[backup] files volume → $OUT/files.tgz"
 dc exec -T backend tar czf - -C /var/lib/mover . > "$OUT/files.tgz"
 
@@ -41,6 +44,7 @@ cat > "$OUT/manifest.json" <<EOF
   "files": {
     "db.dump": "$(sha "$OUT/db.dump")",
     "keycloak.dump": "$(sha "$OUT/keycloak.dump")",
+    "openfga.dump": "$(sha "$OUT/openfga.dump")",
     "identity-fingerprint.txt": "$(sha "$OUT/identity-fingerprint.txt")",
     "files.tgz": "$(sha "$OUT/files.tgz")",
     "map-packages.tgz": "$(sha "$OUT/map-packages.tgz")",

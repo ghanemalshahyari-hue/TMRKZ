@@ -119,4 +119,24 @@ values (md5('t:m:t.requester2:11')::uuid, md5('t:person:t.requester2')::uuid, md
         md5('t:site:11')::uuid, '2026-01-01T00:00:00Z')
 on conflict do nothing;
 
+-- an access manager of SS only (permissions studio, ADR-018): may grant these roles inside SS and its branches
+insert into role_def(code, name, permissions, scope, summary_only, sort_order, grantable_roles)
+values ('ORG_ACCESS_MANAGER', 'مسؤول صلاحيات الجهة', '{MANAGE_ACCESS,VIEW}', 'ORGANIZATION', false, 21,
+        '{REQUESTER,LIMITED_VIEWER,SHARED_SITE_REQUESTER}')
+on conflict do nothing;
+insert into membership(id, person_id, organization_id, role_code, valid_from)
+values (md5('t:m:t.manager:access')::uuid, md5('t:person:t.manager')::uuid, md5('t:org:T-SS')::uuid, 'ORG_ACCESS_MANAGER',
+        '2026-01-01T00:00:00Z')
+on conflict do nothing;
+
+-- one explicit scope: summary view of SS (with branches) AND the shared building (site 11) only
+insert into membership(id, person_id, organization_id, role_code, valid_from, scope_mode, scope_combine)
+values (md5('t:m:t.manager.it:custom')::uuid, md5('t:person:t.manager.it')::uuid, md5('t:org:T-IT')::uuid, 'LIMITED_VIEWER',
+        '2026-01-01T00:00:00Z', 'CUSTOM', 'AND')
+on conflict do nothing;
+insert into membership_scope_target(membership_id, kind, target_id, include_descendants) values
+  (md5('t:m:t.manager.it:custom')::uuid, 'ORGANIZATION', md5('t:org:T-SS')::uuid, true),
+  (md5('t:m:t.manager.it:custom')::uuid, 'SITE', md5('t:site:11')::uuid, true)
+on conflict do nothing;
+
 commit;

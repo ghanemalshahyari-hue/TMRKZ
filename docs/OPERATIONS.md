@@ -66,7 +66,9 @@ configuration changes never require data migration of in-flight requests.
 ## Secrets and key rotation
 
 - `.env` holds `MOVER_DB_PASSWORD`, `MOVER_ATTESTATION_KEY`, `TMRKZ_HR_SETTINGS_KEY`, `TMRKZ_OIDC_CLIENT_SECRET`,
-  `TMRKZ_KEYCLOAK_DB_PASSWORD`, `TMRKZ_KEYCLOAK_ADMIN_PASSWORD` and the directory settings; permissions 600; never committed.
+  `TMRKZ_KEYCLOAK_DB_PASSWORD`, `TMRKZ_KEYCLOAK_ADMIN_PASSWORD`, `TMRKZ_OPENFGA_DB_PASSWORD`, `TMRKZ_OPENFGA_API_TOKEN`
+  (the OpenFGA preshared key) and the directory settings; permissions 600; never committed. `sh ops/init-env.sh` adds
+  keys introduced by later versions to an existing `.env` without changing the others.
 - Keys restored with a backup: `MOVER_ATTESTATION_KEY` (re-verifies attestation evidence), `TMRKZ_HR_SETTINGS_KEY`
   (decrypts the stored HR source password), `TMRKZ_OIDC_CLIENT_SECRET` (the realm's client secret) and the Keycloak and
   database passwords. They are not in the backup set: keep them in the organisation's key vault and restore `.env`
@@ -76,6 +78,24 @@ configuration changes never require data migration of in-flight requests.
   vault to re-verify evidence on historical approval documents.
 - Production hardening: create a restricted runtime database role (DML on business tables, no DDL, no `TRUNCATE`)
   and run migrations with a separate owner role; keep the audit table's triggers owned by that owner.
+
+## Authorisation decisions (OpenFGA)
+
+- TMRKZ runs its own OpenFGA 1.8.16 (`openfga`, with `openfga-migrate` run once per start) on its own database
+  `openfga` (owner `openfga`, created by `db-init`). It is not published on any port; only the backend calls it with
+  the preshared key. Do not point TMRKZ at another application's OpenFGA or store.
+- Mapping from TNQL's settings: `OPENFGA_API_URL` → fixed internal `http://openfga:8080`; `OPENFGA_API_TOKEN` →
+  `TMRKZ_OPENFGA_API_TOKEN`; `OPENFGA_STORE_ID` → optional `TMRKZ_OPENFGA_STORE_ID` (empty: the store is created once
+  and recorded in the business database); `OPENFGA_MODEL_ID` → not configured: the model id is pinned per published
+  policy version.
+- State: «مركز الصلاحيات ← خدمة القرار» or `GET /api/v1/access/status` (store, model, applied/latest change, pending
+  changes, tuples, last success, last error). While OpenFGA is unavailable, sensitive actions are refused with
+  `AUTHZ_UNAVAILABLE`; nothing falls back to allowing. Pending changes are applied within seconds and before any
+  sensitive action of the person concerned.
+- Repair: «إعادة بناء بيانات الصلاحيات» (global access manager) or `POST /api/v1/access/rebuild` writes every tuple from
+  the database into a new store, switches to it and deletes the old store.
+- Backup and restore include `openfga.dump`. A backup without it restores cleanly: the backend creates a new store and
+  rebuilds the tuples from the restored grants.
 
 ## HR source (read-only mirror)
 
@@ -167,12 +187,14 @@ fictional identity links (TMRKZ otherwise refuses, correctly, to link new direct
 ## Running the tests
 
 ```sh
-sh ops/test-backend.sh                                        # 70 backend acceptance tests on a throw-away PostgreSQL + PostGIS
+sh ops/test-backend.sh                                        # backend acceptance tests on throw-away PostgreSQL + PostGIS and OpenFGA
+sh ops/test-backend.sh AuthorizationIT,AccessAcceptanceIT     # only the classes a change affects
 sh ops/test-env/up.sh && node tests/acceptance/journey.mjs     # real sign-in (Keycloak + LDAP) and the journey
 sh ops/test-env/check-untrusted-tls.sh                       # directory with an untrusted certificate is refused
 sh ops/test-env/clean-install.sh                             # empty database: first administrator and first configuration
 sh ops/test-env/up-offline.sh && (cd tests/acceptance && npm ci) && node tests/acceptance/map-workspace.mjs
                                                               # MAP-01 … MAP-18 in Microsoft Edge, no internet egress
 (cd frontend && npm ci && npm test && npm run build)          # frontend unit tests and type-checked build
+node tests/acceptance/access-studio.mjs                       # permissions studio in Microsoft Edge (STUDIO-01 … 06)
 python ops/tools/gen-openapi.py                               # regenerate docs/api/openapi.json from the controllers
 ```

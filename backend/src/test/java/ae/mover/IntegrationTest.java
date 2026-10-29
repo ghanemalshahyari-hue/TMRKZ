@@ -46,7 +46,9 @@ import ae.mover.workflow.WorkflowService;
         "mover.signature.attestation-key=test-attestation-key-0123456789abcdef-0123",
         "mover.outbox.enabled=false",
         "tmrkz.hr.settings-key=test-hr-settings-key-0123456789abcdef-0123",
-        "tmrkz.hr.scheduler-enabled=false"})
+        "tmrkz.hr.scheduler-enabled=false",
+        "tmrkz.authz.api-url=${MOVER_TEST_FGA_URL:http://localhost:18080}",
+        "tmrkz.authz.api-token=${MOVER_TEST_FGA_KEY:test-openfga-preshared-key}"})
 public abstract class IntegrationTest {
 
     /** Kept in the signature payload only to show that a password is ignored: TMRKZ verifies no passwords. */

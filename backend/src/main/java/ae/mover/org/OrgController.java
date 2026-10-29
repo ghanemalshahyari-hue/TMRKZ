@@ -8,13 +8,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import ae.mover.access.AccessService;
+import ae.mover.authz.GrantAdminService;
 import ae.mover.common.PageResult;
 import ae.mover.security.Actor;
 
@@ -24,10 +24,12 @@ public class OrgController {
 
     private final AccessService access;
     private final OrganizationService orgs;
+    private final GrantAdminService grants;
 
-    public OrgController(AccessService access, OrganizationService orgs) {
+    public OrgController(AccessService access, OrganizationService orgs, GrantAdminService grants) {
         this.access = access;
         this.orgs = orgs;
+        this.grants = grants;
     }
 
     public record EndInput(String endAt, String reason) {
@@ -69,13 +71,13 @@ public class OrgController {
     }
 
     @PostMapping("/memberships")
-    public Map<String, Object> addMembership(Actor actor, @RequestBody OrganizationService.MembershipInput in) {
-        return orgs.addMembership(access.context(actor), in);
+    public Map<String, Object> addMembership(Actor actor, @RequestBody GrantAdminService.GrantInput in) {
+        return grants.create(access.context(actor), in);
     }
 
     @PostMapping("/memberships/{id}/end")
     public Map<String, Object> endMembership(Actor actor, @PathVariable UUID id, @RequestBody EndInput in) {
-        return orgs.endMembership(access.context(actor), id, in.endAt(), in.reason());
+        return grants.end(access.context(actor), id, in.endAt(), in.reason());
     }
 
     @GetMapping("/delegations")
@@ -97,10 +99,5 @@ public class OrgController {
     @GetMapping("/roles")
     public List<OrganizationService.RoleDef> roles(Actor actor) {
         return orgs.roles(access.context(actor));
-    }
-
-    @PutMapping("/roles/{code}")
-    public OrganizationService.RoleDef updateRole(Actor actor, @PathVariable String code, @RequestBody OrganizationService.RoleInput in) {
-        return orgs.updateRole(access.context(actor), code, in);
     }
 }

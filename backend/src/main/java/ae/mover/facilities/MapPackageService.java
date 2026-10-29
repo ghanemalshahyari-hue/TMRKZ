@@ -172,7 +172,7 @@ public class MapPackageService {
 
     /** Map manager: facility management over the whole organisation (packages are not scoped to one organisation). */
     static boolean manager(AccessContext ctx) {
-        return ctx.grants().stream().anyMatch(g -> g.has(Permission.MANAGE_FACILITIES) && g.isAll());
+        return ctx.canEverywhere(Permission.MANAGE_FACILITIES);
     }
 
     public List<MapPackage> list(AccessContext ctx, boolean all) {

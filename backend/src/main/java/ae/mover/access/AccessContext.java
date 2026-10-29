@@ -2,7 +2,9 @@ package ae.mover.access;
 
 import java.time.Instant;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -13,17 +15,62 @@ import ae.mover.security.Actor;
 /**
  * Effective authorisation of one actor, evaluated from the database at the start of each HTTP request. Nothing is
  * cached across requests, so ending a membership or revoking a delegation takes effect on the next call.
+ *
+ * <p>For a person acting over HTTP the context carries a {@link Confirmer}: whenever the business-database evaluation
+ * allows {@link #require}, {@link #requireAny} or {@link #canFor}, OpenFGA must allow too (ADR-018). OpenFGA can only
+ * narrow a decision; if it cannot decide, the action is refused.
  */
 public final class AccessContext {
+
+    /** Second decision for actions allowed by the grants; throws when the decision service cannot answer. */
+    public interface Confirmer {
+
+        boolean anywhere(AccessContext ctx, Permission p);
+
+        boolean forOrganization(AccessContext ctx, Permission p, UUID orgId);
+
+        boolean everywhere(AccessContext ctx, Permission p);
+
+        /** Refuses reading a request at this level unless OpenFGA agrees. */
+        void view(AccessContext ctx, RequestScope r, ViewLevel level);
+
+        /** Refuses a task decision or execution unless OpenFGA agrees for the task's role, actions and target. */
+        void task(AccessContext ctx, String roleCode, UUID targetOrgId, RequestScope r, Permission... actions);
+    }
 
     private final Actor actor;
     private final List<Grant> grants;
     private final Instant at;
+    private final Confirmer confirmer;
+    private final Map<String, Boolean> confirmed = new HashMap<>();
 
     public AccessContext(Actor actor, List<Grant> grants, Instant at) {
+        this(actor, grants, at, null);
+    }
+
+    private AccessContext(Actor actor, List<Grant> grants, Instant at, Confirmer confirmer) {
         this.actor = actor;
         this.grants = List.copyOf(grants);
         this.at = at;
+        this.confirmer = confirmer;
+    }
+
+    public AccessContext withConfirmer(Confirmer c) {
+        return new AccessContext(actor, grants, at, c);
+    }
+
+    public boolean confirmed() {
+        return confirmer != null;
+    }
+
+    /** Memoises second decisions for the duration of this context (one HTTP request). */
+    public boolean remember(String key, java.util.function.BooleanSupplier decision) {
+        Boolean known = confirmed.get(key);
+        if (known == null) {
+            known = decision.getAsBoolean();
+            confirmed.put(key, known);
+        }
+        return known;
     }
 
     public Actor actor() {
@@ -47,7 +94,7 @@ public final class AccessContext {
     }
 
     public void require(Permission p) {
-        if (!has(p)) {
+        if (!has(p) || confirmer != null && !confirmer.anywhere(this, p)) {
             throw ApiException.forbidden();
         }
     }
@@ -55,11 +102,33 @@ public final class AccessContext {
     /** Requires at least one of the permissions (e.g. any kind of view, or facility management, for the map). */
     public void requireAny(Permission... ps) {
         for (Permission p : ps) {
-            if (has(p)) {
+            if (has(p) && (confirmer == null || confirmer.anywhere(this, p))) {
                 return;
             }
         }
         throw ApiException.forbidden();
+    }
+
+    /** Second decision for reading a request the grants let this actor read (no-op for background contexts). */
+    public void confirmView(RequestScope r, ViewLevel level) {
+        if (confirmer != null) {
+            confirmer.view(this, r, level);
+        }
+    }
+
+    /** Second decision for a task the grants let this actor decide or execute. */
+    public void confirmTask(String roleCode, UUID targetOrgId, RequestScope r, Permission... actions) {
+        if (confirmer != null) {
+            confirmer.task(this, roleCode, targetOrgId, r, actions);
+        }
+    }
+
+    /** The action through an explicit ALL scope (e.g. administering every facility or every access grant). */
+    public boolean canEverywhere(Permission p) {
+        if (grants.stream().noneMatch(g -> g.has(p) && g.isAll())) {
+            return false;
+        }
+        return confirmer == null || confirmer.everywhere(this, p);
     }
 
     /** Some view of content: VIEW or VIEW_SUMMARY. Configuration rights alone never give it. */
@@ -95,7 +164,7 @@ public final class AccessContext {
             if (!g.viewer()) {
                 continue;
             }
-            if (g.covers(r.relatedOrgs(), r.siteIds())) {
+            if (g.coversRequest(r)) {
                 if (g.fullViewer()) {
                     return ViewLevel.FULL;
                 }
@@ -123,8 +192,8 @@ public final class AccessContext {
                 .filter(g -> g.roleCode().equals(roleCode))
                 .filter(g -> g.has(Permission.REVIEW) && (!finalStage || g.has(Permission.APPROVE)))
                 .filter(g -> targetOrgId == null
-                        ? g.covers(r.relatedOrgs(), r.siteIds())
-                        : g.covers(Set.of(targetOrgId), r.siteIds()))
+                        ? g.coversRequest(r)
+                        : g.covers(Set.of(targetOrgId), r.siteIds(), r.resourceIds()))
                 .findFirst();
     }
 
@@ -141,8 +210,8 @@ public final class AccessContext {
         return grants.stream()
                 .filter(g -> g.roleCode().equals(roleCode) && g.has(Permission.EXECUTE))
                 .filter(g -> targetOrgId == null
-                        ? g.covers(r.relatedOrgs(), r.siteIds())
-                        : g.covers(Set.of(targetOrgId), r.siteIds()))
+                        ? g.coversRequest(r)
+                        : g.covers(Set.of(targetOrgId), r.siteIds(), r.resourceIds()))
                 .findFirst();
     }
 
@@ -152,12 +221,11 @@ public final class AccessContext {
      */
     public ViewLevel siteView(UUID siteId, Set<UUID> siteAncestry, UUID responsibleOrgId) {
         ViewLevel best = ViewLevel.NONE;
-        Set<UUID> orgs = responsibleOrgId == null ? Set.of() : Set.of(responsibleOrgId);
         for (Grant g : grants) {
             if (!g.viewer() && !g.has(Permission.MANAGE_FACILITIES)) {
                 continue;
             }
-            if (g.covers(orgs, siteAncestry.isEmpty() ? Set.of(siteId) : siteAncestry)) {
+            if (g.coversSite(siteId, responsibleOrgId)) {
                 if (g.fullViewer() || g.has(Permission.MANAGE_FACILITIES)) {
                     return ViewLevel.FULL;
                 }
@@ -181,11 +249,14 @@ public final class AccessContext {
         return "RETURNED".equals(status) && canFor(Permission.EDIT, ownerOrgId);
     }
 
-    /** True if some grant with the permission covers the organisation (e.g. CREATE on behalf of an organisation). */
+    /**
+     * True if some grant with the permission acts for the organisation (e.g. CREATE on its behalf): it is inside the
+     * grant's organisation limit, or it is the grant's own organisation when the grant is limited by site only.
+     */
     public boolean canFor(Permission p, UUID orgId) {
-        return grants.stream().anyMatch(g -> g.has(p) && (g.isAll()
-                || ("ORGANIZATION".equals(g.scope()) || "ORGANIZATION_AND_SITE".equals(g.scope()))
-                && g.orgSubtree().contains(orgId)
-                || "SITE".equals(g.scope()) && g.orgId().equals(orgId)));
+        if (orgId == null || grants.stream().noneMatch(g -> g.has(p) && g.actsFor(orgId))) {
+            return false;
+        }
+        return confirmer == null || confirmer.forOrganization(this, p, orgId);
     }
 }

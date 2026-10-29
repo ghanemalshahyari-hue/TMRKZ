@@ -32,7 +32,7 @@ expiry). Reason: the organisation's identity system and its contract are undecid
 air-gapped deployment self-contained and lets revocation take effect immediately (no long-lived JWT). Replacing it
 with OIDC/LDAP (e.g. Keycloak) changes only `AuthService`/`SessionFilter`; the rest of the system consumes `Actor`.
 
-## ADR-004 In-process relationship authorisation instead of OpenFGA — Accepted
+## ADR-004 In-process relationship authorisation instead of OpenFGA — Amended by ADR-018 (2026-10-29)
 
 Proposed: OpenFGA. Chosen: `AccessService` evaluates, on every HTTP request and inside the same database, the
 caller's active memberships and delegations (dated, role-based, organisation and/or site scope, summary-only flag).
@@ -275,3 +275,58 @@ Owner's completion brief `docs/MAP_WORKSPACE_COMPLETION_AR.md` (MAP-01 … MAP-1
 - **Session.** The map remembers per person only identifiers and view settings (never data), validates them against the
   server on return, and forgets them at sign-out; the module-level package cache was removed.
 
+## ADR-018 OpenFGA as co-decider, scoped grants and the permissions studio — Accepted (2026-10-29)
+
+Owner decisions in `docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md` §2 (Keycloak with LDAP, and OpenFGA) and §7
+(permissions studio). Amends ADR-004: the business database stays the source of truth and the in-process evaluation is
+kept, but it no longer decides alone.
+
+- **Two deciders, both must allow.** For a person acting over HTTP, every action the grants allow is checked again in
+  OpenFGA 1.8.16 (TMRKZ's own service, store and PostgreSQL database; preshared key; no playground) with the model id
+  in force and `HIGHER_CONSISTENCY`: `require`/`requireAny` ("holds the action somewhere"), `canFor` (acting for an
+  organisation), the explicit ALL scope, reading a request (full, summary, information copy), downloading an
+  attachment, deciding a review task (its role, REVIEW and APPROVE for the final stage, its target organisation) and
+  completing an execution task. OpenFGA can only narrow a decision. If it does not answer, the action is refused with
+  `AUTHZ_UNAVAILABLE` (503); if it refuses what the grants allow, the action is refused and logged. Background work
+  (information copies, task realignment candidates) uses the database evaluation only.
+- **Lists keep one SQL predicate.** Lists, searches, counts, map layers, reports and exports are filtered by the SQL
+  predicate built from the same grants (ADR-004 reason 2); OpenFGA cannot filter rows. A test asserts that list,
+  detail and OpenFGA agree for every scope shape.
+- **Model.** Generated from the action list (`ae.mover.authz.AuthzModel`; reviewed copy `docs/authz/model.fga`, a test
+  fails if they differ). Each grant (membership, delegation, responsibility seat holder) is an object `grant:<id>`
+  whose single `holder` tuple carries the condition `grant_scope`: validity window, role, and the grant's own site or
+  resource limit. Organisations and sites have `<action>_here` and `<action>_tree` (followed through `parent`); a site
+  inherits from the organisation that administers it; `system` holds ALL grants and "held somewhere". Requests are not
+  stored: their creator, related organisations, sites, resources and information recipients are contextual tuples of
+  each check. Because the site limit of an AND grant is evaluated on that grant's own holder tuple, a site reached by
+  another grant can never complete it.
+- **Outbox.** Database triggers append `authz_change` rows in the same transaction as any change to memberships,
+  delegations, scope targets, roles, seats, affiliations, person status and the organisation/site/resource structure.
+  The sync worker (own transactions, advisory lock, every 2 s, full reconciliation every 5 min) derives the tuples
+  from the same `GrantSource` the in-process evaluation reads, diffs them against the mirror `authz_tuple` and writes
+  only the difference. Before the first OpenFGA check of an HTTP request, pending changes concerning the actor (or
+  shared ones) are applied; if that is impossible the action is refused with `AUTHZ_SYNC_PENDING` (503). Validity
+  windows travel as conditions, so an ending grant stops in OpenFGA without waiting for a sync. "Rebuild" writes every
+  tuple into a new store from the database and then switches to it (repairs a store changed or restored on its own).
+- **Scoped grants.** A grant keeps its role's scope (`scope_mode = ROLE`) or names explicit targets (`CUSTOM`):
+  organisations (alone or with branches), sites (alone or with sub-sites), resources, or an explicit ALL. With both an
+  organisation and a site/resource limit the grant is their intersection (AND, default) or, by explicit choice, their
+  union (OR). Targets are fixed once granted (trigger); a new scope is a new grant. A resource grant reaches requests
+  for that resource and the record of the site that holds it, never its sibling resources' requests.
+- **Authority of access managers.** A grant is accepted only if one of the granter's own MANAGE_ACCESS grants lists the
+  role as grantable (`role_def.grantable_roles`, edited in the studio) and reaches the grant's organisation and every
+  target. The explicit ALL scope and roles with CONFIGURE or VIEW_SOURCE_IDENTIFIERS are reserved to a global access
+  manager (MANAGE_ACCESS with ALL). Ending grants and revoking delegations also require MANAGE_ACCESS over the grant's
+  organisation (previously any MANAGE_ACCESS sufficed — fixed).
+- **Versioned policy.** The role catalogue is a sequence of `access_policy_version` rows (one draft, one published,
+  earlier ones kept; published rows immutable). Draft → validation → impact (actions added or withdrawn, holders,
+  persons) → publication with a note by a global access manager; the OpenFGA model id in force is pinned on the
+  version; `role_def` is the published projection. Restoring an earlier version publishes a new version that names its
+  origin; roles created after it remain defined without actions. Every step is audited.
+- **Studio.** «مركز الصلاحيات»: versions and action matrix, grants per organisation with the scope in plain Arabic,
+  a scope builder with lazily loaded trees, "what can this person do and why" for the published policy and the draft
+  with OpenFGA's answer beside each action, and the decision service's state. Organisation access managers see the
+  policy read-only and can only pick what their own scope shows.
+- **Not done.** No explicit deny rules (grants are additive). Time-bound delegation is still created on the
+  organisation page. The authorisation database is backed up and restored with the others (`openfga.dump`); a backup
+  without it is rebuilt from the restored grants.

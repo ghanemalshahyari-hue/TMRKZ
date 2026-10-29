@@ -406,7 +406,7 @@ public class SiteService {
     /** MANAGE_FACILITIES over the administering organisation; configuration rights alone are not enough. */
     static void requireFacilityManager(AccessContext ctx, UUID orgId) {
         boolean allowed = orgId == null
-                ? ctx.grants().stream().anyMatch(g -> g.has(Permission.MANAGE_FACILITIES) && g.isAll())
+                ? ctx.canEverywhere(Permission.MANAGE_FACILITIES)
                 : ctx.canFor(Permission.MANAGE_FACILITIES, orgId);
         if (!allowed) {
             throw ApiException.forbidden("إدارة المرافق تتطلب صلاحية إدارة المرافق على الجهة المسؤولة.");

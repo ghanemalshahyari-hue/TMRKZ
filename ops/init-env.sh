@@ -5,7 +5,8 @@ cd "$(dirname "$0")/.."
 rand() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c "$1"; }
 if [ -f .env ]; then
   # Existing values are never changed; keys introduced by later versions are added once.
-  for k in TMRKZ_HR_SETTINGS_KEY:48 TMRKZ_OIDC_CLIENT_SECRET:48 TMRKZ_KEYCLOAK_DB_PASSWORD:32 TMRKZ_KEYCLOAK_ADMIN_PASSWORD:32; do
+  for k in TMRKZ_HR_SETTINGS_KEY:48 TMRKZ_OIDC_CLIENT_SECRET:48 TMRKZ_KEYCLOAK_DB_PASSWORD:32 TMRKZ_KEYCLOAK_ADMIN_PASSWORD:32 \
+           TMRKZ_OPENFGA_DB_PASSWORD:32 TMRKZ_OPENFGA_API_TOKEN:48; do
     name=${k%%:*}; len=${k##*:}
     grep -q "^$name=" .env || { echo "$name=$(rand "$len")" >> .env; echo "added $name"; }
   done
@@ -19,6 +20,8 @@ fi
   echo "TMRKZ_OIDC_CLIENT_SECRET=$(rand 48)"
   echo "TMRKZ_KEYCLOAK_DB_PASSWORD=$(rand 32)"
   echo "TMRKZ_KEYCLOAK_ADMIN_PASSWORD=$(rand 32)"
+  echo "TMRKZ_OPENFGA_DB_PASSWORD=$(rand 32)"
+  echo "TMRKZ_OPENFGA_API_TOKEN=$(rand 48)"
   echo "TMRKZ_PUBLIC_URL=http://localhost:8088"
   echo "MOVER_HTTP_PORT=8088"
   echo "MOVER_SECURE_COOKIE=false"

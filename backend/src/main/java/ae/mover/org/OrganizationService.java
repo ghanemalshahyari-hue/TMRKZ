@@ -328,80 +328,6 @@ public class OrganizationService {
         return new PageResult<>(items, p, s, total);
     }
 
-    // ---- memberships --------------------------------------------------------------------------------
-
-    public record MembershipInput(String personId, String organizationId, String roleCode, String positionTitle,
-                                  String siteScopeId, String validFrom, String validTo) {
-    }
-
-    @Transactional
-    public Map<String, Object> addMembership(AccessContext ctx, MembershipInput in) {
-        ctx.require(Permission.MANAGE_ACCESS);
-        if (in == null || in.personId() == null || in.organizationId() == null || in.roleCode() == null) {
-            throw ApiException.validation("حدد الشخص والجهة والدور.");
-        }
-        if (!ctx.canFor(Permission.MANAGE_ACCESS, UUID.fromString(in.organizationId()))) {
-            throw ApiException.forbidden("لا تملك إدارة الصلاحيات على هذه الجهة.");
-        }
-        Instant from = in.validFrom() == null ? clock.instant() : Times.parse(in.validFrom(), "validFrom");
-        Instant to = Times.parse(in.validTo(), "validTo");
-        if (to != null && !to.isAfter(from)) {
-            throw ApiException.validation("نهاية العضوية يجب أن تكون بعد بدايتها.");
-        }
-        UUID id = UUID.randomUUID();
-        try {
-            jdbc.sql("""
-                    insert into membership(id, person_id, organization_id, role_code, position_title, site_scope_id, valid_from, valid_to)
-                    values (:id, :p, :o, :r, :t, :s, :f, :to)""")
-                    .param("id", id).param("p", UUID.fromString(in.personId())).param("o", UUID.fromString(in.organizationId()))
-                    .param("r", in.roleCode()).param("t", in.positionTitle())
-                    .param("s", in.siteScopeId() == null ? null : UUID.fromString(in.siteScopeId()))
-                    .param("f", Db.ts(from)).param("to", Db.ts(to)).update();
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            throw ApiException.validation("الشخص أو الجهة أو الدور غير موجود.");
-        }
-        audit.recordAs(ctx.actor(), "MEMBERSHIP_CREATED", "PERSON", in.personId(), null,
-                Map.of("organizationId", in.organizationId(), "role", in.roleCode()), null);
-        return Map.of("id", id.toString());
-    }
-
-    /**
-     * Ends a membership. Access derived from it (and delegations made from it) stops immediately because grants are
-     * evaluated per request. Open tasks are role-pooled, so they remain with the other holders of the role; the
-     * realignment is audited. Past decisions keep the capacity recorded at decision time.
-     */
-    @Transactional
-    public Map<String, Object> endMembership(AccessContext ctx, UUID id, String endAt, String reason) {
-        ctx.require(Permission.MANAGE_ACCESS);
-        if (reason == null || reason.isBlank()) {
-            throw ApiException.validation("اذكر سبب إنهاء العضوية.");
-        }
-        Map<String, Object> m = jdbc.sql("select person_id, organization_id, role_code, valid_from, valid_to from membership where id = :id for update")
-                .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
-        Instant end = endAt == null ? clock.instant() : Times.parse(endAt, "endAt");
-        Instant from = Db.toInstant(m.get("valid_from"));
-        if (!end.isAfter(from)) {
-            end = from.plusMillis(1);
-        }
-        Instant currentEnd = Db.toInstant(m.get("valid_to"));
-        if (currentEnd != null && !currentEnd.isAfter(end)) {
-            throw ApiException.validation("العضوية منتهية بالفعل.");
-        }
-        jdbc.sql("update membership set valid_to = :e, ended_reason = :r where id = :id")
-                .param("e", Db.ts(end)).param("r", reason).param("id", id).update();
-        int pooled = jdbc.sql("""
-                select count(*) from task_assignment where status = 'OPEN' and role_code = :role
-                  and (target_org_id is null or target_org_id = :org)""")
-                .param("role", m.get("role_code")).param("org", m.get("organization_id")).query(Integer.class).single();
-        audit.recordAs(ctx.actor(), "MEMBERSHIP_ENDED", "PERSON", m.get("person_id").toString(), null,
-                Map.of("membershipId", id.toString(), "endAt", end.toString()), reason);
-        if (pooled > 0) {
-            audit.recordAs(ctx.actor(), "TASKS_REALIGNED", "PERSON", m.get("person_id").toString(), null,
-                    Map.of("openTasks", pooled, "rule", "المهام مسندة إلى الدور وتبقى لدى شاغليه الحاليين"), reason);
-        }
-        return Map.of("id", id.toString(), "validTo", end.toString(), "realignedTasks", pooled);
-    }
-
     // ---- delegations --------------------------------------------------------------------------------
 
     public record DelegationView(String id, Ref delegator, Ref delegate, Map<String, String> role, Ref organization,
@@ -462,9 +388,11 @@ public class OrganizationService {
 
     @Transactional
     public void revokeDelegation(AccessContext ctx, UUID id, String reason) {
-        Map<String, Object> d = jdbc.sql("select delegator_id, delegate_id, revoked_at from delegation where id = :id for update")
+        Map<String, Object> d = jdbc.sql("""
+                select d.delegator_id, d.delegate_id, d.revoked_at, m.organization_id from delegation d
+                join membership m on m.id = d.membership_id where d.id = :id for update of d""")
                 .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
-        if (!ctx.personId().equals(d.get("delegator_id")) && !ctx.has(Permission.MANAGE_ACCESS)) {
+        if (!ctx.personId().equals(d.get("delegator_id")) && !ctx.canFor(Permission.MANAGE_ACCESS, (UUID) d.get("organization_id"))) {
             throw ApiException.forbidden();
         }
         if (d.get("revoked_at") != null) {
@@ -478,48 +406,17 @@ public class OrganizationService {
 
     // ---- roles --------------------------------------------------------------------------------------
 
-    public record RoleDef(String code, String name, List<String> permissions, String scope, boolean summaryOnly, boolean system) {
+    public record RoleDef(String code, String name, List<String> permissions, String scope, boolean summaryOnly, boolean system,
+                          List<String> grantableRoles, Integer policyVersion) {
     }
 
     public List<RoleDef> roles(AccessContext ctx) {
         ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_ACCESS, Permission.CONFIGURE);
         return jdbc.sql("select * from role_def order by sort_order, code")
                 .query((rs, n) -> new RoleDef(rs.getString("code"), rs.getString("name"), Db.strings(rs, "permissions"),
-                        rs.getString("scope"), rs.getBoolean("summary_only"), rs.getBoolean("system"))).list();
+                        rs.getString("scope"), rs.getBoolean("summary_only"), rs.getBoolean("system"),
+                        Db.strings(rs, "grantable_roles"), (Integer) rs.getObject("policy_version"))).list();
     }
 
-    public record RoleInput(List<String> permissions, String scope, Boolean summaryOnly) {
-    }
 
-    @Transactional
-    public RoleDef updateRole(AccessContext ctx, String code, RoleInput in) {
-        ctx.require(Permission.MANAGE_ACCESS);
-        Map<String, Object> row = jdbc.sql("select system, permissions, scope, summary_only from role_def where code = :c for update")
-                .param("c", code).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
-        if ((Boolean) row.get("system")) {
-            throw ApiException.validation("دور مدير النظام محمي ولا يُعدل من هذه الشاشة.");
-        }
-        if (in == null || in.permissions() == null || in.scope() == null) {
-            throw ApiException.validation("حدد الصلاحيات والنطاق.");
-        }
-        for (String p : in.permissions()) {
-            try {
-                Permission.valueOf(p);
-            } catch (IllegalArgumentException e) {
-                throw ApiException.validation("صلاحية غير معروفة: " + p);
-            }
-        }
-        if (!List.of("ALL", "ORGANIZATION", "SITE", "ORGANIZATION_AND_SITE").contains(in.scope())) {
-            throw ApiException.validation("نطاق البيانات غير معروف.");
-        }
-        jdbc.sql("update role_def set permissions = string_to_array(:p, ','), scope = :s, summary_only = :so, updated_at = :now where code = :c")
-                .param("p", String.join(",", new java.util.LinkedHashSet<>(in.permissions()))).param("s", in.scope())
-                .param("so", Boolean.TRUE.equals(in.summaryOnly())).param("now", Db.ts(clock.instant())).param("c", code).update();
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("permissions", in.permissions());
-        detail.put("scope", in.scope());
-        detail.put("summaryOnly", Boolean.TRUE.equals(in.summaryOnly()));
-        audit.recordAs(ctx.actor(), "ROLE_UPDATED", "ROLE", code, code, detail, null);
-        return roles(ctx).stream().filter(r -> r.code().equals(code)).findFirst().orElseThrow();
-    }
 }

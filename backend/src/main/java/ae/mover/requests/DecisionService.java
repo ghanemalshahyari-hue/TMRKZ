@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import ae.mover.access.AccessContext;
 import ae.mover.access.AccessService;
 import ae.mover.access.Grant;
+import ae.mover.access.Permission;
 import ae.mover.access.RequestScope;
 import ae.mover.access.ViewLevel;
 import ae.mover.audit.AuditService;
@@ -274,6 +275,8 @@ public class DecisionService {
                     ? "المهمة بانتظار أن يسندها مسؤول الصلاحيات إلى شخص مخول."
                     : "المهمة مسندة إلى شخص آخر.");
         }
+        ctx.confirmTask(t.roleCode(), t.targetOrgId(), scope,
+                t.finalStage() ? new Permission[] {Permission.REVIEW, Permission.APPROVE} : new Permission[] {Permission.REVIEW});
         int currentRevision = ((Number) req.get("current_revision")).intValue();
         if (in.expectedRevision() == null || in.expectedRevision() != currentRevision || t.revision() != currentRevision) {
             throw ApiException.staleRevision();

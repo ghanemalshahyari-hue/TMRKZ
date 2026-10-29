@@ -249,7 +249,7 @@ public class IdentityService {
                     .param("p", person).query(UUID.class).optional().orElse(null);
             boolean active = jdbc.sql("select count(*) from person where id = :p and status = 'ACTIVE'").param("p", person)
                     .query(Integer.class).single() > 0;
-            if (!active || (org == null ? !ctx.grants().stream().anyMatch(g -> g.has(Permission.MANAGE_ACCESS) && g.isAll())
+            if (!active || (org == null ? !ctx.canEverywhere(Permission.MANAGE_ACCESS)
                     : !ctx.canFor(Permission.MANAGE_ACCESS, org))) {
                 throw ApiException.forbidden("لا تملك ربط هذا الشخص أو أنه غير نشط.");
             }

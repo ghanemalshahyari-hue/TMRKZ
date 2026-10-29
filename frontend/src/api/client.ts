@@ -1,5 +1,11 @@
 import type {
+  AccessExplain,
+  AccessPolicyVersion,
   ApiErrorBody,
+  AuthzStatus,
+  GrantScopeInput,
+  GrantView,
+  PolicyImpact,
   ApprovalDocument,
   Attachment,
   AuditEvent,
@@ -220,7 +226,32 @@ export const api = {
   createDelegation: (body: { delegateId: string; membershipId: string; validFrom: string; validTo: string; reason: string }) => post<Delegation>('/delegations', body),
   revokeDelegation: (id: string, reason: string) => post<Delegation>(`/delegations/${id}/revoke`, { reason }),
   roles: () => get<RoleDef[]>('/roles'),
-  updateRole: (code: string, body: { permissions: Permission[]; scope: Scope; summaryOnly: boolean }) => put<RoleDef>(`/roles/${code}`, body),
+
+  // permissions studio (policy versions, scoped grants, explanations, OpenFGA sync)
+  authzStatus: () => get<AuthzStatus>('/access/status'),
+  authzRebuild: () => post<AuthzStatus>('/access/rebuild'),
+  policyVersions: () => get<AccessPolicyVersion[]>('/access/policy/versions'),
+  policyVersion: (id: string) => get<AccessPolicyVersion>(`/access/policy/versions/${id}`),
+  policyDraft: (note?: string) => post<AccessPolicyVersion>('/access/policy/draft', { note }),
+  policySaveRole: (body: { code: string; name: string; permissions: Permission[]; scope: Scope; summaryOnly: boolean; grantableRoles: string[] }) =>
+    put<AccessPolicyVersion>('/access/policy/draft/roles', body),
+  policyImpact: () => get<PolicyImpact>('/access/policy/draft/impact'),
+  policyPublish: (note: string) => post<AccessPolicyVersion>('/access/policy/draft/publish', { note }),
+  policyDiscard: (note: string) => post<void>('/access/policy/draft/discard', { note }),
+  policyRestore: (id: string, note: string) => post<AccessPolicyVersion>(`/access/policy/versions/${id}/restore`, { note }),
+  accessGrants: (organizationId: string, includeEnded = false) =>
+    get<GrantView[]>('/access/grants' + query({ organizationId, includeEnded: includeEnded || undefined })),
+  createGrant: (body: {
+    personId: string;
+    organizationId: string;
+    roleCode: string;
+    positionTitle?: string;
+    validFrom: string;
+    validTo?: string | null;
+    scope: GrantScopeInput;
+  }) => post<{ id: string; scopeText: string }>('/memberships', body),
+  explainAccess: (q: { personId: string; organizationId?: string; siteId?: string; resourceId?: string }) =>
+    get<AccessExplain>('/access/explain' + query(q)),
 
   // facilities & map
   sites: () => get<Site[]>('/sites'),

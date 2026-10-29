@@ -100,3 +100,13 @@ tmrkz:
     initial-delay-seconds: ${TMRKZ_HR_INITIAL_DELAY_SECONDS:60}
     max-run-seconds: ${TMRKZ_HR_MAX_RUN_SECONDS:1800}
     scheduler-enabled: ${TMRKZ_HR_SCHEDULER_ENABLED:true}
+  authz:
+    # TMRKZ's own OpenFGA (never another application's store). The preshared key comes from the environment.
+    api-url: ${TMRKZ_OPENFGA_API_URL:}
+    api-token: ${TMRKZ_OPENFGA_API_TOKEN:}
+    store-id: ${TMRKZ_OPENFGA_STORE_ID:}
+    store-name: ${TMRKZ_OPENFGA_STORE_NAME:tmrkz}
+    timeout-ms: ${TMRKZ_OPENFGA_TIMEOUT_MS:5000}
+    poll-ms: 2000
+    reconcile-ms: 300000
+    sync-enabled: ${TMRKZ_OPENFGA_SYNC_ENABLED:true}

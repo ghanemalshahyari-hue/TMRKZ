@@ -14,6 +14,7 @@ sha() { (sha256sum "$1" 2>/dev/null || shasum -a 256 "$1") | cut -d' ' -f1; }
 
 FILES="db.dump files.tgz map-packages.tgz fingerprint.txt"
 [ -f "$SRC/keycloak.dump" ] && FILES="$FILES keycloak.dump identity-fingerprint.txt"
+[ -f "$SRC/openfga.dump" ] && FILES="$FILES openfga.dump"
 for f in $FILES; do
   expected="$(grep "\"$f\"" "$SRC/manifest.json" | sed 's/.*: "\([0-9a-f]*\)".*/\1/')"
   actual="$(sha "$SRC/$f")"
@@ -36,10 +37,16 @@ sleep 2
 echo "[restore] database"
 dc exec -T db pg_restore -U mover -d mover --no-owner --exit-on-error < "$SRC/db.dump"
 
+dc run --rm db-init >/dev/null
 if [ -f "$SRC/keycloak.dump" ]; then
   echo "[restore] identity database"
-  dc run --rm db-init >/dev/null
   dc exec -T db pg_restore -U mover -d keycloak --no-owner --role=keycloak --exit-on-error < "$SRC/keycloak.dump"
+fi
+# The authorisation store is restored with the business database it was built from. A backup without it is still
+# usable: the backend then creates a new store and rebuilds every tuple from the restored grants (ADR-018).
+if [ -f "$SRC/openfga.dump" ]; then
+  echo "[restore] authorisation database"
+  dc exec -T db pg_restore -U mover -d openfga --no-owner --role=openfga --exit-on-error < "$SRC/openfga.dump"
 fi
 
 echo "[restore] files"

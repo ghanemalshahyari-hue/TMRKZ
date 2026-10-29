@@ -29,7 +29,10 @@ the account to the fictional HR record whose domain account equals the login nam
 | `t.unlinked` | In the directory only: sign-in is refused and queued for an access manager | — |
 
 `t.requester2` also holds «مقدم طلب في موقع مشترك», a role scoped to the shared building (site 11), so a second
-organisation can use it. Sites: `00` main campus (no parent) with sub-sites `01`–`08`; `10` a main site of the remote
+organisation can use it. `t.manager` is also «مسؤول صلاحيات الجهة» for SS: in «مركز الصلاحيات» they may grant
+«مقدم الطلب», «اطلاع محدود» and «مقدم طلب في موقع مشترك» inside SS only. `t.manager.it` holds a summary view whose scope
+is SS (with branches) AND the shared building — an example of an explicit intersection. `t.admin` is the global access
+manager (drafts, publication, rollback, rebuild). Sites: `00` main campus (no parent) with sub-sites `01`–`08`; `10` a main site of the remote
 branch «فريق مرافق الشمال» (إدارة المشاريع ‹ قسم مشاريع المباني ‹ وحدة الصيانة الإدارية); `11` a shared main building with a
 shared resource and two exclusive rooms. No boundaries are seeded: they are imported or drawn through the application
 (`tests/acceptance/fixtures/`).

@@ -45,12 +45,19 @@ Date: 29 October 2026 · Version 1.0.0
     revisions and approval documents; the map package manager; the fabricated shapes around points removed. MAP-01 …
     MAP-18 pass (backend and Edge browser, acceptance environment without internet egress). Migrated in place from the
     earlier release's data with every earlier row unchanged.
-  - Steps 3, 5–7 open — OpenFGA and the permissions studio, visual rule editor, DSS signatures and seals, isolated
-    bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
+  - Step 3 done — OpenFGA and the permissions studio (ADR-018): TMRKZ's own OpenFGA 1.8.16 confirms every action the
+    grants allow (both must allow; refused if it cannot answer), tuples kept current by a transactional outbox with
+    per-actor freshness before sensitive actions, a generated and reviewed model (`docs/authz/model.fga`); scoped
+    grants with explicit organisation sets, sites, resources, AND/OR and explicit ALL; access managers bounded by their
+    own authority and grantable roles; a versioned role policy (draft, impact, publication with the model id pinned,
+    recorded rollback); «مركز الصلاحيات» with plain-Arabic scopes and "what can this person do and why".
+  - Steps 5–7 open — visual rule editor, DSS signatures and seals, isolated bundle with UI and load acceptance. See the
+    PA matrix in `TRACEABILITY.md`.
 
-Test evidence: 70 backend acceptance tests on PostgreSQL + PostGIS (including the map criteria and a 10,000-site
-measurement), 21 browser checks for MAP-01 … MAP-18 in Microsoft Edge, a 40-check end-to-end journey through nginx, a
-restore verification, an upgrade check of earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
+Test evidence: backend acceptance tests on PostgreSQL + PostGIS with OpenFGA in the loop (including the map criteria,
+a 10,000-site measurement and the authorisation suite), 21 browser checks for MAP-01 … MAP-18 and 6 for the permissions
+studio in Microsoft Edge, a 40-check end-to-end journey through nginx, a restore verification, an upgrade check of
+earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
 
 ## Known limitations
 
@@ -62,11 +69,12 @@ restore verification, an upgrade check of earlier data, and 17 frontend tests �
 | Map backgrounds | Renderers for SVG and PNG/JPEG overlays georeferenced by corner bounds. No aerial imagery is installed (the map says so). PMTiles, MBTiles and XYZ tiles are refused at upload. | Install licensed enterprise packages through the map manager; a tile renderer needs its own decision (D-07). |
 | Map volume | 10,000 sites: city viewport 17 ms, district (900 sites) 40 ms; above 1,500 sites in one viewport only markers are sent, above 5,000 the list is capped with a message (`PERFORMANCE.md`). | Clustering if enterprise data needs it. |
 | Audit | Append-only at database level; no cryptographic hash chain. Database superusers can still alter data. | Optional sealing job and separation of the DB owner from the application role in production. |
+| Authorisation | OpenFGA confirms point decisions; lists and counts are filtered by the SQL predicate of the same grants (OpenFGA cannot filter rows). No explicit deny rules: grants are additive. Background jobs (information copies, task realignment) use the database evaluation only. Delegations are still created on the organisation page. | Add deny rules only if the owner asks for them; move delegation into the studio. |
 | Database roles | The application connects as the schema owner. | Production: separate migration owner and a restricted runtime role (documented in OPERATIONS). |
 | Malware scanning | Built-in checks (type sniffing, EICAR, macros, active PDF content); no AV engine. | Connect an internal scanner (e.g. ClamAV) behind `ContentInspector`. |
 | Notifications | In-app only. | Correspondence connector after D-04. |
 | SLA timers | Overdue review tasks are detected every minute and notified; no automatic escalation/reassignment. | Add escalation rules to the workflow definition. |
-| Org tree UI | The map uses lazily loaded organisation and site trees with search (ADR-017). The organisation page and the request form's organisation list still load the whole visible tree (7,000 nodes ≈ 1.5 MB, ~0.1 s). | Move those two screens to the lazy endpoints. |
+| Org tree UI | The map and the permissions studio use lazily loaded organisation and site trees with search (ADR-017/018). The organisation page and the request form's organisation list still load the whole visible tree (7,000 nodes ≈ 1.5 MB, ~0.1 s). | Move those two screens to the lazy endpoints. |
 | High availability | Single instance per service in compose; no HA or failover tested. | Out of scope until D-03/D-05 targets are set. |
 
 ## Integrations not connected (never simulated as connected)

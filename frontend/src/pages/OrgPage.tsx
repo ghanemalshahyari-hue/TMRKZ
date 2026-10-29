@@ -1,38 +1,13 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { Delegation, Member, OrgDetail, Person, RoleDef } from '../api/types';
+import type { Delegation, Member, OrgDetail, RoleDef } from '../api/types';
+import { PersonPicker } from '../components/access/pickers';
 import { Dialog, DialogHead, Heading, Icon } from '../components/ui';
 import { useApp } from '../lib/app';
 import { addDays, dubaiISO, fullDate, todayDubai } from '../lib/dates';
 
 type MembershipForm = { personId: string; roleCode: string; positionTitle: string; validFrom: string; validTo: string };
 type DelegationForm = { membership: Member; delegateId: string; validFrom: string; validTo: string; reason: string };
-
-function PersonPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  const [q, setQ] = useState('');
-  const [people, setPeople] = useState<Person[]>([]);
-  useEffect(() => {
-    const t = setTimeout(() => {
-      api
-        .people(q)
-        .then((p) => setPeople(p.items))
-        .catch(() => setPeople([]));
-    }, 250);
-    return () => clearTimeout(t);
-  }, [q]);
-  return (
-    <>
-      <input placeholder="ابحث بالاسم أو الرقم الوظيفي…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="بحث الأشخاص" />
-      <select value={value} onChange={(e) => onChange(e.target.value)} size={4} style={{ marginTop: 6, width: '100%' }} aria-label="الشخص">
-        {people.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.displayName} · {p.employeeNo}
-          </option>
-        ))}
-      </select>
-    </>
-  );
-}
 
 export function OrgPage() {
   const app = useApp();
