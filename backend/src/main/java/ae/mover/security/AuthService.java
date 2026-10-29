@@ -45,7 +45,10 @@ public class AuthService {
     public record LoginResult(String token, Actor actor) {
     }
 
-    /** Opens a session for a linked, active person after a verified sign-in at {@code authenticatedAt}. */
+    /**
+     * Opens a session for a linked, active person after a verified sign-in. {@code authenticatedAt} is the proven time of
+     * the interactive authentication, or null when the provider did not state it (then a step-up precedes approvals).
+     */
     @Transactional
     public LoginResult issueSession(UUID personId, String issuer, String idToken, Instant authenticatedAt, String ip, String userAgent) {
         Map<String, Object> p = jdbc.sql("select id, username, display_name, status from person where id = :id")
@@ -65,7 +68,7 @@ public class AuthService {
                 .param("id", Hashing.sha256(token)).param("p", personId).param("now", Db.ts(now))
                 .param("exp", Db.ts(now.plus(Duration.ofHours(props.sessionAbsoluteHours()))))
                 .param("ip", ip).param("ua", userAgent == null ? null : userAgent.substring(0, Math.min(200, userAgent.length())))
-                .param("auth", Db.ts(authenticatedAt == null ? now : authenticatedAt)).param("iss", issuer).param("tok", idToken)
+                .param("auth", Db.ts(authenticatedAt)).param("iss", issuer).param("tok", idToken)
                 .update();
         Actor actor = new Actor(personId, (String) p.get("username"), (String) p.get("display_name"), Hashing.sha256(token));
         audit.recordAs(actor, "LOGIN", "PERSON", personId.toString(), actor.displayName(), Map.of("issuer", String.valueOf(issuer)), null);
@@ -113,16 +116,24 @@ public class AuthService {
         return found.stream().findFirst();
     }
 
-    /** Ends the session; returns the ID token so the provider session can be ended too. */
+    public record Ended(String issuer, String idToken) {
+    }
+
+    /** Ends the session; returns its issuer and ID token so a provider session can be ended too. */
     @Transactional
-    public String logout(Actor actor) {
+    public Ended logout(Actor actor) {
         if (actor == null || actor.sessionId() == null) {
-            return null;
+            return new Ended(null, null);
         }
-        String idToken = jdbc.sql("delete from user_session where id = :id returning id_token").param("id", actor.sessionId())
-                .query(String.class).optional().orElse(null);
+        Ended ended = jdbc.sql("delete from user_session where id = :id returning issuer, id_token").param("id", actor.sessionId())
+                .query((rs, n) -> new Ended(rs.getString("issuer"), rs.getString("id_token"))).optional().orElse(new Ended(null, null));
         audit.recordAs(actor, "LOGOUT", "PERSON", actor.personId().toString(), actor.displayName(), Map.of(), null);
-        return idToken;
+        return ended;
+    }
+
+    /** The issuer that authenticated this session (the identity provider or the directory). */
+    public Optional<String> issuer(String sessionId) {
+        return jdbc.sql("select issuer from user_session where id = :id").param("id", sessionId).query(String.class).optional();
     }
 
     public Duration sessionLifetime() {

@@ -207,6 +207,27 @@ class EnterpriseSignInIT extends IntegrationTest {
         return "/api/v1/auth/oidc/callback?code=" + code + "&state=" + a.state();
     }
 
+    /** Like the provider, but with a chosen auth_time (null leaves the claim out). */
+    private String callbackWithAuthTime(Authorization a, String subject, String account, Long authTime) throws Exception {
+        JWTClaimsSet.Builder b = new JWTClaimsSet.Builder().issuer(issuer()).subject(subject).audience(CLIENT)
+                .issueTime(new Date()).expirationTime(Date.from(Instant.now().plusSeconds(300)))
+                .claim("nonce", a.nonce()).claim("preferred_username", account).claim("name", "موظف " + account).claim("azp", CLIENT);
+        if (authTime != null) {
+            b.claim("auth_time", authTime);
+        }
+        SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(KEY.getKeyID()).type(JOSEObjectType.JWT).build(), b.build());
+        jwt.sign(new RSASSASigner(KEY));
+        String code = UUID.randomUUID().toString();
+        CODES.put(code, new Grant(a.challenge(), jwt.serialize()));
+        return "/api/v1/auth/oidc/callback?code=" + code + "&state=" + a.state();
+    }
+
+    private Authorization reauthOf(Browser b) throws Exception {
+        String redirect = JSON.readTree(b.post("/api/v1/auth/reauth", "{\"returnTo\":\"/#review\"}").body()).path("redirect").asText();
+        Map<String, String> q = parse(URI.create(redirect).getRawQuery());
+        return new Authorization(q.get("state"), q.get("nonce"), q.get("code_challenge"), q);
+    }
+
     private String callbackFor(Authorization a, String subject, String account) throws Exception {
         return callbackFor(a, subject, account, KEY, a.nonce(), CLIENT, issuer());
     }
@@ -226,7 +247,7 @@ class EnterpriseSignInIT extends IntegrationTest {
         HttpResponse<String> start = b.get("/api/v1/auth/oidc/start?return=/%23requests");
         Authorization a = authorizationOf(start);
         assertThat(a.query()).containsEntry("code_challenge_method", "S256").containsEntry("response_type", "code")
-                .containsEntry("client_id", CLIENT).containsKey("nonce");
+                .containsEntry("client_id", CLIENT).containsEntry("max_age", "43200").containsKey("nonce");
         assertThat(start.headers().allValues("Set-Cookie")).anyMatch(c -> c.startsWith("TMRKZ_OIDC=") && c.contains("HttpOnly") && c.contains("SameSite=Lax"));
 
         String subject = UUID.randomUUID().toString();
@@ -391,6 +412,47 @@ class EnterpriseSignInIT extends IntegrationTest {
         assertThat(location(b.get(callbackFor(ra2, sub, "apr" + sfx)))).isEqualTo("/#review");
         HttpResponse<String> ok = b.post("/api/v1/tasks/" + task + "/decision", decision);
         assertThat(ok.statusCode()).as(ok.body()).isEqualTo(200);
+        assertThat(activeReservations(res)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("auth_time: required (max_age is always sent), never replaced by iat; future, too old or pre-step-up values are refused")
+    void authenticationTime() throws Exception {
+        UUID person = hrPerson("at" + sfx, true);
+        membership(person, "APPROVER", org, null);
+        String sub = "sub-at-" + sfx;
+        long now = Instant.now().getEpochSecond();
+
+        Browser future = new Browser();
+        assertThat(location(future.get(callbackWithAuthTime(authorizationOf(future.get("/api/v1/auth/oidc/start")), sub, "at" + sfx, now + 600))))
+                .startsWith("/#auth-error=IDENTITY_SIGN_IN_FAILED");
+
+        Browser missing = new Browser();
+        assertThat(location(missing.get(callbackWithAuthTime(authorizationOf(missing.get("/api/v1/auth/oidc/start")), sub, "at" + sfx, null))))
+                .startsWith("/#auth-error=IDENTITY_SIGN_IN_FAILED");
+        Browser tooOld = new Browser();
+        assertThat(location(tooOld.get(callbackWithAuthTime(authorizationOf(tooOld.get("/api/v1/auth/oidc/start")), sub, "at" + sfx, now - 50000))))
+                .startsWith("/#auth-error=IDENTITY_SIGN_IN_FAILED");
+
+        // Authenticated an hour ago (a reused provider session): signed in, but approvals ask for a step-up.
+        Browser b = new Browser();
+        assertThat(location(b.get(callbackWithAuthTime(authorizationOf(b.get("/api/v1/auth/oidc/start")), sub, "at" + sfx, now - 3600)))).isEqualTo("/");
+        assertThat(jdbc.sql("select count(*) from user_session where person_id = :p").param("p", person).query(Long.class).single()).isEqualTo(1);
+        UUID siteId = site("S", null, org);
+        UUID res = resource("R", siteId, null, 0);
+        person("req", "REQUESTER", org);
+        UUID request = login("req").submitted(requestType("NEW_RESERVATION", finalOnly(), null), org, List.of(res), day("2029-05-01"), day("2029-05-02"));
+        String task = jdbc.sql("select id::text from task_assignment where request_id = :r").param("r", request).query(String.class).single();
+        String decision = "{\"decision\":\"APPROVE\",\"expectedRevision\":1,\"signature\":{\"confirm\":true}}";
+        assertThat(JSON.readTree(b.post("/api/v1/tasks/" + task + "/decision", decision).body()).path("code").asText())
+                .isEqualTo("REAUTHENTICATION_REQUIRED");
+
+        // max_age=0 makes auth_time mandatory, and it must not predate the step-up (a reused old session).
+        assertThat(location(b.get(callbackWithAuthTime(reauthOf(b), sub, "at" + sfx, null)))).startsWith("/#auth-error=IDENTITY_SIGN_IN_FAILED");
+        assertThat(location(b.get(callbackWithAuthTime(reauthOf(b), sub, "at" + sfx, now - 3600)))).startsWith("/#auth-error=IDENTITY_SIGN_IN_FAILED");
+        assertThat(b.post("/api/v1/tasks/" + task + "/decision", decision).statusCode()).isEqualTo(403);
+        assertThat(location(b.get(callbackWithAuthTime(reauthOf(b), sub, "at" + sfx, Instant.now().getEpochSecond())))).isEqualTo("/#review");
+        assertThat(b.post("/api/v1/tasks/" + task + "/decision", decision).statusCode()).isEqualTo(200);
         assertThat(activeReservations(res)).isEqualTo(1);
     }
 

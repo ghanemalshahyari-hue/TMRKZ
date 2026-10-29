@@ -197,3 +197,30 @@ Supersedes ADR-003 (local identity adapter). Owner decision: Keycloak with LDAP;
 - **One sign-in page.** Opening TMRKZ without a session goes straight to the provider's sign-in page, which holds the
   username and password, laid out like the TNQL sign-in page. TMRKZ shows its own page, in the same design, only when
   sign-in cannot start or was refused, with the reason and a way back.
+
+## ADR-016 Two sign-in paths as in TNQL, authentication time, first administrator, task assignment — Accepted (2026-10-29)
+
+Owner decisions after the review of `c96cb4b`.
+
+- **Two paths on one page.** The sign-in page has TNQL's layout: «الدخول الآلي بالحساب المؤسسي» goes through Keycloak
+  (ADR-015), and «إدخال اسم المستخدم وكلمة المرور يدوياً» opens the username and password form in the same card. The
+  manual form is checked by the enterprise directory itself: the service account finds exactly one entry, then the
+  person's own bind proves the password (`DirectoryAuthenticator`). The channel is always LDAPS or StartTLS, trusting
+  only the CA folder with host-name checking, and credentials are never sent before it is secured. Empty passwords are
+  refused, since they would be an unauthenticated bind. Failures are throttled per login name (5 in 15 minutes) and per
+  address. The identity is (`urn:tmrkz:directory`, directory UUID) and is linked by the same rules as the provider path.
+  This is not the removed local password login: TMRKZ stores and checks no password.
+- **Authentication time.** Every authorisation request sends `max_age` (12 hours for sign-in, 0 for a step-up), so
+  `auth_time` is mandatory (OIDC Core 3.1.2.1). A missing value is refused, as is one in the future or older than the
+  requested age; a step-up must have authenticated after it began. `iat` is never used instead. The realm's client
+  includes Keycloak's `basic` scope, which carries `auth_time`. A step-up for a directory session re-binds with the
+  password.
+- **First administrator.** `ops/bootstrap-admin.sh <login>` (host operator, 24 hours, only while no active system
+  administrator exists) lets that directory login's first verified sign-in become a temporary local administrator for
+  72 hours, so the HR source can be configured on an empty installation. When the HR mirror later contains the person,
+  the identity moves to the HR record and the temporary grant ends. Everything is audited; `ops/test-env/clean-install.sh`
+  proves the path on an empty database.
+- **Task assignment.** After a transfer or departure, a task whose role and scope have exactly one remaining holder is
+  assigned to that person. With none or several it waits for the organisation's access managers, who assign it from a
+  searchable, paged list of authorised people (`/task-reassignments`). Candidates are scanned in keyset pages with no cap
+  before the scope check. An assigned task can be decided only by its assignee.

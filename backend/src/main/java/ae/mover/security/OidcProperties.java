@@ -18,12 +18,14 @@ public record OidcProperties(
         String linkKey,
         String enterpriseKeyClaim,
         int reauthMaxAgeSeconds,
+        int loginMaxAgeSeconds,
         int httpTimeoutMs) {
 
     public OidcProperties {
         if (!"EMPLOYEE_NUMBER".equals(linkKey)) linkKey = "DOMAIN_ACCOUNT";
         if (enterpriseKeyClaim == null || enterpriseKeyClaim.isBlank()) enterpriseKeyClaim = "employee_number";
         if (reauthMaxAgeSeconds <= 0) reauthMaxAgeSeconds = 300;
+        if (loginMaxAgeSeconds <= 0) loginMaxAgeSeconds = 43200;
         if (httpTimeoutMs <= 0) httpTimeoutMs = 10000;
     }
 

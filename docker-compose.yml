@@ -48,10 +48,22 @@ services:
       TMRKZ_OIDC_CLIENT_ID: tmrkz-web
       TMRKZ_OIDC_CLIENT_SECRET: ${TMRKZ_OIDC_CLIENT_SECRET:?set TMRKZ_OIDC_CLIENT_SECRET in .env; run ops/init-env.sh}
       TMRKZ_OIDC_REDIRECT_URI: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}/api/v1/auth/oidc/callback
-      TMRKZ_OIDC_POST_LOGOUT_REDIRECT_URI: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}/
+      TMRKZ_OIDC_POST_LOGOUT_REDIRECT_URI: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}/?signed-out=1
       TMRKZ_OIDC_LINK_KEY: ${TMRKZ_OIDC_LINK_KEY:-DOMAIN_ACCOUNT}
+      # Manual sign-in: username and password verified by the same directory (LDAP bind over TLS), as in TNQL.
+      LDAP_URL: ${LDAP_URL:?set LDAP_URL to the enterprise directory (ldaps://... or ldap://... with LDAP_START_TLS=true)}
+      LDAP_START_TLS: ${LDAP_START_TLS:-true}
+      LDAP_BIND_DN: ${LDAP_BIND_DN:?set LDAP_BIND_DN (read-only service account)}
+      LDAP_BIND_CREDENTIAL: ${LDAP_BIND_CREDENTIAL:?set LDAP_BIND_CREDENTIAL}
+      LDAP_USERS_DN: ${LDAP_USERS_DN:?set LDAP_USERS_DN}
+      LDAP_USERNAME_ATTRIBUTE: ${LDAP_USERNAME_ATTRIBUTE:-uid}
+      LDAP_UUID_ATTRIBUTE: ${LDAP_UUID_ATTRIBUTE:-entryUUID}
+      LDAP_EMPLOYEE_NUMBER_ATTRIBUTE: ${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:-employeeNumber}
+      LDAP_USER_OBJECT_CLASS: ${LDAP_USER_OBJECT_CLASS:-inetOrgPerson}
+      TMRKZ_LDAP_CA_DIR: /etc/tmrkz/ldap-ca
     volumes:
       - files:/var/lib/mover
+      - ${TMRKZ_TRUSTSTORE_DIR:-./ops/keycloak/truststores}:/etc/tmrkz/ldap-ca:ro
     networks: [internal]
 
   # One-shot: the identity provider's own database and role in the same PostgreSQL server (separate owner).

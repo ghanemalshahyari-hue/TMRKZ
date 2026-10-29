@@ -34,10 +34,13 @@ Date: 29 October 2026 · Version 1.0.0
     the HR domain account with a review list for anything ambiguous, step-up before approval, and the TMRKZ sign-in
     theme. The local password form, the demo switch and the demo data are gone from the production build; fictional
     users and data live in the separate test environment `ops/test-env` (PA-07, PA-08).
+  - Review fixes (ADR-016) — TNQL's two sign-in paths on one page (automatic through Keycloak, manual username and
+    password checked by the directory over TLS), `auth_time` required on every sign-in, a limited first-administrator
+    path proven by a clean installation, and task assignment with access-manager choice and uncapped candidate scans.
   - Steps 3–7 open — OpenFGA and the permissions studio, PostGIS boundaries and the map manager, visual rule editor,
     DSS signatures and seals, isolated bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
 
-Test evidence: 46 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
+Test evidence: 54 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
 17 frontend tests — see `TRACEABILITY.md`.
 
 ## Known limitations

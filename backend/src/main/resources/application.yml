@@ -78,6 +78,20 @@ tmrkz:
     link-key: ${TMRKZ_OIDC_LINK_KEY:DOMAIN_ACCOUNT}
     enterprise-key-claim: ${TMRKZ_OIDC_EMPLOYEE_NUMBER_CLAIM:employee_number}
     reauth-max-age-seconds: ${TMRKZ_REAUTH_MAX_AGE_SECONDS:300}
+    # Sent as max_age on every sign-in, so the provider must state auth_time (equals the 12-hour session limit).
+    login-max-age-seconds: ${TMRKZ_LOGIN_MAX_AGE_SECONDS:43200}
+  ldap:
+    # Manual sign-in (username and password verified by the directory); the same values configure Keycloak.
+    url: ${LDAP_URL:}
+    start-tls: ${LDAP_START_TLS:true}
+    bind-dn: ${LDAP_BIND_DN:}
+    bind-credential: ${LDAP_BIND_CREDENTIAL:}
+    users-dn: ${LDAP_USERS_DN:}
+    username-attribute: ${LDAP_USERNAME_ATTRIBUTE:uid}
+    uuid-attribute: ${LDAP_UUID_ATTRIBUTE:entryUUID}
+    employee-number-attribute: ${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:employeeNumber}
+    user-object-class: ${LDAP_USER_OBJECT_CLASS:inetOrgPerson}
+    ca-dir: ${TMRKZ_LDAP_CA_DIR:/etc/tmrkz/ldap-ca}
   hr:
     # Protects stored HR source credentials; TMRKZ's own key, never another application's.
     settings-key: ${TMRKZ_HR_SETTINGS_KEY:}

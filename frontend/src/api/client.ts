@@ -170,6 +170,8 @@ export const api = {
   authStatus: () => call<AuthStatus>('GET', '/auth/status', { silent401: true }),
   logout: () => post<{ redirect: string }>('/auth/logout'),
   reauth: (returnTo: string) => post<{ redirect: string }>('/auth/reauth', { returnTo }),
+  directoryLogin: (username: string, password: string) => call<Me>('POST', '/auth/directory/login', { body: { username, password }, silent401: true }),
+  directoryReauth: (password: string) => post<void>('/auth/directory/reauth', { password }),
   me: () => call<Me>('GET', '/me', { silent401: true }),
 
   // organizations

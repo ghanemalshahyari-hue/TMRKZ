@@ -59,11 +59,12 @@ export type Me = {
   permissions: Permission[];
   summaryOnly: boolean;
   grants: Grant[];
+  signInMethod: 'PROVIDER' | 'DIRECTORY';
   serverTime: string;
   timezone: string;
 };
 
-export type AuthStatus = { provider: 'OIDC'; configured: boolean; reachable: boolean };
+export type AuthStatus = { provider: 'OIDC'; configured: boolean; reachable: boolean; manual: boolean };
 
 // ---------- organizations ----------
 export type OrgNode = {

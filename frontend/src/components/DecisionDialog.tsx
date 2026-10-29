@@ -13,6 +13,7 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
   const [reasonCode, setReasonCode] = useState<ReasonCode>('INCOMPLETE_DATA');
   const [ack, setAck] = useState(false);
   const [reauth, setReauth] = useState(false);
+  const [reauthPassword, setReauthPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [doc, setDoc] = useState<ApprovalDocument | null>(null);
@@ -130,9 +131,34 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
               <div className="note orange">نمط التوقيع المهيأ «توقيع بشهادة (PKI)» غير مربوط بمزود شهادات بعد (القرار D-02). لن يُسجل اعتماد دون توقيع صحيح.</div>
             ) : (
               <>
-                {reauth && (
+                {reauth && app.me.signInMethod === 'DIRECTORY' && (
                   <div className="note orange" role="alert" style={{ marginBottom: 10 }}>
-                    يتطلب الاعتماد تحققاً حديثاً من هويتك لدى مزود الهوية. لم يُسجل أي قرار.
+                    يتطلب الاعتماد تأكيد هويتك بكلمة المرور في الدليل المؤسسي. لم يُسجل أي قرار.
+                    <div className="flex" style={{ marginTop: 8, gap: 8 }}>
+                      <input type="password" autoComplete="current-password" aria-label="كلمة المرور" value={reauthPassword} onChange={(e) => setReauthPassword(e.target.value)} />
+                      <button
+                        className="button compact"
+                        disabled={!reauthPassword || busy}
+                        onClick={async () => {
+                          try {
+                            await api.directoryReauth(reauthPassword);
+                            setReauthPassword('');
+                            setReauth(false);
+                            await apply();
+                          } catch (e) {
+                            setReauthPassword('');
+                            setError((e as Error).message);
+                          }
+                        }}
+                      >
+                        تأكيد الهوية والاعتماد
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {reauth && app.me.signInMethod !== 'DIRECTORY' && (
+                  <div className="note orange" role="alert" style={{ marginBottom: 10 }}>
+                    يتطلب الاعتماد تحققاً حديثاً من هويتك لدى خدمة الدخول المؤسسية. لم يُسجل أي قرار.
                     <div style={{ marginTop: 8 }}>
                       <button
                         className="button compact"

@@ -64,9 +64,24 @@ async function browserSignIn(username, password) {
   return { signedIn: jar.cookies.has('MOVER_SESSION'), location: res.headers.get('location'), jar, loginPage: html };
 }
 
+/** The manual path of the sign-in page: username and password checked by the directory (LDAP over TLS). */
+async function manualSignIn(username, password) {
+  const res = await fetch(BASE + '/api/v1/auth/directory/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'mover' }, body: JSON.stringify({ username, password }),
+  });
+  const cookie = res.headers.getSetCookie().find((c) => c.startsWith('MOVER_SESSION='))?.split(';')[0];
+  return { status: res.status, body: await res.json().catch(() => null), cookie };
+}
+
 class Session {
-  constructor(user) { this.user = user; this.cookie = ''; }
+  constructor(user, via = 'automatic') { this.user = user; this.via = via; this.cookie = ''; }
   async login() {
+    if (this.via === 'manual') {
+      const m = await manualSignIn(this.user, PASSWORD);
+      if (!m.cookie) throw new Error(`manual sign-in ${this.user} failed: ${m.status}`);
+      this.cookie = m.cookie;
+      return this;
+    }
     const r = await browserSignIn(this.user, PASSWORD);
     if (!r.signedIn) throw new Error(`sign-in ${this.user} failed: ${r.location ?? 'no redirect'}`);
     this.cookie = 'MOVER_SESSION=' + r.jar.cookies.get('MOVER_SESSION');
@@ -93,7 +108,7 @@ class Session {
   patch = (p, b) => this.call('PATCH', p, b);
 }
 
-const user = (name) => new Session(name).login();
+const user = (name, via) => new Session(name, via).login();
 const key = () => crypto.randomUUID();
 const dubaiMidnight = (y, m, d) => new Date(Date.UTC(y, m - 1, d) - 4 * 3600 * 1000).toISOString();
 
@@ -134,11 +149,21 @@ const dubaiMidnight = (y, m, d) => new Date(Date.UTC(y, m - 1, d) - 4 * 3600 * 1
   const unlinked = await browserSignIn('t.unlinked', PASSWORD);
   ok(!unlinked.signedIn && unlinked.location === '/#auth-error=IDENTITY_NOT_LINKED&reason=NO_MATCH',
     'directory account without an HR record is refused and queued', unlinked.location);
+  // The manual path of the same page: username and password checked by the directory directly.
+  ok(status.manual === true, 'manual sign-in offered on the sign-in page');
+  const manualOk = await manualSignIn('t.requester', PASSWORD);
+  ok(manualOk.status === 200 && !!manualOk.cookie && manualOk.body?.signInMethod === 'DIRECTORY', 'manual sign-in: directory password accepted');
+  const manualWrong = await manualSignIn('t.requester', PASSWORD + 'x');
+  ok(manualWrong.status === 401 && !manualWrong.cookie, 'manual sign-in: wrong password refused, no session');
+  const manualUnlinked = await manualSignIn('t.unlinked', PASSWORD);
+  ok(manualUnlinked.status === 403 && manualUnlinked.body?.details?.reason === 'NO_MATCH', 'manual sign-in: directory-only account refused and queued');
+  const out = await fetch(BASE + '/api/v1/auth/logout', { method: 'POST', headers: { Cookie: manualOk.cookie, 'X-Requested-With': 'mover' } });
+  ok((await out.json()).redirect === '/?signed-out=1', 'logout returns to the sign-in page with the signed-out message');
 }
 
 // ---- Journey -----------------------------------------------------------------------------------------
 const requester = await user('t.requester');
-const facilities = await user('t.facilities');
+const facilities = await user('t.facilities', 'manual');
 const manager = await user('t.manager');
 const approver = await user('t.approver');
 

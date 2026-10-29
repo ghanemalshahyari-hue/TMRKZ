@@ -52,6 +52,7 @@ public class OidcClient {
     private static final Logger log = LoggerFactory.getLogger(OidcClient.class);
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Duration ATTEMPT_LIFETIME = Duration.ofMinutes(10);
+    private static final Duration CLOCK_SKEW = Duration.ofSeconds(60);
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -112,9 +113,12 @@ public class OidcClient {
         q.put("code_challenge", challenge(verifier));
         q.put("code_challenge_method", "S256");
         q.put("ui_locales", "ar");
+        // max_age obliges the provider to return auth_time (OIDC Core 3.1.2.1); a step-up asks for a fresh authentication.
         if ("REAUTH".equals(purpose)) {
             q.put("prompt", "login");
             q.put("max_age", "0");
+        } else {
+            q.put("max_age", String.valueOf(props.loginMaxAgeSeconds()));
         }
         return new Started(props.authorizationEndpoint() + "?" + form(q), browser);
     }
@@ -163,8 +167,7 @@ public class OidcClient {
         }
         JWTClaimsSet claims = verify(idToken, (String) attempt.get("nonce"));
         try {
-            Object authTime = claims.getClaim("auth_time");
-            Instant at = authTime instanceof Number n ? Instant.ofEpochSecond(n.longValue()) : claims.getIssueTime().toInstant();
+            Instant at = authenticationTime(claims, (String) attempt.get("purpose"), Db.toInstant(attempt.get("created_at")));
             String name = claims.getStringClaim("name");
             String username = claims.getStringClaim("preferred_username");
             Object key = "DOMAIN_ACCOUNT".equals(props.linkKey()) ? username : claims.getClaim(props.enterpriseKeyClaim());
@@ -176,6 +179,29 @@ public class OidcClient {
         } catch (java.text.ParseException e) {
             throw failed("رمز الهوية يحمل بيانات غير صالحة.");
         }
+    }
+
+    /**
+     * When the person authenticated (OIDC {@code auth_time}). The token's issue time proves nothing about that and is never
+     * used instead. Every request carries {@code max_age}, so {@code auth_time} is mandatory: missing, in the future or
+     * older than the requested age, the response is refused. A step-up ({@code max_age=0}) must have authenticated after
+     * the step-up began.
+     */
+    Instant authenticationTime(JWTClaimsSet claims, String purpose, Instant attemptStarted) {
+        Object value = claims.getClaim("auth_time");
+        if (!(value instanceof Number n)) {
+            throw failed("لم يُثبت مزود الهوية وقت المصادقة؛ رُفض الدخول.");
+        }
+        Instant at = Instant.ofEpochSecond(n.longValue());
+        Instant now = clock.instant();
+        if (at.isAfter(now.plus(CLOCK_SKEW))) {
+            throw failed("وقت المصادقة في رمز الهوية لاحق للوقت الحالي؛ رُفض الدخول.");
+        }
+        Instant earliest = "REAUTH".equals(purpose) ? attemptStarted : now.minusSeconds(props.loginMaxAgeSeconds());
+        if (at.isBefore(earliest.minus(CLOCK_SKEW))) {
+            throw failed("REAUTH".equals(purpose) ? "لم تُجرَ إعادة تحقق جديدة لدى مزود الهوية." : "انقضت مدة المصادقة المسموحة؛ سجّل الدخول من جديد.");
+        }
+        return at;
     }
 
     JWTClaimsSet verify(String idToken, String nonce) {

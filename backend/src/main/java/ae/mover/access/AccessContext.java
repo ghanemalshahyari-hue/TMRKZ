@@ -128,6 +128,14 @@ public final class AccessContext {
                 .findFirst();
     }
 
+    /**
+     * A task assigned to a person is theirs alone; a task waiting for the access manager's choice belongs to nobody until
+     * then. Combined with {@link #taskGrant} / {@link #executionGrant}, which still require the role and scope.
+     */
+    public boolean assignedToMe(UUID assignedPersonId, boolean awaitingAssignment) {
+        return !awaitingAssignment && (assignedPersonId == null || assignedPersonId.equals(actor.personId()));
+    }
+
     /** Grant that lets this actor complete an execution task (role + EXECUTE + scope over the target). */
     public Optional<Grant> executionGrant(String roleCode, UUID targetOrgId, RequestScope r) {
         return grants.stream()

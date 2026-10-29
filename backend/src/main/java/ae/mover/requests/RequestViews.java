@@ -257,7 +257,8 @@ public class RequestViews {
             jdbc.sql("select t.*, rd.name as role_name from task_assignment t join role_def rd on rd.code = t.role_code where t.request_id = :id and t.status = 'OPEN' order by t.created_at")
                     .param("id", id).query((rs, n) -> {
                         UUID target = Db.uuid(rs, "target_org_id");
-                        if (ctx.taskGrant(rs.getString("role_code"), target, scope, rs.getBoolean("final")).isPresent()) {
+                        if (ctx.taskGrant(rs.getString("role_code"), target, scope, rs.getBoolean("final")).isPresent()
+                                && ctx.assignedToMe(Db.uuid(rs, "assigned_person_id"), rs.getBoolean("awaiting_assignment"))) {
                             myTasks.add(new MyTask(rs.getString("id"), rs.getString("stage_key"), rs.getString("stage_name"),
                                     rs.getString("role_name"), rs.getBoolean("final"), rs.getBoolean("requires_signature")));
                         }
@@ -410,7 +411,8 @@ public class RequestViews {
                 .query((rs, n) -> {
                     boolean open = "OPEN".equals(rs.getString("status"));
                     Instant due = Db.instant(rs, "due_at");
-                    boolean can = open && ctx.executionGrant(rs.getString("role_code"), Db.uuid(rs, "target_org_id"), scope).isPresent();
+                    boolean can = open && ctx.executionGrant(rs.getString("role_code"), Db.uuid(rs, "target_org_id"), scope).isPresent()
+                            && ctx.assignedToMe(Db.uuid(rs, "assigned_person_id"), rs.getBoolean("awaiting_assignment"));
                     return new ExecutionTaskView(rs.getString("id"), rs.getString("key"), rs.getString("name"),
                             rs.getString("role_name"), rs.getString("org_name"), due.toString(), rs.getString("status"),
                             rs.getBoolean("evidence_required"), rs.getString("completer"), Db.iso(rs, "completed_at"),

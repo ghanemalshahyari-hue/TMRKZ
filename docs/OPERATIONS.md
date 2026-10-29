@@ -101,14 +101,14 @@ configuration changes never require data migration of in-flight requests.
   (`TMRKZ_OIDC_LINK_KEY=DOMAIN_ACCOUNT`), or, with `EMPLOYEE_NUMBER`, when the directory attribute mapped to the
   `employee_number` claim equals the HR employee number. Anything else appears under «الهيكل التنظيمي» → sign-ins
   waiting for review, where a MANAGE_ACCESS holder links or dismisses it with a reason.
-- Business rights come only from memberships and responsibility seats. Give the first administrator a `SYSTEM_ADMIN`
-  membership by SQL once their HR record is mirrored:
-  ```sql
-  -- docker compose exec db psql -U mover -d mover
-  insert into membership(id, person_id, organization_id, role_code, valid_from, follows_affiliation)
-  select gen_random_uuid(), p.id, a.organization_id, 'SYSTEM_ADMIN', now(), false
-  from person p join affiliation a on a.person_id = p.id and a.valid_to is null where p.employee_no = '<employee number>';
-  ```
+- The sign-in page offers both paths, as in TNQL: automatic (Keycloak) and manual (username and password checked by the
+  directory; the backend uses the same `LDAP_*` settings and CA folder). Five failed manual attempts lock a login name
+  for 15 minutes.
+- **First administrator of an empty installation:** run `sh ops/bootstrap-admin.sh <directory-login>` on the host
+  within 24 hours of that person's first sign-in. It works only while no active system administrator exists. The
+  person becomes a temporary administrator for 72 hours, enough to configure the HR source and grant rights. When the
+  HR mirror contains them, their next sign-in moves to the HR record and the temporary grant ends. Business rights
+  otherwise come only from memberships and responsibility seats.
 - Organisation structure comes from the HR mirror. The CSV import in «إعدادات النظام» remains for local organisations.
 
 ## Acceptance test environment (fictional)
@@ -120,9 +120,10 @@ a fictional HR mirror, people, grants and facilities. Users and the generated sh
 ## Running the tests
 
 ```sh
-sh ops/test-backend.sh                                        # 46 backend acceptance tests on a throw-away PostgreSQL
+sh ops/test-backend.sh                                        # 54 backend acceptance tests on a throw-away PostgreSQL
 sh ops/test-env/up.sh && node tests/acceptance/journey.mjs     # real sign-in (Keycloak + LDAP) and the journey
 sh ops/test-env/check-untrusted-tls.sh                       # directory with an untrusted certificate is refused
+sh ops/test-env/clean-install.sh                             # empty database: first administrator and first configuration
 (cd frontend && npm ci && npm test && npm run build)          # frontend unit tests and type-checked build
 python ops/tools/gen-openapi.py                               # regenerate docs/api/openapi.json from the controllers
 ```

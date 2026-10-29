@@ -52,7 +52,7 @@ export function App() {
   }, []);
 
   if (checking) return <div className="login-shell"><div className="empty">جارٍ التحقق من الجلسة…</div></div>;
-  if (!me) return <LoginPage />;
+  if (!me) return <LoginPage onLogin={setMe} />;
   return <Workspace me={me} setMe={setMe} />;
 }
 

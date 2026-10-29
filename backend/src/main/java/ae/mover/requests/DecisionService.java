@@ -110,7 +110,7 @@ public class DecisionService {
 
     record TaskRow(UUID id, UUID requestId, int revision, String flowableTaskId, String stageKey, String stageName,
                    String roleCode, String roleName, UUID targetOrgId, boolean finalStage, boolean requiresSignature,
-                   String status, Instant createdAt, Instant dueAt) {
+                   String status, Instant createdAt, Instant dueAt, UUID assignedPersonId, boolean awaitingAssignment) {
     }
 
     private TaskRow task(UUID taskId, boolean lock) {
@@ -122,7 +122,8 @@ public class DecisionService {
                         rs.getString("flowable_task_id"), rs.getString("stage_key"), rs.getString("stage_name"),
                         rs.getString("role_code"), rs.getString("role_name"), Db.uuid(rs, "target_org_id"),
                         rs.getBoolean("final"), rs.getBoolean("requires_signature"), rs.getString("status"),
-                        Db.instant(rs, "created_at"), Db.instant(rs, "due_at")))
+                        Db.instant(rs, "created_at"), Db.instant(rs, "due_at"), Db.uuid(rs, "assigned_person_id"),
+                        rs.getBoolean("awaiting_assignment")))
                 .optional().orElseThrow(ApiException::notFound);
     }
 
@@ -135,7 +136,8 @@ public class DecisionService {
         }
         List<Map<String, Object>> rows = jdbc.sql("""
                 select t.id, t.request_id, r.number, ty.name as type_name, t.stage_key, t.stage_name, t.role_code,
-                       rd.name as role_name, o.name as org_name, t.target_org_id, t.created_at, t.due_at, t.final, t.requires_signature
+                       rd.name as role_name, o.name as org_name, t.target_org_id, t.created_at, t.due_at, t.final, t.requires_signature,
+                       t.assigned_person_id, t.awaiting_assignment
                 from task_assignment t join request r on r.id = t.request_id join request_type ty on ty.code = r.type_code
                 join role_def rd on rd.code = t.role_code left join organization o on o.id = t.target_org_id
                 where t.status = 'OPEN' and r.status = 'SUBMITTED' and t.role_code = any(string_to_array(:roles, ','))
@@ -147,7 +149,8 @@ public class DecisionService {
         for (Map<String, Object> m : rows) {
             RequestScope scope = scopes.get((UUID) m.get("request_id"));
             boolean fin = (Boolean) m.get("final");
-            if (ctx.taskGrant((String) m.get("role_code"), (UUID) m.get("target_org_id"), scope, fin).isEmpty()) {
+            if (ctx.taskGrant((String) m.get("role_code"), (UUID) m.get("target_org_id"), scope, fin).isEmpty()
+                    || !ctx.assignedToMe((UUID) m.get("assigned_person_id"), (Boolean) m.get("awaiting_assignment"))) {
                 continue;
             }
             Instant due = Db.toInstant(m.get("due_at"));
@@ -198,7 +201,8 @@ public class DecisionService {
     public ApprovalDocumentPreview approvalDocument(AccessContext ctx, UUID taskId) {
         TaskRow t = task(taskId, false);
         RequestScope scope = access.requestScope(t.requestId());
-        if (ctx.taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage()).isEmpty()) {
+        if (ctx.taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage()).isEmpty()
+                || !ctx.assignedToMe(t.assignedPersonId(), t.awaitingAssignment())) {
             throw ApiException.notFound();
         }
         Canonical c = canonical(t.requestId(), t.revision());
@@ -246,6 +250,11 @@ public class DecisionService {
         boolean byRequester = ctx.personId().equals(req.get("created_by"));
         Grant grant = ctx.taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage())
                 .orElseThrow(() -> ApiException.forbidden("لا تملك حالياً صفة هذه المهمة أو نطاقها."));
+        if (!ctx.assignedToMe(t.assignedPersonId(), t.awaitingAssignment())) {
+            throw ApiException.forbidden(t.awaitingAssignment()
+                    ? "المهمة بانتظار أن يسندها مسؤول الصلاحيات إلى شخص مخول."
+                    : "المهمة مسندة إلى شخص آخر.");
+        }
         int currentRevision = ((Number) req.get("current_revision")).intValue();
         if (in.expectedRevision() == null || in.expectedRevision() != currentRevision || t.revision() != currentRevision) {
             throw ApiException.staleRevision();

@@ -456,6 +456,8 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         assertThat((String) moved.get("h")).contains(personOf("B").toString());
         assertThat(jdbc.sql("select count(*) from notification where person_id = :p and kind = 'TASK_REALIGNED'").param("p", personOf("B"))
                 .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select assigned_person_id from task_assignment where id = :t").param("t", task).query(UUID.class).single())
+                .isEqualTo(personOf("B"));
 
         // B leaves the service: nobody holds the position, so the access managers receive the task to resolve.
         jdbc.sql("update " + schema + ".people_t set status_desc = 'منتهية خدمته' where person_id = :p").param("p", p("B")).update();
@@ -470,5 +472,115 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         assertThat(jdbc.sql("select status from person where id = :id").param("id", personOf("B")).query(String.class).single())
                 .isEqualTo("DISABLED");
         assertThat(jdbc.sql("select count(*) from decision where request_id = :r").param("r", request).query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("select awaiting_assignment from task_assignment where id = :t").param("t", task).query(Boolean.class).single())
+                .isTrue();
+
+        // The access manager gives the role to C, finds C among the authorised candidates and assigns the task, with a reason.
+        UUID c = person("cc", seatRole, root);
+        UUID d = person("dd", seatRole, root);
+        assertThat(login("dd").taskFor(request)).isNull();
+        JsonNode pending = admin.get("/task-reassignments").body();
+        String routedId = null;
+        for (JsonNode r : pending) {
+            if (r.path("requestNumber").asText().equals(jdbc.sql("select number from request where id = :r").param("r", request)
+                    .query(String.class).single())) {
+                routedId = r.path("id").asText();
+            }
+        }
+        assertThat(routedId).isNotNull();
+        JsonNode candidates = admin.get("/task-reassignments/" + routedId + "/candidates?q=cc").body();
+        assertThat(candidates.path("items").toString()).contains(c.toString()).doesNotContain(d.toString());
+        assertThat(admin.post("/task-reassignments/" + routedId + "/assign", Map.of("personId", c.toString(), "reason", "أُسندت للمكلف الجديد"))
+                .status()).isEqualTo(204);
+        assertThat(login("cc").taskFor(request)).isNotNull();
+        assertThat(login("dd").taskFor(request)).isNull();
+        assertThat(login("dd").approve(task.toString(), 1).status()).isEqualTo(403);
+        assertThat(login("cc").approve(task.toString(), 1).status()).isEqualTo(200);
+        person("plainmgr", "REQUESTER", root);
+        assertThat(login("plainmgr").get("/task-reassignments").status()).isEqualTo(403);
+    }
+
+    /** A request owned by HR unit 2 whose final stage needs an organisation-scoped approval role; A holds it and transfers. */
+    private record Departure(String role, UUID unit2, UUID request, UUID task) {
+    }
+
+    private Departure departureFixture() {
+        String role = role("ORGAPR", "ORGANIZATION", "VIEW", "REVIEW", "APPROVE");
+        unit("1", "الجهة الرئيسية", null, 1);
+        unit("2", "الإدارة أ", "1", 1);
+        unit("3", "الإدارة ب", "1", 1);
+        personRow("A", "صاحب الاعتماد في الإدارة أ", "2", "في الخدمة", "POS-A");
+        configure(fields());
+        assertThat(status(run("SCHEDULED", null))).isEqualTo("SUCCEEDED");
+        UUID unit2 = orgOf("2");
+        membership(personOf("A"), role, unit2, null);
+        UUID site = site("S2", null, unit2);
+        UUID res = resource("R2", site, null, 0);
+        person("req2", "REQUESTER", unit2);
+        String type = requestType("NEW_RESERVATION", workflow(List.of(), stage("final_approval", "ALL", true, role + "|REQUEST_ORG")), null);
+        UUID request = login("req2").submitted(type, unit2, List.of(res), day("2029-02-01"), day("2029-02-02"));
+        UUID task = jdbc.sql("select id from task_assignment where request_id = :r and status = 'OPEN'").param("r", request)
+                .query(UUID.class).single();
+        return new Departure(role, unit2, request, task);
+    }
+
+    private void bulkHolders(String role, int count) {
+        UUID elsewhere = org("ELSEWHERE", root);
+        jdbc.sql("""
+                insert into person(id, employee_no, display_name, username)
+                select gen_random_uuid(), 'BULK-' || :s || '-' || g, 'حامل دور خارج النطاق ' || g, 'bulk-' || :s || '-' || g
+                from generate_series(1, :n) g""").param("s", sfx).param("n", count).update();
+        jdbc.sql("""
+                insert into membership(id, person_id, organization_id, role_code, valid_from)
+                select gen_random_uuid(), p.id, :o, :r, '2026-01-01T00:00:00Z' from person p where p.username like :u""")
+                .param("o", elsewhere).param("r", role).param("u", "bulk-" + sfx + "-%").update();
+    }
+
+    private UUID localHolder(String name, String role, UUID org, UUID id) {
+        jdbc.sql("insert into person(id, employee_no, display_name, username) values (:id, :e, :n, :u)")
+                .param("id", id).param("e", "L-" + name + "-" + sfx).param("n", "شخص " + name).param("u", name + "-" + sfx).update();
+        membership(id, role, org, null);
+        return id;
+    }
+
+    @Test
+    @DisplayName("PA-09: with more than 2,000 role holders outside the scope, the one authorised substitute is still found and assigned")
+    void soleSubstituteAmongManyCandidates() {
+        Departure f = departureFixture();
+        bulkHolders(f.role(), 2100);
+        // Sorts after every generated identifier, so a capped candidate list would never reach it.
+        UUID e = localHolder("ee", f.role(), f.unit2(), UUID.fromString("ffffffff-ffff-4fff-bfff-fffffffffff0"));
+        jdbc.sql("update " + schema + ".people_t set unit_id = :u where person_id = :p").param("u", u("3")).param("p", p("A")).update();
+        assertThat(status(run("SCHEDULED", null))).isEqualTo("SUCCEEDED");
+        Map<String, Object> r = jdbc.sql("select outcome, assigned_person_id from task_reassignment where task_id = :t").param("t", f.task())
+                .query().singleRow();
+        assertThat(r.get("outcome")).isEqualTo("SOLE_SUBSTITUTE");
+        assertThat(r.get("assigned_person_id")).isEqualTo(e);
+        assertThat(jdbc.sql("select assigned_person_id from task_assignment where id = :t").param("t", f.task()).query(UUID.class).single())
+                .isEqualTo(e);
+        assertThat(login("ee").taskFor(f.request())).isNotNull();
+    }
+
+    @Test
+    @DisplayName("PA-09: with several authorised substitutes the task waits for the access manager, who assigns one")
+    void severalCandidatesGoToAccessManager() {
+        Departure f = departureFixture();
+        UUID e = localHolder("e2", f.role(), f.unit2(), UUID.randomUUID());
+        UUID g = localHolder("g2", f.role(), f.unit2(), UUID.randomUUID());
+        jdbc.sql("update " + schema + ".people_t set unit_id = :u where person_id = :p").param("u", u("3")).param("p", p("A")).update();
+        assertThat(status(run("SCHEDULED", null))).isEqualTo("SUCCEEDED");
+        assertThat(jdbc.sql("select outcome from task_reassignment where task_id = :t").param("t", f.task()).query(String.class).single())
+                .isEqualTo("ROUTED_TO_ACCESS_MANAGER");
+        assertThat(login("e2").taskFor(f.request())).isNull();
+        assertThat(login("g2").taskFor(f.request())).isNull();
+        String routedId = jdbc.sql("select id::text from task_reassignment where task_id = :t").param("t", f.task()).query(String.class).single();
+        JsonNode candidates = admin.get("/task-reassignments/" + routedId + "/candidates").body();
+        assertThat(candidates.path("items").toString()).contains(e.toString(), g.toString());
+        assertThat(admin.post("/task-reassignments/" + routedId + "/assign", Map.of("personId", g.toString(), "reason", "الأقرب لموقع المرفق"))
+                .status()).isEqualTo(204);
+        assertThat(login("g2").taskFor(f.request())).isNotNull();
+        assertThat(login("e2").taskFor(f.request())).isNull();
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'TASK_ASSIGNED_BY_ACCESS_MANAGER' and entity_id = :r")
+                .param("r", f.request().toString()).query(Long.class).single()).isEqualTo(1);
     }
 }

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.http.HttpHeaders;
@@ -27,6 +28,7 @@ import ae.mover.access.AccessContext;
 import ae.mover.access.AccessService;
 import ae.mover.access.Grant;
 import ae.mover.common.ApiException;
+import ae.mover.common.ErrorCode;
 import ae.mover.common.Ref;
 import ae.mover.policy.PolicyService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -45,6 +47,9 @@ public class AuthController {
 
     private final AuthService auth;
     private final OidcClient oidc;
+    private final DirectoryAuthenticator directory;
+    private final LoginThrottle throttle;
+    private final OidcProperties oidcProps;
     private final IdentityService identities;
     private final AccessService access;
     private final JdbcClient jdbc;
@@ -52,10 +57,14 @@ public class AuthController {
     private final PolicyService policies;
     private final Clock clock;
 
-    public AuthController(AuthService auth, OidcClient oidc, IdentityService identities, AccessService access, JdbcClient jdbc,
+    public AuthController(AuthService auth, OidcClient oidc, DirectoryAuthenticator directory, LoginThrottle throttle,
+                          OidcProperties oidcProps, IdentityService identities, AccessService access, JdbcClient jdbc,
                           SecurityProperties props, PolicyService policies, Clock clock) {
         this.auth = auth;
         this.oidc = oidc;
+        this.directory = directory;
+        this.throttle = throttle;
+        this.oidcProps = oidcProps;
         this.identities = identities;
         this.access = access;
         this.jdbc = jdbc;
@@ -64,11 +73,91 @@ public class AuthController {
         this.clock = clock;
     }
 
-    /** Public: whether enterprise sign-in is configured and its provider answers (for a clear sign-in page). */
+    /**
+     * Public: the two sign-in paths, as in TNQL — automatic through the identity provider (Keycloak) and manual with the
+     * directory username and password — and whether each is configured (and the provider answers).
+     */
     @GetMapping("/auth/status")
     public Map<String, Object> status() {
         boolean configured = oidc.configured();
-        return Map.of("provider", "OIDC", "configured", configured, "reachable", configured && oidc.reachable());
+        return Map.of("provider", "OIDC", "configured", configured, "reachable", configured && oidc.reachable(),
+                "manual", directory.configured());
+    }
+
+    public record DirectoryLogin(String username, String password) {
+
+        @Override
+        public String toString() {
+            return "DirectoryLogin[" + username + "]"; // never the password
+        }
+    }
+
+    /** Manual sign-in: the directory verifies the password (LDAP bind over TLS); TMRKZ links and opens a session. */
+    @PostMapping("/auth/directory/login")
+    public ResponseEntity<Map<String, Object>> directoryLogin(@RequestBody(required = false) DirectoryLogin in, HttpServletRequest request) {
+        String username = in == null ? null : in.username();
+        String ip = request.getRemoteAddr();
+        throttle.check(username, ip);
+        DirectoryAuthenticator.DirectoryUser user;
+        try {
+            user = directory.authenticate(username, in == null ? null : in.password());
+        } catch (DirectoryAuthenticator.DirectoryException e) {
+            if (e.failure() == DirectoryAuthenticator.Failure.INVALID_CREDENTIALS) {
+                throttle.failed(username, ip);
+            }
+            throw directoryError(e);
+        }
+        Instant now = clock.instant();
+        OidcClient.Identity id = new OidcClient.Identity(directory.issuer(), user.uuid(),
+                "EMPLOYEE_NUMBER".equals(oidcProps.linkKey()) ? user.employeeNumber() : user.username(),
+                user.displayName(), user.username(), now, null, "LOGIN", "/", null);
+        UUID person = identities.resolve(id);
+        throttle.succeeded(username);
+        AuthService.LoginResult r = auth.issueSession(person, directory.issuer(), null, now, ip, request.getHeader("User-Agent"));
+        ResponseCookie session = ResponseCookie.from(SessionFilter.COOKIE, r.token()).httpOnly(true)
+                .secure(props.secureCookie()).sameSite("Strict").path("/").maxAge(auth.sessionLifetime()).build();
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, session.toString()).body(me(r.actor()));
+    }
+
+    public record PasswordInput(String password) {
+
+        @Override
+        public String toString() {
+            return "PasswordInput[***]";
+        }
+    }
+
+    /** Step-up for a session opened with the directory password: the same password, verified again by the directory. */
+    @PostMapping("/auth/directory/reauth")
+    public ResponseEntity<Void> directoryReauth(Actor actor, @RequestBody(required = false) PasswordInput in) {
+        String subject = jdbc.sql("select subject from identity_link where person_id = :p and issuer = :i")
+                .param("p", actor.personId()).param("i", directory.issuer()).query(String.class).optional()
+                .orElseThrow(() -> new ApiException(ErrorCode.REAUTHENTICATION_FAILED, "حسابك غير مربوط بالدليل المؤسسي."));
+        throttle.check("id:" + subject, null);
+        try {
+            directory.reauthenticate(subject, in == null ? null : in.password());
+        } catch (DirectoryAuthenticator.DirectoryException e) {
+            if (e.failure() == DirectoryAuthenticator.Failure.INVALID_CREDENTIALS) {
+                throttle.failed("id:" + subject, null);
+                throw new ApiException(ErrorCode.REAUTHENTICATION_FAILED, "كلمة المرور غير صحيحة؛ لم يُسجل أي قرار.");
+            }
+            throw directoryError(e);
+        }
+        throttle.succeeded("id:" + subject);
+        auth.markReauthenticated(actor.sessionId(), actor.personId(), clock.instant(), null);
+        return ResponseEntity.noContent().build();
+    }
+
+    private static ApiException directoryError(DirectoryAuthenticator.DirectoryException e) {
+        return switch (e.failure()) {
+            case INVALID_CREDENTIALS -> new ApiException(ErrorCode.IDENTITY_SIGN_IN_FAILED, "اسم المستخدم أو كلمة المرور غير صحيحة.");
+            case AMBIGUOUS -> new ApiException(ErrorCode.IDENTITY_NOT_LINKED,
+                    "اسم المستخدم يطابق أكثر من حساب في الدليل؛ أُحيل الأمر إلى مسؤول الصلاحيات.", Map.of("reason", "AMBIGUOUS"));
+            case TLS -> new ApiException(ErrorCode.DIRECTORY_TLS_FAILED,
+                    "تعذر تأمين الاتصال بالدليل المؤسسي؛ لم تُرسل بيانات الدخول. أبلغ الدعم الفني.");
+            case NOT_CONFIGURED -> new ApiException(ErrorCode.IDENTITY_PROVIDER_NOT_CONFIGURED, "الدخول اليدوي غير مهيأ في هذه البيئة.");
+            case UNAVAILABLE -> new ApiException(ErrorCode.DIRECTORY_UNAVAILABLE, "الدليل المؤسسي غير متاح الآن؛ حاول لاحقاً.");
+        };
     }
 
     @GetMapping("/auth/oidc/start")
@@ -121,12 +210,16 @@ public class AuthController {
 
     @PostMapping("/auth/logout")
     public ResponseEntity<Map<String, Object>> logout(Actor actor) {
-        String idToken = auth.logout(actor);
+        AuthService.Ended ended = auth.logout(actor);
         ResponseCookie cookie = ResponseCookie.from(SessionFilter.COOKIE, "").httpOnly(true).secure(props.secureCookie())
                 .sameSite("Strict").path("/").maxAge(0).build();
-        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(Map.of("redirect", oidc.endSessionUrl(idToken)));
+        // A provider session is ended at the provider, which returns to the sign-in page; a directory session returns directly.
+        String redirect = ended.idToken() != null && !directory.issuer().equals(ended.issuer())
+                ? oidc.endSessionUrl(ended.idToken()) : SIGNED_OUT;
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(Map.of("redirect", redirect));
     }
+
+    static final String SIGNED_OUT = "/?signed-out=1";
 
     // ---- identities waiting for an access manager ---------------------------------------------------------------
 
@@ -160,6 +253,7 @@ public class AuthController {
         me.put("permissions", ctx.permissions());
         me.put("summaryOnly", ctx.summaryOnly());
         me.put("grants", grants(ctx));
+        me.put("signInMethod", directory.issuer().equals(auth.issuer(actor.sessionId()).orElse(null)) ? "DIRECTORY" : "PROVIDER");
         me.put("serverTime", clock.instant().toString());
         me.put("timezone", policies.settings().timezone());
         return me;

@@ -1,0 +1,15 @@
+# Acceptance test environment ONLY: fictional organisations, HR mirror rows, people, grants and facilities.
+services:
+  # Fictional organisations, HR mirror rows, people, grants and facilities (runs once the backend has migrated).
+  test-seed:
+    image: postgres:17.11-alpine
+    restart: "no"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${MOVER_DB_PASSWORD}
+    volumes:
+      - ./ops/test-env/seed.sql:/seed.sql:ro
+    entrypoint: ["psql", "-h", "db", "-U", "mover", "-d", "mover", "-v", "ON_ERROR_STOP=1", "-q", "-f", "/seed.sql"]
+    networks: [internal]

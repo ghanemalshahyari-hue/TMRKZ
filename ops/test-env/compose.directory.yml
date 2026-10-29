@@ -1,0 +1,27 @@
+# Test environments ONLY — never part of a production deployment.
+# A fictional directory (OpenLDAP over StartTLS with a test CA) for both sign-in paths: automatic (browser → Keycloak →
+# LDAP → TMRKZ) and manual (TMRKZ → LDAP). Used by ops/test-env/up.sh (with compose.data.yml) and by
+# ops/test-env/clean-install.sh (without it). Certificates and passwords are generated under ops/test-env/.generated/.
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    restart: unless-stopped
+    command: --copy-service
+    environment:
+      LDAP_ORGANISATION: "TMRKZ Test"
+      LDAP_DOMAIN: "tmrkz.test"
+      LDAP_ADMIN_PASSWORD: ${TEST_LDAP_ADMIN_PASSWORD:?run ops/test-env/up.sh}
+      LDAP_TLS: "true"
+      LDAP_TLS_CRT_FILENAME: ldap.crt
+      LDAP_TLS_KEY_FILENAME: ldap.key
+      LDAP_TLS_CA_CRT_FILENAME: ca.crt
+      LDAP_TLS_VERIFY_CLIENT: never
+    volumes:
+      - ./ops/test-env/.generated/certs:/container/service/slapd/assets/certs
+      - ./ops/test-env/.generated/ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom
+    networks: [internal]
+
+  keycloak:
+    depends_on:
+      openldap:
+        condition: service_started

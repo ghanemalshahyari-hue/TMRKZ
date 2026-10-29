@@ -84,6 +84,13 @@
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+    <!-- In-memory LDAP directory with StartTLS for the manual sign-in tests (test scope only). -->
+    <dependency>
+      <groupId>com.unboundid</groupId>
+      <artifactId>unboundid-ldapsdk</artifactId>
+      <version>7.0.3</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

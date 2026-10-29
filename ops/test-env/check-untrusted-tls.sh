@@ -10,7 +10,7 @@ G=ops/test-env/.generated
 export TEST_LDAP_ADMIN_PASSWORD="$(cat "$G/ldap-admin-password")"
 export LDAP_URL="ldap://openldap:389" LDAP_START_TLS="true" LDAP_BIND_DN="cn=admin,dc=tmrkz,dc=test"
 export LDAP_BIND_CREDENTIAL="$TEST_LDAP_ADMIN_PASSWORD" LDAP_USERS_DN="ou=people,dc=tmrkz,dc=test"
-compose() { docker compose -p tmrkz-test -f docker-compose.yml -f ops/test-env/compose.acceptance.yml "$@"; }
+compose() { docker compose -p tmrkz-test -f docker-compose.yml -f ops/test-env/compose.directory.yml -f ops/test-env/compose.data.yml "$@"; }
 ready() {
   i=0
   until [ "$(curl -s -o /dev/null -w '%{http_code}' "${MOVER_URL:-http://localhost:8088}/auth/realms/tmrkz/.well-known/openid-configuration")" = 200 ]; do

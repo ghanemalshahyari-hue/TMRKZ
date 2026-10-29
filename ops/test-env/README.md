@@ -8,7 +8,8 @@ sh ops/test-env/up.sh                 # builds and starts TMRKZ + Keycloak + a f
 cat ops/test-env/.generated/user-password
 ```
 
-Open `http://localhost:8088` and choose **الدخول بالحساب المؤسسي**. Keycloak shows the TMRKZ sign-in page. The
+Open `http://localhost:8088` and choose either **الدخول الآلي بالحساب المؤسسي** (Keycloak) or **إدخال اسم المستخدم
+وكلمة المرور يدوياً** (checked by the directory). Keycloak shows the TMRKZ sign-in page. The
 directory (OpenLDAP, StartTLS with a test CA that only this environment trusts) verifies the password, and TMRKZ links
 the account to the fictional HR record whose domain account equals the login name.
 
@@ -29,6 +30,6 @@ the account to the fictional HR record whose domain account equals the login nam
 
 All users share the password in `ops/test-env/.generated/user-password`. The directory administrator password and the
 test CA are also there. Everything under `.generated/` is git-ignored and is regenerated if deleted. To stop, run
-`docker compose -p tmrkz-test -f docker-compose.yml -f ops/test-env/compose.acceptance.yml down` (add `-v` to delete the data).
+`docker compose -p tmrkz-test -f docker-compose.yml -f ops/test-env/compose.directory.yml -f ops/test-env/compose.data.yml down` (add `-v` to delete the data).
 
 The organisations, people and facilities are fictional and illustrative; they do not describe any real site.

@@ -99,7 +99,8 @@ public class ExecutionService {
                 .param("id", taskId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         UUID requestId = (UUID) t.get("request_id");
         RequestScope scope = access.requestScope(requestId);
-        Grant grant = ctx.executionGrant((String) t.get("role_code"), (UUID) t.get("target_org_id"), scope).orElse(null);
+        Grant grant = ctx.executionGrant((String) t.get("role_code"), (UUID) t.get("target_org_id"), scope)
+                .filter(g -> ctx.assignedToMe((UUID) t.get("assigned_person_id"), (Boolean) t.get("awaiting_assignment"))).orElse(null);
         if (grant == null) {
             if (ctx.viewLevel(scope) == ae.mover.access.ViewLevel.NONE) {
                 throw ApiException.notFound();

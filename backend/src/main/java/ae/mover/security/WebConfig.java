@@ -16,7 +16,7 @@ import ae.mover.common.ApiException;
 import ae.mover.common.ErrorCode;
 
 @Configuration
-@EnableConfigurationProperties({SecurityProperties.class, OidcProperties.class})
+@EnableConfigurationProperties({SecurityProperties.class, OidcProperties.class, LdapProperties.class})
 public class WebConfig implements WebMvcConfigurer {
 
     @Override

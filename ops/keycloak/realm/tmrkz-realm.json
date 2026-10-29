@@ -47,11 +47,11 @@
       "webOrigins": [],
       "attributes": {
         "pkce.code.challenge.method": "S256",
-        "post.logout.redirect.uris": "${TMRKZ_PUBLIC_URL}/",
+        "post.logout.redirect.uris": "${TMRKZ_PUBLIC_URL}/##${TMRKZ_PUBLIC_URL}/?signed-out=1",
         "use.refresh.tokens": "false",
         "backchannel.logout.session.required": "true"
       },
-      "defaultClientScopes": ["profile"],
+      "defaultClientScopes": ["basic", "profile"],
       "optionalClientScopes": [],
       "protocolMappers": [
         {

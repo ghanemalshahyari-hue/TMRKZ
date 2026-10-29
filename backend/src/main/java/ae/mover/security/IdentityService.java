@@ -2,6 +2,7 @@ package ae.mover.security;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,16 +48,42 @@ public class IdentityService {
     /** Returns the linked person, linking on first sign-in when unambiguous; otherwise records an issue and refuses. */
     @Transactional(noRollbackFor = ApiException.class)
     public UUID resolve(OidcClient.Identity id) {
-        UUID linked = jdbc.sql("select person_id from identity_link where issuer = :i and subject = :s")
-                .param("i", id.issuer()).param("s", id.subject()).query(UUID.class).optional().orElse(null);
+        Map<String, Object> linked = jdbc.sql("""
+                select il.id, il.person_id, p.bootstrap from identity_link il join person p on p.id = il.person_id
+                where il.issuer = :i and il.subject = :s""")
+                .param("i", id.issuer()).param("s", id.subject()).query().listOfRows().stream().findFirst().orElse(null);
         if (linked != null) {
-            return linked;
+            UUID person = (UUID) linked.get("person_id");
+            if (Boolean.TRUE.equals(linked.get("bootstrap"))) {
+                Match m = match(id);
+                if (m.person() != null) {
+                    return replaceBootstrap((UUID) linked.get("id"), person, m.person());
+                }
+            }
+            return person;
         }
+        Match m = match(id);
+        if (m.person() != null) {
+            link(m.person(), id.issuer(), id.subject(), "ENTERPRISE_KEY", null);
+            return m.person();
+        }
+        UUID boot = bootstrap(id);
+        if (boot != null) {
+            return boot;
+        }
+        throw refuse(id, m.reason(), m.message());
+    }
+
+    /** Either the one HR person the identity belongs to, or why there is none. */
+    record Match(UUID person, String reason, String message) {
+    }
+
+    private Match match(OidcClient.Identity id) {
         if (id.enterpriseKey() == null) {
-            throw refuse(id, "NO_KEY", "لا يحمل حسابك مفتاح الربط المؤسسي في الدليل؛ أُحيل الدخول إلى مسؤول الصلاحيات.");
+            return new Match(null, "NO_KEY", "لا يحمل حسابك مفتاح الربط المؤسسي في الدليل؛ أُحيل الدخول إلى مسؤول الصلاحيات.");
         }
         if (hr.stale()) {
-            throw refuse(id, "STALE_SOURCE", "بيانات الموارد البشرية غير محدثة ضمن السياسة؛ لا يُربط حساب جديد حتى تنجح المزامنة.");
+            return new Match(null, "STALE_SOURCE", "بيانات الموارد البشرية غير محدثة ضمن السياسة؛ لا يُربط حساب جديد حتى تنجح المزامنة.");
         }
         // DOMAIN_ACCOUNT: the directory login name equals the HR domain account of the published snapshot (TNQL's rule);
         // EMPLOYEE_NUMBER: a directory attribute equals the HR employee number.
@@ -70,22 +97,84 @@ public class IdentityService {
                 : jdbc.sql("select id, status from person where source = 'HR' and employee_no = :k")
                         .param("k", id.enterpriseKey()).query().listOfRows();
         if (matches.isEmpty()) {
-            throw refuse(id, "NO_MATCH", "لم يُعثر على سجلك في مصدر الموارد البشرية؛ أُحيل الدخول إلى مسؤول الصلاحيات.");
+            return new Match(null, "NO_MATCH", "لم يُعثر على سجلك في مصدر الموارد البشرية؛ أُحيل الدخول إلى مسؤول الصلاحيات.");
         }
         if (matches.size() > 1) {
-            throw refuse(id, "AMBIGUOUS", "مفتاح الربط يطابق أكثر من سجل؛ لا يُربط آلياً وأُحيل إلى مسؤول الصلاحيات.");
+            return new Match(null, "AMBIGUOUS", "مفتاح الربط يطابق أكثر من سجل؛ لا يُربط آلياً وأُحيل إلى مسؤول الصلاحيات.");
         }
         UUID person = (UUID) matches.get(0).get("id");
         if (!"ACTIVE".equals(matches.get(0).get("status"))) {
-            throw refuse(id, "INACTIVE", "سجلك غير نشط في مصدر الموارد البشرية.");
+            return new Match(null, "INACTIVE", "سجلك غير نشط في مصدر الموارد البشرية.");
         }
         boolean taken = jdbc.sql("select count(*) from identity_link where person_id = :p and issuer = :i")
                 .param("p", person).param("i", id.issuer()).query(Integer.class).single() > 0;
         if (taken) {
-            throw refuse(id, "ALREADY_LINKED", "سجل الموارد البشرية مرتبط بحساب آخر؛ أُحيل الدخول إلى مسؤول الصلاحيات.");
+            return new Match(null, "ALREADY_LINKED", "سجل الموارد البشرية مرتبط بحساب آخر؛ أُحيل الدخول إلى مسؤول الصلاحيات.");
         }
-        link(person, id.issuer(), id.subject(), "ENTERPRISE_KEY", null);
+        return new Match(person, null, null);
+    }
+
+    /**
+     * First administrator of an empty installation: only for a login registered by the host operator
+     * (ops/bootstrap-admin.sh), within 24 hours, and only while no active system administrator exists. The password was
+     * verified by the directory or the identity provider before this point.
+     */
+    private UUID bootstrap(OidcClient.Identity id) {
+        String login = id.username() == null ? null : id.username().trim().toLowerCase(java.util.Locale.ROOT);
+        if (login == null || login.isEmpty()) {
+            return null;
+        }
+        Instant now = clock.instant();
+        Map<String, Object> request = jdbc.sql("""
+                select login from bootstrap_admin where login = :l and used_at is null and expires_at > :now for update""")
+                .param("l", login).param("now", Db.ts(now)).query().listOfRows().stream().findFirst().orElse(null);
+        if (request == null) {
+            return null;
+        }
+        int admins = jdbc.sql("""
+                select count(*) from membership m join person p on p.id = m.person_id and p.status = 'ACTIVE'
+                where m.role_code = 'SYSTEM_ADMIN' and m.valid_from <= :now and (m.valid_to is null or m.valid_to > :now)""")
+                .param("now", Db.ts(now)).query(Integer.class).single();
+        if (admins > 0) {
+            audit.system("BOOTSTRAP_ADMIN_REFUSED", "IDENTITY", null, login, Map.of("reason", "ADMIN_EXISTS"));
+            return null;
+        }
+        UUID org = jdbc.sql("select id from organization where status = 'ACTIVE' order by (parent_id is null) desc, created_at limit 1")
+                .query(UUID.class).optional().orElse(null);
+        if (org == null) {
+            org = UUID.randomUUID();
+            jdbc.sql("insert into organization(id, code, name, valid_from) values (:id, 'LOCAL-ROOT', 'المؤسسة (تهيئة أولى)', :now)")
+                    .param("id", org).param("now", Db.ts(now)).update();
+        }
+        UUID person = UUID.randomUUID();
+        jdbc.sql("""
+                insert into person(id, employee_no, display_name, status, source, bootstrap)
+                values (:id, :e, :n, 'ACTIVE', 'LOCAL', true)""")
+                .param("id", person).param("e", "BOOTSTRAP-" + login).param("n", id.displayName() == null ? login : id.displayName()).update();
+        jdbc.sql("""
+                insert into membership(id, person_id, organization_id, role_code, position_title, valid_from, valid_to, follows_affiliation)
+                values (:id, :p, :o, 'SYSTEM_ADMIN', 'مدير التهيئة الأولى', :now, :until, false)""")
+                .param("id", UUID.randomUUID()).param("p", person).param("o", org).param("now", Db.ts(now))
+                .param("until", Db.ts(now.plus(java.time.Duration.ofHours(72)))).update();
+        link(person, id.issuer(), id.subject(), "BOOTSTRAP", null);
+        jdbc.sql("update bootstrap_admin set used_at = :now, person_id = :p where login = :l")
+                .param("now", Db.ts(now)).param("p", person).param("l", login).update();
+        audit.system("BOOTSTRAP_ADMIN_CREATED", "PERSON", person.toString(), id.displayName(), Map.of("login", login, "validHours", 72));
         return person;
+    }
+
+    /** The HR record now exists: the identity moves to it and the temporary administrator grant ends. */
+    private UUID replaceBootstrap(UUID linkId, UUID bootstrapPerson, UUID hrPerson) {
+        Instant now = clock.instant();
+        jdbc.sql("update identity_link set person_id = :p, method = 'ENTERPRISE_KEY', linked_at = :now where id = :id")
+                .param("p", hrPerson).param("now", Db.ts(now)).param("id", linkId).update();
+        jdbc.sql("""
+                update membership set valid_to = greatest(:now, valid_from + interval '1 second'), ended_reason = 'BOOTSTRAP_REPLACED'
+                where person_id = :p and (valid_to is null or valid_to > :now)""")
+                .param("now", Db.ts(now)).param("p", bootstrapPerson).update();
+        jdbc.sql("update person set status = 'DISABLED' where id = :p").param("p", bootstrapPerson).update();
+        audit.system("BOOTSTRAP_ADMIN_REPLACED", "PERSON", hrPerson.toString(), null, Map.of("bootstrapPerson", bootstrapPerson.toString()));
+        return hrPerson;
     }
 
     private void link(UUID person, String issuer, String subject, String method, UUID by) {

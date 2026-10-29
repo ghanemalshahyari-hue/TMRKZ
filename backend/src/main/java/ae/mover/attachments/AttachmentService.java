@@ -61,9 +61,10 @@ public class AttachmentService {
         String status = (String) r.get("status");
         boolean creatorEditing = ctx.mayModify((UUID) r.get("created_by"), (UUID) r.get("owner_org_id"), status);
         boolean evidence = "APPROVED".equals(status) && "evidence".equals(fieldId)
-                && jdbc.sql("select role_code, target_org_id from execution_task where request_id = :r and status = 'OPEN'")
+                && jdbc.sql("select role_code, target_org_id, assigned_person_id, awaiting_assignment from execution_task where request_id = :r and status = 'OPEN'")
                 .param("r", requestId).query().listOfRows().stream()
-                .anyMatch(t -> ctx.executionGrant((String) t.get("role_code"), (UUID) t.get("target_org_id"), scope).isPresent());
+                .anyMatch(t -> ctx.executionGrant((String) t.get("role_code"), (UUID) t.get("target_org_id"), scope).isPresent()
+                        && ctx.assignedToMe((UUID) t.get("assigned_person_id"), (Boolean) t.get("awaiting_assignment")));
         if (!creatorEditing && !evidence) {
             throw ApiException.forbidden("لا يمكن إضافة مرفقات لهذا الطلب في حالته الحالية.");
         }

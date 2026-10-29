@@ -26,10 +26,12 @@ public class HrController {
 
     private final AccessService access;
     private final HrAdminService hr;
+    private final TaskRealignment realignment;
 
-    public HrController(AccessService access, HrAdminService hr) {
+    public HrController(AccessService access, HrAdminService hr, TaskRealignment realignment) {
         this.access = access;
         this.hr = hr;
+        this.realignment = realignment;
     }
 
     public record SyncInput(String overrideReason) {
@@ -112,6 +114,23 @@ public class HrController {
     @PostMapping("/position-seats/{id}/deactivate")
     public ResponseEntity<Void> deactivateSeat(Actor actor, @PathVariable UUID id, @RequestBody(required = false) ReasonInput in) {
         hr.deactivateSeat(access.context(actor), id, in == null ? null : in.reason());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/task-reassignments")
+    public List<Map<String, Object>> pendingReassignments(Actor actor) {
+        return realignment.pending(access.context(actor));
+    }
+
+    @GetMapping("/task-reassignments/{id}/candidates")
+    public Map<String, Object> reassignmentCandidates(Actor actor, @PathVariable UUID id, @RequestParam(required = false) String q,
+                                                      @RequestParam(required = false) Integer page) {
+        return realignment.candidates(access.context(actor), id, q, page == null ? 0 : page);
+    }
+
+    @PostMapping("/task-reassignments/{id}/assign")
+    public ResponseEntity<Void> assignTask(Actor actor, @PathVariable UUID id, @RequestBody TaskRealignment.AssignInput in) {
+        realignment.assign(access.context(actor), id, in);
         return ResponseEntity.noContent().build();
     }
 
