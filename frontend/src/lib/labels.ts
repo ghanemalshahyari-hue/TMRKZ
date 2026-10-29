@@ -130,6 +130,8 @@ export const INTEGRATION_STATUS: Record<string, [string, string]> = {
   NOT_CONNECTED: ['غير مربوط', 'orange'],
   FILE_IMPORT: ['استيراد ملف', 'blue'],
   BUILT_IN: ['مدمج', 'green'],
+  CONFIGURED: ['مهيأ — لم يُختبر بنجاح', 'orange'],
+  CONNECTED: ['مربوط ومُزامَن', 'green'],
 };
 
 export const SIGNATURE_DISCLAIMER = 'توثيق داخلي — ليس توقيعاً رقمياً بشهادة';

@@ -52,14 +52,39 @@ public class IntegrationService {
                 new Connector("ORG_STRUCTURE", "الهيكل التنظيمي", "FILE_IMPORT",
                         "استيراد ملف (رمز، اسم، رمز الجهة الأم) مع تحقق ومعاينة قبل الحفظ. المزامنة الآلية غير مربوطة.",
                         lastRun("ORG_STRUCTURE")),
-                new Connector("PEOPLE", "الأشخاص والعضويات", "NOT_CONNECTED",
-                        "تُدار العضويات من شاشة الهيكل. مصدر الأشخاص المرجعي ينتظر تحديد النظام (D-04).", null),
+                hrConnector(),
                 new Connector("CORRESPONDENCE", "المراسلات", "NOT_CONNECTED",
                         "الإشعارات داخل النظام فقط. لا يُرسل أي إشعار خارجي ولا يُدّعى تسليمه.", null),
                 new Connector("SIGNATURE_PKI", "التوقيع الرقمي بشهادة", "NOT_CONNECTED",
                         "القرار D-02 مفتوح. نمط PKI يرفض الاعتماد برسالة واضحة حتى ربط مزود الشهادات.", null),
                 new Connector("MALWARE_SCAN", "فحص المرفقات", "BUILT_IN",
                         "فحص مدمج للنوع الفعلي والتوقيعات المعروفة (EICAR، الماكرو، محتوى PDF النشط). ماسح خارجي غير مربوط.", null));
+    }
+
+    /**
+     * Status of the HR mirror as measured, never assumed: CONNECTED only after a successful sync from the configured
+     * source; CONFIGURED when settings exist but no sync has succeeded; NOT_CONNECTED otherwise.
+     */
+    private Connector hrConnector() {
+        Map<String, Object> src = jdbc.sql("select enabled, last_success_at, last_connection_ok from hr_source order by created_at limit 1")
+                .query().listOfRows().stream().findFirst().orElse(null);
+        Map<String, Object> run = jdbc.sql("select id, status, started_at from hr_sync_run order by started_at desc limit 1")
+                .query((rs, n) -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", rs.getString("id"));
+                    m.put("status", rs.getString("status"));
+                    m.put("startedAt", Db.iso(rs, "started_at"));
+                    return m;
+                }).optional().orElse(null);
+        if (src == null) {
+            return new Connector("PEOPLE", "مصدر الموارد البشرية (الجهات والأشخاص)", "NOT_CONNECTED",
+                    "قراءة فقط من عروض الموارد البشرية بعقد تنقل، مزامنة كل ساعة. لم تُدخل إعدادات المصدر بعد.", null);
+        }
+        boolean synced = src.get("last_success_at") != null;
+        return new Connector("PEOPLE", "مصدر الموارد البشرية (الجهات والأشخاص)", synced ? "CONNECTED" : "CONFIGURED",
+                synced ? "مرآة للقراءة فقط تُحدّث كل ساعة؛ آخر نجاح " + Db.toInstant(src.get("last_success_at"))
+                        : "الإعدادات محفوظة ولم تنجح مزامنة بعد" + (Boolean.FALSE.equals(src.get("last_connection_ok")) ? "؛ فشل آخر اختبار اتصال." : "."),
+                run);
     }
 
     private Map<String, Object> lastRun(String connector) {

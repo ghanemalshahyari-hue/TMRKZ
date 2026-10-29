@@ -46,7 +46,9 @@ import ae.mover.workflow.WorkflowService;
         "mover.signature.attestation-key=test-attestation-key-0123456789abcdef-0123",
         "mover.demo.mode=false",
         "mover.demo.seed=false",
-        "mover.outbox.enabled=false"})
+        "mover.outbox.enabled=false",
+        "tmrkz.hr.settings-key=test-hr-settings-key-0123456789abcdef-0123",
+        "tmrkz.hr.scheduler-enabled=false"})
 public abstract class IntegrationTest {
 
     protected static final String PASSWORD = "Test#Pass-2026";
@@ -253,6 +255,11 @@ public abstract class IntegrationTest {
         public Res patch(String path, Object body) {
             return send(HttpRequest.newBuilder(URI.create(url(path))).header("Content-Type", "application/json")
                     .header("X-Requested-With", "mover").method("PATCH", HttpRequest.BodyPublishers.ofString(write(body))));
+        }
+
+        public Res put(String path, Object body) {
+            return send(HttpRequest.newBuilder(URI.create(url(path))).header("Content-Type", "application/json")
+                    .header("X-Requested-With", "mover").PUT(HttpRequest.BodyPublishers.ofString(write(body))));
         }
 
         public Res upload(UUID requestId, String fieldId, String fileName, byte[] content) {

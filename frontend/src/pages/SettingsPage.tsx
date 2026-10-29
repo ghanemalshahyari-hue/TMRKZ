@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Integration, OrgImportPreview, PolicyVersion, Settings, SystemInfo } from '../api/types';
 import { Heading, KeyValue } from '../components/ui';
+import { HrSourcePanel } from '../components/HrSourcePanel';
 import { useApp } from '../lib/app';
 import { formatBytes, fullTime } from '../lib/dates';
 import { INTEGRATION_STATUS } from '../lib/labels';
@@ -162,6 +163,7 @@ export function SettingsPage() {
             «غير مربوط» يعني أن الواجهة والعقد جاهزان دون اتصال فعلي؛ لا يعرض النظام اتصالاً وهمياً ناجحاً.
           </p>
         </section>
+        {app.can('CONFIGURE') && <HrSourcePanel />}
         <section className="card padding">
           <h2>استيراد الهيكل التنظيمي</h2>
           <p className="micro muted" style={{ margin: '12px 0' }}>

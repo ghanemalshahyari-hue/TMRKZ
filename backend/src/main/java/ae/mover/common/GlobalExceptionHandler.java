@@ -55,6 +55,17 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.RESOURCE_NOT_FOUND, "المسار غير موجود.", Map.of());
     }
 
+    /** The database refuses changes to fields that come from HR (trigger {@code hr_fields_read_only}). */
+    @ExceptionHandler(org.springframework.dao.DataAccessException.class)
+    public ResponseEntity<ErrorResponse> data(org.springframework.dao.DataAccessException e) {
+        String cause = e.getMostSpecificCause().getMessage();
+        if (cause != null && cause.contains("HR_FIELD_READ_ONLY")) {
+            return respond(ErrorCode.HR_FIELD_READ_ONLY,
+                    "هذه البيانات مصدرها الموارد البشرية وتُحدّث بالمزامنة فقط؛ استخدم الإضافات المحلية للاسم المعروض والوسوم.", Map.of());
+        }
+        return unexpected(e);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> unexpected(Exception e) {
         log.error("Unhandled error", e);

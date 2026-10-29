@@ -43,3 +43,6 @@
 .data-table td input[type=text],.data-table td input:not([type]),.data-table td input[type=number]{padding:5px 7px;font-size:11px}
 
 @media(max-width:700px){.notif-pop{left:auto;right:-120px;width:290px}}
+/* HR source administration */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:0 14px}
+.form-grid .field input,.form-grid .field select{width:100%}

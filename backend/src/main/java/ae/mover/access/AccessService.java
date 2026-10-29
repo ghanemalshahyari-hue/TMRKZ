@@ -76,6 +76,18 @@ public class AccessService {
                 where d.delegate_id = :pid and d.revoked_at is null
                   and d.valid_from <= :at and d.valid_to > :at
                   and m.valid_from <= :at and (m.valid_to is null or m.valid_to > :at)
+                union all
+                -- responsibility seats: the role follows whoever currently holds the HR position in the organisation
+                select null::uuid, null::uuid, null,
+                       r.code, r.name, r.permissions, r.scope, r.summary_only,
+                       o.id, o.name, s.id, s.name, null::timestamptz
+                from affiliation a
+                join position_seat ps on ps.organization_id = a.organization_id and ps.position_id = a.position_id and ps.active
+                join role_def r on r.code = ps.role_code
+                join organization o on o.id = ps.organization_id and o.status = 'ACTIVE'
+                left join site s on s.id = ps.site_scope_id
+                join person p on p.id = a.person_id and p.status = 'ACTIVE'
+                where a.person_id = :pid and a.valid_from <= :at and (a.valid_to is null or a.valid_to > :at)
                 order by 2 nulls first, 4""")
                 .param("pid", actor.personId()).param("at", Db.ts(at))
                 .query().listOfRows();

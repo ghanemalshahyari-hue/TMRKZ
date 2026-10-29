@@ -134,3 +134,33 @@ VIEW_SOURCE_IDENTIFIERS`; none implies another.
 
 ADR-004 (in-process authorisation) remains in force until OpenFGA is introduced in phase 3 of the production
 programme; the action model above is the contract the OpenFGA model must reproduce.
+
+## ADR-014 Read-only HR mirror compatible with TNQL — Accepted (2026-10-29)
+
+Owner decision: organisations and people come from the same Oracle views as TNQL, read only, hourly. Details and the
+mapping to the reference files are in `docs/TNQL_COMPATIBILITY.md`.
+
+- **Contract.** Canonical fields are fixed in `HrMapping`; source columns come from a published, immutable mapping
+  version (`hr_mapping_version`, trigger-enforced). Publishing requires every required field to be mapped to a column
+  that the view metadata actually reports. Health, passport, contact, rank and similar data cannot be mapped.
+- **Reading.** `HrSourceAdapter` opens one `SET TRANSACTION READ ONLY` transaction, reads metadata with
+  `SELECT * ... WHERE 1 = 0` and streams `SELECT "col", ... FROM view` in batches, then rolls back. Identifiers are
+  pattern checked and taken from metadata. The JDBC thin driver `ojdbc10` 19.27.0.0 was chosen for the widest server
+  range (11.2-21c); the enterprise database version is still to be confirmed.
+- **Snapshots.** Each run loads a STAGING snapshot (`hr_unit`, `hr_person`), validates keys, duplicates, orphans,
+  cycles and ambiguous employee numbers, applies the drop protection, then in one transaction marks it PUBLISHED and
+  projects it. Readers always see one complete version; earlier snapshots are kept for diagnosis (three by default).
+- **Projection.** Organisations and people are matched by source id (`source`, `source_external_id`). HR fields are
+  read-only outside the projection (database triggers; the API answers `HR_FIELD_READ_ONLY`). Local additions live in
+  `local_metadata`, `site_responsibility`, `membership` and `position_seat`, and survive every sync. HR affiliation is
+  dated and separate from grants (`affiliation`).
+- **Changes of affiliation.** A transfer ends grants that `follow_affiliation` and no longer contain the new
+  organisation. Leaving the service ends all grants and delegations and deletes sessions. Access is re-evaluated on
+  every request, so the next action is already refused. Responsibility seats (`position_seat`) give a role to whoever
+  holds an HR position in an organisation. Open tasks are role-pooled, so `TaskRealignment` records each task an
+  affected person could act on and can no longer act on: it notifies the sole new holder, or routes the task to the
+  organisation's access managers when nobody is left. Past decisions are never re-attributed.
+- **One run at a time.** A PostgreSQL advisory lock (shared by the schedule and the manual button) plus a busy flag;
+  a run that finds the lock taken is SKIPPED; a run left RUNNING after a crash is closed as INTERRUPTED.
+- **Testing.** The acceptance suite runs this exact code against fictional views behind a SELECT-only login role. The
+  connection to the enterprise Oracle is a separate, still-open integration step.

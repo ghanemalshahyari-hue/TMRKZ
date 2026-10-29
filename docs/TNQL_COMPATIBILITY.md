@@ -1,0 +1,45 @@
+# TNQL compatibility memo — HR source, identity and sign-in
+
+Reference: the TNQL ("mover") repository, read only, at commit `247d6a9` (28 Oct 2026). Nothing in that repository,
+its containers, databases or data was changed. This memo is public: it names the reference files and describes the
+contract, but it deliberately omits internal view names, source column names, directory attribute names, hostnames
+and any personal data. Those values are configuration that operations deliver to an installation through an
+authorised channel. They never enter this repository.
+
+TMRKZ is Java/Spring and TNQL is Python/Flask. TMRKZ re-implements the same read contract in Java. It does not embed
+TNQL or its runtime.
+
+## What is reused, where it comes from, why it differs, how it is proven
+
+| Part | Reference file(s) | TMRKZ implementation | Adaptation and reason | Proof |
+|---|---|---|---|---|
+| Canonical fields fixed in code, source columns from a published mapping version (draft → published → superseded) | `app/hr_mapping.py` | `hr/HrMapping.java`, `hr_mapping_version` (V3), `HrAdminService.saveDraft/discover/publish` | Same model. TMRKZ's canonical list is a strict subset: identity, affiliation, status and position only. Contact, rank, gender, secondment and medical fields cannot be mapped, so they are never selected. The column layout of TNQL's v1 mapping is entered by an administrator or imported as JSON through the API, never committed. | PA-01, PA-02 (`HrSyncAcceptanceIT`) |
+| Column validation against metadata (`SELECT * … WHERE 1 = 0`), case-insensitive, required fields mapped, active-record rule | `app/hr_mirror.py` (`columns`, `probe_contract`), `hr_mapping.validate_version` | `HrSourceAdapter.Session.columns`, `HrMapping.metadataProblems/compile` | Same rules. Alternates resolve by list order (`first_non_empty`), as TNQL does today. The SELECT quotes the exact metadata spelling. View names and columns are checked against an identifier pattern on every path; TNQL checks only the live-lookup path. | PA-02 |
+| Read-only session: `SET TRANSACTION READ ONLY`, rollback on close, connect/call timeouts | `app/oracle_integration.py` (`test_connection`, `open_connection`) | `HrSourceAdapter.open`, `HrConnectionFactory` | One read-only transaction covers both views, so units and people come from the same point in time. Connect timeout maps to `oracle.net.CONNECT_TIMEOUT` and the call timeout to `oracle.jdbc.ReadTimeout` and `Statement.setQueryTimeout`. Defaults are TNQL's: 10 s and 30 000 ms. | PA-01 |
+| Settings: host/URL (no credentials or path), port 1521, service name or SID, user name, password | `app/oracle_integration.py` (`save_oracle_config`, `_host_and_port`, `_dsn`) | `hr_source`, `HrAdminService.saveSource`, `HrConnectionFactory.url` | Same fields and validation. The password is encrypted with AES-256-GCM under `TMRKZ_HR_SETTINGS_KEY`, which belongs to TMRKZ alone; TNQL's Fernet tokens are not portable by design, so migrated settings are re-entered. Only the thin driver (`jdbc:oracle:thin`) is offered: the isolated image carries no Oracle client. TNQL defaults to thick mode, so the HR server version must be confirmed (`ojdbc10` 19.27 supports Oracle Database 11.2–21c). | `HrConnectionFactory.url` validation; enterprise connection pending |
+| Mirror protections: empty result always refused; a drop in units, people, active units or active people above max(10 %, 3) refused unless an explicit override reason is given, which is audited | `app/hr_mirror.py` (`run_sync`) | `HrSyncService.protect` | Same thresholds, configurable per source (`drop_percent`, `drop_minimum`). Only a manual run may carry an override; a scheduled one cannot. | PA-03 |
+| Failure log that survives rollback; source rows never written to logs | `app/hr_mirror.py` (run row committed as running, marked failed after rollback) | `hr_sync_run`, `HrSyncService.finish/discard` | TMRKZ loads a staging snapshot and publishes it by switching the snapshot pointer inside one transaction, where TNQL deletes and reinserts. A failed or rejected run discards its staging rows; the published snapshot stays in force. | PA-03 |
+| Interval in seconds (`TNQL_HR_SYNC_INTERVAL`, default 86 400) | `scripts/sync_hr_mirror.py`, compose | `TMRKZ_HR_SYNC_INTERVAL_SECONDS=3600` | Same unit, so a migrated value keeps its meaning. TMRKZ defaults to hourly by owner decision. | PA-04 |
+| Single run at a time | CLI file lock in TNQL; the admin buttons skip it | PostgreSQL advisory lock taken by the schedule and the manual button alike, plus an in-process busy flag | Fixes a gap found in the reference: TNQL's admin "sync now" can overlap the scheduled run. In TMRKZ a run that finds the lock taken is recorded as SKIPPED (deferred), and a run left RUNNING by a stopped worker is closed as INTERRUPTED before the next one starts. | PA-04 |
+| Mirror age policy (TNQL treats a mirror older than 30 days as unavailable) | `app/hr_mirror.py` | `hr_source.max_age_hours` (default 720 h), shown in the status panel | Same default. Which business actions require fresh source data is wired with sign-in (step 2b). | Status panel; PA-04 |
+| Projection: stable identity by source id, never by name or row position; vanished units retired, never deleted; orphans and cycles skipped and counted, never invented | `app/hr_organisation.py`, `app/hr_people.py` | `HrProjection.apply` | Same rules. Projection runs in the same publish transaction, which fixes another reference gap: TNQL projects units last, so a person moved into a brand-new unit is re-homed only on the next pass. HR fields are protected by database triggers. Local display names and tags live in `local_metadata`. | PA-05, PA-06 |
+| Ambiguity: more than one match fails closed | `app/hr_live.py` (>1 row → ambiguous) | An employee number shared by several source records is never linked automatically (issue `DUPLICATE_NUMBER`); duplicate source keys reject the run | Applied to the mirror as well; TNQL's mirror lookups take the first match. | PA-03 issues; identity linking in step 2b |
+| Organisation and subtree scoping of administration | `app/hr_access.py`, `app/effective_access.py` | `MANAGE_ACCESS` scoped by organisation subtree (`OrganizationService.addMembership`, `HrAdminService.createSeat`) | Same semantics, expressed as independent actions (ADR-013). | PA-10, PA-11 |
+| LDAP and OIDC identity link (`iss` and `sub`; directory account ↔ HR person) | `app/auth/ldap_service.py`, `identity_link.py`, `oidc.py` | Step 2b (Keycloak federation and `identity_link`) | Planned as in the reference, with TLS validation mandatory and no local-password fallback. Corrections to apply rather than copy: the LDAPS port default, and a single fixed link key instead of a fallback chain. | PA-07 (open) |
+| Sign-in page look | `app/templates/auth/login.html` | Step 2b (Keycloak theme with the TMRKZ name and mark) | The palette is taken from what the page actually renders, not only the tokens in the brief: text #2e2618, gold hairlines #b8975a, cream card, local font, reduced-motion still image. | PA-07 (open) |
+
+## Operations channel for migrating TNQL settings
+
+1. On the TNQL host, an authorised operator reads the approved source profile: the two view names, connection host,
+   port, service name or SID, and the read-only user name. They read the published mapping version (canonical field
+   → column). They do not export TNQL's encrypted password token; it cannot be decrypted with TMRKZ's key.
+2. In TMRKZ, a holder of CONFIGURE enters the profile under Settings → HR source. They type the password, which is
+   stored encrypted. Then they create the mapping draft, run **Discover columns** against the real views, and publish.
+   Publishing refuses any column the views do not have.
+3. The first run stores a snapshot only if the source is non-empty. Later runs apply the drop protection.
+
+## Open integration inputs (blocking a connected status)
+
+- Oracle address, service name or SID, a read-only account with SELECT on the two views, and the database version.
+- The approved TNQL mapping (canonical field → column) and its active-record rules.
+- A network path from the TMRKZ host to the database, with egress limited to it.

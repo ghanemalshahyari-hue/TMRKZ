@@ -50,7 +50,7 @@ docker compose up -d --build     # قاعدة البيانات + الخادم + 
 
 | المجموعة | الأمر | النتيجة الحالية |
 |---|---|---|
-| اختبارات القبول في الخادم (PostgreSQL حقيقي + HTTP) | `ops/test-backend.sh` | 36/36 ناجحة — AT-01…AT-36 |
+| اختبارات القبول في الخادم (PostgreSQL حقيقي + HTTP) | `ops/test-backend.sh` | 42/42 ناجحة — AT-01…AT-36 |
 | رحلة القبول الكاملة عبر nginx | `node tests/acceptance/journey.mjs` | 29/29 فحصاً ناجحاً، بما فيها AT-29 (دون اعتماد خارجي) |
 | الاستعادة إلى بيئة نظيفة (AT-30) | `sh ops/verify-restore.sh` | ناجحة: 20 جدولاً متطابقاً والمرفقات مطابقة للبصمة |
 | الواجهة (أنواع + وحدات) | `cd frontend && npm test && npm run build` | 17/17 ناجحة |

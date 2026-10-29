@@ -42,7 +42,7 @@ decision. Backend tests live in `backend/src/test/java/ae/mover/*IT.java`; `jour
 | R-32 | Info copies after the final decision, per-recipient access check | `OutboxProcessor.notifyInfoRecipients` | `infoCopyAndOutbox` (AT-25) | Done |
 | R-33 | Production audit trail, not editable through the API | `audit_event` + append-only triggers; read-only `GET /audit-events` | `auditImmutable` | Done |
 | R-34 | Real attachments: content, checksum, scan, scope, versions | `AttachmentService`, `ContentInspector`, content-addressed `FileStore` | `attachments` (AT-34) | Done |
-| R-35 | Integration contracts without fake connections | `IntegrationService` registry (NOT_CONNECTED), org-structure file import | `structureImport` (AT-32) | Partial — identity/people/correspondence connectors await D-04 |
+| R-35 | Integration contracts without fake connections | `IntegrationService` registry (measured status), org-structure file import, read-only HR mirror (ADR-014) | `structureImport` (AT-32), `HrSyncAcceptanceIT` | Partial — HR mirror implemented, enterprise Oracle not connected; identity and correspondence pending |
 | R-36 | Indicators with definitions | `ReportService.kpis` | `reportsAreScoped` | Done |
 | R-37 | 7,000 organisations / 200,000 people | synthetic dataset + exploratory load | `docs/PERFORMANCE.md` | Open (D-03) — exploratory only |
 | R-38 | Isolated deployment, nothing fetched at run time | compose, `ops/airgap-bundle.sh`, CSP, local assets | journey (AT-29) | Done |
@@ -97,15 +97,15 @@ is missing; nothing is simulated as connected. Evidence lists the command whose 
 
 | PA | Requirement (short) | Code | Test | Result | Evidence | Remaining limit |
 |---|---|---|---|---|---|---|
-| PA-01 | Oracle read with the TNQL contract, no DML/DDL | — | — | Open | — | Phase 2 |
-| PA-02 | Incompatible metadata/mapping refused without guessing | — | — | Open | — | Phase 2 |
-| PA-03 | Full sync, then partial/empty/large-drop result keeps the valid copy | — | — | Open | — | Phase 2 |
-| PA-04 | No overlapping runs, safe resume, hourly schedule | — | — | Open | — | Phase 2 |
-| PA-05 | Stable organisation/person identity across rename and transfer | — | — | Open | — | Phase 2 |
-| PA-06 | Original HR fields not editable; local additions survive sync | — | — | Open | — | Phase 2 |
+| PA-01 | Oracle read with the TNQL contract, no DML/DDL | `HrSourceAdapter` (read-only transaction, metadata, streamed SELECT), `HrConnectionFactory` | `HrSyncAcceptanceIT.readOnlyContract` | Pass (fictional views, SELECT-only role) | `sh ops/test-backend.sh` | Enterprise Oracle not connected: needs address, read-only account, DB version |
+| PA-02 | Incompatible metadata/mapping refused without guessing | `HrMapping.metadataProblems/compile`, `HrAdminService.publish` | `HrSyncAcceptanceIT.contractMismatch` | Pass | `sh ops/test-backend.sh` | — |
+| PA-03 | Full sync, then partial/empty/large-drop result keeps the valid copy | `HrSyncService.protect/discard`, staging snapshots | `HrSyncAcceptanceIT.protections` | Pass | `sh ops/test-backend.sh` | — |
+| PA-04 | No overlapping runs, safe resume, hourly schedule | advisory lock, `recoverInterrupted`, `@Scheduled` 3600 s | `HrSyncAcceptanceIT.noOverlap` | Pass | `sh ops/test-backend.sh` | — |
+| PA-05 | Stable organisation/person identity across rename and transfer | `HrProjection` (match by source id), `affiliation` | `HrSyncAcceptanceIT.identityAndLocalAdditions` | Pass | `sh ops/test-backend.sh` | — |
+| PA-06 | Original HR fields not editable; local additions survive sync | V3 triggers `*_hr_read_only`, `local_metadata` | `HrSyncAcceptanceIT.identityAndLocalAdditions` | Pass | `sh ops/test-backend.sh` | — |
 | PA-07 | LDAP right/wrong/down, untrusted TLS, no demo fallback | — | — | Open | — | Phase 2; enterprise LDAP and CA required |
 | PA-08 | Withdrawn membership/delegation blocks the next action, export and attachments | `AccessService.load` per request | AT-21, AT-23 | Partial | `sh ops/test-backend.sh` | Same-session revocation proven for local grants; OpenFGA path pending (Phase 3) |
-| PA-09 | Tasks move to a single substitute; ambiguous cases go to the access manager | — | — | Open | — | Phase 2/3 |
+| PA-09 | Tasks move to a single substitute; ambiguous cases go to the access manager | `position_seat`, `TaskRealignment`, `HrProjection` grant ending | `HrSyncAcceptanceIT.transferRealignsTasks` | Pass | `sh ops/test-backend.sh` | Tasks are role-pooled: with several remaining holders the pool continues (recorded POOL_CONTINUES) instead of asking the access manager to choose |
 | PA-10 | View without edit, edit without approve, administration without content | `Permission`, `AccessContext.mayModify`, `V2__independent_actions.sql`, `Bootstrap.seedRoles` | `AccessAcceptanceIT.independentActions` | Pass | `sh ops/test-backend.sh` | — |
 | PA-11 | Organisation/subtree/explicit-set scopes, org∩site intersection, access-manager bounds | `Grant.covers`, `OrganizationService.addMembership` (MANAGE_ACCESS over the organisation) | `AccessAcceptanceIT` | Partial | `sh ops/test-backend.sh` | Explicit organisation sets, OR policies and permission-subset bounds come with the studio (Phase 3) |
 | PA-12 | Availability check outside scope reveals no existence, name or requests | `SiteService.requireVisibleResources`, `MapService.check` | `AccessAcceptanceIT.availabilityOutOfScope` | Pass | `sh ops/test-backend.sh` | — |

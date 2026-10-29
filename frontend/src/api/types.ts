@@ -457,3 +457,92 @@ export type Notification = {
 };
 
 export type ApiErrorBody = { code: string; message: string; details?: Record<string, unknown>; traceId?: string };
+
+// ---- HR source (read-only mirror of the HR views) -------------------------------------------------------------
+
+export type HrRun = {
+  id: string;
+  trigger: 'SCHEDULED' | 'MANUAL';
+  status: 'RUNNING' | 'SUCCEEDED' | 'REJECTED' | 'FAILED' | 'SKIPPED';
+  startedAt: string;
+  finishedAt: string | null;
+  requestedBy: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  overrideReason: string | null;
+  counts: Record<string, unknown>;
+  issues: number;
+};
+export type HrStatus = {
+  keyConfigured: boolean;
+  configured: boolean;
+  enabled: boolean;
+  sourceName: string | null;
+  intervalSeconds: number;
+  running: boolean;
+  mappingVersion: number | null;
+  lastSuccessAt: string | null;
+  dataAgeMinutes: number | null;
+  maxAgeHours: number;
+  stale: boolean;
+  published: { units: number; people: number; activeUnits: number; activePeople: number; publishedAt: string } | null;
+  lastRun: HrRun | null;
+  nextRunAt: string | null;
+};
+export type HrSource = {
+  keyConfigured: boolean;
+  exists: boolean;
+  id?: string;
+  name?: string;
+  enabled?: boolean;
+  hostOrUrl?: string;
+  port?: number;
+  serverName?: string;
+  nameType?: 'service_name' | 'sid';
+  username?: string;
+  passwordSet?: boolean;
+  unitView?: string;
+  personView?: string;
+  connectTimeoutS?: number;
+  callTimeoutMs?: number;
+  dropPercent?: number;
+  dropMinimum?: number;
+  maxAgeHours?: number;
+  lastConnectionOk?: boolean | null;
+  lastConnectionAt?: string | null;
+  settingsReadable?: boolean;
+  settingsError?: string;
+};
+export type HrSourceInput = {
+  name: string;
+  enabled: boolean;
+  hostOrUrl: string;
+  port: number;
+  serverName: string;
+  nameType: 'service_name' | 'sid';
+  username: string;
+  password?: string;
+  unitView: string;
+  personView: string;
+  connectTimeoutS: number;
+  callTimeoutMs: number;
+  dropPercent: number;
+  dropMinimum: number;
+  maxAgeHours: number;
+};
+export type HrEntity = 'UNIT' | 'PERSON';
+export type HrCanonical = { entity: HrEntity; field: string; required: boolean; label: string };
+export type HrField = { entity: HrEntity; field: string; column: string; transform: string; alternates?: string[]; enabled: boolean };
+export type HrRule = { column: string; operator: 'EQUALS' | 'IN' | 'NOT_EQUALS'; values: string[] };
+export type HrMappingVersion = {
+  id: string;
+  version: number;
+  status: 'DRAFT' | 'PUBLISHED' | 'SUPERSEDED';
+  fields: HrField[];
+  activeRules: Partial<Record<HrEntity, HrRule>>;
+  discoveredColumns: Partial<Record<HrEntity, string[]>> | null;
+  discoveredAt: string | null;
+  publishedAt: string | null;
+  problems?: string[];
+};
+export type HrTestResult = { ok: boolean; databaseVersion?: string; unitColumns?: number; personColumns?: number; failure?: string; message?: string; elapsedMs: number };

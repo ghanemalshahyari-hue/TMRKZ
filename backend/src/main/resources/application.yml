@@ -68,3 +68,13 @@ mover:
   outbox:
     enabled: ${MOVER_OUTBOX_ENABLED:true}
     poll-ms: 2000
+
+tmrkz:
+  hr:
+    # Protects stored HR source credentials; TMRKZ's own key, never another application's.
+    settings-key: ${TMRKZ_HR_SETTINGS_KEY:}
+    # Seconds, like TNQL_HR_SYNC_INTERVAL (whose default was one day); TMRKZ defaults to hourly.
+    sync-interval-seconds: ${TMRKZ_HR_SYNC_INTERVAL_SECONDS:3600}
+    initial-delay-seconds: ${TMRKZ_HR_INITIAL_DELAY_SECONDS:60}
+    max-run-seconds: ${TMRKZ_HR_MAX_RUN_SECONDS:1800}
+    scheduler-enabled: ${TMRKZ_HR_SCHEDULER_ENABLED:true}

@@ -13,6 +13,16 @@ import type {
   ExportJob,
   FormSchema,
   FormVersion,
+  HrCanonical,
+  HrEntity,
+  HrField,
+  HrMappingVersion,
+  HrRule,
+  HrRun,
+  HrSource,
+  HrSourceInput,
+  HrStatus,
+  HrTestResult,
   Integration,
   Kpis,
   MapFeatures,
@@ -234,6 +244,20 @@ export const api = {
   previewOrgImport: (rows: { code: string; name: string; parentCode: string | null }[]) => post<OrgImportPreview>('/integrations/org-structure/preview', { rows }),
   commitOrgImport: (runId: string) => post<unknown>(`/integrations/org-structure/runs/${runId}/commit`),
   systemInfo: () => get<SystemInfo>('/system/info'),
+
+  // HR source
+  hrStatus: () => get<HrStatus>('/hr/status'),
+  hrRuns: (size = 10) => get<HrRun[]>('/hr/runs' + query({ size })),
+  hrSync: (overrideReason?: string) => post<{ runId: string }>('/hr/sync', overrideReason ? { overrideReason } : {}),
+  hrSource: () => get<HrSource>('/hr/source'),
+  saveHrSource: (input: HrSourceInput) => put<HrSource>('/hr/source', input),
+  testHrSource: () => post<HrTestResult>('/hr/source/test'),
+  hrContract: () => get<HrCanonical[]>('/hr/contract'),
+  hrMappings: () => get<HrMappingVersion[]>('/hr/mappings'),
+  saveHrDraft: (fields?: HrField[], activeRules?: Partial<Record<HrEntity, HrRule>>) =>
+    post<HrMappingVersion>('/hr/mappings/draft', fields ? { fields, activeRules } : {}),
+  discoverHrMapping: (id: string) => post<HrMappingVersion>(`/hr/mappings/${id}/discover`),
+  publishHrMapping: (id: string) => post<HrMappingVersion>(`/hr/mappings/${id}/publish`),
 
   // audit, reports, exports, notifications
   auditEvents: (page: number, size = 50) => get<Page<AuditEvent>>('/audit-events' + query({ page, size })),

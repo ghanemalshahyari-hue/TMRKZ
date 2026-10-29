@@ -23,11 +23,17 @@ Date: 29 October 2026 · Version 1.0.0
   - Step 1 done — independent actions (EDIT separate from CREATE; access, facility and configuration administration
     separate from content), requester decisions under the same stage rule, availability checks confined to scope,
     main sites on the map and occupancy (ADR-013, PA-10/12/13/14).
-  - Steps 2–7 open — Oracle HR mirror and hourly sync, Keycloak/LDAP and removal of demo sign-in, OpenFGA and the
-    permissions studio, PostGIS boundaries and the map manager, visual rule editor, DSS signatures and seals, isolated
-    bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
+  - Step 2a done — read-only HR mirror with the TNQL contract (ADR-014, `docs/TNQL_COMPATIBILITY.md`): versioned
+    column mapping validated against view metadata, hourly single-run sync with staging, drop protection and atomic
+    publish, stable projection with read-only HR fields and local additions, dated affiliations, responsibility seats,
+    grant ending and task realignment on transfer or departure, administration panel (PA-01…PA-06, PA-09).
+    The connection to the enterprise Oracle is not made: it needs the address, a read-only account and the approved
+    mapping.
+  - Steps 2b–7 open — Keycloak/LDAP and removal of demo sign-in, OpenFGA and the permissions studio, PostGIS
+    boundaries and the map manager, visual rule editor, DSS signatures and seals, isolated bundle with UI and load
+    acceptance. See the PA matrix in `TRACEABILITY.md`.
 
-Test evidence: 36 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
+Test evidence: 42 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
 17 frontend tests — see `TRACEABILITY.md`.
 
 ## Known limitations
@@ -51,7 +57,7 @@ Test evidence: 36 backend acceptance tests, a 29-check end-to-end journey throug
 |---|---|---|
 | Enterprise identity (OIDC/LDAP) | NOT_CONNECTED | Local identity adapter in use (ADR-003). |
 | Organisation structure | FILE_IMPORT | Validated import with preview; automatic sync waits for D-04. |
-| People directory | NOT_CONNECTED | Managed in the organisation screen. |
+| HR source (organisations and people) | NOT_CONNECTED until a sync succeeds | Read-only Oracle mirror implemented and tested on fictional views (ADR-014); enterprise address, account and mapping pending. |
 | Correspondence | NOT_CONNECTED | No external message is sent or claimed. |
 | PKI signature provider | NOT_CONNECTED | PKI mode fails closed (`SIGNATURE_PROVIDER_UNAVAILABLE`). |
 | Malware scanner | BUILT_IN only | See limitations. |
