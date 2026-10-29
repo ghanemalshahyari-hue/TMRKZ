@@ -1,0 +1,23 @@
+{
+  "run": "2026-10-29T09:09:19.239Z",
+  "results": [
+    {
+      "id": "RES-01",
+      "title": "A shared resource has no limit until one is set; a limit is saved and removed again",
+      "result": "PASS",
+      "detail": "بلا حد ← 5 ← بلا حد"
+    },
+    {
+      "id": "RES-02",
+      "title": "The relation with sub-resources is switched to independent and back",
+      "result": "PASS"
+    },
+    {
+      "id": "RES-03",
+      "title": "An invalid setting is refused by the server and shown in the dialog",
+      "result": "PASS"
+    }
+  ],
+  "externalRequests": [],
+  "consoleErrors": []
+}

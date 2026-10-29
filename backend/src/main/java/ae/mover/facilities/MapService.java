@@ -203,7 +203,11 @@ public class MapService {
                 String policy = (String) res.get("policy");
                 String state;
                 String reason = null;
-                if ("SHARED".equals(policy)) {
+                if ("SHARED".equals(policy) && res.get("shared_limit") != null && sharedInUse.contains(rid)
+                        && sharedPeak(rid, period) >= ((Number) res.get("shared_limit")).intValue()) {
+                    state = "BLOCKED";
+                    reason = "مورد مشترك بلغ حد الاستخدام المتزامن المهيأ (" + res.get("shared_limit") + ") خلال الفترة";
+                } else if ("SHARED".equals(policy)) {
                     state = sharedInUse.contains(rid) ? "SHARED_IN_USE" : "FREE";
                     reason = sharedInUse.contains(rid) ? "مورد مشترك مستخدم في الفترة ويبقى قابلاً للطلب" : null;
                 } else if (lockKind.containsKey(rid)) {
@@ -346,7 +350,7 @@ public class MapService {
             return out;
         }
         jdbc.sql("""
-                select id, site_id, code, name, kind, policy, parent_resource_id, handover_minutes from resource
+                select id, site_id, code, name, kind, policy, parent_resource_id, handover_minutes, shared_limit from resource
                 where status = 'ACTIVE' and site_id = any(string_to_array(:ids, ',')::uuid[]) order by code""")
                 .param("ids", Db.ids(siteIds)).query().listOfRows()
                 .forEach(r -> out.computeIfAbsent((UUID) r.get("site_id"), k -> new ArrayList<>()).add(r));
@@ -370,6 +374,11 @@ public class MapService {
                 .param("ids", Db.ids(resourceIds)).param("a", Db.ts(p.start())).param("b", Db.ts(p.end()))
                 .query((rs, n) -> out.put(Db.uuid(rs, "resource_id"), rs.getBoolean("x") ? "X" : "I")).list();
         return out;
+    }
+
+    private int sharedPeak(UUID resourceId, Period p) {
+        return jdbc.sql("select resource_shared_peak(:rid, tstzrange(:a, :b, '[)'), null)")
+                .param("rid", resourceId).param("a", Db.ts(p.start())).param("b", Db.ts(p.end())).query(Integer.class).single();
     }
 
     private Set<UUID> sharedInUse(Set<UUID> resourceIds, Period p) {

@@ -64,7 +64,7 @@ Flowable shares the application's `DataSource` and transaction manager: completi
 reservation locks, the decision, the approval document, the audit row and the outbox event commit or roll back
 together (proved by AT-10, AT-11, AT-27).
 
-## ADR-006 Reservations: scope locks under exclusion constraints — Accepted (D-08 default)
+## ADR-006 Reservations: scope locks under exclusion constraints — Accepted (D-08 default); amended by ADR-019
 
 A reservation inserts **X** locks on its resource and all descendants and **I** (intent) locks on all ancestors, each
 over `[start, end + handover)`. Two exclusion constraints forbid X/X and X/I overlaps on the same resource; I/I is
@@ -330,3 +330,25 @@ kept, but it no longer decides alone.
 - **Not done.** No explicit deny rules (grants are additive). Time-bound delegation is still created on the
   organisation page. The authorisation database is backed up and restored with the others (`openfga.dump`); a backup
   without it is rebuilt from the restored grants.
+
+## ADR-019 Parent/child relation per resource and an optional shared-use limit — Accepted (2026-10-29)
+
+Owner decisions in `docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md` §2 ("the blocking or sharing relation is set per
+resource, not a fixed rule for all sites"; "no default capacity") and §9. Amends ADR-006.
+
+- **Relation.** `resource.child_blocking` (default true = the earlier behaviour for every existing resource). When a
+  parent's relation is "independent", the scope-lock traversal does not cross the edge to its children in either
+  direction: booking the parent no longer X-locks them, and booking a child no longer I-locks the parent or anything
+  above it. The same traversal serves the final approval, period changes, the availability preview and the map.
+- **Changing it.** A facility manager over the site's organisation changes the relation, handover time, name or kind
+  (`PUT /resources/{id}`). If the relation or handover changes, the locks of every reservation on the resource's
+  ancestors, itself and its descendants are rebuilt in the same transaction; if the new rule makes approved bookings
+  overlap, the exclusion constraints refuse it and nothing changes (409 with an explanation).
+- **Shared-use limit.** `resource.shared_limit` is null (no limit) unless set, and only for SHARED resources. At final
+  approval the resource row is locked (serialising approvals of the same resource) and
+  `resource_shared_peak(resource, period, excluding)` — the highest number of overlapping active reservations in the
+  period — must stay below the limit, otherwise the approval is refused as a reservation conflict with nothing
+  recorded. A limit below the uses already approved from now on is refused. The map shows a shared resource at its
+  limit as unavailable with the reason.
+- **Interface.** «إعداد الموارد وعلاقاتها» in the site panel (facility managers): resources with policy, handover,
+  relation and limit; add a resource; edit with server-side refusal shown in place.

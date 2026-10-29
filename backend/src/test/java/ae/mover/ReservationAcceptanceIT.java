@@ -275,6 +275,92 @@ class ReservationAcceptanceIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("PA-17: the parent/child relation is set per resource; changing it re-locks bookings or is refused")
+    void configurableParentChildRelation() {
+        person("fm", role("FM", "ORGANIZATION", "MANAGE_FACILITIES", "VIEW"), orgA);
+        Api fm = login("fm");
+        Api req = login("req");
+        Api apr = login("apr");
+        UUID parent = resource("WING", siteB, null, 0);
+        UUID child = resource("WING-1", siteB, parent, 0);
+        Res independent = fm.put("/resources/" + parent, Map.of("childBlocking", false));
+        assertThat(independent.status()).isEqualTo(200);
+        assertThat(independent.body().path("childBlocking").asBoolean()).isFalse();
+        // independent: the wing and its room are booked over the same period by two requests
+        UUID c = req.submitted(finalType, orgA, List.of(child), day("2028-02-01"), day("2028-02-05"));
+        assertThat(apr.approve(apr.taskFor(c), 1).status()).isEqualTo(200);
+        UUID p = req.submitted(finalType, orgA, List.of(parent), day("2028-02-03"), day("2028-02-06"));
+        assertThat(apr.approve(apr.taskFor(p), 1).status()).isEqualTo(200);
+        // making the wing block its rooms would make the two approved bookings overlap: refused, nothing changes
+        Res refused = fm.put("/resources/" + parent, Map.of("childBlocking", true));
+        assertThat(refused.code()).isEqualTo("RESERVATION_CONFLICT");
+        assertThat(jdbc.sql("select child_blocking from resource where id = :id").param("id", parent).query(Boolean.class).single()).isFalse();
+
+        // without overlapping bookings the change is applied and the new rule binds the existing bookings' locks
+        UUID parent2 = resource("WING2", siteB, null, 0);
+        UUID child2 = resource("WING2-1", siteB, parent2, 0);
+        assertThat(fm.put("/resources/" + parent2, Map.of("childBlocking", false)).status()).isEqualTo(200);
+        UUID onlyWing = req.submitted(finalType, orgA, List.of(parent2), day("2028-03-01"), day("2028-03-05"));
+        assertThat(apr.approve(apr.taskFor(onlyWing), 1).status()).isEqualTo(200);
+        assertThat(jdbc.sql("select count(*) from reservation_lock where resource_id = :id").param("id", child2).query(Integer.class).single()).isZero();
+        assertThat(fm.put("/resources/" + parent2, Map.of("childBlocking", true)).status()).isEqualTo(200);
+        assertThat(jdbc.sql("select count(*) from reservation_lock where resource_id = :id and kind = 'X'").param("id", child2)
+                .query(Integer.class).single()).isEqualTo(1);
+        UUID room = req.submitted(finalType, orgA, List.of(child2), day("2028-03-02"), day("2028-03-03"));
+        assertThat(apr.approve(apr.taskFor(room), 1).code()).isEqualTo("RESERVATION_CONFLICT");
+        // a resource manager outside the site's organisation cannot change it
+        assertThat(login("reqb").put("/resources/" + parent2, Map.of("childBlocking", false)).status()).isEqualTo(403);
+    }
+
+    @Test
+    @DisplayName("PA-17: shared resources have no limit unless one is set; a set limit is enforced atomically at approval")
+    void sharedUseLimit() throws Exception {
+        person("fm", role("FM", "ORGANIZATION", "MANAGE_FACILITIES", "VIEW"), orgA);
+        Api fm = login("fm");
+        Res created = fm.post("/resources", Map.of("siteId", siteB.toString(), "code", "HALL-S-" + sfx, "name", "قاعة مشتركة",
+                "kind", "قاعة", "policy", "SHARED"));
+        assertThat(created.status()).as(created.toString()).isEqualTo(200);
+        UUID shared = UUID.fromString(created.body().path("id").asText());
+        assertThat(created.body().path("sharedLimit").isNull()).isTrue();
+        Api req = login("req");
+        Api apr = login("apr");
+        Api apr2 = login("apr2");
+        // no limit: three overlapping uses are approved
+        for (int i = 0; i < 3; i++) {
+            UUID id = req.submitted(finalType, orgA, List.of(shared), day("2028-05-01"), day("2028-05-04"));
+            assertThat(apr.approve(apr.taskFor(id), 1).status()).isEqualTo(200);
+        }
+        assertThat(fm.put("/resources/" + shared, Map.of("sharedLimit", 2)).status()).as("limit below approved uses").isEqualTo(400);
+        assertThat(fm.put("/resources/" + res1, Map.of("sharedLimit", 2)).status()).as("exclusive resource").isEqualTo(400);
+        assertThat(fm.put("/resources/" + shared, Map.of("sharedLimit", 4)).body().path("sharedLimit").asInt()).isEqualTo(4);
+        // limit 4 with three uses: two candidates for the last place approved at once, exactly one wins
+        UUID a = req.submitted(finalType, orgA, List.of(shared), day("2028-05-02"), day("2028-05-03"));
+        UUID b = req.submitted(finalType, orgA, List.of(shared), day("2028-05-02"), day("2028-05-05"));
+        String ta = apr.taskFor(a);
+        String tb = apr2.taskFor(b);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        Future<Res> fa = pool.submit(() -> {
+            start.await();
+            return apr.approve(ta, 1);
+        });
+        Future<Res> fb = pool.submit(() -> {
+            start.await();
+            return apr2.approve(tb, 1);
+        });
+        start.countDown();
+        List<Res> results = List.of(fa.get(), fb.get());
+        pool.shutdown();
+        assertThat(results).extracting(Res::status).containsExactlyInAnyOrder(200, 409);
+        assertThat(results.stream().filter(r -> r.status() == 409).findFirst().orElseThrow().code()).isEqualTo("RESERVATION_CONFLICT");
+        assertThat(activeReservations(shared)).isEqualTo(4);
+        // after the busy days a use is free again; removing the limit (0) lifts it
+        UUID later = req.submitted(finalType, orgA, List.of(shared), day("2028-05-04"), day("2028-05-06"));
+        assertThat(apr.approve(apr.taskFor(later), 1).status()).isEqualTo(200);
+        assertThat(fm.put("/resources/" + shared, Map.of("sharedLimit", 0)).body().path("sharedLimit").isNull()).isTrue();
+    }
+
+    @Test
     @DisplayName("Availability check is a preview only and reports conflicts without reserving")
     void availabilityPreview() {
         Api req = login("req");

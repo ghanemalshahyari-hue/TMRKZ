@@ -106,22 +106,42 @@ public class ReservationService {
     }
 
     private void insertLocks(UUID reservationId, UUID resourceId, Instant start, Instant end) {
-        Map<String, Object> res = jdbc.sql("select name, policy, handover_minutes from resource where id = :id")
+        Map<String, Object> res = jdbc.sql("select name, policy, handover_minutes, shared_limit from resource where id = :id")
                 .param("id", resourceId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         if (!"EXCLUSIVE".equals(res.get("policy"))) {
-            return; // shared resources do not take exclusive locks (capacity rules: open item, see docs/STATUS.md)
+            // Shared resources take no exclusive locks. An optional limit counts concurrent approved uses; the row lock
+            // serialises approvals of the same resource so two of them cannot both take the last place.
+            Integer limit = (Integer) res.get("shared_limit");
+            if (limit != null) {
+                jdbc.sql("select id from resource where id = :id for update").param("id", resourceId).query(UUID.class).single();
+                int peak = jdbc.sql("select resource_shared_peak(:rid, tstzrange(:s, :e, '[)'), :resv)")
+                        .param("rid", resourceId).param("s", Db.ts(start)).param("e", Db.ts(end)).param("resv", reservationId)
+                        .query(Integer.class).single();
+                if (peak + 1 > limit) {
+                    Map<String, Object> details = new LinkedHashMap<>();
+                    details.put("resourceId", resourceId.toString());
+                    details.put("resourceName", res.get("name"));
+                    details.put("sharedLimit", limit);
+                    throw new ApiException(ErrorCode.RESERVATION_CONFLICT,
+                            "تعذر تثبيت الحجز: المورد المشترك «" + res.get("name") + "» بلغ حد الاستخدام المتزامن المهيأ ("
+                                    + limit + ") خلال جزء من الفترة. لم يُسجل أي حجز من هذا الطلب.", details);
+                }
+            }
+            return;
         }
         int handover = ((Number) res.get("handover_minutes")).intValue();
         Instant blockedEnd = end == null ? null : end.plusSeconds(handover * 60L);
         try {
             jdbc.sql("""
                     insert into reservation_lock(reservation_id, resource_id, kind, period)
-                    with recursive down(id) as (
-                        select id from resource where id = :rid
-                        union all select r.id from resource r join down on r.parent_resource_id = down.id),
+                    with recursive down(id, blocks) as (
+                        select id, child_blocking from resource where id = :rid
+                        union all select r.id, r.child_blocking from resource r join down on r.parent_resource_id = down.id
+                        where down.blocks),
                     up(id, parent_id) as (
                         select id, parent_resource_id from resource where id = :rid
-                        union all select r.id, r.parent_resource_id from resource r join up on r.id = up.parent_id)
+                        union all select p.id, p.parent_resource_id from resource p join up on p.id = up.parent_id
+                        where p.child_blocking)
                     select :resv, id, 'X', tstzrange(:s, :e, '[)') from down
                     union all
                     select :resv, id, 'I', tstzrange(:s, :e, '[)') from up where id <> :rid""")
@@ -158,25 +178,68 @@ public class ReservationService {
     }
 
     /**
+     * Rebuilds the scope locks of every reservation that a change of {@code resourceId}'s relation or handover time can
+     * affect (reservations on its ancestors, itself and its descendants that hold locks). Runs in the caller's
+     * transaction: if the new rule makes two existing reservations overlap, the exclusion constraints refuse it and
+     * nothing changes. Returns the number of reservations re-locked.
+     */
+    public int relock(UUID resourceId) {
+        List<Map<String, Object>> affected = jdbc.sql("""
+                with recursive down(id) as (
+                    select id from resource where id = :rid
+                    union all select r.id from resource r join down on r.parent_resource_id = down.id),
+                up(id, parent_id) as (
+                    select id, parent_resource_id from resource where id = :rid
+                    union all select r.id, r.parent_resource_id from resource r join up on r.id = up.parent_id)
+                select v.id, v.resource_id, v.period_start, v.period_end from reservation v
+                where v.resource_id in (select id from down union select id from up)
+                  and exists (select 1 from reservation_lock l where l.reservation_id = v.id)
+                order by v.period_start for update of v""")
+                .param("rid", resourceId).query().listOfRows();
+        for (Map<String, Object> v : affected) {
+            jdbc.sql("delete from reservation_lock where reservation_id = :id").param("id", v.get("id")).update();
+        }
+        for (Map<String, Object> v : affected) {
+            insertLocks((UUID) v.get("id"), (UUID) v.get("resource_id"), Db.toInstant(v.get("period_start")),
+                    Db.toInstant(v.get("period_end")));
+        }
+        return affected.size();
+    }
+
+    /** Highest number of approved uses of a shared resource overlapping one another from {@code from} onwards. */
+    public int sharedPeak(UUID resourceId, Instant from) {
+        return jdbc.sql("select resource_shared_peak(:rid, tstzrange(:s, null, '[)'), null)")
+                .param("rid", resourceId).param("s", Db.ts(from)).query(Integer.class).single();
+    }
+
+    /**
      * Preview of conflicts for a candidate period (no locks taken). The authoritative check happens again when the
      * final approval commits.
      */
     public List<Conflict> conflicts(List<UUID> resourceIds, Instant start, Instant end, UUID excludeReservation) {
         List<Conflict> out = new ArrayList<>();
         for (UUID rid : resourceIds) {
-            Map<String, Object> res = jdbc.sql("select name, policy, handover_minutes from resource where id = :id")
+            Map<String, Object> res = jdbc.sql("select name, policy, handover_minutes, shared_limit from resource where id = :id")
                     .param("id", rid).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
             if (!"EXCLUSIVE".equals(res.get("policy"))) {
+                Integer limit = (Integer) res.get("shared_limit");
+                if (limit != null && jdbc.sql("select resource_shared_peak(:rid, tstzrange(:s, :e, '[)'), :ex)")
+                        .param("rid", rid).param("s", Db.ts(start)).param("e", Db.ts(end)).param("ex", excludeReservation)
+                        .query(Integer.class).single() + 1 > limit) {
+                    out.add(new Conflict(rid.toString(), (String) res.get("name")));
+                }
                 continue;
             }
             Instant blockedEnd = end == null ? null : end.plusSeconds(((Number) res.get("handover_minutes")).intValue() * 60L);
             boolean conflict = jdbc.sql("""
-                    with recursive down(id) as (
-                        select id from resource where id = :rid
-                        union all select r.id from resource r join down on r.parent_resource_id = down.id),
+                    with recursive down(id, blocks) as (
+                        select id, child_blocking from resource where id = :rid
+                        union all select r.id, r.child_blocking from resource r join down on r.parent_resource_id = down.id
+                        where down.blocks),
                     up(id, parent_id) as (
                         select id, parent_resource_id from resource where id = :rid
-                        union all select r.id, r.parent_resource_id from resource r join up on r.id = up.parent_id)
+                        union all select p.id, p.parent_resource_id from resource p join up on p.id = up.parent_id
+                        where p.child_blocking)
                     select exists (
                         select 1 from reservation_lock l
                         where l.period && tstzrange(:s, :e, '[)')

@@ -98,6 +98,11 @@ public class FacilityController {
         return sites.createResource(access.context(actor), in);
     }
 
+    @PutMapping("/resources/{id}")
+    public SiteService.ResourceView updateResource(Actor actor, @PathVariable UUID id, @RequestBody SiteService.ResourceUpdate in) {
+        return sites.updateResource(access.context(actor), id, in);
+    }
+
     // ---- boundaries ---------------------------------------------------------------------------------------
 
     @GetMapping("/sites/{id}/geometry/versions")

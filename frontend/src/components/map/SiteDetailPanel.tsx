@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import type { MapFeature, RequestType, SiteDetail } from '../../api/types';
 import { fullDate, fullTime } from '../../lib/dates';
 import { AVAILABILITY_STYLE, RESOURCE_STYLE, UNKNOWN_STYLE, type MapPeriod } from '../../lib/mapState';
+import { ResourceSettings } from './ResourceSettings';
 
 export type SiteAction =
   | { kind: 'NEW'; open: boolean }
@@ -51,6 +53,7 @@ export function SiteDetailPanel({
   requestTypes: RequestType[];
   onClose: () => void;
 }) {
+  const [settings, setSettings] = useState(false);
   if (!site) {
     return (
       <aside className="card map-detail" aria-live="polite">
@@ -183,8 +186,12 @@ export function SiteDetailPanel({
             <button className="button compact ghost" onClick={() => onAction({ kind: 'IMPORT_BOUNDARY' })}>
               استيراد حدود لهذا الموقع
             </button>
+            <button className="button compact ghost" onClick={() => setSettings(true)}>
+              إعداد الموارد وعلاقاتها
+            </button>
           </>
         )}
+        {settings && <ResourceSettings site={site} onClose={() => setSettings(false)} />}
       </div>
 
       {full && canCreate && active.length > 0 && changeTypes.length > 0 && (

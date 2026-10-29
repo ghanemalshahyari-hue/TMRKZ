@@ -24,8 +24,10 @@ import ae.mover.access.ViewLevel;
 import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
 import ae.mover.common.Db;
+import ae.mover.common.ErrorCode;
 import ae.mover.common.Json;
 import ae.mover.common.Ref;
+import ae.mover.reservations.ReservationService;
 
 /** Permanent sites and reservable resources. Sites are never destructively deleted; they are retired. */
 @Service
@@ -35,19 +37,22 @@ public class SiteService {
     private final Json json;
     private final Clock clock;
     private final AuditService audit;
+    private final ReservationService reservations;
 
-    public SiteService(JdbcClient jdbc, Json json, Clock clock, AuditService audit) {
+    public SiteService(JdbcClient jdbc, Json json, Clock clock, AuditService audit, ReservationService reservations) {
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
         this.audit = audit;
+        this.reservations = reservations;
     }
 
     public record Location(double lat, double lng) {
     }
 
     public record ResourceView(String id, String code, String name, String kind, String policy, String parentResourceId,
-                               int handoverMinutes, Integer capacity, String siteId, String label) {
+                               int handoverMinutes, Integer capacity, String siteId, String label, boolean childBlocking,
+                               Integer sharedLimit) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -112,7 +117,8 @@ public class SiteService {
             out.computeIfAbsent(site, k -> new ArrayList<>()).add(new ResourceView(rs.getString("id"), rs.getString("code"),
                     rs.getString("name"), rs.getString("kind"), rs.getString("policy"), rs.getString("parent_resource_id"),
                     rs.getInt("handover_minutes"), (Integer) rs.getObject("capacity"), site.toString(),
-                    primary ? rs.getString("site_name") : rs.getString("site_name") + " — " + rs.getString("name")));
+                    primary ? rs.getString("site_name") : rs.getString("site_name") + " — " + rs.getString("name"),
+                    rs.getBoolean("child_blocking"), (Integer) rs.getObject("shared_limit")));
             return null;
         }).list();
         return out;
@@ -372,7 +378,7 @@ public class SiteService {
     }
 
     public record ResourceInput(String siteId, String code, String name, String kind, String policy, String parentResourceId,
-                                Integer handoverMinutes, Integer capacity) {
+                                Integer handoverMinutes, Integer capacity, Boolean childBlocking, Integer sharedLimit) {
     }
 
     @Transactional
@@ -385,22 +391,101 @@ public class SiteService {
         SiteRow site = rows("where s.id = :id", Map.of("id", UUID.fromString(in.siteId()))).stream().findFirst()
                 .orElseThrow(() -> ApiException.validation("الموقع غير موجود."));
         requireFacilityManager(ctx, site.orgId());
+        checkSharedLimit(in.policy(), in.sharedLimit());
+        if (in.handoverMinutes() != null && (in.handoverMinutes() < 0 || in.handoverMinutes() > 10080)) {
+            throw ApiException.validation("فترة التسليم بين 0 و10080 دقيقة.");
+        }
         UUID id = UUID.randomUUID();
         try {
             jdbc.sql("""
-                    insert into resource(id, site_id, code, name, kind, policy, parent_resource_id, handover_minutes, capacity)
-                    values (:id, :site, :code, :name, :kind, :policy, :parent, :handover, :cap)""")
+                    insert into resource(id, site_id, code, name, kind, policy, parent_resource_id, handover_minutes, capacity,
+                                         child_blocking, shared_limit)
+                    values (:id, :site, :code, :name, :kind, :policy, :parent, :handover, :cap, :blocks, :limit)""")
                     .param("id", id).param("site", UUID.fromString(in.siteId())).param("code", in.code().trim())
                     .param("name", in.name().trim()).param("kind", in.kind() == null ? "مورد" : in.kind())
                     .param("policy", in.policy())
                     .param("parent", in.parentResourceId() == null ? null : UUID.fromString(in.parentResourceId()))
-                    .param("handover", in.handoverMinutes() == null ? 0 : in.handoverMinutes()).param("cap", in.capacity()).update();
+                    .param("handover", in.handoverMinutes() == null ? 0 : in.handoverMinutes()).param("cap", in.capacity())
+                    .param("blocks", !Boolean.FALSE.equals(in.childBlocking())).param("limit", in.sharedLimit()).update();
         } catch (DataAccessException e) {
             throw ApiException.validation("تعذر حفظ المورد: الرمز مستخدم أو المورد الأب غير صالح.");
         }
         audit.recordAs(ctx.actor(), "RESOURCE_CREATED", "RESOURCE", id.toString(), in.name(), Map.of("code", in.code()), null);
         return resourcesBySite().values().stream().flatMap(List::stream).filter(r -> r.id().equals(id.toString()))
                 .findFirst().orElseThrow();
+    }
+
+    public record ResourceUpdate(String name, String kind, Integer handoverMinutes, Boolean childBlocking, Integer sharedLimit) {
+    }
+
+    /**
+     * Changes a resource's name, kind, handover time, relation to its sub-resources or shared-use limit. Locks of the
+     * reservations the change can affect are rebuilt in the same transaction, so a rule that would make existing
+     * approved bookings overlap, or a limit below the uses already approved, is refused and nothing changes.
+     */
+    @Transactional
+    public ResourceView updateResource(AccessContext ctx, UUID id, ResourceUpdate in) {
+        ctx.require(Permission.MANAGE_FACILITIES);
+        Map<String, Object> cur = jdbc.sql("""
+                select r.*, sr.organization_id from resource r
+                left join site_responsibility sr on sr.site_id = r.site_id and sr.valid_to is null
+                where r.id = :id and r.status = 'ACTIVE' for update of r""")
+                .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
+        requireFacilityManager(ctx, (UUID) cur.get("organization_id"));
+        if (in == null) {
+            throw ApiException.validation("لا توجد تغييرات.");
+        }
+        String name = in.name() == null || in.name().isBlank() ? (String) cur.get("name") : in.name().trim();
+        String kind = in.kind() == null || in.kind().isBlank() ? (String) cur.get("kind") : in.kind().trim();
+        int handover = in.handoverMinutes() == null ? ((Number) cur.get("handover_minutes")).intValue() : in.handoverMinutes();
+        if (handover < 0 || handover > 10080) {
+            throw ApiException.validation("فترة التسليم بين 0 و10080 دقيقة.");
+        }
+        boolean blocks = in.childBlocking() == null ? (Boolean) cur.get("child_blocking") : in.childBlocking();
+        Integer limit = in.sharedLimit() == null ? null : in.sharedLimit() == 0 ? null : in.sharedLimit();
+        checkSharedLimit((String) cur.get("policy"), limit);
+        if (limit != null) {
+            int peak = reservations.sharedPeak(id, clock.instant());
+            if (peak > limit) {
+                throw ApiException.validation("الحد الجديد (" + limit + ") أقل من عدد الاستخدامات المعتمدة المتزامنة حالياً أو لاحقاً ("
+                        + peak + "). خفّض الحد بعد انتهائها أو اختر حداً أعلى.");
+            }
+        }
+        jdbc.sql("""
+                update resource set name = :n, kind = :k, handover_minutes = :h, child_blocking = :b, shared_limit = :l
+                where id = :id""")
+                .param("n", name).param("k", kind).param("h", handover).param("b", blocks).param("l", limit).param("id", id).update();
+        boolean relationChanged = blocks != (Boolean) cur.get("child_blocking")
+                || handover != ((Number) cur.get("handover_minutes")).intValue();
+        int relocked = 0;
+        if (relationChanged) {
+            try {
+                relocked = reservations.relock(id);
+            } catch (ApiException e) {
+                if (e.code() == ErrorCode.RESERVATION_CONFLICT) {
+                    throw new ApiException(ErrorCode.RESERVATION_CONFLICT, "لا يمكن تطبيق التغيير: توجد حجوزات معتمدة على «" + name
+                            + "» أو موارده الفرعية أو الأعلى منه تتداخل وفق القاعدة الجديدة. لم يتغير شيء.", e.details());
+                }
+                throw e;
+            }
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("childBlocking", blocks);
+        detail.put("sharedLimit", limit);
+        detail.put("handoverMinutes", handover);
+        detail.put("relockedReservations", relocked);
+        audit.recordAs(ctx.actor(), "RESOURCE_UPDATED", "RESOURCE", id.toString(), name, detail, null);
+        return resourcesBySite().values().stream().flatMap(List::stream).filter(r -> r.id().equals(id.toString()))
+                .findFirst().orElseThrow();
+    }
+
+    private static void checkSharedLimit(String policy, Integer limit) {
+        if (limit != null && !"SHARED".equals(policy)) {
+            throw ApiException.validation("حد الاستخدام المتزامن خاص بالموارد المشتركة.");
+        }
+        if (limit != null && (limit < 1 || limit > 10000)) {
+            throw ApiException.validation("حد الاستخدام المتزامن بين 1 و10000، أو اتركه فارغاً لعدم التقييد.");
+        }
     }
 
     /** MANAGE_FACILITIES over the administering organisation; configuration rights alone are not enough. */

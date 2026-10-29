@@ -121,6 +121,8 @@ export type Resource = {
   capacity: number | null;
   siteId: string;
   label: string;
+  childBlocking: boolean;
+  sharedLimit: number | null;
 };
 export type Site = {
   id: string;

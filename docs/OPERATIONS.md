@@ -197,5 +197,6 @@ sh ops/test-env/up-offline.sh && (cd tests/acceptance && npm ci) && node tests/a
 (cd frontend && npm ci && npm test && npm run build)          # frontend unit tests and type-checked build
 node tests/acceptance/access-studio.mjs                       # permissions studio in Microsoft Edge (STUDIO-01 … 06)
 node tests/acceptance/rule-editor.mjs                         # visual rule editor in Microsoft Edge (RULES-01 … 04)
+node tests/acceptance/resources.mjs                           # resource relation and shared-use limit (RES-01 … 03)
 python ops/tools/gen-openapi.py                               # regenerate docs/api/openapi.json from the controllers
 ```

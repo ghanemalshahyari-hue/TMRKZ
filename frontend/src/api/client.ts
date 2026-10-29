@@ -54,6 +54,7 @@ import type {
   RequestDetail,
   RequestListItem,
   RequestType,
+  Resource,
   ReservationItem,
   RoleDef,
   Settings,
@@ -256,6 +257,19 @@ export const api = {
   // facilities & map
   sites: () => get<Site[]>('/sites'),
   site: (id: string) => get<SiteDetail>(`/sites/${id}`),
+  createResource: (body: {
+    siteId: string;
+    code: string;
+    name: string;
+    kind: string;
+    policy: 'EXCLUSIVE' | 'SHARED';
+    parentResourceId: string | null;
+    handoverMinutes: number;
+    childBlocking: boolean;
+    sharedLimit: number | null;
+  }) => post<Resource>('/resources', body),
+  updateResource: (id: string, body: { name: string; kind: string; handoverMinutes: number; childBlocking: boolean; sharedLimit?: number }) =>
+    put<Resource>(`/resources/${id}`, body),
   siteTree: (parentId?: string | null) => get<SiteNode[]>('/sites/tree' + query({ parentId: parentId ?? undefined })),
   siteSearch: (q: string, signal?: AbortSignal) => get<SiteNode[]>('/sites/search' + query({ q }), { signal }),
   mapContext: () => get<MapContext>('/map/context'),

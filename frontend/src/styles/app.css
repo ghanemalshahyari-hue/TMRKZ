@@ -101,3 +101,9 @@
 .sim-inputs{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
 .sim-inputs .field input,.sim-inputs .field select{width:100%}
 @media(max-width:900px){.rules-layout{grid-template-columns:1fr}.rule-cond{grid-template-columns:1fr 1fr}}
+
+/* resource settings (PA-17) */
+.resource-settings .resource-form{margin-top:12px}
+.resource-form h4{margin:0 0 8px;font-size:13px}
+.resource-form .check-label{display:flex;align-items:center;gap:8px;font-size:12px;line-height:1.6}
+.resource-form .check-label input{width:auto;flex:0 0 auto;margin:0}
