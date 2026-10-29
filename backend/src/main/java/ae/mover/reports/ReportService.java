@@ -52,7 +52,7 @@ public class ReportService {
     }
 
     public Map<String, Object> kpis(AccessContext ctx, String from, String to) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY);
         LocalDate today = LocalDate.now(clock.withZone(Times.DISPLAY_ZONE));
         Instant a = Times.startOfDay(from == null ? today.minusDays(30) : Times.parseDate(from, "from"));
         Instant b = Times.startOfDay((to == null ? today : Times.parseDate(to, "to")).plusDays(1));

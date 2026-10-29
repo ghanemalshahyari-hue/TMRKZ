@@ -37,7 +37,7 @@ function PersonPicker({ value, onChange }: { value: string; onChange: (id: strin
 export function OrgPage() {
   const app = useApp();
   const { orgs, revision } = app;
-  const canConfigure = app.can('CONFIGURE');
+  const canConfigure = app.can('MANAGE_ACCESS');
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<OrgDetail | null>(null);
   const [delegations, setDelegations] = useState<Delegation[]>([]);

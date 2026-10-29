@@ -245,12 +245,14 @@ public class RequestService {
             }
             throw ApiException.forbidden("يعدّل الطلب مقدمه فقط.");
         }
-        if (!ctx.has(Permission.CREATE)) {
-            throw ApiException.forbidden("لم تعد تملك صلاحية إنشاء الطلبات أو تعديلها.");
-        }
         String status = (String) row.get("status");
         if (!"DRAFT".equals(status) && !"RETURNED".equals(status)) {
             throw ApiException.validation("لا يمكن تعديل الطلب في حالته الحالية.");
+        }
+        if (!ctx.mayModify((UUID) row.get("created_by"), (UUID) row.get("owner_org_id"), status)) {
+            throw ApiException.forbidden("DRAFT".equals(status)
+                    ? "لم تعد تملك صلاحية إنشاء الطلبات أو تعديلها لهذه الجهة."
+                    : "تعديل الطلب المعاد يتطلب صلاحية التعديل على الجهة الطالبة.");
         }
     }
 

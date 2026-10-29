@@ -114,6 +114,17 @@ public abstract class IntegrationTest {
         return id;
     }
 
+    /** A role holding exactly the given actions, for tests of independent permissions. */
+    protected String role(String name, String scope, String... permissions) {
+        String code = "T_" + name + "_" + sfx.toUpperCase();
+        jdbc.sql("""
+                insert into role_def(code, name, permissions, scope, summary_only, sort_order)
+                values (:c, :n, string_to_array(:p, ','), :s, false, 900)""")
+                .param("c", code).param("n", "دور اختبار " + name).param("p", String.join(",", permissions))
+                .param("s", scope).update();
+        return code;
+    }
+
     protected UUID membership(UUID person, String role, UUID org, UUID siteScope) {
         UUID id = UUID.randomUUID();
         jdbc.sql("""

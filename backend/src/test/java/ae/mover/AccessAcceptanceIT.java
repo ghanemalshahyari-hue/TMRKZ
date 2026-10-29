@@ -171,17 +171,91 @@ class AccessAcceptanceIT extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("AT-24: the requester cannot decide on their own request even when holding the approving role")
-    void separationOfDuties() {
+    @DisplayName("AT-24 (revised 2026-10-29): a requester holding APPROVE over the stage may approve their own request, recorded as such; one without it may not")
+    void requesterDecision() {
         UUID both = person("both", "REQUESTER", orgA);
         membership(both, "APPROVER", root, null);
         Api api = login("both");
         UUID id = api.submitted(finalType, orgA, List.of(resA), day("2028-08-01"), day("2028-08-02"));
-        String task = jdbc.sql("select id::text from task_assignment where request_id = :r").param("r", id).query(String.class).single();
-        assertThat(api.taskFor(id)).isNull();
-        Res r = api.approve(task, 1);
-        assertThat(r.status()).isEqualTo(403);
+        String task = api.taskFor(id);
+        assertThat(task).isNotNull();
+        assertThat(api.approve(task, 1).status()).isEqualTo(200);
+        assertThat(activeReservations(resA)).isEqualTo(1);
+        assertThat(jdbc.sql("select by_requester from decision where request_id = :r").param("r", id).query(Boolean.class).single()).isTrue();
+        assertThat(api.get("/requests/" + id).body().path("history").toString()).contains("(مقدم الطلب)");
+
+        // REVIEW without APPROVE (organisation manager) does not reach the final stage, for one's own request or any other.
+        UUID reviewer = person("selfrev", "REQUESTER", orgA);
+        membership(reviewer, "ORG_MANAGER", orgA, null);
+        Api other = login("selfrev");
+        UUID id2 = other.submitted(finalType, orgA, List.of(resA), day("2028-08-03"), day("2028-08-04"));
+        String task2 = jdbc.sql("select id::text from task_assignment where request_id = :r").param("r", id2).query(String.class).single();
+        assertThat(other.taskFor(id2)).isNull();
+        assertThat(other.approve(task2, 1).status()).isEqualTo(403);
+        assertThat(activeReservations(resA)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("Independent actions: view without edit, create without edit, edit without approve, administration without content")
+    void independentActions() {
+        person("viewer", role("VIEWONLY", "ORGANIZATION", "VIEW"), orgA);
+        person("composer", role("CREATEONLY", "ORGANIZATION", "VIEW", "CREATE"), orgA);
+        Api composer = login("composer");
+        UUID id = composer.submitted(finalType, orgA, List.of(resA), day("2028-10-01"), day("2028-10-02"));
+
+        JsonNode seen = login("viewer").get("/requests/" + id).body();
+        assertThat(seen.path("view").asText()).isEqualTo("FULL");
+        assertThat(seen.path("actions").path("canEditDraft").asBoolean()).isFalse();
+
+        // Revising a returned request is EDIT, which CREATE does not imply.
+        Api apr = login("apr");
+        assertThat(apr.decide(apr.taskFor(id), "RETURN", "يرجى استكمال البيانات", 1).status()).isEqualTo(200);
+        JsonNode returned = composer.get("/requests/" + id).body();
+        assertThat(returned.path("actions").path("canEditDraft").asBoolean()).isFalse();
+        assertThat(composer.patch("/requests/" + id + "/draft",
+                Map.of("expectedVersion", returned.path("version").asInt(), "subject", "تعديل")).status()).isEqualTo(403);
+        assertThat(composer.upload(id, "attachments", "a.txt", "نص".getBytes(StandardCharsets.UTF_8)).status()).isEqualTo(403);
+        assertThat(composer.submit(id).status()).isEqualTo(403);
+
+        // EDIT without APPROVE: the requester gets no approval task and cannot decide one.
+        Api req = login("req");
+        UUID id2 = req.submitted(finalType, orgA, List.of(resA), day("2028-10-03"), day("2028-10-04"));
+        String task = jdbc.sql("select id::text from task_assignment where request_id = :r").param("r", id2).query(String.class).single();
+        assertThat(req.taskFor(id2)).isNull();
+        assertThat(req.approve(task, 1).status()).isEqualTo(403);
+
+        // System administration grants neither request content nor decisions.
+        Api admin = adminApi();
+        assertThat(admin.get("/requests/" + id2).status()).isEqualTo(404);
+        assertThat(admin.get("/requests?size=200").body().path("items").size()).isZero();
+        assertThat(admin.taskFor(id2)).isNull();
+        assertThat(admin.approve(task, 1).status()).isIn(403, 404);
+        assertThat(admin.get("/reports/kpis").status()).isEqualTo(403);
+        assertThat(admin.get("/roles").status()).isEqualTo(200);
         assertThat(activeReservations(resA)).isZero();
+    }
+
+    @Test
+    @DisplayName("Availability preview: a resource outside the caller's scope is indistinguishable from one that does not exist")
+    void availabilityOutOfScope() {
+        login("req").submitted(finalType, orgA, List.of(resA), day("2028-09-01"), day("2028-09-03"));
+        Api out = login("outsider");
+        Res hidden = out.post("/availability/check", Map.of("resourceIds", List.of(resA.toString()),
+                "start", day("2028-09-01"), "end", day("2028-09-02")));
+        Res unknown = out.post("/availability/check", Map.of("resourceIds", List.of(UUID.randomUUID().toString()),
+                "start", day("2028-09-01"), "end", day("2028-09-02")));
+        Res mixed = out.post("/availability/check", Map.of("resourceIds", List.of(resB.toString(), resA.toString()),
+                "start", day("2028-09-01"), "end", day("2028-09-02")));
+        assertThat(hidden.status()).isEqualTo(404);
+        assertThat(unknown.status()).isEqualTo(404);
+        assertThat(mixed.status()).isEqualTo(404);
+        assertThat(hidden.code()).isEqualTo(unknown.code());
+        assertThat(hidden.body().path("message").asText()).isEqualTo(unknown.body().path("message").asText());
+        assertThat(new String(hidden.raw(), StandardCharsets.UTF_8)).doesNotContain("RA-" + sfx).doesNotContain("مورد RA");
+        Res own = out.post("/availability/check", Map.of("resourceIds", List.of(resB.toString()),
+                "start", day("2028-09-01"), "end", day("2028-09-02")));
+        assertThat(own.status()).isEqualTo(200);
+        assertThat(own.body().path("pendingRequests").asInt()).isZero();
     }
 
     @Test

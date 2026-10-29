@@ -35,16 +35,35 @@ export const ADMINISTRATIVE: Record<Administrative, { label: string; color: stri
   NONE: { label: 'دون طلب قائم', color: COLORS.none },
 };
 
-export const PERMISSIONS: Permission[] = ['VIEW', 'CREATE', 'REVIEW', 'APPROVE', 'EXPORT', 'CONFIGURE', 'AUDIT', 'EXECUTE'];
+export const PERMISSIONS: Permission[] = [
+  'VIEW',
+  'VIEW_SUMMARY',
+  'CREATE',
+  'EDIT',
+  'REVIEW',
+  'APPROVE',
+  'EXPORT',
+  'EXECUTE',
+  'MANAGE_FACILITIES',
+  'MANAGE_ACCESS',
+  'CONFIGURE',
+  'AUDIT',
+  'VIEW_SOURCE_IDENTIFIERS',
+];
 export const PERMISSION_NAMES: Record<Permission, string> = {
   VIEW: 'عرض',
+  VIEW_SUMMARY: 'عرض مختصر',
   CREATE: 'إنشاء',
+  EDIT: 'تعديل',
   REVIEW: 'مراجعة',
   APPROVE: 'اعتماد نهائي',
   EXPORT: 'تصدير',
+  EXECUTE: 'تنفيذ واستلام',
+  MANAGE_FACILITIES: 'إدارة المرافق',
+  MANAGE_ACCESS: 'إدارة الصلاحيات',
   CONFIGURE: 'تهيئة',
   AUDIT: 'تدقيق',
-  EXECUTE: 'تنفيذ واستلام',
+  VIEW_SOURCE_IDENTIFIERS: 'معرفات المصدر',
 };
 
 export const SCOPES: [Scope, string][] = [

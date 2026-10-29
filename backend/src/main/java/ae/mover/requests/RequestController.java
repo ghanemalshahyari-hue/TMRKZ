@@ -57,7 +57,7 @@ public class RequestController {
 
     @GetMapping("/request-types")
     public List<RequestTypes.TypeView> requestTypes(Actor actor) {
-        access.context(actor).require(Permission.VIEW);
+        access.context(actor).requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.CREATE, Permission.CONFIGURE);
         return types.views();
     }
 

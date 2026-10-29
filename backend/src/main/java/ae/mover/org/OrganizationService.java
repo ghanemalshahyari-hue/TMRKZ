@@ -55,14 +55,19 @@ public class OrganizationService {
     public record OrgDetail(OrgNode org, List<Member> members, List<SiteService.SiteView> sites) {
     }
 
+    /** Grants that read the organisation structure: content views and the administration of access or facilities. */
+    private static boolean orgReader(Grant g) {
+        return g.viewer() || g.has(Permission.MANAGE_ACCESS) || g.has(Permission.MANAGE_FACILITIES);
+    }
+
     /** Organisations visible to the actor: whole tree for ALL scope, otherwise their subtrees plus ancestors. */
     private Set<UUID> visibleOrgs(AccessContext ctx) {
-        if (ctx.grants().stream().anyMatch(g -> g.has(Permission.VIEW) && g.isAll()) || ctx.has(Permission.CONFIGURE)) {
+        if (ctx.grants().stream().anyMatch(g -> g.isAll() && orgReader(g)) || ctx.has(Permission.CONFIGURE)) {
             return null;
         }
         Set<UUID> out = new java.util.HashSet<>();
         for (Grant g : ctx.grants()) {
-            if (g.has(Permission.VIEW) && g.orgId() != null) {
+            if (orgReader(g) && g.orgId() != null) {
                 out.addAll(g.orgSubtree().isEmpty() ? Set.of(g.orgId()) : g.orgSubtree());
                 out.addAll(jdbc.sql("""
                         with recursive up(id, parent_id) as (select id, parent_id from organization where id = :id
@@ -74,7 +79,7 @@ public class OrganizationService {
     }
 
     public List<OrgNode> tree(AccessContext ctx) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_ACCESS, Permission.MANAGE_FACILITIES, Permission.CONFIGURE);
         Set<UUID> visible = visibleOrgs(ctx);
         Map<UUID, Integer> siteCounts = new HashMap<>();
         jdbc.sql("select organization_id, count(*) as n from site_responsibility where valid_to is null group by organization_id")
@@ -140,7 +145,7 @@ public class OrganizationService {
     }
 
     public List<OrgNode> children(AccessContext ctx, UUID id) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_ACCESS, Permission.MANAGE_FACILITIES, Permission.CONFIGURE);
         Set<UUID> visible = visibleOrgs(ctx);
         return jdbc.sql("select id, code, name, parent_id, status from organization where parent_id = :id order by code")
                 .param("id", id).query((rs, n) -> new OrgNode(rs.getString("id"), rs.getString("code"), rs.getString("name"),
@@ -149,7 +154,7 @@ public class OrganizationService {
     }
 
     public OrgDetail detail(AccessContext ctx, UUID id) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_ACCESS, Permission.MANAGE_FACILITIES, Permission.CONFIGURE);
         Set<UUID> visible = visibleOrgs(ctx);
         if (visible != null && !visible.contains(id)) {
             throw ApiException.notFound();
@@ -178,7 +183,7 @@ public class OrganizationService {
     }
 
     public PageResult<Map<String, Object>> people(AccessContext ctx, String q, Integer page, Integer size) {
-        ctx.require(Permission.CONFIGURE);
+        ctx.require(Permission.MANAGE_ACCESS);
         int p = PageResult.page(page);
         int s = PageResult.size(size);
         String like = q == null || q.isBlank() ? "%" : "%" + q.trim().replace("%", "") + "%";
@@ -209,9 +214,12 @@ public class OrganizationService {
 
     @Transactional
     public Map<String, Object> addMembership(AccessContext ctx, MembershipInput in) {
-        ctx.require(Permission.CONFIGURE);
+        ctx.require(Permission.MANAGE_ACCESS);
         if (in == null || in.personId() == null || in.organizationId() == null || in.roleCode() == null) {
             throw ApiException.validation("حدد الشخص والجهة والدور.");
+        }
+        if (!ctx.canFor(Permission.MANAGE_ACCESS, UUID.fromString(in.organizationId()))) {
+            throw ApiException.forbidden("لا تملك إدارة الصلاحيات على هذه الجهة.");
         }
         Instant from = in.validFrom() == null ? clock.instant() : Times.parse(in.validFrom(), "validFrom");
         Instant to = Times.parse(in.validTo(), "validTo");
@@ -242,7 +250,7 @@ public class OrganizationService {
      */
     @Transactional
     public Map<String, Object> endMembership(AccessContext ctx, UUID id, String endAt, String reason) {
-        ctx.require(Permission.CONFIGURE);
+        ctx.require(Permission.MANAGE_ACCESS);
         if (reason == null || reason.isBlank()) {
             throw ApiException.validation("اذكر سبب إنهاء العضوية.");
         }
@@ -279,7 +287,7 @@ public class OrganizationService {
     }
 
     public List<DelegationView> delegations(AccessContext ctx) {
-        boolean all = ctx.has(Permission.CONFIGURE);
+        boolean all = ctx.has(Permission.MANAGE_ACCESS);
         return jdbc.sql("""
                 select d.*, a.display_name as delegator_name, b.display_name as delegate_name, r.code as role_code,
                        r.name as role_name, o.id as org_id, o.name as org_name,
@@ -334,7 +342,7 @@ public class OrganizationService {
     public void revokeDelegation(AccessContext ctx, UUID id, String reason) {
         Map<String, Object> d = jdbc.sql("select delegator_id, delegate_id, revoked_at from delegation where id = :id for update")
                 .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
-        if (!ctx.personId().equals(d.get("delegator_id")) && !ctx.has(Permission.CONFIGURE)) {
+        if (!ctx.personId().equals(d.get("delegator_id")) && !ctx.has(Permission.MANAGE_ACCESS)) {
             throw ApiException.forbidden();
         }
         if (d.get("revoked_at") != null) {
@@ -352,7 +360,7 @@ public class OrganizationService {
     }
 
     public List<RoleDef> roles(AccessContext ctx) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_ACCESS, Permission.CONFIGURE);
         return jdbc.sql("select * from role_def order by sort_order, code")
                 .query((rs, n) -> new RoleDef(rs.getString("code"), rs.getString("name"), Db.strings(rs, "permissions"),
                         rs.getString("scope"), rs.getBoolean("summary_only"), rs.getBoolean("system"))).list();
@@ -363,7 +371,7 @@ public class OrganizationService {
 
     @Transactional
     public RoleDef updateRole(AccessContext ctx, String code, RoleInput in) {
-        ctx.require(Permission.CONFIGURE);
+        ctx.require(Permission.MANAGE_ACCESS);
         Map<String, Object> row = jdbc.sql("select system, permissions, scope, summary_only from role_def where code = :c for update")
                 .param("c", code).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         if ((Boolean) row.get("system")) {

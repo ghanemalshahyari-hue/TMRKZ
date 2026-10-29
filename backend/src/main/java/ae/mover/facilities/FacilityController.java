@@ -38,14 +38,14 @@ public class FacilityController {
     @GetMapping("/sites")
     public List<SiteService.SiteView> sites(Actor actor) {
         var ctx = access.context(actor);
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_FACILITIES);
         return sites.list(ctx);
     }
 
     @GetMapping("/sites/{id}")
     public java.util.Map<String, Object> site(Actor actor, @PathVariable UUID id) {
         var ctx = access.context(actor);
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_FACILITIES);
         return sites.detailView(ctx, id);
     }
 

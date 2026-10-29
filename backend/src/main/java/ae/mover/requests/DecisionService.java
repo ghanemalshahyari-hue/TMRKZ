@@ -242,9 +242,8 @@ public class DecisionService {
         if (!"OPEN".equals(t.status()) || !"SUBMITTED".equals(req.get("status"))) {
             throw new ApiException(ErrorCode.TASK_ALREADY_COMPLETED, "هذه المهمة لم تعد مفتوحة؛ ربما أُنجزت أو أُغلقت وفق سياسة المرحلة.");
         }
-        if (ctx.personId().equals(req.get("created_by"))) {
-            throw ApiException.forbidden("سياسة فصل المهام: لا يجوز لمقدم الطلب اتخاذ قرار على طلبه.");
-        }
+        // The requester may decide only through a grant that satisfies this stage like anyone else's would.
+        boolean byRequester = ctx.personId().equals(req.get("created_by"));
         Grant grant = ctx.taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage())
                 .orElseThrow(() -> ApiException.forbidden("لا تملك حالياً صفة هذه المهمة أو نطاقها."));
         int currentRevision = ((Number) req.get("current_revision")).intValue();
@@ -286,13 +285,14 @@ public class DecisionService {
         jdbc.sql("""
                 insert into decision(id, request_id, revision, task_id, stage_key, stage_name, actor_person_id, actor_name,
                     actor_role_code, actor_role_name, actor_org_id, actor_org_name, via_delegation_id, decision, reason_code,
-                    note, decided_at)
-                values (:id, :req, :rev, :task, :sk, :sn, :pid, :pname, :rc, :rn, :oid, :oname, :del, :dec, :rcode, :note, :now)""")
+                    note, decided_at, by_requester)
+                values (:id, :req, :rev, :task, :sk, :sn, :pid, :pname, :rc, :rn, :oid, :oname, :del, :dec, :rcode, :note, :now, :self)""")
                 .param("id", decisionId).param("req", requestIdValue).param("rev", currentRevision).param("task", t.id())
                 .param("sk", t.stageKey()).param("sn", t.stageName()).param("pid", ctx.personId())
                 .param("pname", ctx.actor().displayName()).param("rc", grant.roleCode()).param("rn", grant.roleName())
                 .param("oid", grant.orgId()).param("oname", grant.orgName()).param("del", grant.delegationId())
-                .param("dec", decision).param("rcode", reasonCode).param("note", note).param("now", Db.ts(now)).update();
+                .param("dec", decision).param("rcode", reasonCode).param("note", note).param("now", Db.ts(now))
+                .param("self", byRequester).update();
 
         if (!"APPROVE".equals(decision)) {
             String status = "RETURN".equals(decision) ? "RETURNED" : "REJECTED";
@@ -307,7 +307,8 @@ public class DecisionService {
                     .param("s", status).param("note", note).param("now", Db.ts(now)).param("id", requestIdValue).update();
             audit.record(ctx.actor(), capacity, "RETURN".equals(decision) ? "REQUEST_RETURNED" : "REQUEST_REJECTED",
                     "REQUEST", requestIdValue.toString(), number,
-                    reasonCode == null ? Map.of("stage", t.stageName()) : Map.of("stage", t.stageName(), "reasonCode", reasonCode),
+                    reasonCode == null ? Map.of("stage", t.stageName(), "byRequester", byRequester)
+                            : Map.of("stage", t.stageName(), "reasonCode", reasonCode, "byRequester", byRequester),
                     note, currentRevision);
             outbox.enqueue("REQUEST", requestIdValue.toString(), "REQUEST_" + status,
                     Map.of("requestId", requestIdValue.toString(), "revision", currentRevision));
@@ -320,7 +321,7 @@ public class DecisionService {
             jdbc.sql("update request set last_note = :note where id = :id").param("note", note).param("id", requestIdValue).update();
         }
         audit.record(ctx.actor(), capacity, "TASK_APPROVED", "REQUEST", requestIdValue.toString(), number,
-                Map.of("stage", t.stageName()), note, currentRevision);
+                Map.of("stage", t.stageName(), "byRequester", byRequester), note, currentRevision);
         taskService.complete(t.flowableTaskId());
         WorkflowDefinition def = workflows.definition((UUID) req.get("workflow_version_id"));
         boolean ended = runtime.createProcessInstanceQuery().processInstanceId(pid).count() == 0;

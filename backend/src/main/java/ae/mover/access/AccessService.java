@@ -198,7 +198,7 @@ public class AccessService {
         Set<UUID> infoOrgs = new HashSet<>();
         int i = 0;
         for (Grant g : ctx.grants()) {
-            if (!g.has(Permission.VIEW)) {
+            if (!g.viewer()) {
                 continue;
             }
             if (g.orgId() != null) {

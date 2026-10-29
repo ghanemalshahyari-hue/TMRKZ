@@ -47,6 +47,7 @@ Rules implemented: creator sees own requests; VIEW grants cover a request throug
 organisations and the organisations administering the requested facilities, or through site scope; info recipients
 see a summary after approval; reviewers must hold the task's role with REVIEW (APPROVE for the final stage) and a
 scope reaching the task's target organisation; a requester can never decide on their own request.
+*Amended 2026-10-29 by ADR-013: the requester may decide when a grant satisfies the stage; actions are independent.*
 
 ## ADR-005 Workflow studio compiles a typed definition to BPMN; Flowable embedded — Accepted
 
@@ -107,3 +108,29 @@ Spring Boot 4 serialises HTTP with Jackson 3; Flowable 8 and our stored-document
 
 The UI refreshes counters and notifications by polling scoped endpoints. Each poll is a normal authorised request,
 so withdrawn access stops updates immediately without channel re-evaluation logic.
+
+## ADR-013 Independent actions, configuration separate from content, requester decisions — Accepted (2026-10-29)
+
+Owner decisions in `docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md` §2 and §7. The action set is
+`VIEW, VIEW_SUMMARY, CREATE, EDIT, REVIEW, APPROVE, EXPORT, EXECUTE, MANAGE_FACILITIES, MANAGE_ACCESS, CONFIGURE, AUDIT,
+VIEW_SOURCE_IDENTIFIERS`; none implies another.
+
+- **CREATE vs EDIT.** CREATE composes and submits a new request (a never-submitted draft); revising a returned request
+  is EDIT. Both must still cover the owner organisation at the time of the action (`AccessContext.mayModify`).
+- **Configuration vs content.** The protected `SYSTEM_ADMIN` role holds `CONFIGURE, MANAGE_ACCESS, MANAGE_FACILITIES,
+  VIEW_SOURCE_IDENTIFIERS` only. It no longer reads request content, exports, audits or decides; a person who needs
+  those rights receives them explicitly through another membership. `MANAGE_FACILITIES` gives the facility record
+  (registry, geometry, occupancy) within its scope; `MANAGE_ACCESS` administers memberships, delegations and roles
+  within the organisations it covers.
+- **Requester decisions.** The previous absolute separation-of-duties rule (ADR-004) is replaced: the requester is
+  held to exactly the same stage rule as anyone else (role, REVIEW or APPROVE for the final stage, scope over the
+  target). Stage order is unchanged. The decision row records `by_requester` and the history shows «(مقدم الطلب)».
+- **Migration.** `V2__independent_actions.sql` keeps the effective behaviour of existing custom roles (CREATE → +EDIT,
+  CONFIGURE → +MANAGE_ACCESS/+MANAGE_FACILITIES, summary-only VIEW → VIEW_SUMMARY) and narrows `SYSTEM_ADMIN` as decided.
+- **Scope fixes delivered with this ADR.** Availability checks resolve every resource against the caller's scope
+  first; an out-of-scope id and an unknown id give the same 404 (PA-12). Main sites (no parent) are drawn and listed in
+  occupancy like sub-sites; ancestors outside scope are returned only as `view: CONTEXT` (code, name, parent) so the
+  tree stays readable without revealing location, resources or occupant (PA-14).
+
+ADR-004 (in-process authorisation) remains in force until OpenFGA is introduced in phase 3 of the production
+programme; the action model above is the contract the OpenFGA model must reproduce.

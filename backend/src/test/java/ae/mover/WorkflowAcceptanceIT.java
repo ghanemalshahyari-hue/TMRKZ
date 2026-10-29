@@ -157,7 +157,8 @@ class WorkflowAcceptanceIT extends IntegrationTest {
                 stage("parallel", "ALL", false, "FACILITIES_REVIEWER|RESOURCE_ORG"),
                 stage("final_approval", "ALL", true, "APPROVER|ANY")), null);
         // Facilities of two administering organisations: only an all-scope creator may combine them in one request.
-        Api req = login("admin");
+        person("global", role("GLOBALREQ", "ALL", "VIEW", "CREATE", "EDIT"), root);
+        Api req = login("global");
         Api fac = login("fac");
         Api fac2 = login("fac2");
         UUID id = req.submitted(allType, orgA, List.of(res1, resB), day("2027-12-01"), day("2027-12-02"));

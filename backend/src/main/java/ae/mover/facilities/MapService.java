@@ -126,7 +126,7 @@ public class MapService {
     }
 
     public List<MapPackage> packages(AccessContext ctx) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_FACILITIES);
         return jdbc.sql("select * from map_package where status = 'ACTIVE' order by code, version desc, format desc")
                 .query((rs, n) -> new MapPackage(rs.getString("id"), rs.getString("code"), rs.getString("name"),
                         rs.getString("source"), rs.getString("license"), rs.getString("attribution_html"),
@@ -139,7 +139,7 @@ public class MapService {
     }
 
     public PackageContent content(AccessContext ctx, UUID id) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_FACILITIES);
         Map<String, Object> row = jdbc.sql("select local_path, format, content_sha256 from map_package where id = :id and status = 'ACTIVE'")
                 .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         Path file = mapRoot.resolve((String) row.get("local_path")).normalize();
@@ -156,14 +156,15 @@ public class MapService {
     }
 
     public record Feature(String siteId, String code, String name, double lat, double lng, String availability,
-                          String administrative, @JsonInclude(JsonInclude.Include.NON_NULL) Ref occupantOrg, int pendingCount) {
+                          String administrative, @JsonInclude(JsonInclude.Include.NON_NULL) Ref occupantOrg, int pendingCount,
+                          @JsonInclude(JsonInclude.Include.ALWAYS) String parentId) {
     }
 
     public record MapFeatures(String asOf, String dataVersion, Map<String, Object> coverage, List<Feature> features) {
     }
 
     public MapFeatures features(AccessContext ctx, String bbox, String time) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_FACILITIES);
         Instant at = time == null || time.isBlank() ? clock.instant() : Times.parse(time, "time");
         Instant until = at.plus(Duration.ofDays(1));
         double[] box = null;
@@ -202,7 +203,8 @@ public class MapService {
         Map<UUID, Ref> occupants = occupants(at, until);
         List<Feature> features = new ArrayList<>();
         for (SiteService.SiteView s : sites.list(ctx)) {
-            if (s.location() == null || s.parentId() == null) {
+            // Main sites (no parent) are drawn like sub-sites; tree-context ancestors are outside scope and never drawn.
+            if (s.location() == null || SiteService.CONTEXT.equals(s.view())) {
                 continue;
             }
             if (box != null && (s.location().lng() < box[0] || s.location().lng() > box[2]
@@ -213,7 +215,7 @@ public class MapService {
             String availability = status.getOrDefault(id, pending.containsKey(id) ? "PENDING" : "FREE");
             String administrative = "BUSY".equals(availability) ? "APPROVED" : pending.containsKey(id) ? "PENDING" : "NONE";
             features.add(new Feature(s.id(), s.code(), s.name(), s.location().lat(), s.location().lng(), availability,
-                    administrative, "FULL".equals(s.view()) ? occupants.get(id) : null, pending.getOrDefault(id, 0)));
+                    administrative, "FULL".equals(s.view()) ? occupants.get(id) : null, pending.getOrDefault(id, 0), s.parentId()));
         }
         String dataVersion = jdbc.sql("select coalesce(max(updated_at), now())::text from reservation").query(String.class).single();
         return new MapFeatures(at.toString(), dataVersion, coverage, features);
@@ -267,7 +269,7 @@ public class MapService {
     }
 
     public Grid grid(AccessContext ctx, String from, Integer days) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_FACILITIES);
         LocalDate start = from == null ? LocalDate.now(clock.withZone(Times.DISPLAY_ZONE)) : Times.parseDate(from, "from");
         int n = days == null ? 7 : Math.max(1, Math.min(days, 31));
         List<String> dayList = new ArrayList<>();
@@ -283,7 +285,7 @@ public class MapService {
         }
         List<GridRow> rows = new ArrayList<>();
         for (SiteService.SiteView s : sites.list(ctx)) {
-            if (s.parentId() == null) {
+            if (SiteService.CONTEXT.equals(s.view())) {
                 continue;
             }
             UUID id = UUID.fromString(s.id());
@@ -303,7 +305,7 @@ public class MapService {
     }
 
     public CheckResult check(AccessContext ctx, CheckInput in) {
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_FACILITIES);
         if (in == null || in.resourceIds() == null || in.resourceIds().isEmpty()) {
             throw ApiException.validation("حدد المرافق المطلوب فحصها.");
         }
@@ -312,7 +314,13 @@ public class MapService {
         if (start == null || (end != null && !end.isAfter(start))) {
             throw ApiException.validation("حدد فترة صحيحة.");
         }
-        List<UUID> ids = in.resourceIds().stream().map(UUID::fromString).toList();
+        List<UUID> ids;
+        try {
+            ids = in.resourceIds().stream().map(UUID::fromString).toList();
+        } catch (IllegalArgumentException e) {
+            throw ApiException.notFound();
+        }
+        sites.requireVisibleResources(ctx, ids);
         List<ReservationService.Conflict> conflicts = reservations.conflicts(ids, start, end,
                 in.excludeReservationId() == null ? null : UUID.fromString(in.excludeReservationId()));
         int pending = jdbc.sql("""

@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ae.mover.access.AccessContext;
 import ae.mover.access.AccessService;
-import ae.mover.access.Permission;
 import ae.mover.access.ViewLevel;
 import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
@@ -53,15 +52,14 @@ public class AttachmentService {
      */
     @Transactional
     public RequestViews.AttachmentView upload(AccessContext ctx, UUID requestId, String fieldId, String fileName, byte[] bytes) {
-        Map<String, Object> r = jdbc.sql("select status, created_by, number from request where id = :id for update")
+        Map<String, Object> r = jdbc.sql("select status, created_by, owner_org_id, number from request where id = :id for update")
                 .param("id", requestId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         var scope = access.requestScope(requestId);
         if (ctx.viewLevel(scope) != ViewLevel.FULL) {
             throw ApiException.notFound();
         }
         String status = (String) r.get("status");
-        boolean creatorEditing = ctx.personId().equals(r.get("created_by")) && ctx.has(Permission.CREATE)
-                && ("DRAFT".equals(status) || "RETURNED".equals(status));
+        boolean creatorEditing = ctx.mayModify((UUID) r.get("created_by"), (UUID) r.get("owner_org_id"), status);
         boolean evidence = "APPROVED".equals(status) && "evidence".equals(fieldId)
                 && jdbc.sql("select role_code, target_org_id from execution_task where request_id = :r and status = 'OPEN'")
                 .param("r", requestId).query().listOfRows().stream()

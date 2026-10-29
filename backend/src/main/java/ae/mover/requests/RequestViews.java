@@ -265,7 +265,7 @@ public class RequestViews {
                     }).list();
         }
         boolean creator = ctx.personId().equals(r.get("created_by"));
-        boolean editable = creator && ctx.has(Permission.CREATE) && ("DRAFT".equals(status) || "RETURNED".equals(status));
+        boolean editable = ctx.mayModify((UUID) r.get("created_by"), (UUID) r.get("owner_org_id"), status);
         List<ExecutionTaskView> exec = executionTasks(ctx, id, scope);
         boolean canClose = "APPROVED".equals(status) && exec.stream().allMatch(e -> "DONE".equals(e.status()))
                 && (creator || ctx.grants().stream().anyMatch(g -> g.has(Permission.REVIEW) && g.covers(scope.relatedOrgs(), scope.siteIds())));
@@ -363,11 +363,13 @@ public class RequestViews {
 
     private List<HistoryItem> history(UUID requestId) {
         return jdbc.sql("""
-                select action, actor_name, actor_role, occurred_at, reason, detail->>'note' as note from audit_event
+                select action, actor_name, actor_role, occurred_at, reason, detail->>'note' as note,
+                       coalesce((detail->>'byRequester')::boolean, false) as by_requester from audit_event
                 where entity_type = 'REQUEST' and entity_id = :id order by id""")
                 .param("id", requestId.toString())
                 .query((rs, n) -> new HistoryItem(AuditService.LABELS.getOrDefault(rs.getString("action"), rs.getString("action")),
-                        rs.getString("actor_role") == null ? rs.getString("actor_name") : rs.getString("actor_name") + " — " + rs.getString("actor_role"),
+                        (rs.getString("actor_role") == null ? rs.getString("actor_name") : rs.getString("actor_name") + " — " + rs.getString("actor_role"))
+                                + (rs.getBoolean("by_requester") ? " (مقدم الطلب)" : ""),
                         Db.iso(rs, "occurred_at"), rs.getString("reason") != null ? rs.getString("reason") : rs.getString("note")))
                 .list();
     }

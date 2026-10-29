@@ -82,7 +82,7 @@ configuration changes never require data migration of in-flight requests.
 ## Running the tests
 
 ```sh
-sh ops/test-backend.sh                                        # 33 backend acceptance tests on a throw-away PostgreSQL
+sh ops/test-backend.sh                                        # 36 backend acceptance tests on a throw-away PostgreSQL
 MOVER_DEMO_PASSWORD=... node tests/acceptance/journey.mjs      # end-to-end journey through the web entry point
 (cd frontend && npm ci && npm test && npm run build)          # frontend unit tests and type-checked build
 python ops/tools/gen-openapi.py                               # regenerate docs/api/openapi.json from the controllers

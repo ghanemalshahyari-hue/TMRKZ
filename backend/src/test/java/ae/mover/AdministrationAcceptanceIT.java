@@ -15,13 +15,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 /** Signature failure, map coverage, structure import, site tree integrity (AT-27, 31, 32; R-01). */
 class AdministrationAcceptanceIT extends IntegrationTest {
 
-    UUID root, orgA, siteA, resA;
+    UUID root, orgA, main, siteA, resA;
 
     @BeforeEach
     void fixtures() {
         root = org("ROOT", null);
         orgA = org("A", root);
-        siteA = site("SA", site("MAIN", null, root), orgA);
+        main = site("MAIN", null, root);
+        siteA = site("SA", main, orgA);
         resA = resource("RA", siteA, null, 0);
         person("req", "REQUESTER", orgA);
         person("apr", "APPROVER", root);
@@ -72,7 +73,42 @@ class AdministrationAcceptanceIT extends IntegrationTest {
         for (JsonNode t : admin.get("/request-types").body()) {
             assertThat(t.path("formVersion").path("schema").path("fields").isArray()).isTrue();
         }
-        assertThat(admin.get("/reports/kpis?from=2026-09-27T20:00:00.000Z&to=2026-11-27T20:00:00.000Z").status()).isEqualTo(200);
+        // Indicators summarise request content: a viewer reads them, configuration rights alone do not.
+        String kpis = "/reports/kpis?from=2026-09-27T20:00:00.000Z&to=2026-11-27T20:00:00.000Z";
+        assertThat(login("apr").get(kpis).status()).isEqualTo(200);
+        assertThat(admin.get(kpis).status()).isEqualTo(403);
+    }
+
+    @Test
+    @DisplayName("Main sites (no parent) appear on the map and in occupancy like sub-sites; ancestors outside scope stay tree context only")
+    void mainSitesShown() {
+        UUID hq = site("HQ", null, orgA);
+        UUID hall = resource("HQR", hq, null, 0);
+        UUID annex = site("HQS", hq, orgA);
+        Api req = login("req");
+        List<String> drawn = new java.util.ArrayList<>();
+        req.get("/map/features").body().path("features").forEach(f -> drawn.add(f.path("siteId").asText()));
+        assertThat(drawn).contains(hq.toString(), annex.toString(), siteA.toString()).doesNotContain(main.toString());
+        List<String> rows = new java.util.ArrayList<>();
+        req.get("/availability/grid?days=1").body().path("rows").forEach(r -> rows.add(r.path("siteId").asText()));
+        assertThat(rows).contains(hq.toString(), annex.toString()).doesNotContain(main.toString());
+
+        // MAIN belongs to the parent organisation: the requester of A sees it only to place SA in the tree.
+        JsonNode context = null;
+        for (JsonNode s : req.get("/sites").body()) {
+            if (s.path("id").asText().equals(main.toString())) {
+                context = s;
+            }
+        }
+        assertThat(context).isNotNull();
+        assertThat(context.path("view").asText()).isEqualTo("CONTEXT");
+        assertThat(context.path("location").isNull()).isTrue();
+        assertThat(context.path("resources").size()).isZero();
+        assertThat(req.get("/sites/" + main).status()).isEqualTo(404);
+
+        assertThat(req.post("/availability/check", Map.of("resourceIds", List.of(hall.toString()),
+                "start", "2028-11-01T00:00:00Z", "end", "2028-11-02T00:00:00Z")).status()).isEqualTo(200);
+        assertThat(login("apr").get("/map/features").body().path("features").toString()).contains(main.toString());
     }
 
     @Test

@@ -19,6 +19,14 @@ Date: 29 October 2026 · Version 1.0.0
 - **Maintenance update (29 Oct 2026):** backend runtime/toolchain uplifted to Java 25 LTS (Temurin 25) in Maven build,
   runtime image, and backend test runner image.
 
+- **Administrative production programme (from 29 Oct 2026, `docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md`):**
+  - Step 1 done — independent actions (EDIT separate from CREATE; access, facility and configuration administration
+    separate from content), requester decisions under the same stage rule, availability checks confined to scope,
+    main sites on the map and occupancy (ADR-013, PA-10/12/13/14).
+  - Steps 2–7 open — Oracle HR mirror and hourly sync, Keycloak/LDAP and removal of demo sign-in, OpenFGA and the
+    permissions studio, PostGIS boundaries and the map manager, visual rule editor, DSS signatures and seals, isolated
+    bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
+
 Test evidence: 36 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
 17 frontend tests — see `TRACEABILITY.md`.
 

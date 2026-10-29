@@ -110,12 +110,13 @@ public class Bootstrap implements ApplicationRunner {
 
     private void seedRoles() {
         Object[][] roles = {
-                {"SYSTEM_ADMIN", "مدير النظام", "VIEW,CREATE,REVIEW,APPROVE,EXPORT,CONFIGURE,AUDIT,EXECUTE", "ALL", false, true, 1},
-                {"REQUESTER", "مقدم الطلب", "VIEW,CREATE,EXECUTE", "ORGANIZATION", false, false, 2},
+                // Configuration rights never imply reading request content or deciding (owner decision 2026-10-29).
+                {"SYSTEM_ADMIN", "مدير النظام", "CONFIGURE,MANAGE_ACCESS,MANAGE_FACILITIES,VIEW_SOURCE_IDENTIFIERS", "ALL", false, true, 1},
+                {"REQUESTER", "مقدم الطلب", "VIEW,CREATE,EDIT,EXECUTE", "ORGANIZATION", false, false, 2},
                 {"FACILITIES_REVIEWER", "مراجع المرافق", "VIEW,REVIEW,EXPORT,EXECUTE", "ALL", false, false, 3},
-                {"ORG_MANAGER", "مدير الجهة", "VIEW,CREATE,REVIEW,EXPORT", "ORGANIZATION", false, false, 4},
+                {"ORG_MANAGER", "مدير الجهة", "VIEW,CREATE,EDIT,REVIEW,EXPORT", "ORGANIZATION", false, false, 4},
                 {"APPROVER", "صاحب الاعتماد", "VIEW,REVIEW,APPROVE,EXPORT", "ALL", false, false, 5},
-                {"LIMITED_VIEWER", "اطلاع محدود", "VIEW", "SITE", true, false, 6},
+                {"LIMITED_VIEWER", "اطلاع محدود", "VIEW_SUMMARY", "SITE", true, false, 6},
                 {"AUDITOR", "مدقق السجلات", "VIEW,AUDIT", "ALL", false, false, 7}};
         for (Object[] r : roles) {
             jdbc.sql("""
@@ -299,11 +300,11 @@ public class Bootstrap implements ApplicationRunner {
                 .ifPresent(t -> decisions.decide(facilities, UUID.fromString(t.id()),
                         new Commands.DecisionInput("APPROVE", "المرفق مناسب للفترة المطلوبة.", null, 1, null), null));
 
-        AccessContext admin = ctx("admin");
-        UUID second = requests.create(admin, new Commands.DraftInput("TEMP_OCCUPANCY", "LIST", orgIds.get("GA").toString(),
+        AccessContext gaManager = ctx("manager_ga");
+        UUID second = requests.create(gaManager, new Commands.DraftInput("TEMP_OCCUPANCY", "LIST", orgIds.get("GA").toString(),
                 List.of(resourceIds.get("R-04").toString()), List.of(), List.of(), "إشغال مؤقت — قاعة الاجتماعات", "DAYS",
                 period("2026-11-05", "2026-11-06"), Map.of("reason", "تنظيم اجتماع إداري خلال الفترة المطلوبة."), null, null));
-        requests.submit(admin, second, new Commands.SubmitInput(0, null), null);
+        requests.submit(gaManager, second, new Commands.SubmitInput(0, null), null);
     }
 
     private static Commands.PeriodInput period(String start, String end) {

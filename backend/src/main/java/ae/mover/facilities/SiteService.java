@@ -109,7 +109,13 @@ public class SiteService {
         return out;
     }
 
-    /** Visible sites. Ancestors of visible sites are included as summary context (name only). */
+    /** View value of an ancestor that is listed only to place visible sites in the tree. */
+    public static final String CONTEXT = "CONTEXT";
+
+    /**
+     * Visible sites, main (no parent) and sub-sites alike. Ancestors outside the actor's scope are included only as
+     * tree context ({@link #CONTEXT}): code, name and parent — never location, resources, capacity or occupant.
+     */
     public List<SiteView> list(AccessContext ctx) {
         List<SiteRow> all = rows("", Map.of());
         Map<UUID, SiteRow> byId = new HashMap<>();
@@ -119,11 +125,13 @@ public class SiteService {
             ViewLevel v = ctx.siteView(s.id(), Set.of(), s.orgId());
             if (v != ViewLevel.NONE) {
                 levels.put(s.id(), v);
-                UUID p = s.parentId();
-                while (p != null && !levels.containsKey(p)) {
-                    levels.put(p, ViewLevel.SUMMARY);
-                    p = byId.get(p) == null ? null : byId.get(p).parentId();
-                }
+            }
+        }
+        Set<UUID> context = new java.util.HashSet<>();
+        for (UUID id : List.copyOf(levels.keySet())) {
+            UUID p = byId.get(id).parentId();
+            while (p != null && !levels.containsKey(p) && context.add(p)) {
+                p = byId.get(p) == null ? null : byId.get(p).parentId();
             }
         }
         Map<UUID, List<ResourceView>> resources = resourcesBySite();
@@ -132,9 +140,28 @@ public class SiteService {
             ViewLevel v = levels.get(s.id());
             if (v != null) {
                 out.add(view(s, v, resources.getOrDefault(s.id(), List.of())));
+            } else if (context.contains(s.id())) {
+                out.add(new SiteView(s.id().toString(), s.code(), s.name(), s.kind(),
+                        s.parentId() == null ? null : s.parentId().toString(), s.status(), null, null, null, List.of(), CONTEXT));
             }
         }
         return out;
+    }
+
+    /**
+     * Fails with "not found" unless every resource is in the actor's scope. An unknown id and an out-of-scope id give
+     * the same answer, so an availability check cannot confirm that a resource exists, nor reveal its name or requests.
+     */
+    public void requireVisibleResources(AccessContext ctx, List<UUID> resourceIds) {
+        for (UUID rid : resourceIds) {
+            Map<String, Object> res = jdbc.sql("""
+                    select r.site_id, sr.organization_id from resource r
+                    left join site_responsibility sr on sr.site_id = r.site_id and sr.valid_to is null where r.id = :id""")
+                    .param("id", rid).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
+            if (ctx.siteView((UUID) res.get("site_id"), Set.of(), (UUID) res.get("organization_id")) == ViewLevel.NONE) {
+                throw ApiException.notFound();
+            }
+        }
     }
 
     private SiteView view(SiteRow s, ViewLevel v, List<ResourceView> resources) {
@@ -175,8 +202,8 @@ public class SiteService {
 
     @Transactional
     public SiteView create(AccessContext ctx, SiteInput in) {
-        ctx.require(Permission.CONFIGURE);
         validate(in);
+        requireFacilityManager(ctx, UUID.fromString(in.responsibleOrgId()));
         UUID id = UUID.randomUUID();
         Instant now = clock.instant();
         try {
@@ -200,9 +227,10 @@ public class SiteService {
 
     @Transactional
     public SiteView update(AccessContext ctx, UUID id, SiteInput in) {
-        ctx.require(Permission.CONFIGURE);
         validate(in);
         SiteRow current = rows("where s.id = :id", Map.of("id", id)).stream().findFirst().orElseThrow(ApiException::notFound);
+        requireFacilityManager(ctx, current.orgId());
+        requireFacilityManager(ctx, UUID.fromString(in.responsibleOrgId()));
         Instant now = clock.instant();
         try {
             jdbc.sql("""
@@ -231,7 +259,8 @@ public class SiteService {
 
     @Transactional
     public void retire(AccessContext ctx, UUID id) {
-        ctx.require(Permission.CONFIGURE);
+        SiteRow current = rows("where s.id = :id", Map.of("id", id)).stream().findFirst().orElseThrow(ApiException::notFound);
+        requireFacilityManager(ctx, current.orgId());
         int n = jdbc.sql("update site set status = 'RETIRED', version = version + 1 where id = :id and status = 'ACTIVE'")
                 .param("id", id).update();
         if (n == 0) {
@@ -247,11 +276,14 @@ public class SiteService {
 
     @Transactional
     public ResourceView createResource(AccessContext ctx, ResourceInput in) {
-        ctx.require(Permission.CONFIGURE);
+        ctx.require(Permission.MANAGE_FACILITIES);
         if (in.siteId() == null || in.code() == null || in.code().isBlank() || in.name() == null || in.name().isBlank()
                 || !List.of("EXCLUSIVE", "SHARED").contains(in.policy())) {
             throw ApiException.validation("أكمل بيانات المورد: الموقع والرمز والاسم وسياسة الحجز.");
         }
+        SiteRow site = rows("where s.id = :id", Map.of("id", UUID.fromString(in.siteId()))).stream().findFirst()
+                .orElseThrow(() -> ApiException.validation("الموقع غير موجود."));
+        requireFacilityManager(ctx, site.orgId());
         UUID id = UUID.randomUUID();
         try {
             jdbc.sql("""
@@ -268,6 +300,16 @@ public class SiteService {
         audit.recordAs(ctx.actor(), "RESOURCE_CREATED", "RESOURCE", id.toString(), in.name(), Map.of("code", in.code()), null);
         return resourcesBySite().values().stream().flatMap(List::stream).filter(r -> r.id().equals(id.toString()))
                 .findFirst().orElseThrow();
+    }
+
+    /** MANAGE_FACILITIES over the administering organisation; configuration rights alone are not enough. */
+    private static void requireFacilityManager(AccessContext ctx, UUID orgId) {
+        boolean allowed = orgId == null
+                ? ctx.grants().stream().anyMatch(g -> g.has(Permission.MANAGE_FACILITIES) && g.isAll())
+                : ctx.canFor(Permission.MANAGE_FACILITIES, orgId);
+        if (!allowed) {
+            throw ApiException.forbidden("إدارة المرافق تتطلب صلاحية إدارة المرافق على الجهة المسؤولة.");
+        }
     }
 
     private void validate(SiteInput in) {

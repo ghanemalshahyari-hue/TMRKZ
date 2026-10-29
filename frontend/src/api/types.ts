@@ -1,6 +1,19 @@
 // Mirrors docs/api/API_V1.md. Keep in sync with the backend contract.
 
-export type Permission = 'VIEW' | 'CREATE' | 'REVIEW' | 'APPROVE' | 'EXPORT' | 'CONFIGURE' | 'AUDIT' | 'EXECUTE';
+export type Permission =
+  | 'VIEW'
+  | 'VIEW_SUMMARY'
+  | 'CREATE'
+  | 'EDIT'
+  | 'REVIEW'
+  | 'APPROVE'
+  | 'EXPORT'
+  | 'EXECUTE'
+  | 'MANAGE_FACILITIES'
+  | 'MANAGE_ACCESS'
+  | 'CONFIGURE'
+  | 'AUDIT'
+  | 'VIEW_SOURCE_IDENTIFIERS';
 export type Scope = 'ALL' | 'ORGANIZATION' | 'SITE' | 'ORGANIZATION_AND_SITE';
 export type Ref = { id: string; name: string; code?: string };
 export type Period = { start: string; end: string | null };
@@ -8,7 +21,7 @@ export type Page<T> = { items: T[]; page: number; size: number; total: number };
 
 export type RequestStatus = 'DRAFT' | 'SUBMITTED' | 'RETURNED' | 'REJECTED' | 'APPROVED' | 'CLOSED';
 export type RequestKind = 'NEW_RESERVATION' | 'EXTENSION' | 'MODIFICATION' | 'CANCELLATION' | 'EVACUATION';
-export type ViewLevel = 'FULL' | 'SUMMARY';
+export type ViewLevel = 'FULL' | 'SUMMARY' | 'CONTEXT';
 export type Availability = 'FREE' | 'PENDING' | 'BUSY';
 export type Administrative = 'APPROVED' | 'PENDING' | 'NONE';
 
@@ -147,6 +160,7 @@ export type MapFeature = {
   administrative: Administrative;
   occupantOrg?: Ref;
   pendingCount: number;
+  parentId: string | null;
 };
 export type MapFeatures = {
   asOf: string;

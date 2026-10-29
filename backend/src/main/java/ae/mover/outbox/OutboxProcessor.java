@@ -172,7 +172,7 @@ public class OutboxProcessor {
         for (Map<String, Object> p : people) {
             Actor actor = new Actor((UUID) p.get("id"), (String) p.get("username"), (String) p.get("display_name"), null);
             var ctx = access.load(actor, clock.instant());
-            if (!ctx.has(Permission.VIEW) || ctx.viewLevel(access.requestScope(requestId)) == ae.mover.access.ViewLevel.NONE) {
+            if (!ctx.viewer() || ctx.viewLevel(access.requestScope(requestId)) == ae.mover.access.ViewLevel.NONE) {
                 continue;
             }
             notify(eventId, actor.personId(), "INFO_COPY", "للعلم: اعتماد " + typeName + " — " + number,

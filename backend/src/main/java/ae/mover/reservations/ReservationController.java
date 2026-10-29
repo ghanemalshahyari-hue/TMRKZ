@@ -50,7 +50,7 @@ public class ReservationController {
                                           @RequestParam(required = false) UUID resourceId,
                                           @RequestParam(required = false) String status) {
         AccessContext ctx = access.context(actor);
-        ctx.require(Permission.VIEW);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_FACILITIES);
         StringBuilder where = new StringBuilder("true");
         Map<String, Object> params = new HashMap<>();
         if (resourceId != null) {

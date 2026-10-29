@@ -28,11 +28,14 @@ function viewFromHash(): View {
 /** Server-enforced permissions decide what each screen shows; this mirrors them for navigation only. */
 function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: boolean): boolean {
   if (view === 'docs') return false;
-  if (summaryOnly && !['map', 'calendar'].includes(view)) return true;
-  if (['workflow', 'forms', 'permissions', 'settings'].includes(view)) return !can('CONFIGURE');
+  if (['workflow', 'forms', 'settings'].includes(view)) return !can('CONFIGURE');
+  if (view === 'permissions') return !can('MANAGE_ACCESS');
+  if (view === 'org') return !(can('VIEW') || can('MANAGE_ACCESS') || can('MANAGE_FACILITIES') || can('CONFIGURE'));
+  if (['map', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
+  if (summaryOnly) return true;
   if (view === 'review') return !can('REVIEW');
   if (view === 'audit') return !can('AUDIT');
-  return !can('VIEW');
+  return !(can('VIEW') || can('CREATE'));
 }
 
 export function App() {

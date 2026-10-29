@@ -29,6 +29,16 @@ public record Grant(
         return permissions.contains(p);
     }
 
+    /** Grants some view of request and site content (full or summary). */
+    public boolean viewer() {
+        return permissions.contains(Permission.VIEW) || permissions.contains(Permission.VIEW_SUMMARY);
+    }
+
+    /** Full view: VIEW without the legacy summary-only role flag. */
+    public boolean fullViewer() {
+        return permissions.contains(Permission.VIEW) && !summaryOnly;
+    }
+
     public boolean isAll() {
         return "ALL".equals(scope);
     }

@@ -141,7 +141,7 @@ export function RequestsPage() {
                       <StatusPill status={r.status} />
                     </td>
                     <td>
-                      {(r.status === 'DRAFT' || r.status === 'RETURNED') && r.createdByMe && app.can('CREATE') ? (
+                      {r.createdByMe && ((r.status === 'DRAFT' && (app.can('CREATE') || app.can('EDIT'))) || (r.status === 'RETURNED' && app.can('EDIT'))) ? (
                         <button className="button compact" onClick={() => app.openWizard({ origin: 'LIST', requestId: r.id })}>
                           تعديل وإرسال
                         </button>
