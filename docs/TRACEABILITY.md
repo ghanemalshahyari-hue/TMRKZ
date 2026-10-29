@@ -21,7 +21,7 @@ decision. Backend tests live in `backend/src/test/java/ae/mover/*IT.java`; `jour
 | R-11 | Request from map or list, same rules | single `POST /requests`, `origin` recorded | `mapAndListSameRules` (AT-02) | Done |
 | R-12 | Configurable request scope (sites/organisations) | policy `multiSites`/`multiOrgs` + per-type flags, checked at submit | `RequestService.doSubmit` | Done |
 | R-13 | Transfer, temporary occupancy, extension, modification, cancellation, evacuation | six request types; kinds applied in `DecisionService.finalizeApproval` | `changes`, `evacuation` | Done |
-| R-14 | Configurable fields/attachments with restricted rules | `FormSchemas`, `RuleLanguage` (visibleWhen/requiredWhen, typed ops) | `ruleLanguageRejectsCode`, `versionsArePinned` | Partial — studio UI edits fields, kinds, visibility, requirement and change policy; rule conditions are edited through the API (UI editor not built) |
+| R-14 | Configurable fields/attachments with restricted rules | `FormSchemas`, `RuleLanguage` (visibleWhen/requiredWhen, typed ops), `RuleEditor`, `FieldRulesDialog`, `FormService.evaluate` | `ruleLanguageRejectsCode`, `versionsArePinned`, `ruleTryIt`; browser RULES-01, RULES-02 | Done |
 | R-15 | Published, immutable form versions | `form_version` + immutability trigger; draft → validate → publish | `versionsArePinned` (AT-13) | Done |
 | R-16 | Pending request is not a reservation | reservations only in `finalizeApproval` | `fullJourney` (AT-03) | Done |
 | R-17 | Reservation only after approval, atomically | shared Flowable/JDBC transaction | AT-09/10/11 | Done |
@@ -152,7 +152,7 @@ is missing; nothing is simulated as connected. Evidence lists the command whose 
 | PA-18 | Pending request reserves nothing; two concurrent approvals, one wins | `DecisionService.finalizeApproval`, exclusion constraints | AT-03, AT-10 | Pass | `sh ops/test-backend.sh` | — |
 | PA-19 | Multi-resource request rolls back entirely on one conflict | shared transaction | AT-11 | Pass | `sh ops/test-backend.sh` | — |
 | PA-20 | Open-ended, hour and day periods; boundaries and handover | `[start,end)`, unbounded ranges | AT-12 | Pass | `sh ops/test-backend.sh` | — |
-| PA-21 | New forms/workflows leave running requests; rule editor tested from the UI | pinned versions | AT-13, AT-14 | Partial | `sh ops/test-backend.sh` | Visual rule editor pending (Phase 5) |
+| PA-21 | New forms/workflows leave running requests; rule editor tested from the UI | pinned versions; `RuleEditor` (forms: visibility, requirement, affected stages; workflows: stage conditions), server "try it" and simulation with sample values | AT-13, AT-14, `WorkflowAcceptanceIT.ruleTryIt`; browser RULES-01 … RULES-04 (rules authored by clicks, tried on the server, published, enforced on submission, stage skipped/run in simulation) | Pass | `sh ops/test-backend.sh WorkflowAcceptanceIT`; `node tests/acceptance/rule-editor.mjs` | No action to migrate running requests to a newer version (they keep theirs) |
 | PA-22 | Person signature and organisation seal with real certificates; revoked/expired/untrusted fail | — | — | Open | — | Phase 6; enterprise provider and certificates required |
 | PA-23 | Provider outage, version change or conflict after signing: no misleading reservation/document | PKI mode fails closed | AT-27 | Partial | `sh ops/test-backend.sh` | DSS signing job pending (Phase 6) |
 | PA-24 | Summary view withholds fields and attachments server-side | `RequestViews`, VIEW_SUMMARY | AT-20 | Pass | `sh ops/test-backend.sh` | — |

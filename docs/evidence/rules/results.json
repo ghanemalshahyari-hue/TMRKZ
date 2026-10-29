@@ -1,0 +1,35 @@
+{
+  "run": "2026-10-29T09:00:43.791Z",
+  "results": [
+    {
+      "id": "RULES-01",
+      "title": "Visibility and requirement built by clicks, tried on the server, published as the typed rule",
+      "result": "PASS",
+      "detail": "3 يوم ← لا يظهر · 10 يوم ← اختياري · 40 يوم ← مطلوب · المخزن مطابق"
+    },
+    {
+      "id": "RULES-02",
+      "title": "The server enforces the published rule on submission (no client trust)",
+      "result": "PASS",
+      "detail": "طلب 45 يوماً دون «المرجع الإداري» ← رفض 400 من الخادم"
+    },
+    {
+      "id": "RULES-03",
+      "title": "A stage made conditional by clicks; the simulation skips or runs it by sample values",
+      "result": "PASS",
+      "detail": "موارد 1 ← المرحلة الأولى تُتخطى · موارد 2 ← تُنفذ"
+    },
+    {
+      "id": "RULES-04",
+      "title": "Clean-up through the interface: rules removed and published as a new version",
+      "result": "PASS"
+    }
+  ],
+  "setupApiCalls": [
+    "GET /forms, /form-versions/{id}: published rule read back",
+    "POST /requests (draft, 45 days): 200",
+    "POST /requests/{id}/submit: 400"
+  ],
+  "externalRequests": [],
+  "consoleErrors": []
+}

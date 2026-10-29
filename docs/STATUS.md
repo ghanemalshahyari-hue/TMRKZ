@@ -51,8 +51,13 @@ Date: 29 October 2026 · Version 1.0.0
     grants with explicit organisation sets, sites, resources, AND/OR and explicit ALL; access managers bounded by their
     own authority and grantable roles; a versioned role policy (draft, impact, publication with the model id pinned,
     recorded rollback); «مركز الصلاحيات» with plain-Arabic scopes and "what can this person do and why".
-  - Steps 5–7 open — visual rule editor, DSS signatures and seals, isolated bundle with UI and load acceptance. See the
-    PA matrix in `TRACEABILITY.md`.
+  - Step 5 in progress — visual rule editor done: visibility and requirement conditions of form fields, the stages a
+    field change restarts, and stage conditions of workflows are built from lists (all / any / not, typed operators,
+    literal values) with a plain-Arabic sentence; "try it" evaluates the unsaved form on the server
+    (`POST /forms/evaluate`) and the workflow simulation takes sample values. Open in step 5: per-resource
+    parent/child relation and optional capacity, explicit migration of running requests to a new version.
+  - Steps 6–7 open — DSS signatures and seals, isolated bundle with UI and load acceptance. See the PA matrix in
+    `TRACEABILITY.md`.
 
 Test evidence: backend acceptance tests on PostgreSQL + PostGIS with OpenFGA in the loop (including the map criteria,
 a 10,000-site measurement and the authorisation suite), 21 browser checks for MAP-01 … MAP-18 and 6 for the permissions
@@ -63,7 +68,7 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
 
 | Area | Limitation | Planned handling |
 |---|---|---|
-| Studio UI | Rule conditions (`visibleWhen`, `requiredWhen`, stage `condition`, `affectsStages`) are validated and enforced by the server but edited through the API; the studio shows that a condition exists. | Add a structured rule editor. |
+| Studio UI | Rule conditions are edited visually (forms and workflow stages); groups nest two levels deep in the editor (the language allows six, which the API still accepts). Running requests stay on their versions; there is no action to migrate them to a newer version. | Add an explicit, audited migration action if the owner needs one. |
 | Shared resources | Resources with policy `SHARED` take no exclusive locks; capacity accounting is not implemented. | Define capacity rules, then add a capacity check in the same transaction. |
 | Geometry | PostGIS boundaries (ADR-017). Import accepts GeoJSON and KML; Shapefile and GeoPackage are converted outside the application with an explicit CRS. Supported CRS: EPSG:4326/CRS84, 3857, 32639, 32640. | Add further formats or CRS only with converters and tests; organisation CRS decision D-01. |
 | Map backgrounds | Renderers for SVG and PNG/JPEG overlays georeferenced by corner bounds. No aerial imagery is installed (the map says so). PMTiles, MBTiles and XYZ tiles are refused at upload. | Install licensed enterprise packages through the map manager; a tile renderer needs its own decision (D-07). |

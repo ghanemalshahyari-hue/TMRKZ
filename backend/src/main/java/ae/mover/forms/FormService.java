@@ -140,6 +140,32 @@ public class FormService {
                 problems.stream().map(p -> Map.of("path", p.path(), "message", p.message())).toList());
     }
 
+    public record FieldState(String id, String label, boolean visible, boolean required) {
+    }
+
+    public record Evaluation(boolean valid, List<Map<String, String>> errors, List<FieldState> fields) {
+    }
+
+    /**
+     * Tries an unsaved schema with sample values and facts, using the server's own rule evaluation (the studio's
+     * "try it"). Nothing is stored; an invalid schema returns its problems instead of states.
+     */
+    public Evaluation evaluate(AccessContext ctx, JsonNode schema, Map<String, Object> values, Map<String, Object> facts) {
+        ctx.require(Permission.CONFIGURE);
+        List<Problem> problems = FormSchemas.validateSchema(schema);
+        if (!problems.isEmpty()) {
+            return new Evaluation(false, problems.stream().map(p -> Map.of("path", p.path(), "message", p.message())).toList(), List.of());
+        }
+        List<FieldState> out = new java.util.ArrayList<>();
+        for (JsonNode f : schema.get("fields")) {
+            boolean visible = f.path("visible").asBoolean(true) && RuleLanguage.evaluate(f.get("visibleWhen"), values, facts);
+            boolean required = visible && (f.path("required").asBoolean(false)
+                    || f.hasNonNull("requiredWhen") && RuleLanguage.evaluate(f.get("requiredWhen"), values, facts));
+            out.add(new FieldState(f.get("id").asText(), f.get("label").asText(), visible, required));
+        }
+        return new Evaluation(true, List.of(), out);
+    }
+
     @Transactional
     public FormVersionView publish(AccessContext ctx, UUID versionId) {
         ctx.require(Permission.CONFIGURE);

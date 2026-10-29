@@ -58,6 +58,14 @@ public class StudioController {
         return forms.validate(access.context(actor), id);
     }
 
+    /** Body: {schema, values, facts}. Evaluates visibility and requirement without saving anything. */
+    @PostMapping("/forms/evaluate")
+    public FormService.Evaluation evaluateForm(Actor actor, @RequestBody Map<String, Object> body) {
+        return forms.evaluate(access.context(actor), json.tree(body.get("schema")),
+                body.get("values") == null ? Map.of() : json.map(body.get("values")),
+                body.get("facts") == null ? Map.of() : json.map(body.get("facts")));
+    }
+
     @PostMapping("/form-versions/{id}/publish")
     public FormService.FormVersionView publishForm(Actor actor, @PathVariable UUID id) {
         return forms.publish(access.context(actor), id);

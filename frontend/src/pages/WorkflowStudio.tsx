@@ -1,10 +1,13 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api, urls } from '../api/client';
-import type { OrgFrom, RoleDef, SimulationResult, StudioItem, WfStage, WorkflowDefinition, WorkflowVersion } from '../api/types';
-import { Heading } from '../components/ui';
+import type { FormField, OrgFrom, RoleDef, Rule, SimulationResult, StudioItem, WfStage, WorkflowDefinition, WorkflowVersion } from '../api/types';
+import { formSubjects } from '../components/rules/FieldRulesDialog';
+import { RuleEditor } from '../components/rules/RuleEditor';
+import { Dialog, DialogHead, Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { fullTime } from '../lib/dates';
 import { ORG_FROM } from '../lib/labels';
+import { describeRule, FACT_SUBJECTS } from '../lib/rules';
 
 const EXCLUDED_ROLES = new Set(['SYSTEM_ADMIN', 'LIMITED_VIEWER', 'AUDITOR']);
 const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o)) as T;
@@ -29,7 +32,26 @@ export function WorkflowStudio() {
   const [dragged, setDragged] = useState<number | null>(null);
   const [sim, setSim] = useState<SimulationResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [conditionFor, setConditionFor] = useState<number | null>(null);
+  const [conditionDraft, setConditionDraft] = useState<Rule | null>(null);
+  const [formFields, setFormFields] = useState<FormField[]>([]);
+  const [sample, setSample] = useState<Record<string, string>>({ durationDays: '3', durationHours: '72', resourceCount: '1', participantCount: '0' });
   const item = items.find((i) => i.requestType.code === typeCode) ?? items[0];
+  const subjects = useMemo(() => formSubjects(formFields, app.requestTypes), [formFields, app.requestTypes]);
+
+  // fields of the request type's published form: the only fields a stage condition may test
+  useEffect(() => {
+    const code = item?.requestType.code;
+    if (!code) return setFormFields([]);
+    api
+      .forms()
+      .then(async (fs) => {
+        const it = fs.find((x) => x.requestType.code === code);
+        const v = it?.published ? await api.formVersion(it.published.id) : null;
+        setFormFields(v?.schema.fields ?? []);
+      })
+      .catch(() => setFormFields([]));
+  }, [item?.requestType.code]);
   const reviewerRoles = useMemo(() => roles.filter((r) => !EXCLUDED_ROLES.has(r.code)), [roles]);
   const roleName = (code: string) => roles.find((r) => r.code === code)?.name ?? code;
 
@@ -126,7 +148,13 @@ export function WorkflowStudio() {
     setBusy(true);
     try {
       const v = await saveDraft();
-      setSim(await api.simulateWorkflow(v.id));
+      const facts: Record<string, unknown> = {};
+      Object.entries(sample).forEach(([k, val]) => {
+        if (k.startsWith('value:')) {
+          if (val !== '') (facts.values = { ...((facts.values as Record<string, unknown>) ?? {}), [k.slice(6)]: Number.isNaN(Number(val)) ? val : Number(val) });
+        } else if (val !== '') facts[k] = k === 'requestType' ? val : Number(val);
+      });
+      setSim(await api.simulateWorkflow(v.id, facts));
     } catch (e) {
       app.toast((e as Error).message);
     } finally {
@@ -251,8 +279,23 @@ export function WorkflowStudio() {
                               اعتماد نهائي مع توقيع
                             </label>
                           )}
-                          {!last && s.condition && <span className="pill orange">مشروطة</span>}
+                          {!last && (
+                            <button
+                              className="button compact"
+                              onClick={() => {
+                                setConditionDraft(s.condition ?? null);
+                                setConditionFor(i);
+                              }}
+                            >
+                              {s.condition ? 'تعديل شرط المرحلة' : 'جعل المرحلة شرطية'}
+                            </button>
+                          )}
                         </div>
+                        {!last && s.condition && (
+                          <div className="stage-condition">
+                            <span className="pill orange">مشروطة</span> تُنفذ عندما: {describeRule(s.condition, subjects)}
+                          </div>
+                        )}
                       </article>
                       <span className="flow-connector" />
                     </Fragment>
@@ -347,6 +390,37 @@ export function WorkflowStudio() {
               </a>
             </p>
           )}
+          <div className="rule" />
+          <h3>قيم المحاكاة</h3>
+          <p className="micro muted">تُقيّم شروط المراحل في الخادم بهذه القيم عند «محاكاة الأثر».</p>
+          <div className="sim-inputs">
+            {FACT_SUBJECTS.filter((x) => x.kind !== 'requestType').map((x) => {
+              const k = x.key.slice(5);
+              return (
+                <label className="field" key={k}>
+                  <span>{x.label}</span>
+                  <input type="number" value={sample[k] ?? ''} onChange={(e) => setSample({ ...sample, [k]: e.target.value })} />
+                </label>
+              );
+            })}
+            {formFields
+              .filter((ff) => f?.stages.some((st) => JSON.stringify(st.condition ?? null).includes('"field":"' + ff.id + '"')))
+              .map((ff) => (
+                <label className="field" key={ff.id}>
+                  <span>{ff.label}</span>
+                  {ff.kind === 'select' ? (
+                    <select value={sample['value:' + ff.id] ?? ''} onChange={(e) => setSample({ ...sample, ['value:' + ff.id]: e.target.value })}>
+                      <option value="">—</option>
+                      {(ff.options ?? []).map((o) => (
+                        <option key={o}>{o}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input value={sample['value:' + ff.id] ?? ''} onChange={(e) => setSample({ ...sample, ['value:' + ff.id]: e.target.value })} />
+                  )}
+                </label>
+              ))}
+          </div>
           {sim && (
             <>
               <div className="rule" />
@@ -382,6 +456,36 @@ export function WorkflowStudio() {
           </p>
         </aside>
       </div>
+      <Dialog open={conditionFor !== null} onClose={() => setConditionFor(null)} className="large-dialog">
+        {conditionFor !== null && f?.stages[conditionFor] && (
+          <>
+            <DialogHead
+              eyebrow="WORKFLOW / STAGE CONDITION"
+              title={'شرط المرحلة «' + f.stages[conditionFor].name + '»'}
+              small="المرحلة تُنفذ عندما يتحقق الشرط، وتُتخطى خلاف ذلك. مرحلة الاعتماد النهائي لا تكون شرطية."
+              onClose={() => setConditionFor(null)}
+            />
+            <div className="dialog-content">
+              <RuleEditor title="تُنفذ المرحلة عندما" empty="تُنفذ دائماً" value={conditionDraft} subjects={subjects} onChange={setConditionDraft} />
+              {!formFields.length && <p className="micro muted">لا نموذج منشور لهذا النوع بعد: الشروط على معطيات الطلب فقط.</p>}
+            </div>
+            <div className="dialog-actions">
+              <button
+                className="button primary"
+                onClick={() => {
+                  setStage(conditionFor, { condition: conditionDraft });
+                  setConditionFor(null);
+                }}
+              >
+                تطبيق على المسودة
+              </button>
+              <button className="button" onClick={() => setConditionFor(null)}>
+                إلغاء
+              </button>
+            </div>
+          </>
+        )}
+      </Dialog>
     </>
   );
 }

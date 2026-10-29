@@ -324,6 +324,11 @@ export const api = {
   formVersion: (id: string) => get<FormVersion>(`/form-versions/${id}`),
   saveFormDraft: (formId: string, schema: FormSchema) => post<FormVersion>(`/forms/${formId}/drafts`, { schema }),
   validateForm: (versionId: string) => post<ValidationResult>(`/form-versions/${versionId}/validate`),
+  evaluateForm: (schema: FormSchema, values: Record<string, unknown>, facts: Record<string, unknown>) =>
+    post<{ valid: boolean; errors: { path: string; message: string }[]; fields: { id: string; label: string; visible: boolean; required: boolean }[] }>(
+      '/forms/evaluate',
+      { schema, values, facts },
+    ),
   publishForm: (versionId: string) => post<FormVersion>(`/form-versions/${versionId}/publish`),
   workflows: () => get<StudioItem[]>('/workflows'),
   workflowVersion: (id: string) => get<WorkflowVersion>(`/workflow-versions/${id}`),

@@ -238,6 +238,37 @@ class WorkflowAcceptanceIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("PA-21: the studio's \"try it\" evaluates unsaved rules on the server, stores nothing, and needs CONFIGURE")
+    void ruleTryIt() {
+        Map<String, Object> schema = Map.of("fields", List.of(
+                Map.of("id", "reason", "label", "المبرر", "kind", "textarea", "required", true, "visible", true, "changePolicy", "DESCRIPTIVE"),
+                Map.of("id", "reference", "label", "المرجع", "kind", "text", "required", false, "visible", true,
+                        "changePolicy", "DESCRIPTIVE",
+                        "visibleWhen", Map.of("fact", "durationDays", "op", "gt", "value", 7),
+                        "requiredWhen", Map.of("any", List.of(Map.of("fact", "durationDays", "op", "gt", "value", 30),
+                                Map.of("field", "reason", "op", "eq", "value", "عاجل"))))));
+        Api admin = login("admin");
+        int versions = jdbc.sql("select count(*) from form_version").query(Integer.class).single();
+        JsonNode shortStay = admin.post("/forms/evaluate", Map.of("schema", schema, "facts", Map.of("durationDays", 3))).body();
+        JsonNode longStay = admin.post("/forms/evaluate", Map.of("schema", schema, "facts", Map.of("durationDays", 10))).body();
+        JsonNode urgent = admin.post("/forms/evaluate", Map.of("schema", schema, "facts", Map.of("durationDays", 10),
+                "values", Map.of("reason", "عاجل"))).body();
+        assertThat(shortStay.path("fields").get(1).path("visible").asBoolean()).isFalse();
+        assertThat(longStay.path("fields").get(1).path("visible").asBoolean()).isTrue();
+        assertThat(longStay.path("fields").get(1).path("required").asBoolean()).isFalse();
+        assertThat(urgent.path("fields").get(1).path("required").asBoolean()).isTrue();
+        assertThat(jdbc.sql("select count(*) from form_version").query(Integer.class).single()).isEqualTo(versions);
+
+        Map<String, Object> broken = Map.of("fields", List.of(Map.of("id", "reference", "label", "المرجع", "kind", "text",
+                "required", false, "visible", true, "changePolicy", "DESCRIPTIVE",
+                "visibleWhen", Map.of("fact", "durationDays", "op", "gt"))));
+        JsonNode invalid = admin.post("/forms/evaluate", Map.of("schema", broken)).body();
+        assertThat(invalid.path("valid").asBoolean()).isFalse();
+        assertThat(invalid.path("errors").toString()).contains("القيمة مطلوبة");
+        assertThat(login("req").post("/forms/evaluate", Map.of("schema", schema)).status()).isEqualTo(403);
+    }
+
+    @Test
     @DisplayName("AT-33: a rule that tries to run code or a query is rejected by the rule language")
     void ruleLanguageRejectsCode() {
         String type = requestType("NEW_RESERVATION", finalOnly(), null);

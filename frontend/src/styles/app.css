@@ -73,3 +73,31 @@
 .status-list dd{margin:0;overflow-wrap:anywhere}
 @media(max-width:900px){.access-grid,.grant-form,.grant-form.with-pickers{grid-template-columns:1fr}.grant-form-pickers{border:0;padding:0}.status-list{grid-template-columns:1fr}}
 
+
+/* rule editor (forms and workflow conditions) */
+.rule-editor{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px;background:var(--paper)}
+.rule-editor-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.rule-editor-head h4{margin:0;font-size:13px}
+.rule-group{border-inline-start:3px solid #cde2d1;padding:8px 10px;border-radius:6px;background:#f7faf8}
+.rule-group.depth-1{background:#fbfaf4;border-inline-start-color:#e5d7b6}
+.rule-group.depth-2{background:#fff;border-inline-start-color:var(--line)}
+.rule-group-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.rule-group-head select{width:auto}
+.rule-items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.rule-cond{display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(120px,1fr) minmax(130px,1.2fr) auto;gap:6px;align-items:center}
+.rule-cond select,.rule-cond input{width:100%;min-width:0}
+.rule-values{display:flex;flex-wrap:wrap;gap:4px 12px}
+.rule-values .check-label,.rule-group-head .check-label{display:flex;align-items:center;gap:6px;font-size:11px}
+.rule-values input[type=checkbox],.rule-group-head input[type=checkbox]{width:auto}
+.rule-group-actions{display:flex;gap:6px;margin-top:8px}
+.rule-sentence{margin:10px 0 0;font-size:12px;line-height:1.7}
+.rule-cell{min-width:200px;max-width:320px}
+.rule-cell .micro{margin-top:4px;line-height:1.6}
+.rules-layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:16px;align-items:start}
+.rules-try h4{margin:0 0 4px}
+.rules-try .field input,.rules-try .field select{width:100%}
+.rules-result{margin-top:10px;font-size:13px}
+.stage-condition{margin-top:6px;font-size:11px;line-height:1.6;color:var(--muted)}
+.sim-inputs{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.sim-inputs .field input,.sim-inputs .field select{width:100%}
+@media(max-width:900px){.rules-layout{grid-template-columns:1fr}.rule-cond{grid-template-columns:1fr 1fr}}

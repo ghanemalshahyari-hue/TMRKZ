@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { ChangePolicy, FieldKind, FormField, FormSchema, FormVersion, StudioItem } from '../api/types';
+import { FieldRulesDialog, formSubjects } from '../components/rules/FieldRulesDialog';
 import { Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { CHANGE_POLICIES, FIELD_KINDS } from '../lib/labels';
+import { describeRule } from '../lib/rules';
 
 const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o)) as T;
 
@@ -49,7 +51,23 @@ export function FormStudio() {
   const [newKind, setNewKind] = useState<FieldKind>('text');
   const [errors, setErrors] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [rulesFor, setRulesFor] = useState<number | null>(null);
+  const [stages, setStages] = useState<{ key: string; name: string }[]>([]);
   const item = items.find((i) => i.requestType.code === typeCode) ?? items[0];
+
+  // review stages of the same request type, for "restart the affected stages"
+  useEffect(() => {
+    const code = item?.requestType.code;
+    if (!code) return setStages([]);
+    api
+      .workflows()
+      .then(async (ws) => {
+        const w = ws.find((x) => x.requestType.code === code);
+        const v = w?.published ? await api.workflowVersion(w.published.id) : null;
+        setStages((v?.definition.stages ?? []).map((s) => ({ key: s.key, name: s.name })));
+      })
+      .catch(() => setStages([]));
+  }, [item?.requestType.code]);
 
   useEffect(() => {
     api.forms().then(setItems).catch((e: Error) => app.toast(e.message));
@@ -182,6 +200,7 @@ export function FormStudio() {
                   <th>ظاهر</th>
                   <th>مطلوب</th>
                   <th>أثر التعديل</th>
+                  <th>القواعد</th>
                   <th>إجراء</th>
                 </tr>
               </thead>
@@ -192,7 +211,6 @@ export function FormStudio() {
                       <input type="text" aria-label={'اسم الحقل ' + (i + 1)} value={f.label} onChange={(e) => setField(i, { label: e.target.value })} />
                       <br />
                       <span className="latin tiny muted">{f.id}</span>
-                      {(f.visibleWhen || f.requiredWhen) && <span className="pill orange" style={{ marginInlineStart: 6 }}>قاعدة</span>}
                     </td>
                     <td>
                       <select aria-label={'نوع الحقل ' + (i + 1)} value={f.kind} onChange={(e) => setField(i, { kind: e.target.value as FieldKind })}>
@@ -227,6 +245,17 @@ export function FormStudio() {
                         ))}
                       </select>
                     </td>
+                    <td className="rule-cell">
+                      <button className="button compact" onClick={() => setRulesFor(i)} aria-label={'قواعد الحقل ' + f.label}>
+                        {f.visibleWhen || f.requiredWhen ? 'تعديل القواعد' : 'إضافة قاعدة'}
+                      </button>
+                      {f.visibleWhen && (
+                        <div className="micro muted">يظهر عندما: {describeRule(f.visibleWhen, formSubjects(draft?.fields ?? [], app.requestTypes, f.id))}</div>
+                      )}
+                      {f.requiredWhen && (
+                        <div className="micro muted">مطلوب عندما: {describeRule(f.requiredWhen, formSubjects(draft?.fields ?? [], app.requestTypes, f.id))}</div>
+                      )}
+                    </td>
                     <td>
                       <button className="icon-button" onClick={() => removeField(i)} aria-label={'حذف الحقل ' + (i + 1)}>
                         ×
@@ -251,7 +280,7 @@ export function FormStudio() {
             </button>
           </div>
           <div className="legend-note">
-            قواعد الظهور والإلزامية بلغة قواعد محددة الأنواع؛ لا يُقبل كود أو استعلام حر. سياسة أثر التعديل تحدد أي الموافقات تُعاد عند تعديل الحقل بعد الإرجاع (القرار D-06).
+            قواعد الظهور والإلزامية تُبنى من القوائم بلغة قواعد محددة الأنواع ويُتحقق منها في الخادم؛ لا يُقبل كود أو استعلام حر. سياسة أثر التعديل تحدد أي الموافقات تُعاد عند تعديل الحقل بعد الإرجاع (القرار D-06).
           </div>
         </section>
         <aside className="card field-preview">
@@ -264,6 +293,15 @@ export function FormStudio() {
             ))}
         </aside>
       </div>
+      {rulesFor !== null && draft && draft.fields[rulesFor] && (
+        <FieldRulesDialog
+          schema={draft}
+          index={rulesFor}
+          stages={stages}
+          onApply={(patch) => setField(rulesFor, patch)}
+          onClose={() => setRulesFor(null)}
+        />
+      )}
     </>
   );
 }
