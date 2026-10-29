@@ -9,7 +9,7 @@ Verify licences of the exact installed versions before production approval.
 | Component | Version | Licence | Use |
 |---|---|---|---|
 | PostgreSQL (image `postgres:17.11-alpine`) | 17.11 | PostgreSQL Licence | Database; `btree_gist` contrib extension |
-| Eclipse Temurin JRE (image) | 21.0.12.1 | GPL-2.0 with Classpath Exception | Java runtime |
+| Eclipse Temurin JRE (image) | 25.0.1_8 | GPL-2.0 with Classpath Exception | Java runtime |
 | nginx (image `nginx:1.28.3-alpine`) | 1.28.3 | BSD-2-Clause | Web entry point and reverse proxy |
 | Alpine Linux (base layers) | 3.2x | Various (mostly MIT/GPL) | Container base |
 | Spring Boot / Spring Framework | 4.0.9 / 7.0.x | Apache-2.0 | Application framework |

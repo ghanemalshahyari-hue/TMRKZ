@@ -1,6 +1,6 @@
 # MOVER — Delivery status, limits and open decisions
 
-Date: 28 October 2026 · Version 1.0.0
+Date: 29 October 2026 · Version 1.0.0
 
 ## Delivered
 
@@ -16,8 +16,10 @@ Date: 28 October 2026 · Version 1.0.0
   structure import with preview, extension/modification/cancellation/evacuation, parent/child scope locking.
 - **Phase 4 – operational readiness (initial):** offline bundle script, licence/component register, backup, restore
   and automated restore verification, local Prometheus metrics, exploratory load measurement, operations guide.
+- **Maintenance update (29 Oct 2026):** backend runtime/toolchain uplifted to Java 25 LTS (Temurin 25) in Maven build,
+  runtime image, and backend test runner image.
 
-Test evidence: 33 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
+Test evidence: 36 backend acceptance tests, a 29-check end-to-end journey through nginx, a restore verification, and
 17 frontend tests — see `TRACEABILITY.md`.
 
 ## Known limitations

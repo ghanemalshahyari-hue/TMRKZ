@@ -5,15 +5,15 @@ Status values: **Accepted** (in force), **Provisional** (in force until the name
 
 ## ADR-001 Stack and version pinning — Accepted
 
-- Backend: Java 21 (Temurin 21.0.12.1), Spring Boot **4.0.9**, Flowable **8.0.0**, PostgreSQL **17.11**, Flyway 11.14.
+- Backend: Java 25 LTS (Temurin 25.0.1_8), Spring Boot **4.0.9**, Flowable **8.0.0**, PostgreSQL **17.11**, Flyway 11.14.
 - Compatibility evidence: `flowable-dependencies-8.0.0.pom` (Maven Central) declares `spring.boot.version 4.0.2`,
   `spring.framework.version 7.0.3`, `jdk.version 17`. We stay on the same Spring Boot 4.0.x line and take the latest
   patch release (4.0.9) for security fixes; patch releases are API-compatible by Spring's policy. The whole
   acceptance suite runs against this exact combination. Flowable 7.2.0 (Spring Boot 3.5) was the alternative; it was
   not chosen because the 3.x line is at the end of its open-source support window.
 - Frontend: React 19.3.1, Vite 7.3.7, TypeScript 5.9.3, Leaflet 1.9.4 (same version as the prototype).
-- Images pinned by exact tag: `postgres:17.11-alpine`, `maven:3.9.16-eclipse-temurin-21` (build only),
-  `eclipse-temurin:21.0.12.1_1-jre-alpine`, `node:24.18.1-alpine` (build only), `nginx:1.28.3-alpine`.
+- Images pinned by exact tag: `postgres:17.11-alpine`, `maven:3.9.16-eclipse-temurin-25` (build only),
+  `eclipse-temurin:25.0.1_8-jre-alpine`, `node:24.18.1-alpine` (build only), `nginx:1.28.3-alpine`.
   `ops/airgap-bundle.sh` records the resolved image IDs in the offline bundle.
 
 ## ADR-002 Modular monolith with JDBC (no JPA) — Accepted

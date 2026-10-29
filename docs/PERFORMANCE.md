@@ -8,7 +8,7 @@ numbers describe one run on known hardware and data so that a real target can be
 | Item | Value |
 |---|---|
 | Host | Windows 11 workstation, Docker Desktop 4.77 (Linux VM), 32 vCPU, 15.5 GB RAM available to Docker |
-| Stack | compose project `tmrkz-mover-perf`: postgres 17.11, backend (Spring Boot 4.0.9, Flowable 8.0.0, JDK 21, default JVM flags), nginx 1.28 |
+| Stack | compose project `tmrkz-mover-perf`: postgres 17.11, backend (Spring Boot 4.0.9, Flowable 8.0.0, JDK 21 at measurement time, default JVM flags), nginx 1.28 |
 | Data | demo dataset + `ops/load/synthetic.sql`: **7,005 organisations, 200,071 people, 200,073 dated memberships** (DB 115 MB); loaded in 21 s |
 | Load | `ops/load/load-test.mjs`: 50 concurrent signed-in users for 60 s through nginx; each loops over 6 read endpoints and every 5th loop creates and submits a request (writes go through Flowable) |
 

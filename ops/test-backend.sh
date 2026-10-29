@@ -15,7 +15,7 @@ sleep 2
 status=0
 HOST_DIR="$(pwd -W 2>/dev/null || pwd)"
 docker run --rm --network "$NET" -v mover-m2:/root/.m2 -v "$HOST_DIR:/repo" -w /repo/backend \
-  -e MOVER_TEST_DB_URL="jdbc:postgresql://$PG:5432/mover_test" maven:3.9.16-eclipse-temurin-21 mvn -B test || status=$?
+  -e MOVER_TEST_DB_URL="jdbc:postgresql://$PG:5432/mover_test" maven:3.9.16-eclipse-temurin-25 mvn -B test || status=$?
 docker rm -f "$PG" >/dev/null
 docker network rm "$NET" >/dev/null 2>&1 || true
 exit $status
