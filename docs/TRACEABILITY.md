@@ -91,7 +91,10 @@ decision. Backend tests live in `backend/src/test/java/ae/mover/*IT.java`; `jour
 | AT-36 | `ReservationAcceptanceIT.parentChildScope` | Pass |
 
 
-## Map workspace MAP-01 … MAP-18 (`docs/MAP_WORKSPACE_COMPLETION_AR.md` §8)
+## Map workspace MAP-01 … MAP-19 (`docs/MAP_WORKSPACE_COMPLETION_AR.md` §8; MAP-19 from the owner continuation prompt §3)
+
+Latest browser run (29 Oct 2026, after the on-site menu change): 17 pass / 5 fail (MAP-11, MAP-12a, MAP-12b, MAP-17,
+MAP-19) — work in progress; the earlier all-pass run below is history, not the current state.
 
 Backend tests run on real PostgreSQL 17.11 + PostGIS 3.5 (`sh ops/test-backend.sh`). Browser tests drive Microsoft Edge
 with clicks and the keyboard against the acceptance environment started without internet egress
@@ -120,6 +123,7 @@ errors; screenshots in `docs/evidence/map/`.
 | MAP-16 | Slow, reversed or failed responses and a scope change: nothing stale shown as current; no forced re-zoom | `MapPage` (abort + sequence), neutral `UNKNOWN_STYLE`, `MapCanvas` (no fit on data), per-request access | `MapWorkspaceAcceptanceIT.scopeChangeInSession` | MAP-16 | Pass | Late answer never shown; failure → neutral; removed scope → site and details gone |
 | MAP-17 | Phone width and keyboard: select and complete a request without dragging, hidden buttons or horizontal scrolling | `map.css` (single column, bottom-sheet drawer), focusable markers and trees | — | MAP-17 | Pass | 390×844; sign-in, selection, request and submission by keyboard |
 | MAP-18 | Internet blocked with acceptance packages local: backgrounds, boundaries, request and review work | local packages, CSP, `compose.offline.yml` | — | MAP-18 (all steps) | Pass | 0 external browser requests; backend has no egress (`up-offline.sh`) |
+| MAP-19 | Owner prompt §3: one click on a site opens two actions at the site; same command from tree, list and panel; type and resources handed over explicitly; nothing written | `SiteActionMenu`, `MapCanvas` (SiteHit, background click), `MapPage.startRequest`, `SiteRequestActions`, `RequestWizard` (no silent type/parent) | `MapWorkspaceAcceptanceIT.siteRequestActions` (pass) | MAP-19 | **Open** — browser run of 29 Oct failed (see STATUS) | Backend: published types, open-end rule, no-CREATE and no-resource reasons, 404 outside view, no rows written |
 
 Scale (separate from the organisation tree volume): `MapScaleIT` — 10,000 sites with boundaries and 2,000 reservations;
 see `docs/PERFORMANCE.md`. Migration from the earlier release: V7 acceptance data upgraded in place, 130/130 earlier rows

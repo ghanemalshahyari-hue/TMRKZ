@@ -24,6 +24,8 @@ type WizardState = {
   status: RequestStatus | null;
   revision: number;
   origin: 'MAP' | 'LIST';
+  /** The site the request was started from (its resources are offered first); null from the list. */
+  siteId: string | null;
   typeCode: string;
   ownerOrgId: string;
   participantOrgIds: string[];
@@ -80,6 +82,7 @@ export function RequestWizard({
   const [minimized, setMinimized] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [pending, setPending] = useState<WizardRequest | null>(null);
+  const [showOthers, setShowOthers] = useState(false);
 
   const facilities = useMemo(() => facilitySites(sites), [sites]);
   const resourceOptions = useMemo(
@@ -116,6 +119,7 @@ export function RequestWizard({
     setMinimized(false);
     setExpanded(false);
     setPending(null);
+    setShowOthers(false);
     submitKey.current = newIdempotencyKey();
     const defaultOrg = (me.primaryOrg && creatableOrgs.find((o) => o.id === me.primaryOrg!.id)?.id) || creatableOrgs[0]?.id || '';
     if (request.requestId) {
@@ -129,15 +133,9 @@ export function RequestWizard({
       return;
     }
     const site = request.siteId ? sites.find((s) => s.id === request.siteId) : undefined;
-    const primary = site ? site.resources.find((r) => !r.parentResourceId) ?? site.resources[0] : undefined;
     const pf = request.prefill;
-    const reservationTypes = requestTypes.filter((t) => t.kind === 'NEW_RESERVATION');
-    const typeCode =
-      request.typeCode ??
-      (pf?.permanent ? reservationTypes.find((t) => t.openEndAllowed)?.code : undefined) ??
-      reservationTypes[0]?.code ??
-      requestTypes[0]?.code ??
-      '';
+    // the type is the one the person chose (site menu or list); the wizard never picks one silently
+    const typeCode = request.typeCode && requestTypes.some((t) => t.code === request.typeCode) ? request.typeCode : '';
     const unit: Unit = pf?.unit ?? settings?.defaultUnit ?? 'DAYS';
     const startDay = addDays(todayDubai(), 1);
     const prefOrg = pf?.ownerOrgId && creatableOrgs.some((o) => o.id === pf.ownerOrgId) ? pf.ownerOrgId : defaultOrg;
@@ -147,11 +145,13 @@ export function RequestWizard({
       status: null,
       revision: 0,
       origin: request.origin,
+      siteId: request.siteId ?? null,
       typeCode,
       ownerOrgId: prefOrg,
       participantOrgIds: [],
       infoOrgIds: [],
-      resourceIds: pf?.resourceIds?.length ? pf.resourceIds : primary ? [primary.id] : [],
+      // only an unambiguous resource is preselected; with several the person chooses in step 2
+      resourceIds: pf?.resourceIds?.length ? pf.resourceIds : site && site.resources.length === 1 ? [site.resources[0].id] : [],
       subject: '',
       unit,
       start: pf?.start ?? (unit === 'HOURS' ? startDay + 'T09:00' : startDay),
@@ -192,6 +192,7 @@ export function RequestWizard({
       status: d.status,
       revision: d.revision,
       origin: d.origin,
+      siteId: null,
       typeCode: d.type.code,
       ownerOrgId: d.ownerOrg?.id ?? '',
       participantOrgIds: (d.participantOrgs ?? []).map((o) => o.id),
@@ -224,6 +225,13 @@ export function RequestWizard({
   const multiOrgs = (type?.multiOrgs ?? true) && (settings?.multiOrgs ?? true);
   const target = reservations.find((r) => r.id === w.targetReservationId);
   const resourceLabel = (id: string) => resourceOptions.find((o) => o.resource.id === id)?.label ?? id;
+  const focusSite = w.siteId ? facilities.find((s) => s.id === w.siteId) : undefined;
+  const focusOptions = focusSite ? resourceOptions.filter((o) => o.site.id === focusSite.id) : [];
+  const otherOptions = focusSite ? resourceOptions.filter((o) => o.site.id !== focusSite.id) : resourceOptions;
+  const othersOpen = !focusSite || showOthers || w.resourceIds.some((id) => otherOptions.some((o) => o.resource.id === id));
+  const periodText = w.start
+    ? w.start.replace('T', ' ') + ' ← ' + (w.permanent ? 'مفتوحة المدة' : w.end ? w.end.replace('T', ' ') + ' (غير مشمولة)' : '—')
+    : '—';
 
   const startISO = w.start ? dubaiISO(w.start) : null;
   const endISO = w.permanent || !w.end ? null : dubaiISO(w.end);
@@ -253,10 +261,11 @@ export function RequestWizard({
   function validate(upTo: number): string {
     if (upTo >= 1) {
       if (!w!.ownerOrgId) return 'اختر الجهة الطالبة.';
+      if (!type) return 'اختر نوع الطلب.';
       if (type?.requiresTargetReservation && !w!.targetReservationId) return 'اختر الحجز المعتمد المرتبط بالطلب.';
     }
     if (upTo >= 2) {
-      if (!w!.resourceIds.length) return 'اختر مرفقاً واحداً على الأقل.';
+      if (!w!.resourceIds.length) return focusSite ? 'اختر المورد المطلوب من موارد «' + focusSite.name + '».' : 'اختر مرفقاً واحداً على الأقل.';
       if (!multiSites && w!.resourceIds.length > 1) return 'الإعداد الحالي يسمح بمرفق واحد فقط.';
       if (!w!.start || (needsEnd && !w!.end)) return 'حدد بداية الفترة ونهايتها.';
       if (needsEnd && endISO && startISO && new Date(endISO) <= new Date(startISO)) return 'نهاية الفترة يجب أن تكون بعد بدايتها.';
@@ -576,28 +585,42 @@ export function RequestWizard({
         )}
       </>
     );
-  else if (step === 2)
+  else if (step === 2) {
+    const pick = ({ resource, site, label }: (typeof resourceOptions)[number]) => (
+      <label className="site-pick" key={resource.id}>
+        <input type="checkbox" checked={w.resourceIds.includes(resource.id)} onChange={(e) => toggleResource(resource.id, e.target.checked)} />
+        <span>
+          {label}
+          <small>
+            {resource.parentResourceId ? resource.kind : site.kind}
+            {resource.policy === 'SHARED' ? ' · مشترك' : ''}
+            {resource.parentResourceId ? ' · مورد فرعي' : focusSite && focusOptions.length > 1 ? ' · المورد الرئيسي' : ''}
+          </small>
+        </span>
+      </label>
+    );
+    const focusChosen = w.resourceIds.some((id) => focusOptions.some((o) => o.resource.id === id));
     content = (
       <>
         <div className="wizard-title">
           <h3>المرافق والفترة</h3>
           <p>المرفق ثابت في السجل، والحجز مرتبط بفترة مستقلة.</p>
         </div>
-        <div className="site-pick-grid">
-          {resourceOptions.map(({ resource, site, label }) => (
-            <label className="site-pick" key={resource.id}>
-              <input type="checkbox" checked={w.resourceIds.includes(resource.id)} onChange={(e) => toggleResource(resource.id, e.target.checked)} />
-              <span>
-                {label}
-                <small>
-                  {resource.parentResourceId ? resource.kind : site.kind}
-                  {resource.policy === 'SHARED' ? ' · مشترك' : ''}
-                  {resource.parentResourceId ? ' · مورد فرعي' : ''}
-                </small>
-              </span>
-            </label>
-          ))}
-        </div>
+        {focusSite && (
+          <>
+            <h4 className="pick-head">موارد «{focusSite.name}»</h4>
+            {focusOptions.length > 1 && !focusChosen && (
+              <p className="micro note orange">في هذا الموقع {focusOptions.length} موارد؛ اختر المطلوب منها. اختيار المورد الرئيسي يطلبه كاملاً وفق سياسته المهيأة.</p>
+            )}
+            <div className="site-pick-grid">{focusOptions.map(pick)}</div>
+            {multiSites && otherOptions.length > 0 && (
+              <button type="button" className="link-button text-link pick-more" onClick={() => setShowOthers((v) => !v)} aria-expanded={othersOpen}>
+                {othersOpen ? 'إخفاء مرافق المواقع الأخرى' : 'إضافة مرافق من مواقع أخرى (' + otherOptions.length + ')'}
+              </button>
+            )}
+          </>
+        )}
+        {othersOpen && (multiSites || !focusSite) && <div className="site-pick-grid">{otherOptions.map(pick)}</div>}
         <div className="selected-count">
           {w.resourceIds.length} مرفق محدد · {multiSites ? 'اختيار متعدد مفعّل' : 'مرفق واحد فقط'}
         </div>
@@ -647,7 +670,7 @@ export function RequestWizard({
         </div>
       </>
     );
-  else if (step === 3)
+  } else if (step === 3)
     content = (
       <>
         <div className="wizard-title">
@@ -669,6 +692,7 @@ export function RequestWizard({
           {(
             [
               ['نوع الطلب', type?.name ?? w.typeCode],
+              ['الموقع', focusSite?.name ?? request.prefill?.siteName ?? '—'],
               ['الجهة', orgName(w.ownerOrgId)],
               ['المرافق', w.resourceIds.map(resourceLabel).join('، ')],
               ['الفترة', fullTime(startISO) + ' ← ' + (endISO ? fullTime(endISO) : needsEnd ? '—' : 'دون نهاية')],
@@ -710,8 +734,12 @@ export function RequestWizard({
     );
 
   const pendingDiff: [string, string, string][] = [];
+  const pendingSite = !!pending?.siteId && pending.siteId !== w.siteId;
   if (pending?.prefill) {
     const pf = pending.prefill;
+    if (pendingSite) pendingDiff.push(['الموقع', focusSite?.name ?? '—', pf.siteName ?? '—']);
+    if (pending.typeCode && pending.typeCode !== w.typeCode && !w.requestId)
+      pendingDiff.push(['نوع الطلب', type?.name ?? '—', requestTypes.find((t) => t.code === pending.typeCode)?.name ?? pending.typeCode]);
     if (pf.ownerOrgId && pf.ownerOrgId !== w.ownerOrgId && creatableOrgs.some((o) => o.id === pf.ownerOrgId))
       pendingDiff.push(['الجهة', orgName(w.ownerOrgId), orgName(pf.ownerOrgId)]);
     const nextRes = pf.resourceIds ?? [];
@@ -725,9 +753,14 @@ export function RequestWizard({
     const pf = pending?.prefill;
     if (pf) {
       setCheck(null);
+      const typeChange = !!pending?.typeCode && pending.typeCode !== w.typeCode && !w.requestId;
       set({
+        siteId: pending?.siteId ?? w.siteId,
+        typeCode: typeChange ? pending!.typeCode! : w.typeCode,
+        pinnedForm: typeChange ? null : w.pinnedForm,
         ownerOrgId: pf.ownerOrgId && creatableOrgs.some((o) => o.id === pf.ownerOrgId) ? pf.ownerOrgId : w.ownerOrgId,
-        resourceIds: pf.resourceIds?.length ? pf.resourceIds : w.resourceIds,
+        // a different site replaces the resources (none chosen yet stays none); the same site keeps the draft's choice
+        resourceIds: pendingSite ? pf.resourceIds ?? [] : pf.resourceIds?.length ? pf.resourceIds : w.resourceIds,
         unit: pf.unit ?? w.unit,
         start: pf.start ?? w.start,
         end: pf.permanent ? '' : pf.end ?? w.end,
@@ -804,6 +837,24 @@ export function RequestWizard({
         </span>
       </div>
       {banner}
+      <div className="wizard-context" aria-label="ملخص الاختيار">
+        <span>
+          <small>الموقع</small>
+          <b>{focusSite?.name ?? request.prefill?.siteName ?? (w.resourceIds.length ? 'من القائمة' : '—')}</b>
+        </span>
+        <span>
+          <small>نوع الطلب</small>
+          <b>{type?.name ?? 'لم يُختر بعد'}</b>
+        </span>
+        <span>
+          <small>الموارد</small>
+          <b>{w.resourceIds.length ? w.resourceIds.map(resourceLabel).join('، ') : 'لم تُختر بعد'}</b>
+        </span>
+        <span>
+          <small>الفترة</small>
+          <b>{periodText}</b>
+        </span>
+      </div>
       <div className="wizard-steps">
         {STEPS.map((n, i) => (
           <div key={n} className={'wizard-step ' + (step === i + 1 ? 'active' : step > i + 1 ? 'done' : '')}>

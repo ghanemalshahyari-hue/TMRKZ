@@ -13,6 +13,7 @@
   "dependencies": {
     "@geoman-io/leaflet-geoman-free": "2.20.2",
     "leaflet": "1.9.4",
+    "milsymbol": "3.0.4",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },

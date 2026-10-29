@@ -64,6 +64,8 @@ import type {
   Site,
   SiteDetail,
   SiteNode,
+  SiteRequestActions,
+  UnitSymbolLookup,
   StudioItem,
   SystemInfo,
   TaskItem,
@@ -259,6 +261,8 @@ export const api = {
   // facilities & map
   sites: () => get<Site[]>('/sites'),
   site: (id: string) => get<SiteDetail>(`/sites/${id}`),
+  unitSymbols: (orgIds: string[]) => get<UnitSymbolLookup>('/unit-symbols' + query({ orgIds: orgIds.join(',') })),
+  siteRequestActions: (id: string, signal?: AbortSignal) => get<SiteRequestActions>(`/sites/${id}/request-actions`, { signal }),
   createResource: (body: {
     siteId: string;
     code: string;

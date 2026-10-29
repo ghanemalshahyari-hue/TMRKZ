@@ -391,6 +391,11 @@ class HrSyncAcceptanceIT extends IntegrationTest {
                 .status()).isEqualTo(200);
         UUID site = site("HRS", null, unit3);
         UUID grant = membership(person4, "REQUESTER", orgOf("1"), null);
+        // a unit identity symbol is local metadata as well (map brief §10)
+        jdbc.sql("""
+                insert into org_unit_symbol(organization_id, standard, edition, sidc, description_ar, source, updated_by, updated_at)
+                values (:o, 'APP6', 'D', '10031000001601000000', 'وحدة إدارية', 'MANUAL', :p, now())""")
+                .param("o", unit3).param("p", person4).update();
 
         // The source renames unit 3 and moves person 4 to unit 3 (still inside unit 1's subtree).
         jdbc.sql("update " + schema + ".units_t set name = 'إدارة 3 بعد إعادة التسمية' where id = :i").param("i", u("3")).update();
@@ -404,6 +409,8 @@ class HrSyncAcceptanceIT extends IntegrationTest {
                 .isEqualTo("إدارة 3 بعد إعادة التسمية");
         assertThat(jdbc.sql("select display_name from local_metadata where entity_id = :id").param("id", unit3).query(String.class).single())
                 .isEqualTo("الاسم المحلي");
+        assertThat(jdbc.sql("select sidc || '|' || description_ar || '|' || version from org_unit_symbol where organization_id = :id")
+                .param("id", unit3).query(String.class).single()).isEqualTo("10031000001601000000|وحدة إدارية|1");
         assertThat(jdbc.sql("select organization_id from site_responsibility where site_id = :s and valid_to is null").param("s", site)
                 .query(UUID.class).single()).isEqualTo(unit3);
         assertThat(jdbc.sql("select organization_id from affiliation where person_id = :p and valid_to is null").param("p", person4)

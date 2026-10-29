@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, isAbort } from '../../api/client';
 import type { OrgBranch, Ref, SiteNode } from '../../api/types';
 import { Icon } from '../ui';
+import { RowActionsButton } from './SiteActionMenu';
 
 type Loaded<T> = Record<string, T[] | 'loading' | undefined>;
 
@@ -172,11 +173,16 @@ export function OrgTree({
 export function SiteTree({
   selectedId,
   onSelect,
+  onActions,
+  menuSiteId,
   revision,
   revealPath,
 }: {
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Opens the site's request menu beside the row (the map's own menu and command). */
+  onActions?: (id: string, name: string, el: HTMLElement, keyboard: boolean) => void;
+  menuSiteId?: string | null;
   revision: number;
   revealPath?: { ids: string[]; key: number } | null;
 }) {
@@ -255,6 +261,9 @@ export function SiteTree({
                 {s.resourceCount ? ' · ' + s.resourceCount + ' مورد' : ''}
               </small>
             </button>
+          )}
+          {!context && onActions && (
+            <RowActionsButton name={s.name} open={menuSiteId === s.id} onOpen={(el, kb) => onActions(s.id, s.name, el, kb)} />
           )}
         </div>
         {isOpen && (

@@ -590,6 +590,90 @@ class MapWorkspaceAcceptanceIT extends IntegrationTest {
         assertThat(checkFree(req, x1, from, to)).isFalse();
     }
 
+    // ---- MAP-19 (owner continuation §3): the on-site menu -----------------------------------------------------------
+
+    JsonNode action(JsonNode view, String code) {
+        for (JsonNode a : view.path("actions")) {
+            if (a.path("action").asText().equals(code)) {
+                return a;
+            }
+        }
+        return null;
+    }
+
+    Map<String, JsonNode> typesOf(JsonNode action) {
+        Map<String, JsonNode> out = new java.util.HashMap<>();
+        action.path("types").forEach(t -> out.put(t.path("code").asText(), t));
+        return out;
+    }
+
+    @Test
+    @DisplayName("MAP-19: the site menu offers temporary and open-ended use from published types and create rights; reading it writes nothing")
+    void siteRequestActions() {
+        // a type that refuses an open end, and one whose workflow was never published
+        String closed = requestType("NEW_RESERVATION", finalOnly(), null);
+        jdbc.sql("update request_type set open_end_allowed = false where code = :c").param("c", closed).update();
+        String unpublished = "T_" + sfx.toUpperCase() + "_NOWF";
+        tx.executeWithoutResult(s -> {
+            jdbc.sql("insert into request_type(code, name, kind, multi_sites, multi_orgs, sort_order) values (:c, 'نوع دون تدفق', 'NEW_RESERVATION', true, true, 101)")
+                    .param("c", unpublished).update();
+            UUID formId = UUID.randomUUID();
+            jdbc.sql("insert into form_definition(id, request_type_code) values (:id, :t)").param("id", formId).param("t", unpublished).update();
+            UUID fv = UUID.randomUUID();
+            jdbc.sql("insert into form_version(id, form_id, version, status, schema) values (:id, :f, 1, 'DRAFT', cast(:s as jsonb))")
+                    .param("id", fv).param("f", formId).param("s", write(ae.mover.system.Bootstrap.defaultForm())).update();
+            forms.publishInternal(null, fv, null);
+        });
+        UUID empty = siteAt("EMPTY", null, orgA, lat0 + 0.03, lng0 + 0.03);
+        try {
+            int requests = jdbc.sql("select count(*) from request").query(Integer.class).single();
+            int reservations = jdbc.sql("select count(*) from reservation").query(Integer.class).single();
+
+            Api req = login("req");
+            Res r = req.get("/sites/" + main + "/request-actions");
+            assertThat(r.status()).as(r.toString()).isEqualTo(200);
+            JsonNode v = r.body();
+            assertThat(v.path("canCreate").asBoolean()).isTrue();
+            assertThat(v.path("resourceCount").asInt()).isEqualTo(1);
+            JsonNode temporary = action(v, "TEMPORARY");
+            JsonNode open = action(v, "OPEN_ENDED");
+            assertThat(temporary.path("available").asBoolean()).isTrue();
+            assertThat(open.path("available").asBoolean()).isTrue();
+            assertThat(temporary.path("label").asText()).isEqualTo("طلب استخدام مؤقت");
+            assertThat(open.path("label").asText()).isEqualTo("طلب استخدام مفتوح المدة");
+            assertThat(typesOf(temporary)).containsKeys(type, closed, unpublished);
+            assertThat(typesOf(temporary).get(type).path("ready").asBoolean()).isTrue();
+            assertThat(typesOf(temporary).get(unpublished).path("ready").asBoolean()).isFalse();
+            assertThat(typesOf(temporary).get(unpublished).path("reason").asText()).contains("تدفق");
+            // open-ended use only where the published type permits an open end; change requests never appear here
+            assertThat(typesOf(open)).containsKey(type).doesNotContainKey(closed);
+            v.path("actions").forEach(a -> a.path("types").forEach(t ->
+                    assertThat(jdbc.sql("select kind from request_type where code = :c").param("c", t.path("code").asText())
+                            .query(String.class).single()).isEqualTo("NEW_RESERVATION")));
+
+            // a site without resources explains what is missing instead of offering a request
+            JsonNode none = req.get("/sites/" + empty + "/request-actions").body();
+            assertThat(action(none, "TEMPORARY").path("available").asBoolean()).isFalse();
+            assertThat(action(none, "TEMPORARY").path("reason").asText()).contains("لا موارد");
+
+            // a summary viewer without CREATE sees the site but no usable action, with the reason
+            JsonNode lim = login("lim").get("/sites/" + sub + "/request-actions").body();
+            assertThat(lim.path("canCreate").asBoolean()).isFalse();
+            lim.path("actions").forEach(a -> {
+                assertThat(a.path("available").asBoolean()).isFalse();
+                assertThat(a.path("reason").asText()).contains("صلاحية");
+            });
+
+            // a site outside the actor's view is not revealed
+            assertThat(login("reqb").get("/sites/" + main + "/request-actions").status()).isEqualTo(404);
+
+            assertThat(jdbc.sql("select count(*) from request").query(Integer.class).single()).isEqualTo(requests);
+            assertThat(jdbc.sql("select count(*) from reservation").query(Integer.class).single()).isEqualTo(reservations);
+        } finally {
+            jdbc.sql("update request_type set active = false where code in (:c)").param("c", List.of(closed, unpublished)).update();
+        }
+    }
+
     // ---- MAP-11 / MAP-12 / MAP-13 / MAP-14 -------------------------------------------------------------------------
 
     @Test

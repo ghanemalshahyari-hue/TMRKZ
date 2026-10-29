@@ -25,9 +25,11 @@ public class OrgController {
     private final AccessService access;
     private final OrganizationService orgs;
     private final GrantAdminService grants;
+    private final UnitSymbolService symbols;
 
-    public OrgController(AccessService access, OrganizationService orgs, GrantAdminService grants) {
+    public OrgController(AccessService access, OrganizationService orgs, GrantAdminService grants, UnitSymbolService symbols) {
         this.access = access;
+        this.symbols = symbols;
         this.orgs = orgs;
         this.grants = grants;
     }
@@ -99,5 +101,39 @@ public class OrgController {
     @GetMapping("/roles")
     public List<OrganizationService.RoleDef> roles(Actor actor) {
         return orgs.roles(access.context(actor));
+    }
+
+    // ---- unit identity symbols (ADR-021) ----------------------------------------------------------------------
+
+    @GetMapping("/unit-symbols")
+    public UnitSymbolService.Lookup unitSymbols(Actor actor, @RequestParam(required = false) String orgIds) {
+        return symbols.lookup(access.context(actor), UnitSymbolService.ids(orgIds));
+    }
+
+    @GetMapping("/unit-symbols/catalog")
+    public List<UnitSymbolService.CatalogEntry> unitSymbolCatalog(Actor actor) {
+        return symbols.catalog(access.context(actor));
+    }
+
+    @PostMapping("/unit-symbols/catalog")
+    public UnitSymbolService.CatalogEntry addUnitSymbol(Actor actor, @RequestBody UnitSymbolService.CatalogInput in) {
+        return symbols.addCatalog(access.context(actor), in);
+    }
+
+    @PostMapping("/unit-symbols/catalog/{code}/active")
+    public ResponseEntity<Void> unitSymbolActive(Actor actor, @PathVariable String code, @RequestBody UnitSymbolService.ActiveInput in) {
+        symbols.setCatalogActive(access.context(actor), code, in);
+        return ResponseEntity.noContent().build();
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/organizations/{id}/unit-symbol")
+    public UnitSymbolService.SymbolView assignUnitSymbol(Actor actor, @PathVariable UUID id, @RequestBody UnitSymbolService.AssignInput in) {
+        return symbols.assign(access.context(actor), id, in);
+    }
+
+    @PostMapping("/organizations/{id}/unit-symbol/remove")
+    public ResponseEntity<Void> removeUnitSymbol(Actor actor, @PathVariable UUID id, @RequestBody UnitSymbolService.RemoveInput in) {
+        symbols.remove(access.context(actor), id, in);
+        return ResponseEntity.noContent().build();
     }
 }

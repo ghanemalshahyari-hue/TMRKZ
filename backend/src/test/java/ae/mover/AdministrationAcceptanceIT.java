@@ -56,6 +56,89 @@ class AdministrationAcceptanceIT extends IntegrationTest {
         }
     }
 
+    Res assign(Api api, UUID org, Map<String, Object> body) {
+        return api.put("/organizations/" + org + "/unit-symbol", body);
+    }
+
+    @Test
+    @DisplayName("Unit symbols (map brief §10): approved standard first, configuration right, checked SIDC, versions, scoped lookup")
+    void unitSymbols() {
+        Api admin = login("admin");
+        Api req = login("req");
+        UUID orgB = org("B", root);
+        Map<String, Object> manual = new java.util.HashMap<>(Map.of("sidc", "10031000001601000000", "description", "وحدة إدارية",
+                "expectedVersion", 0, "reason", "تعيين اختبار"));
+        JsonNode current = admin.get("/policies/current").body().path("settings");
+        if (current.path("unitSymbolStandard").isTextual()) {
+            Map<String, Object> off = JSON.convertValue(current, Map.class);
+            off.put("unitSymbolStandard", null);
+            Res d = admin.post("/policies/drafts", Map.of("settings", off));
+            admin.post("/policy-versions/" + d.body().path("id").asText() + "/publish", Map.of());
+        }
+        // no approved standard and edition: nothing is assigned
+        Res undecided = assign(admin, orgA, manual);
+        assertThat(undecided.status()).isEqualTo(400);
+        assertThat(undecided.body().path("message").asText()).contains("معيار");
+        Map<String, Object> app6 = JSON.convertValue(current, Map.class);
+        app6.put("unitSymbolStandard", "APP6-D");
+        try {
+            Res d = admin.post("/policies/drafts", Map.of("settings", app6));
+            assertThat(admin.post("/policy-versions/" + d.body().path("id").asText() + "/publish", Map.of()).status()).isEqualTo(200);
+            Map<String, Object> wrong = new java.util.HashMap<>(Map.of("unitSymbolStandard", "APP6-Z"));
+            Map<String, Object> bad = JSON.convertValue(current, Map.class);
+            bad.putAll(wrong);
+            assertThat(admin.post("/policies/drafts", Map.of("settings", bad)).status()).isEqualTo(400);
+
+            // a requester has no configuration right
+            assertThat(assign(req, orgA, manual).status()).isEqualTo(403);
+            // shape checks: hostile identity, installation symbol set, letter-based code
+            for (String sidc : List.of("10061000001601000000", "10032000001601000000", "SFGPUCI----D---")) {
+                Map<String, Object> b = new java.util.HashMap<>(manual);
+                b.put("sidc", sidc);
+                assertThat(assign(admin, orgA, b).status()).as(sidc).isEqualTo(400);
+            }
+            Res ok = assign(admin, orgA, manual);
+            assertThat(ok.status()).as(ok.toString()).isEqualTo(200);
+            assertThat(ok.body().path("version").asInt()).isEqualTo(1);
+            assertThat(ok.body().path("standard").asText()).isEqualTo("APP6");
+            assertThat(ok.body().path("edition").asText()).isEqualTo("D");
+            // a second write from the same version is refused (no silent overwrite)
+            assertThat(assign(admin, orgA, manual).status()).isEqualTo(409);
+
+            // the approved catalog: an entry, then an assignment from it
+            String code = "T-MNT-" + sfx.toUpperCase();
+            assertThat(admin.post("/unit-symbols/catalog", Map.of("code", code, "sidc", "10031000001611000000", "name", "صيانة")).status())
+                    .isEqualTo(200);
+            Res fromCatalog = assign(admin, orgA, Map.of("catalogCode", code, "expectedVersion", 1, "reason", "من الفهرس المعتمد"));
+            assertThat(fromCatalog.status()).as(fromCatalog.toString()).isEqualTo(200);
+            assertThat(fromCatalog.body().path("source").asText()).isEqualTo("CATALOG");
+            assertThat(fromCatalog.body().path("description").asText()).isEqualTo("صيانة");
+            assertThat(fromCatalog.body().path("version").asInt()).isEqualTo(2);
+
+            // lookup within the reader's view: own branch with its symbol, a visible ancestor without one, nothing else
+            JsonNode l = req.get("/unit-symbols?orgIds=" + orgA + "," + root + "," + orgB + "," + UUID.randomUUID()).body();
+            assertThat(l.path("standard").asText()).isEqualTo("APP6-D");
+            assertThat(l.path("symbols").path(orgA.toString()).path("sidc").asText()).isEqualTo("10031000001611000000");
+            assertThat(l.path("symbols").has(root.toString())).isTrue();
+            assertThat(l.path("symbols").path(root.toString()).isNull()).isTrue();
+            assertThat(l.path("symbols").has(orgB.toString())).isFalse();
+            assertThat(l.path("symbols").size()).isEqualTo(2);
+
+            // a symbol grants nothing: the requester's grants are unchanged
+            assertThat(jdbc.sql("select count(*) from membership where organization_id = :o").param("o", orgB).query(Integer.class).single())
+                    .isZero();
+            assertThat(admin.post("/organizations/" + orgA + "/unit-symbol/remove", Map.of("expectedVersion", 2, "reason", "إزالة اختبار"))
+                    .status()).isEqualTo(204);
+            assertThat(req.get("/unit-symbols?orgIds=" + orgA).body().path("symbols").path(orgA.toString()).isNull()).isTrue();
+            assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :o and action like 'UNIT_SYMBOL_%'")
+                    .param("o", orgA.toString()).query(Integer.class).single()).isEqualTo(3);
+        } finally {
+            Map<String, Object> back = JSON.convertValue(current, Map.class);
+            Res d = admin.post("/policies/drafts", Map.of("settings", back));
+            admin.post("/policy-versions/" + d.body().path("id").asText() + "/publish", Map.of());
+        }
+    }
+
     @Test
     @DisplayName("Stored JSON documents (schemas, definitions) are returned as plain JSON to the studios and wizard")
     void storedDocumentsSerialiseAsJson() {

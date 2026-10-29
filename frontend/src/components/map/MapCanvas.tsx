@@ -6,9 +6,18 @@ import { DEFAULT_LAYERS, featureStyle, MAP_COLORS, type LayerSettings, type MapM
 
 export type Viewport = { bbox: string; zoom: number; center: [number, number] };
 export type FitTarget = { bounds: L.LatLngBoundsExpression; key: number; maxZoom?: number };
+/** Where a site was activated: the marker, or the point clicked on its boundary; keyboard when Enter/Space was used. */
+export type SiteHit = { latlng: L.LatLng; keyboard: boolean; element: HTMLElement | null };
 
 function escapeHtml(v: string): string {
   return v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
+}
+
+/** Display anchor of a feature: its stored marker, else the centre of its drawn boundary (never stored). */
+export function featureAnchor(f: Pick<MapFeature, 'boundary' | 'lat' | 'lng'>): L.LatLng | null {
+  if (f.lat != null && f.lng != null) return L.latLng(f.lat, f.lng);
+  if (f.boundary) return L.geoJSON(f.boundary.geojson as never).getBounds().getCenter();
+  return null;
 }
 
 /** Bounds of a feature: its registered boundary, else its marker. */
@@ -21,13 +30,16 @@ export function featureBounds(f: Pick<MapFeature, 'boundary' | 'lat' | 'lng'>): 
 /**
  * Leaflet map of the administrative workspace. Draws only what the server returned: registered boundaries
  * (Polygon/MultiPolygon) and markers; a site without a boundary keeps a marker marked «حدود غير مسجلة». The view
- * changes only on the user's own pan/zoom or an explicit fit request, never because new data arrived.
+ * changes only on the user's own pan/zoom or an explicit fit request, never because new data arrived. A single click,
+ * tap, Enter or Space on a marker or on a registered boundary activates the site ({@link SiteHit}); a click on the
+ * empty map is reported separately so an open site menu can close.
  */
 export function MapCanvas({
   features,
   stale = false,
   selectedSiteId,
   onSelect,
+  onBackgroundClick,
   mode,
   background,
   layers = DEFAULT_LAYERS,
@@ -44,7 +56,8 @@ export function MapCanvas({
   features: MapFeature[];
   stale?: boolean;
   selectedSiteId: string | null;
-  onSelect: (siteId: string) => void;
+  onSelect: (siteId: string, hit: SiteHit) => void;
+  onBackgroundClick?: () => void;
   mode: MapMode;
   background: MapPackage | null;
   layers?: LayerSettings;
@@ -67,6 +80,8 @@ export function MapCanvas({
   const bgAttribution = useRef<string | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onBackgroundRef = useRef(onBackgroundClick);
+  onBackgroundRef.current = onBackgroundClick;
   const onViewportRef = useRef(onViewport);
   onViewportRef.current = onViewport;
 
@@ -107,6 +122,8 @@ export function MapCanvas({
       }, 300);
     };
     map.on('moveend', emit);
+    // boundaries and markers do not bubble their clicks, so this is a click on the map itself (not a drag)
+    map.on('click', () => onBackgroundRef.current?.());
     const ro = new ResizeObserver(() => map.invalidateSize({ pan: false }));
     ro.observe(el.current);
     requestAnimationFrame(() => {
@@ -186,6 +203,7 @@ export function MapCanvas({
       if (f.boundary && setting.visible) {
         const shape = L.geoJSON(f.boundary.geojson as never, {
           pane: isZone ? 'zones' : 'sites',
+          bubblingMouseEvents: false,
           style: {
             color: selected ? '#0d5d4e' : color,
             weight: selected ? 3.5 : 2,
@@ -196,7 +214,7 @@ export function MapCanvas({
           },
         } as L.GeoJSONOptions);
         shape.eachLayer((l) => {
-          (l as L.Path).on('click', () => onSelectRef.current(f.siteId));
+          (l as L.Path).on('click', (e: L.LeafletMouseEvent) => onSelectRef.current(f.siteId, { latlng: e.latlng, keyboard: false, element: null }));
           (l as L.Path).bindTooltip(f.name + ' — ' + stateText + (isZone ? ' · منطقة فرعية' : ''), { sticky: true, direction: 'top' });
           const p = (l as L.Path).getElement?.();
           p?.setAttribute('data-site', f.siteId);
@@ -216,7 +234,8 @@ export function MapCanvas({
         '<span class="pin-head"><i>' + escapeHtml(st.symbol) + '</i></span>' + badge +
         (layers.labels ? '<span class="pin-label">' + escapeHtml(f.name) + (noBoundary ? ' · <em>حدود غير مسجلة</em>' : '') + '</span>' : '') +
         '</div>';
-      L.marker(at, {
+      const point = at;
+      const marker = L.marker(at, {
         title: f.name + ' — ' + stateText + (noBoundary ? ' — حدود الموقع غير مسجلة' : ''),
         alt: f.name,
         keyboard: true,
@@ -224,8 +243,17 @@ export function MapCanvas({
         icon: L.divIcon({ className: 'pin-icon', html, iconSize: [0, 0], iconAnchor: [0, 0] }),
       })
         .addTo(markers)
-        .on('click', () => onSelectRef.current(f.siteId))
-        .on('keypress', (e: L.LeafletKeyboardEvent) => e.originalEvent.key === 'Enter' && onSelectRef.current(f.siteId));
+        .on('click', (e: L.LeafletMouseEvent) => {
+          // a keyboard "click" has no pointer position (detail 0)
+          const keyboard = (e.originalEvent as MouseEvent | undefined)?.detail === 0;
+          onSelectRef.current(f.siteId, { latlng: point, keyboard, element: marker.getElement() ?? null });
+        })
+        .on('keypress', (e: L.LeafletKeyboardEvent) => {
+          if (e.originalEvent.key !== 'Enter' && e.originalEvent.key !== ' ') return;
+          e.originalEvent.preventDefault();
+          onSelectRef.current(f.siteId, { latlng: point, keyboard: true, element: marker.getElement() ?? null });
+        });
+      marker.getElement()?.setAttribute('aria-haspopup', 'dialog');
     }
   }, [features, mode, stale, selectedSiteId, layers, hiddenSiteId]);
 

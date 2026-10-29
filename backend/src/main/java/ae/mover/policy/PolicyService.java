@@ -81,6 +81,9 @@ public class PolicyService {
                 || !Settings.SUPPORTED_TYPES.containsAll(s.allowedAttachmentTypes())) {
             errors.add(error("allowedAttachmentTypes", "أنواع المرفقات يجب أن تكون من القائمة المدعومة."));
         }
+        if (s.unitSymbolStandard() != null && !Settings.UNIT_SYMBOL_STANDARDS.contains(s.unitSymbolStandard())) {
+            errors.add(error("unitSymbolStandard", "معيار رموز الوحدات غير مدعوم في العارض المحلي."));
+        }
         try {
             ZoneId.of(s.timezone());
         } catch (Exception e) {

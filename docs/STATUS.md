@@ -66,6 +66,20 @@ Date: 29 October 2026 · Version 1.0.0
     connected.
   - Step 7 open — isolated bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
 
+- **Owner continuation prompt (`docs/OWNER_CONTINUATION_PROMPT.md`) — in progress, 29 Oct 2026 (ADR-021):**
+  - §3 on-site menu — implemented and running at port 8088 (acceptance stack): marker/boundary click, keyboard, phone
+    bottom sheet, tree and list «طلب» buttons, server-decided actions (`GET /sites/{id}/request-actions`), explicit type
+    and resource handoff to the drawer. Backend MAP-19 passes. **Browser acceptance not yet green:** the last
+    `map-workspace.mjs` run (189 s) passed 17 and failed 5 — MAP-11 (panel action button not found after the drawer is
+    minimised), MAP-12a and MAP-12b (follow-on), MAP-17 (phone run: tree search result not visible after the new
+    bottom-sheet step), MAP-19 (menu did not reopen at a later step). Evidence and `fail-*.png` in `docs/evidence/map/`.
+    A harness defect was fixed on the way: the suite's date windows recycled every 200 minutes and one run aborted in
+    setup with a 409 on a day an earlier run had booked; it now asks the server for a free window.
+  - §6 unit symbols — backend, V12 migration, policy setting and API done; `AdministrationAcceptanceIT.unitSymbols` and the
+    HR-survival check in `HrSyncAcceptanceIT.identityAndLocalAdditions` pass; frontend store/renderer
+    (`lib/unitSymbols.ts`) started; tree/detail/summary components, legend, assignment UI and settings field not done.
+  - §5, §7–§15 of the prompt not started in this session.
+
 Test evidence: backend acceptance tests on PostgreSQL + PostGIS with OpenFGA in the loop (including the map criteria,
 a 10,000-site measurement and the authorisation suite), 21 browser checks for MAP-01 … MAP-18 and 6 for the permissions
 studio in Microsoft Edge, a 40-check end-to-end journey through nginx, a restore verification, an upgrade check of

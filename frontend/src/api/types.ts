@@ -238,6 +238,17 @@ export type SiteNode = {
   resourceCount: number;
   path?: Ref[];
 };
+/** Administrative use requests a person may start from one site (decided by the server from published types and rights). */
+export type SiteRequestActionCode = 'TEMPORARY' | 'OPEN_ENDED';
+export type SiteRequestActionType = { code: string; name: string; multiSites: boolean; ready: boolean; reason: string | null };
+export type SiteRequestAction = {
+  action: SiteRequestActionCode;
+  label: string;
+  available: boolean;
+  reason: string | null;
+  types: SiteRequestActionType[];
+};
+export type SiteRequestActions = { siteId: string; siteName: string; view: ViewLevel; resourceCount: number; canCreate: boolean; actions: SiteRequestAction[] };
 export type GeometryCheck = {
   valid: boolean;
   type?: string;
@@ -572,7 +583,21 @@ export type Settings = {
   attachmentMaxBytes: number;
   allowedAttachmentTypes: string[];
   timezone: string;
+  /** Approved unit symbol standard and edition (APP6-D, APP6-E, 2525-D, 2525-E); null until decided. */
+  unitSymbolStandard?: string | null;
 };
+/** Informational unit identity symbol of an organisation (local metadata, ADR-021). */
+export type UnitSymbol = {
+  sidc: string;
+  standard: 'APP6' | '2525';
+  edition: 'D' | 'E';
+  description: string;
+  source: 'CATALOG' | 'MANUAL';
+  catalogCode?: string;
+  version: number;
+  updatedAt: string;
+};
+export type UnitSymbolLookup = { standard: string | null; symbols: Record<string, UnitSymbol | null> };
 export type PolicyVersion = { id: string; version: number; settings: Settings; publishedAt: string | null; publishedBy: string | null };
 export type PolicyDraft = { id: string; version: number; status: 'DRAFT'; errors: { path?: string; message: string }[] };
 export type Integration = {

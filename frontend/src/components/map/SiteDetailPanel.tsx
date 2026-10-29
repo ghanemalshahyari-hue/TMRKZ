@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import type { MapFeature, RequestType, SiteDetail } from '../../api/types';
+import type { MapFeature, RequestType, SiteDetail, SiteRequestActionCode } from '../../api/types';
 import { fullDate, fullTime } from '../../lib/dates';
 import { AVAILABILITY_STYLE, RESOURCE_STYLE, UNKNOWN_STYLE, type MapPeriod } from '../../lib/mapState';
 import { ResourceSettings } from './ResourceSettings';
+import { SiteRequestActionList, type SiteActionsState } from './SiteActionMenu';
 
 export type SiteAction =
-  | { kind: 'NEW'; open: boolean }
+  | { kind: 'NEW'; action: SiteRequestActionCode; typeCode: string }
   | { kind: 'CHANGE'; reservationId: string; typeCode: string }
   | { kind: 'EDIT_BOUNDARY' }
   | { kind: 'IMPORT_BOUNDARY' }
@@ -37,6 +38,7 @@ export function SiteDetailPanel({
   selectedResources,
   onToggleResource,
   onAction,
+  actions,
   canCreate,
   requestTypes,
   onClose,
@@ -49,6 +51,8 @@ export function SiteDetailPanel({
   selectedResources: string[];
   onToggleResource: (id: string, on: boolean) => void;
   onAction: (a: SiteAction) => void;
+  /** The same server-decided request actions as the on-map menu. */
+  actions: SiteActionsState | null;
   canCreate: boolean;
   requestTypes: RequestType[];
   onClose: () => void;
@@ -62,8 +66,6 @@ export function SiteDetailPanel({
     );
   }
   const st = feature ? AVAILABILITY_STYLE[feature.availability] : UNKNOWN_STYLE;
-  const newTypes = requestTypes.filter((t) => t.kind === 'NEW_RESERVATION');
-  const openAllowed = newTypes.some((t) => t.openEndAllowed);
   const changeTypes = requestTypes.filter((t) => t.requiresTargetReservation);
   const active = site.occupancy.filter((o) => o.status === 'ACTIVE');
   const full = site.view === 'FULL';
@@ -92,6 +94,15 @@ export function SiteDetailPanel({
           <b>{error ? UNKNOWN_STYLE.label : loading ? 'جارٍ تحديث الإتاحة…' : st.label}</b>
           <small>{error ? 'لم تُحدَّث الإتاحة؛ لا تُعرض نتيجة سابقة على أنها حديثة. ' + error : periodText(period) + ' · ' + st.hint}</small>
         </div>
+      </div>
+
+      <div className="detail-request">
+        <SiteRequestActionList state={actions} onChoose={(action, typeCode) => onAction({ kind: 'NEW', action, typeCode })} />
+        {selectedResources.length > 0 && (
+          <p className="micro muted selected-resources">
+            الموارد المختارة تنتقل إلى النموذج: {resources.filter((r) => selectedResources.includes(r.id)).map((r) => r.name).join('، ')}
+          </p>
+        )}
       </div>
 
       <dl className="meta-grid">
@@ -162,19 +173,6 @@ export function SiteDetailPanel({
       )}
 
       <div className="detail-actions">
-        {canCreate && newTypes.length > 0 && site.view !== 'CONTEXT' && (
-          <>
-            <button className="button primary" onClick={() => onAction({ kind: 'NEW', open: false })} disabled={period.mode === 'OPEN' || !selectedResources.length}>
-              طلب استخدام مؤقت
-            </button>
-            {openAllowed && (
-              <button className="button" onClick={() => onAction({ kind: 'NEW', open: true })} disabled={!selectedResources.length}>
-                طلب استخدام مفتوح المدة
-              </button>
-            )}
-            {!selectedResources.length && <p className="micro muted">اختر مورداً واحداً على الأقل لتقديم طلب.</p>}
-          </>
-        )}
         <button className="button compact" onClick={() => onAction({ kind: 'FIT' })}>
           ملاءمة الموقع على الخريطة
         </button>

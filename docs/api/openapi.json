@@ -3491,6 +3491,69 @@
         }
       }
     },
+    "/api/v1/organizations/{id}/unit-symbol/remove": {
+      "post": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "removeUnitSymbol",
+        "summary": "remove unit symbol",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/people": {
       "get": {
         "tags": [
@@ -5126,6 +5189,48 @@
         ]
       }
     },
+    "/api/v1/sites/{id}/request-actions": {
+      "get": {
+        "tags": [
+          "Request"
+        ],
+        "operationId": "siteRequestActions",
+        "summary": "site request actions",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/sites/{id}/retire": {
       "post": {
         "tags": [
@@ -5559,6 +5664,186 @@
         "parameters": [
           {
             "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/unit-symbols": {
+      "get": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "unitSymbols",
+        "summary": "unit symbols",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/unit-symbols/catalog": {
+      "get": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "unitSymbolCatalog",
+        "summary": "unit symbol catalog",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "addUnitSymbol",
+        "summary": "add unit symbol",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/unit-symbols/catalog/{code}/active": {
+      "post": {
+        "tags": [
+          "Org"
+        ],
+        "operationId": "unitSymbolActive",
+        "summary": "unit symbol active",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "code",
             "in": "path",
             "required": true,
             "schema": {

@@ -151,7 +151,16 @@ public class OrganizationService {
     public record OrgBranch(String id, String code, String name, String parentId, int childCount, int siteCount, List<Ref> path) {
     }
 
-    private static void requireOrgReader(AccessContext ctx) {
+    /** The given organisations that the actor may see, in the given order (unknown ids are dropped). */
+    public List<UUID> visibleAmong(AccessContext ctx, java.util.Collection<UUID> ids) {
+        requireOrgReader(ctx);
+        Set<UUID> visible = visibleOrgs(ctx);
+        Set<UUID> existing = new java.util.HashSet<>(ids.isEmpty() ? List.of() : jdbc.sql("select id from organization where id = any(string_to_array(:ids, ',')::uuid[])")
+                .param("ids", ids.stream().map(UUID::toString).collect(java.util.stream.Collectors.joining(","))).query(UUID.class).list());
+        return ids.stream().distinct().filter(existing::contains).filter(id -> visible == null || visible.contains(id)).toList();
+    }
+
+    public static void requireOrgReader(AccessContext ctx) {
         ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_ACCESS, Permission.MANAGE_FACILITIES, Permission.CONFIGURE);
     }
 

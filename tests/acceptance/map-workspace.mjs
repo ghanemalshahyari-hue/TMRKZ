@@ -1,4 +1,5 @@
-// Browser acceptance of the administrative map workspace — MAP-01 … MAP-18 (docs/MAP_WORKSPACE_COMPLETION_AR.md §8).
+// Browser acceptance of the administrative map workspace — MAP-01 … MAP-18 (docs/MAP_WORKSPACE_COMPLETION_AR.md §8)
+// and MAP-19, the on-site request menu (docs/OWNER_CONTINUATION_PROMPT.md §3).
 // Real sign-in (Keycloak page and the manual directory path), real API and PostgreSQL/PostGIS in the acceptance
 // environment, Microsoft Edge driven by clicks and the keyboard. The API is used only to prepare test data (earlier
 // review stages, reservations with known periods, a concurrent edit) and to cross-check what the screen shows; those
@@ -29,7 +30,9 @@ async function step(id, title, page, fn) {
     const details = await fn();
     record(id, title, true, details ?? '');
   } catch (e) {
-    record(id, title, false, (e && e.message ? e.message : String(e)).split('\n')[0].slice(0, 400));
+    const lines = (e && e.message ? e.message : String(e)).split('\n');
+    const waiting = lines.find((l) => l.includes('waiting for'));
+    record(id, title, false, (lines[0] + (waiting ? ' — ' + waiting.trim() : '')).slice(0, 500));
     if (page) await page.screenshot({ path: fileURLToPath(new URL(`fail-${id}.png`, OUT)) }).catch(() => undefined);
   }
 }
@@ -53,7 +56,8 @@ const addDays = (d, n) => {
   x.setUTCDate(x.getUTCDate() + n);
   return x.toISOString().slice(0, 10);
 };
-const D = addDays('2027-01-01', (run % 200) * 10); // each run uses its own 10-day window
+// each run uses its own 10-day window; the start is checked against the server below (windows recycle every 200 minutes)
+let D = addDays('2027-01-01', (run % 200) * 10);
 const dubai = (local) => new Date(local.length === 10 ? local + 'T00:00:00+04:00' : local + ':00+04:00').toISOString();
 
 // ---- setup sessions (API) ---------------------------------------------------------------------------------------
@@ -66,10 +70,25 @@ const managerItApi = await apiSession('t.manager.it');
 const requester2Api = await apiSession('t.requester2');
 
 const sites = (await approverApi.get('/sites')).body;
+// an earlier run may have booked this window: move on until no resource has an approved booking in it
+for (let i = 0, ids = sites.flatMap((x) => x.resources).map((r) => r.id); ; i++) {
+  const c = (await approverApi.post('/availability/check', { resourceIds: ids, start: dubai(D), end: dubai(addDays(D, 12)) })).body;
+  if (c?.available) break;
+  if (i === 40) throw new Error('no free 12-day window found for this run');
+  D = addDays(D, 2000 + 10 * i);
+}
 const site = (code) => sites.find((s) => s.code === code);
 const res = (code) => sites.flatMap((s) => s.resources).find((r) => r.code === code);
 const types = (await requesterApi.get('/request-types')).body;
 const TYPE = types.find((t) => t.kind === 'NEW_RESERVATION').code;
+const TYPE_NAME = types.find((t) => t.code === TYPE).name;
+
+/** Presses a site request action (menu or panel) and, when several published types fit it, picks the named type. */
+async function requestAction(scope, label, typeName = TYPE_NAME) {
+  await scope.getByRole('button', { name: label, exact: true }).click();
+  const list = scope.locator('.site-actions.types');
+  if (await list.waitFor({ timeout: 1500 }).then(() => true, () => false)) await list.getByRole('button', { name: typeName, exact: true }).click();
+}
 const geometryVersion = async (code) => (await admin.get('/sites/' + site(code).id)).body.geometryVersion ?? 0;
 
 /** Runs the earlier stages (and optionally the final one) of a request through the API: test setup only. */
@@ -496,7 +515,7 @@ await step('MAP-11', 'طلب من الخريطة يحتفظ بالجهة وال�
   await pageB.getByLabel('اختيار مركز التدريب الإداري — قاعة التدريب أ').check();
   const mainBox = pageB.getByLabel('اختيار مركز التدريب الإداري', { exact: true });
   if (await mainBox.isChecked()) await mainBox.uncheck();
-  await pageB.getByRole('button', { name: 'طلب استخدام مؤقت' }).click();
+  await requestAction(pageB.locator('.map-detail'), 'طلب استخدام مؤقت');
   const drawer = pageB.locator('aside.request-drawer');
   await drawer.waitFor();
   await drawer.getByPlaceholder('مثال: استخدام مركز الخدمات لاستقبال الموظفين').fill('تدريب الموظفين الجدد — اختبار الخريطة');
@@ -509,7 +528,7 @@ await step('MAP-11', 'طلب من الخريطة يحتفظ بالجهة وال�
   await drawer.getByRole('button', { name: 'تصغير والعودة للخريطة' }).click();
   await pageB.locator('.request-drawer.minimized').waitFor();
   await pageB.getByLabel('اختيار مركز التدريب الإداري — قاعة التدريب ب').check();
-  await pageB.getByRole('button', { name: 'طلب استخدام مؤقت' }).click();
+  await requestAction(pageB.locator('.map-detail'), 'طلب استخدام مؤقت');
   const banner = pageB.locator('.selection-change');
   await banner.waitFor();
   check((await banner.innerText()).includes('الموارد'), 'change not shown before applying');
@@ -541,11 +560,146 @@ await step('MAP-12a', 'إرسال الطلب: قيد المراجعة دون ح�
   await shot(pageB, 'map-12-pending-orange');
   await pageB.getByRole('radio', { name: 'الإتاحة للفترة' }).click();
   const count = (await requesterApi.get('/requests?size=200')).body.total;
-  await pageB.getByRole('button', { name: 'طلب استخدام مؤقت' }).click();
+  await requestAction(pageB.locator('.map-detail'), 'طلب استخدام مؤقت');
   await pageB.locator('aside.request-drawer').waitFor();
   await pageB.getByRole('button', { name: 'إغلاق الطلب دون حفظ' }).click();
   check((await requesterApi.get('/requests?size=200')).body.total === count, 'closing the drawer saved a request');
   return 'الطلب ' + d.number + ' قيد المراجعة (⏳) · لا حجز ولا قفل · المورد يبقى متاحاً · الإغلاق دون حفظ لا ينشئ طلباً';
+});
+
+/** A point on the map whose topmost element is the map itself (no marker, boundary or control). */
+async function emptyMapPoint(page) {
+  return page.evaluate(() => {
+    const m = document.querySelector('.map').getBoundingClientRect();
+    for (let fy = 0.85; fy > 0.2; fy -= 0.05)
+      for (let fx = 0.1; fx < 0.9; fx += 0.04) {
+        const x = m.left + m.width * fx, y = m.top + m.height * fy;
+        const el = document.elementFromPoint(x, y);
+        if (el && (el.classList.contains('leaflet-container') || el.classList.contains('leaflet-image-layer') || el.tagName === 'svg' || el.classList.contains('leaflet-pane'))) return { x, y };
+      }
+    return null;
+  });
+}
+/** A point inside the site's drawn boundary that is not covered by a marker. */
+async function boundaryPoint(page, siteId) {
+  return page.evaluate((id) => {
+    const paths = [...document.querySelectorAll(`path[data-site="${id}"]`)];
+    for (const p of paths) {
+      const b = p.getBoundingClientRect();
+      for (let fy = 0.2; fy < 0.85; fy += 0.07)
+        for (let fx = 0.2; fx < 0.85; fx += 0.07) {
+          const x = b.left + b.width * fx, y = b.top + b.height * fy;
+          if (document.elementFromPoint(x, y) === p) return { x, y };
+        }
+    }
+    return null;
+  }, siteId);
+}
+
+await step('MAP-19', 'نقر الموقع على الخريطة يفتح قائمة بالإجراءين بجوار الموقع، تتبعه عند التحريك، تغلق بـEsc والنقر خارجها، وتنقل النوع والموقع إلى النموذج دون كتابة', pageB, async () => {
+  const before = (await requesterApi.get('/requests?size=200')).body.total;
+  const S = site('11');
+  await selectSite(pageB, '11');
+  await pageB.getByRole('button', { name: 'إغلاق التفاصيل' }).click();
+  const pin = pageB.locator(`.pin-wrap[data-site="${S.id}"]`);
+  const menu = pageB.locator('.site-menu');
+  const mapBox = await pageB.locator('.map').boundingBox();
+  const within = (b, box) => b.x >= box.x - 1 && b.y >= box.y - 1 && b.x + b.width <= box.x + box.width + 1 && b.y + b.height <= box.y + box.height + 1;
+
+  // 1. one click on the marker: compact menu at the site, two labelled actions from the published types
+  await pin.click();
+  await menu.waitFor();
+  check((await menu.innerText()).includes(S.name), 'menu does not show the site name');
+  const temp = menu.getByRole('button', { name: 'طلب استخدام مؤقت', exact: true });
+  const open = menu.getByRole('button', { name: 'طلب استخدام مفتوح المدة', exact: true });
+  await pageB.waitForFunction(() => document.querySelector('.site-menu .site-actions:not([aria-busy])'));
+  check((await temp.isEnabled()) && (await open.isEnabled()), 'actions not available to the requester');
+  const mb = await menu.boundingBox();
+  const pb = await pin.boundingBox();
+  check(within(mb, mapBox), 'menu leaves the map');
+  check(Math.abs(mb.x + mb.width / 2 - pb.x) <= mb.width / 2 + 2 && mb.y + mb.height <= pb.y + 4, 'menu not anchored above the marker');
+  await shot(pageB, 'map-19-site-menu');
+
+  // 2. panning the map keeps the menu on the same site
+  const e = await emptyMapPoint(pageB);
+  check(e, 'no empty map point found');
+  await pageB.mouse.move(e.x, e.y);
+  await pageB.mouse.down();
+  await pageB.mouse.move(e.x - 80, e.y + 50, { steps: 10 });
+  await pageB.mouse.up();
+  await pageB.waitForTimeout(300);
+  check(await menu.isVisible(), 'menu closed while panning');
+  const pb2 = await pin.boundingBox();
+  const mb2 = await menu.boundingBox();
+  check(Math.abs(pb2.x - pb.x + 80) < 6 && Math.abs(pb2.y - pb.y - 50) < 6, 'the map did not pan');
+  // the menu may be held inside the map edge, but its pointer stays on the site and it keeps its distance above it
+  const ab = await menu.locator('.site-menu-arrow').boundingBox();
+  check(ab && Math.abs(ab.x + ab.width / 2 - (pb2.x + pb2.width / 2)) < 6, 'menu pointer left the site while panning');
+  check(Math.abs(pb2.y - (mb2.y + mb2.height) - (pb.y - (mb.y + mb.height))) < 4, 'menu did not follow the site vertically');
+  check(within(mb2, mapBox), 'menu left the map while panning');
+
+  // 3. Escape closes and returns focus to the marker; Enter on the marker reopens it with focus on the first action
+  await pageB.keyboard.press('Escape');
+  await menu.waitFor({ state: 'detached' });
+  const focused = await pageB.evaluate(() => document.activeElement?.querySelector('.pin-wrap')?.getAttribute('data-site'));
+  check(focused === S.id, 'focus not returned to the marker');
+  await pageB.keyboard.press('Enter');
+  await menu.waitFor();
+  await pageB.waitForFunction(() => document.activeElement?.closest('.site-menu') && document.activeElement.textContent.includes('طلب استخدام مؤقت'), null, { timeout: 5000 });
+
+  // 4. a click on the empty map closes; a click on the registered boundary opens it at that point
+  const e2 = await emptyMapPoint(pageB);
+  await pageB.mouse.click(e2.x, e2.y);
+  await menu.waitFor({ state: 'detached' });
+  const bp = await boundaryPoint(pageB, S.id);
+  check(bp, 'no clickable point inside the boundary of ' + S.code);
+  await pageB.mouse.click(bp.x, bp.y);
+  await menu.waitFor();
+  const mb3 = await menu.boundingBox();
+  check(Math.abs(mb3.x + mb3.width / 2 - bp.x) <= mb3.width / 2 + 2, 'boundary menu not anchored at the clicked point');
+
+  // 5. temporary use: the chosen type and the site go to the drawer; with several resources none is claimed silently
+  await requestAction(menu, 'طلب استخدام مؤقت');
+  await menu.waitFor({ state: 'detached' });
+  const drawer = pageB.locator('aside.request-drawer');
+  await drawer.waitFor();
+  const ctxText = await drawer.locator('.wizard-context').innerText();
+  check(ctxText.includes(S.name) && ctxText.includes(TYPE_NAME), 'drawer does not show the site and the chosen type: ' + ctxText);
+  check((await drawer.locator('.type-button.active').innerText()).includes(TYPE_NAME), 'wizard selected another type');
+  await drawer.getByRole('button', { name: 'التالي ←' }).click();
+  const siteBoxes = drawer.locator('.site-pick-grid').first().locator('input[type="checkbox"]');
+  const n = await siteBoxes.count();
+  check(n === S.resources.length, 'the drawer does not offer the site resources first (' + n + ')');
+  for (let i = 0; i < n; i++) check(!(await siteBoxes.nth(i).isChecked()), 'a resource was preselected on a multi-resource site');
+  await drawer.getByRole('button', { name: 'التالي ←' }).click();
+  check((await drawer.locator('#wizardError').innerText()).includes(S.name), 'missing resource not explained');
+  await shot(pageB, 'map-19-drawer-asks-resource');
+  await drawer.getByRole('button', { name: 'إغلاق الطلب دون حفظ' }).click();
+
+  // 6. open-ended use from the same menu: the drawer opens with an open end
+  await pin.click();
+  await menu.waitFor();
+  await pageB.waitForFunction(() => document.querySelector('.site-menu .site-actions:not([aria-busy])'));
+  await requestAction(menu, 'طلب استخدام مفتوح المدة');
+  await drawer.waitFor();
+  check((await drawer.locator('.wizard-context').innerText()).includes('مفتوحة المدة'), 'open end not carried');
+  await drawer.getByRole('button', { name: 'التالي ←' }).click();
+  check(await drawer.getByRole('checkbox', { name: /استخدام دائم/ }).isChecked(), 'open-ended flag not set');
+  await drawer.getByRole('button', { name: 'إغلاق الطلب دون حفظ' }).click();
+
+  // 7. the site tree opens the same menu beside the row
+  await openTab(pageB, 'المواقع');
+  const rowButton = pageB.getByRole('button', { name: 'طلب استخدام «' + S.name + '»' }).first();
+  await rowButton.click();
+  await menu.waitFor();
+  check((await menu.innerText()).includes(S.name), 'tree menu shows another site');
+  check(await menu.getByRole('button', { name: 'طلب استخدام مؤقت', exact: true }).isVisible(), 'tree menu without the actions');
+  await shot(pageB, 'map-19-tree-menu');
+  await pageB.keyboard.press('Escape');
+  await menu.waitFor({ state: 'detached' });
+
+  check((await requesterApi.get('/requests?size=200')).body.total === before, 'opening or closing the menu or the drawer created a request');
+  return 'نقرة واحدة ← قائمة «' + S.name + '» فوق العلامة · تتبع الموقع عند السحب · Esc يعيد التركيز للعلامة · Enter يفتحها والتركيز على الإجراء · نقر الحدود يفتحها عند النقطة · النوع «' + TYPE_NAME + '» والموقع في النموذج · ' + n + ' موارد دون اختيار صامت · المفتوح المدة يصل بنهاية مفتوحة · الشجرة تفتح القائمة نفسها · لا طلب أنشئ';
 });
 
 // =================================================================================================================
@@ -817,6 +971,16 @@ await step('MAP-17', 'عرض هاتف ولوحة مفاتيح: اختيار وإ
   await page.waitForSelector('.map-workspace', { timeout: 30000 });
   await page.waitForSelector('.pin-wrap');
   await noHScroll('map');
+  await page.locator('.pin-wrap').first().tap();
+  const sheet = page.locator('.site-menu.sheet');
+  await sheet.waitFor();
+  for (const name of ['طلب استخدام مؤقت', 'طلب استخدام مفتوح المدة']) {
+    const b = await sheet.getByRole('button', { name, exact: true }).boundingBox();
+    check(b && b.x >= 0 && b.x + b.width <= 391 && b.y + b.height <= 845, name + ' outside the phone screen');
+  }
+  await shot(page, 'map-19-phone-sheet');
+  await sheet.getByRole('button', { name: 'إغلاق قائمة الموقع' }).tap();
+  await sheet.waitFor({ state: 'detached' });
   await page.getByRole('tab', { name: 'المواقع' }).focus();
   await page.keyboard.press('Enter');
   await page.getByLabel('البحث في المواقع', { exact: true }).focus();
@@ -831,11 +995,16 @@ await step('MAP-17', 'عرض هاتف ولوحة مفاتيح: اختيار وإ
   await page.keyboard.press('Enter');
   await page.getByLabel('بداية الفترة').fill(H2 + 'T09:00');
   await page.getByLabel('نهاية الفترة').fill(H2 + 'T10:00');
-  const action = page.getByRole('button', { name: 'طلب استخدام مؤقت' });
+  const action = page.locator('.map-detail').getByRole('button', { name: 'طلب استخدام مؤقت', exact: true });
   await action.focus();
   const bb = await action.boundingBox();
   check(bb && bb.x >= 0 && bb.x + bb.width <= 391, 'primary action outside the screen');
   await page.keyboard.press('Enter');
+  // several published types fit: focus moves to the type list, Enter picks the first one
+  if (await page.locator('.map-detail .site-actions.types').waitFor({ timeout: 1500 }).then(() => true, () => false)) {
+    await page.waitForFunction((n) => document.activeElement?.textContent?.includes(n), TYPE_NAME);
+    await page.keyboard.press('Enter');
+  }
   const drawer = page.locator('aside.request-drawer');
   await drawer.waitFor();
   await noHScroll('drawer');

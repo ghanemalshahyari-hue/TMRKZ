@@ -387,3 +387,28 @@ and is never labelled as a certificate signature.
   inside the network would make them B-T). No OCSP. No assessment against the UAE Trusted List or TDRA guidance —
   that depends on the enterprise provider's services and policy. The fictional test PKI proves the mechanism, not a
   trust level.
+
+## ADR-021 On-site request menu and informational unit symbols — In progress (2026-10-29)
+
+Owner continuation prompt (`docs/OWNER_CONTINUATION_PROMPT.md` §3 and §6).
+
+- **On-site menu.** A click, tap, Enter or Space on a site's marker or registered boundary selects it and opens a
+  compact menu anchored there (`SiteActionMenu`); on phones it is a bottom sheet. It follows the site while the map
+  pans, stays inside the map, and closes on Escape (focus returns to the marker), a click on the empty map or outside,
+  a different selection, the boundary editor, or a chosen action. The site tree and the organisation's site list open
+  the same menu from a «طلب» button; the side panel shows the same action list. All paths call one command
+  (`MapPage.startRequest`).
+- **Server decides the actions.** `GET /sites/{id}/request-actions` (`SiteRequestActions`) derives «طلب استخدام مؤقت»
+  from the active NEW_RESERVATION types and «طلب استخدام مفتوح المدة» only from those with an open end allowed, using
+  the create call's own predicates (a CREATE grant acting for some organisation, a visible site, active resources) and
+  a published workflow per type. Unavailable actions carry the reason; a site outside the view is 404. Reading it
+  writes nothing.
+- **Explicit type and resources.** The selected type code goes to the drawer; the wizard no longer picks the first
+  type (from the list it asks). A multi-resource site preselects no resource (the parent is never claimed silently);
+  the drawer lists the site's resources first and shows site, type, resources and period on every step.
+- **Unit symbols (backend done, UI not yet).** V12 adds `unit_symbol_catalog` and `org_unit_symbol`, local metadata
+  keyed by the organisation id that the HR publication never writes. The approved standard and edition are a policy
+  setting (`unitSymbolStandard`: APP6-D, APP6-E, 2525-D, 2525-E; null blocks assignment). CONFIGURE assigns from the
+  catalog or a manual SIDC checked for shape (20/30 digits, reality, friend, symbol set 10 or 11), with expected
+  version, reason and audit; lookups return only organisations the reader may see. Rendering uses milsymbol 3.0.4
+  (MIT, pinned; 3.0.5 was two days old), loaded lazily from the local bundle. A symbol grants nothing.

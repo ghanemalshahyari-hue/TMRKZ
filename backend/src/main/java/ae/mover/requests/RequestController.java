@@ -45,11 +45,13 @@ public class RequestController {
     private final ExecutionService execution;
     private final AttachmentService attachments;
     private final ae.mover.signing.SigningJobs signingJobs;
+    private final SiteRequestActions siteActions;
 
     public RequestController(AccessService access, RequestTypes types, RequestService requests, RequestViews views,
                              DecisionService decisions, ExecutionService execution, AttachmentService attachments,
-                             ae.mover.signing.SigningJobs signingJobs) {
+                             ae.mover.signing.SigningJobs signingJobs, SiteRequestActions siteActions) {
         this.access = access;
+        this.siteActions = siteActions;
         this.types = types;
         this.requests = requests;
         this.views = views;
@@ -63,6 +65,14 @@ public class RequestController {
     public List<RequestTypes.TypeView> requestTypes(Actor actor) {
         access.context(actor).requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.CREATE, Permission.CONFIGURE);
         return types.views();
+    }
+
+    /** The site menu and the site panel: which administrative use requests this person may start from the site. */
+    @GetMapping("/sites/{id}/request-actions")
+    public SiteRequestActions.View siteRequestActions(Actor actor, @PathVariable UUID id) {
+        var ctx = access.context(actor);
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_FACILITIES);
+        return siteActions.forSite(ctx, id);
     }
 
     @GetMapping("/requests")

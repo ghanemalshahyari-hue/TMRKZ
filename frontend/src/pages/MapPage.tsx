@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type L from 'leaflet';
 import { api, isAbort, urls, type ApiError } from '../api/client';
-import type { ImportJob, MapContext, MapFeature, MapFeatures, MapPackage, SiteDetail } from '../api/types';
+import type { ImportJob, MapContext, MapFeature, MapFeatures, MapPackage, SiteDetail, SiteRequestActionCode } from '../api/types';
 import { BoundaryEditor } from '../components/map/BoundaryEditor';
 import { OrgTree, SiteTree } from '../components/map/BrowseTrees';
 import { ImportDialog, PackageManager } from '../components/map/MapAdmin';
-import { MapCanvas, featureBounds, type FitTarget, type Viewport } from '../components/map/MapCanvas';
+import { MapCanvas, featureBounds, type FitTarget, type SiteHit, type Viewport } from '../components/map/MapCanvas';
 import { BackgroundPanel, CoverageNote, LayersPanel, Legend } from '../components/map/MapPanels';
+import { RowActionsButton, SiteActionMenu, type MenuAnchor, type SiteActionsState } from '../components/map/SiteActionMenu';
 import { SiteDetailPanel, type SiteAction } from '../components/map/SiteDetailPanel';
 import { useApp } from '../lib/app';
 import { fullDate, fullTime } from '../lib/dates';
 import {
   AVAILABILITY_STYLE,
   DEFAULT_LAYERS,
+  UNKNOWN_STYLE,
   defaultPeriod,
   loadMapContext,
   periodQuery,
@@ -25,6 +27,8 @@ import {
 } from '../lib/mapState';
 
 type OrgFilter = { id: string; name: string; includeSub: boolean };
+/** The on-site menu: always for the selected site; the anchor object is kept stable while it is open. */
+type MenuState = { siteId: string; name: string; anchor: MenuAnchor; keyboard: boolean; opener: HTMLElement | null };
 
 function periodSummary(p: MapPeriod): string {
   const q = periodQuery(p);
@@ -40,7 +44,7 @@ function periodSummary(p: MapPeriod): string {
  */
 export function MapPage() {
   const app = useApp();
-  const { me, selectedSiteId, setSelectedSiteId, revision, requestTypes, can } = app;
+  const { me, selectedSiteId, setSelectedSiteId, revision, can } = app;
   const saved = useRef<SavedMapContext>(loadMapContext(me.id));
   const [ctx, setCtx] = useState<MapContext | null>(null);
   const [ctxError, setCtxError] = useState<string | null>(null);
@@ -64,6 +68,8 @@ export function MapPage() {
   const [siteLoading, setSiteLoading] = useState(false);
   const [siteError, setSiteError] = useState<string | null>(null);
   const [resources, setResources] = useState<string[]>([]);
+  const [menu, setMenu] = useState<MenuState | null>(null);
+  const [siteActions, setSiteActions] = useState<SiteActionsState | null>(null);
   const [fit, setFit] = useState<FitTarget | null>(null);
   const [reveal, setReveal] = useState<{ ids: string[]; key: number } | null>(null);
   const [map, setMap] = useState<L.Map | null>(null);
@@ -214,14 +220,36 @@ export function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSiteId, pq?.from, pq?.to, pq?.open, resources.join(','), revision, localRevision, data?.asOf]);
 
-  // default resource choice: the site's main resource; the user changes it in the detail panel
+  // default resource choice: only an unambiguous one (a single resource); with several, the person chooses — clicking a
+  // parent site never claims the whole parent by itself
   const lastSite = useRef<string | null>(null);
   useEffect(() => {
     if (!siteFeature || lastSite.current === siteFeature.siteId) return;
     lastSite.current = siteFeature.siteId;
-    const main = siteFeature.resources.find((r) => !r.parentResourceId) ?? siteFeature.resources[0];
-    setResources(main ? [main.id] : []);
+    setResources(siteFeature.resources.length === 1 ? [siteFeature.resources[0].id] : []);
   }, [siteFeature]);
+
+  // the request actions this person may start from the selected site (server decision; a late answer for an earlier
+  // selection is dropped)
+  useEffect(() => {
+    if (!selectedSiteId) {
+      setSiteActions(null);
+      return;
+    }
+    const ctl = new AbortController();
+    const id = selectedSiteId;
+    setSiteActions((cur) => (cur?.siteId === id ? cur : { siteId: id, data: null, error: null }));
+    api
+      .siteRequestActions(id, ctl.signal)
+      .then((d) => setSiteActions({ siteId: id, data: d, error: null }))
+      .catch((e: ApiError) => !isAbort(e) && setSiteActions({ siteId: id, data: null, error: e.message }));
+    return () => ctl.abort();
+  }, [selectedSiteId, revision, localRevision]);
+
+  // the menu belongs to the selected site: a different selection or the boundary editor closes it
+  useEffect(() => {
+    if (menu && (menu.siteId !== selectedSiteId || editingSite)) setMenu(null);
+  }, [selectedSiteId, editingSite, menu]);
 
   const select = useCallback(
     (id: string | null, fitTo: boolean) => {
@@ -252,7 +280,63 @@ export function MapPage() {
     return c;
   }, [features]);
 
-  const creatable = can('CREATE');
+  const closeMenu = useCallback((restoreFocus: boolean) => {
+    setMenu((m) => {
+      if (m && restoreFocus) {
+        const back = m.opener?.isConnected ? m.opener : document.querySelector<HTMLElement>(`.pin-icon:has(.pin-wrap[data-site="${m.siteId}"])`);
+        window.setTimeout(() => back?.focus({ preventScroll: true }), 0);
+      }
+      return null;
+    });
+  }, []);
+
+  /** A site activated on the map (marker or boundary): select it and open its menu at that point. */
+  const onSiteHit = useCallback(
+    (id: string, hit: SiteHit) => {
+      select(id, false);
+      if (editingSite) return;
+      const f = features.find((x) => x.siteId === id);
+      setMenu({ siteId: id, name: f?.name ?? '', anchor: { kind: 'map', latlng: hit.latlng, offset: hit.element ? 46 : 14 }, keyboard: hit.keyboard, opener: hit.element });
+    },
+    [select, editingSite, features],
+  );
+
+  /** The same menu from a tree or list row: the site is selected and fitted, the menu opens beside the row. */
+  const openMenuFromRow = (id: string, name: string, el: HTMLElement, keyboard: boolean) => {
+    if (menu?.siteId === id && menu.anchor.kind === 'element' && menu.anchor.el === el) return setMenu(null);
+    select(id, true);
+    setMenu({ siteId: id, name, anchor: { kind: 'element', el }, keyboard, opener: el });
+  };
+
+  /**
+   * The one command behind every entry path (map menu, tree, list, side panel): open the request drawer with the
+   * chosen published type, the selected organisation, this site, the resources chosen for it, and the map period.
+   * Nothing is written until the person saves or submits; the server re-checks everything.
+   */
+  const startRequest = (siteId: string, action: SiteRequestActionCode, typeCode: string) => {
+    setMenu(null);
+    const f = siteFeature?.siteId === siteId ? siteFeature : features.find((x) => x.siteId === siteId);
+    const own = f?.resources ?? [];
+    const chosen = resources.filter((id) => own.some((r) => r.id === id));
+    const open = action === 'OPEN_ENDED';
+    const p = !open && period.mode === 'OPEN' ? switchPeriodMode(period, 'DAYS') : period;
+    app.openWizard({
+      origin: 'MAP',
+      siteId,
+      typeCode,
+      layout: 'drawer',
+      prefill: {
+        ownerOrgId: org?.id,
+        resourceIds: chosen.length ? chosen : own.length === 1 ? [own[0].id] : [],
+        unit: p.mode === 'HOURS' ? 'HOURS' : 'DAYS',
+        start: p.start,
+        end: open ? '' : p.end,
+        permanent: open,
+        siteName: f?.name ?? site?.name,
+      },
+    });
+  };
+
   const act = async (a: SiteAction) => {
     if (!site) return;
     if (a.kind === 'FIT') {
@@ -272,21 +356,7 @@ export function MapPage() {
       }
       return;
     }
-    const unit = period.mode === 'HOURS' ? 'HOURS' : 'DAYS';
-    app.openWizard({
-      origin: 'MAP',
-      siteId: site.id,
-      layout: 'drawer',
-      prefill: {
-        ownerOrgId: org?.id,
-        resourceIds: resources,
-        unit,
-        start: period.start,
-        end: a.open || period.mode === 'OPEN' ? '' : period.end,
-        permanent: a.open || period.mode === 'OPEN',
-        siteName: site.name,
-      },
-    });
+    startRequest(site.id, a.action, a.typeCode);
   };
 
   const onImported = (job: ImportJob) => {
@@ -297,6 +367,8 @@ export function MapPage() {
   const setMode2 = (m: PeriodMode2) => setPeriod((p) => switchPeriodMode(p, m));
 
   if (ctxError) return <div className="note red">{ctxError}</div>;
+
+  const menuFeature = menu ? ((siteFeature?.siteId === menu.siteId ? siteFeature : features.find((x) => x.siteId === menu.siteId)) ?? null) : null;
 
   const shownBackground = background;
   const initialExtent = ctx?.extent ?? null;
@@ -410,7 +482,14 @@ export function MapPage() {
               revision={revision}
             />
           ) : (
-            <SiteTree selectedId={selectedSiteId} onSelect={(id) => select(id, true)} revision={revision + localRevision} revealPath={reveal} />
+            <SiteTree
+              selectedId={selectedSiteId}
+              onSelect={(id) => select(id, true)}
+              onActions={openMenuFromRow}
+              menuSiteId={menu?.anchor.kind === 'element' ? menu.siteId : null}
+              revision={revision + localRevision}
+              revealPath={reveal}
+            />
           )}
           {org && (
             <div className="org-sites">
@@ -418,7 +497,7 @@ export function MapPage() {
               {features.length === 0 && <p className="micro muted">{loading ? 'جارٍ التحميل…' : 'لا مواقع ضمن نافذة العرض؛ حرّك الخريطة أو كبّر النطاق.'}</p>}
               <ul>
                 {features.map((f) => (
-                  <li key={f.siteId}>
+                  <li key={f.siteId} className="site-row-item">
                     <button className={'site-row ' + (selectedSiteId === f.siteId ? 'active' : '')} onClick={() => select(f.siteId, true)}>
                       <span>{f.code}</span>
                       <div>
@@ -429,6 +508,11 @@ export function MapPage() {
                       </div>
                       <i className="dot" style={{ color: AVAILABILITY_STYLE[f.availability].color }} title={AVAILABILITY_STYLE[f.availability].label} />
                     </button>
+                    <RowActionsButton
+                      name={f.name}
+                      open={menu?.siteId === f.siteId && menu.anchor.kind === 'element'}
+                      onOpen={(el, kb) => openMenuFromRow(f.siteId, f.name, el, kb)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -443,7 +527,8 @@ export function MapPage() {
               features={features}
               stale={!!stale}
               selectedSiteId={selectedSiteId}
-              onSelect={(id) => select(id, false)}
+              onSelect={onSiteHit}
+              onBackgroundClick={() => menu && closeMenu(false)}
               mode={mode}
               background={shownBackground}
               layers={layers}
@@ -564,13 +649,28 @@ export function MapPage() {
             selectedResources={resources}
             onToggleResource={(id, on) => setResources((cur) => (on ? [...new Set([...cur, id])] : cur.filter((x) => x !== id)))}
             onAction={act}
-            canCreate={creatable}
-            requestTypes={requestTypes}
+            actions={siteActions?.siteId === selectedSiteId ? siteActions : null}
+            canCreate={can('CREATE')}
+            requestTypes={app.requestTypes}
             onClose={() => select(null, false)}
           />
         ) : null}
       </div>
 
+      {menu && (
+        <SiteActionMenu
+          map={map}
+          anchor={menu.anchor}
+          title={menuFeature?.name ?? site?.name ?? menu.name}
+          subtitle={((menuFeature?.parentId ?? site?.parentId) ? 'منطقة أو موقع فرعي' : 'موقع رئيسي') + ' · ' + (menuFeature?.code ?? site?.code ?? '')}
+          state={menuFeature ? (stale ? UNKNOWN_STYLE : AVAILABILITY_STYLE[menuFeature.availability]) : null}
+          availability={periodSummary(period)}
+          actions={siteActions?.siteId === menu.siteId ? siteActions : null}
+          keyboard={menu.keyboard}
+          onChoose={(a, code) => startRequest(menu.siteId, a, code)}
+          onClose={closeMenu}
+        />
+      )}
       <ImportDialog open={importFor !== false} targetSite={importFor || null} onClose={() => setImportFor(false)} onPublished={onImported} />
       <PackageManager
         open={packagesOpen}
