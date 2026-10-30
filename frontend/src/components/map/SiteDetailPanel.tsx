@@ -9,6 +9,7 @@ export type SiteAction =
   | { kind: 'NEW'; action: SiteRequestActionCode; typeCode: string }
   | { kind: 'CHANGE'; reservationId: string; typeCode: string }
   | { kind: 'EDIT_BOUNDARY' }
+  | { kind: 'EDIT_MARKER' }
   | { kind: 'IMPORT_BOUNDARY' }
   | { kind: 'FIT' };
 
@@ -178,6 +179,9 @@ export function SiteDetailPanel({
         </button>
         {site.canManage && (
           <>
+            <button className="button compact" onClick={() => onAction({ kind: 'EDIT_MARKER' })}>
+              {site.location ? 'تحرير سجل الموقع — نقل العلامة' : 'تحرير سجل الموقع — تحديد العلامة'}
+            </button>
             <button className="button compact" onClick={() => onAction({ kind: 'EDIT_BOUNDARY' })}>
               تحرير سجل الموقع — الحدود
             </button>

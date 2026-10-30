@@ -88,6 +88,14 @@ Date: 29 October 2026 · Version 1.0.0
     site register is never changed by a proposal. Main-unit skip rule and automatic registration of the new site are
     not implemented (`docs/STATIONING_REQUEST_DESIGN_AR.md`). Deployment planning, moving groups with preserved
     spacing, tactical graphics and operational movement integration are not built (scope exclusion).
+  - Direct marker management on the map (owner scope clarification of 30 Oct, `docs/SCOPE_CLARIFICATION_AR.md`
+    function 2, ADR-024) — done: adding a new site by placing a marker on the map, and moving an existing site's
+    marker, as a direct audited facility-register edit (`MANAGE_FACILITIES`, reason + audit), separate from the
+    relocation request. `SiteMarkerEditor`, `POST /sites`, `POST /sites/{id}/location`; `SiteMarkerIT` (6 tests pass),
+    frontend typecheck/build/tests pass; the browser MAP-20 check is pending for the consolidated checkpoint (not yet
+    run). It never touches boundaries, resources, responsibility or reservations, and selecting or
+    panning writes nothing. This closes the one in-scope geographic function the map interface had left out; the gap
+    "a facilities administrator registers a new site separately" (ADR-023) is now served by this action.
   - Not started: tiled offline backgrounds (prompt §7), scoped explicit denies and delegations in the studio (§8),
     governed migration of running requests (§9), the browser PKI journey (§10), Node failure diagnostics (§13), load
     measurement (§14), release bundle and restore (§15).

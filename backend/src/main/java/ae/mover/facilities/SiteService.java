@@ -364,6 +364,50 @@ public class SiteService {
         return list(ctx).stream().filter(s -> s.id().equals(id.toString())).findFirst().orElseThrow();
     }
 
+    public record MoveMarkerInput(Location location, String reason) {
+    }
+
+    /**
+     * Moves (or sets) a site's point marker to a coordinate the facility manager placed on the map or typed, as a
+     * direct, audited edit of the site register — the same authority ({@link Permission#MANAGE_FACILITIES} on the
+     * responsible organisation) and the same «reason + audit» contract as boundary editing. It never touches the
+     * registered boundary, resources, responsibility or any reservation; selecting or panning the map writes nothing,
+     * only this call does. A retired site is refused.
+     */
+    @Transactional
+    public SiteView moveMarker(AccessContext ctx, UUID id, MoveMarkerInput in) {
+        if (in == null || in.location() == null) {
+            throw ApiException.validation("حدد موقع العلامة الجديد (خط العرض وخط الطول)، أو انقل العلامة على الخريطة.");
+        }
+        double lat = in.location().lat();
+        double lng = in.location().lng();
+        if (!Double.isFinite(lat) || !Double.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+            throw ApiException.validation("إحداثيات غير صالحة: خط العرض بين −90 و90، وخط الطول بين −180 و180.");
+        }
+        if (in.reason() == null || in.reason().trim().length() < 5) {
+            throw ApiException.validation("اكتب سبب نقل العلامة (5 أحرف على الأقل).");
+        }
+        SiteRow current = rows("where s.id = :id", Map.of("id", id)).stream().findFirst().orElseThrow(ApiException::notFound);
+        requireFacilityManager(ctx, current.orgId());
+        if (!"ACTIVE".equals(current.status())) {
+            throw ApiException.validation("الموقع موقوف؛ لا تُحدَّث علامته.");
+        }
+        double nlat = Math.round(lat * 1e7) / 1e7;
+        double nlng = Math.round(lng * 1e7) / 1e7;
+        jdbc.sql("update site set lat = :lat, lng = :lng, version = version + 1 where id = :id")
+                .param("lat", nlat).param("lng", nlng).param("id", id).update();
+        Map<String, Object> detail = new LinkedHashMap<>();
+        if (current.lat() != null) {
+            detail.put("fromLat", current.lat());
+            detail.put("fromLng", current.lng());
+        }
+        detail.put("toLat", nlat);
+        detail.put("toLng", nlng);
+        audit.recordAs(ctx.actor(), current.lat() == null ? "SITE_MARKER_SET" : "SITE_MARKER_MOVED", "SITE", id.toString(),
+                current.name(), detail, in.reason().trim());
+        return list(ctx).stream().filter(s -> s.id().equals(id.toString())).findFirst().orElseThrow();
+    }
+
     @Transactional
     public void retire(AccessContext ctx, UUID id) {
         SiteRow current = rows("where s.id = :id", Map.of("id", id)).stream().findFirst().orElseThrow(ApiException::notFound);

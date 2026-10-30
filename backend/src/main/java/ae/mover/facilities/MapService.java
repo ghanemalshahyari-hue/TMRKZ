@@ -575,6 +575,7 @@ public class MapService {
         out.put("aerialInstalled", bg.stream().anyMatch(p -> "AERIAL".equals(p.kind())));
         out.put("canManagePackages", MapPackageService.manager(ctx));
         out.put("canEditBoundaries", ctx.has(Permission.MANAGE_FACILITIES));
+        out.put("canManageSites", ctx.has(Permission.MANAGE_FACILITIES));
         out.put("canExport", ctx.has(Permission.EXPORT));
         out.put("timezone", Times.DISPLAY_ZONE.getId());
         return out;

@@ -454,3 +454,33 @@ Owner request of 30 Oct 2026 (two options around the site; draw the new location
   out. The site register is never changed by a proposal; a facilities administrator registers a new site separately.
 - **Not built.** Deployment planning, moving groups with preserved spacing, tactical graphics and operational
   movement integration (scope exclusion, `docs/STATIONING_REQUEST_DESIGN_AR.md` §1).
+
+## ADR-024 Direct marker management on the map: add a site at a point, move a site's marker — Accepted (2026-10-30)
+
+Owner scope clarification of 30 Oct 2026 (`docs/SCOPE_CLARIFICATION_AR.md`, function 2): "add a marker for a new
+location, or drag an existing marker to reposition it." The backend already stored a site's point (`site.lat/lng`) and
+accepted it on `POST /sites` / `PUT /sites/{id}`, but no UI ever called them — `BoundaryEditor` is polygon-only and no
+marker could be placed or dragged. This was an in-scope administrative/geographic function left out of the map
+interface, not an excluded capability.
+
+- **A register edit, not a request.** Placing or moving a marker is a direct, audited edit of the facility register,
+  under the same authority as boundary editing (`MANAGE_FACILITIES` on the responsible organisation) and the same
+  "reason + audit" contract. It is **not** a reservation and **not** an approval workflow; it is distinct from the
+  relocation request (ADR-023), which stays approval-based and only records its move at closing.
+- **Server.** `SiteService.create` (unchanged) stores a new site at its clicked point. `SiteService.moveMarker` +
+  `POST /sites/{id}/location` update only `lat/lng` (version bump), validate the coordinate range, require a reason of
+  at least five characters, refuse a retired site, and audit `SITE_MARKER_MOVED` (or `SITE_MARKER_SET` when the site
+  had no marker) with the old and new coordinates. The boundary, resources, responsibility and every reservation are
+  untouched. `MapService.context` adds `canManageSites` (= `MANAGE_FACILITIES`), the same value as `canEditBoundaries`;
+  no permission was changed.
+- **UI.** `SiteMarkerEditor` (CREATE and MOVE) places one draggable marker on its own layer; the marker is dragged or
+  its coordinates typed, and nothing is written until an explicit save. Selecting or panning the map writes nothing
+  (the existing invariant). Entry points: «إضافة موقع جديد بعلامة» beside the map, and «تحرير سجل الموقع — نقل العلامة /
+  تحديد العلامة» in the site detail panel.
+- **Verified.** `SiteMarkerIT` (create at a point, move with audit and version bump, set on a marker-less site,
+  coordinate/reason validation, viewer and other-organisation manager forbidden, retired-site refusal) on real
+  PostgreSQL/PostGIS with OpenFGA in the loop (6 tests pass); frontend typecheck, build and unit tests pass. The MAP-20
+  browser check (Edge, offline acceptance env) is pending for the consolidated checkpoint — not yet run.
+- **Not changed / not built.** No existing function or approved permission changed. The scope exclusions in
+  `docs/SCOPE_CLARIFICATION_AR.md` §2 remain: no unit/formation dragging to deployment positions, no tactical graphics,
+  no operational movement. A drawn/placed marker is an administrative register point, never an approved booking.

@@ -87,6 +87,12 @@ public class FacilityController {
         return sites.update(access.context(actor), id, in);
     }
 
+    /** Direct, audited move of the site's point marker (facility register edit), separate from a relocation request. */
+    @PostMapping("/sites/{id}/location")
+    public SiteService.SiteView moveMarker(Actor actor, @PathVariable UUID id, @RequestBody SiteService.MoveMarkerInput in) {
+        return sites.moveMarker(access.context(actor), id, in);
+    }
+
     @PostMapping("/sites/{id}/retire")
     public ResponseEntity<Void> retire(Actor actor, @PathVariable UUID id) {
         sites.retire(access.context(actor), id);

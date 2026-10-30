@@ -222,6 +222,7 @@ export type MapContext = {
   aerialInstalled: boolean;
   canManagePackages: boolean;
   canEditBoundaries: boolean;
+  canManageSites: boolean;
   canExport: boolean;
   timezone: string;
 };

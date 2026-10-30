@@ -8,6 +8,7 @@ import { ImportDialog, PackageManager } from '../components/map/MapAdmin';
 import { MapCanvas, featureBounds, type FitTarget, type SiteHit, type Viewport } from '../components/map/MapCanvas';
 import { BackgroundPanel, CoverageNote, LayersPanel, Legend } from '../components/map/MapPanels';
 import { RelocationPanel } from '../components/map/RelocationPanel';
+import { SiteMarkerEditor } from '../components/map/SiteMarkerEditor';
 import { RowActionsButton, SiteActionMenu, type MenuAnchor, type SiteActionsState } from '../components/map/SiteActionMenu';
 import { SiteDetailPanel, type SiteAction } from '../components/map/SiteDetailPanel';
 import { useApp } from '../lib/app';
@@ -79,7 +80,10 @@ export function MapPage() {
   const [map, setMap] = useState<L.Map | null>(null);
   /** The site whose record is being edited; fixed when the editor opens, whatever is selected afterwards. */
   const [editingSite, setEditingSite] = useState<SiteDetail | null>(null);
-  const editing = !!editingSite;
+  /** Placing a new site's marker on the map (CREATE), or moving the selected site's marker (fixed when opened). */
+  const [addingSite, setAddingSite] = useState(false);
+  const [movingMarker, setMovingMarker] = useState<SiteDetail | null>(null);
+  const editing = !!editingSite || addingSite || !!movingMarker;
   const [importFor, setImportFor] = useState<{ id: string; name: string } | null | false>(false);
   const [packagesOpen, setPackagesOpen] = useState(false);
   const [localRevision, setLocalRevision] = useState(0);
@@ -251,10 +255,10 @@ export function MapPage() {
     return () => ctl.abort();
   }, [selectedSiteId, revision, localRevision]);
 
-  // the menu belongs to the selected site: a different selection or the boundary editor closes it
+  // the menu belongs to the selected site: a different selection or any register editor closes it
   useEffect(() => {
-    if (menu && (menu.siteId !== selectedSiteId || editingSite)) setMenu(null);
-  }, [selectedSiteId, editingSite, menu]);
+    if (menu && (menu.siteId !== selectedSiteId || editing)) setMenu(null);
+  }, [selectedSiteId, editing, menu]);
 
   const select = useCallback(
     (id: string | null, fitTo: boolean) => {
@@ -298,12 +302,14 @@ export function MapPage() {
   /** A site activated on the map (marker or boundary): select it and open its menu at that point. */
   const onSiteHit = useCallback(
     (id: string, hit: SiteHit) => {
+      // while placing or moving a marker, map/marker clicks belong to the editor; do not reselect or open the menu
+      if (addingSite || movingMarker) return;
       select(id, false);
       if (editingSite) return;
       const f = features.find((x) => x.siteId === id);
       setMenu({ siteId: id, name: f?.name ?? '', anchor: { kind: 'map', latlng: hit.latlng, offset: hit.element ? 46 : 14 }, keyboard: hit.keyboard, opener: hit.element });
     },
-    [select, editingSite, features],
+    [select, editingSite, addingSite, movingMarker, features],
   );
 
   /** The same menu from a tree or list row: the site is selected and fitted, the menu opens beside the row. */
@@ -355,6 +361,7 @@ export function MapPage() {
       if (b) setFit({ bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]], key: Date.now(), maxZoom: 17 });
       return;
     }
+    if (a.kind === 'EDIT_MARKER') return setMovingMarker(site);
     if (a.kind === 'EDIT_BOUNDARY') return setEditingSite(site);
     if (a.kind === 'IMPORT_BOUNDARY') return setImportFor({ id: site.id, name: site.name });
     if (a.kind === 'CHANGE') {
@@ -565,7 +572,7 @@ export function MapPage() {
               onViewport={onViewport}
               fitTarget={fit}
               onMap={setMap}
-              hiddenSiteId={editingSite?.id ?? null}
+              hiddenSiteId={editingSite?.id ?? movingMarker?.id ?? null}
             >
               <div className="map-toolbar">
                 <div className="map-mode" role="radiogroup" aria-label="وضع الألوان">
@@ -636,6 +643,11 @@ export function MapPage() {
             <section className="card map-card workspace-map empty">جارٍ تحميل سياق الخريطة…</section>
           )}
           <div className="map-admin-links">
+            {ctx?.canManageSites && !editing && (
+              <button className="button compact ghost" onClick={() => (setMenu(null), select(null, false), setAddingSite(true))}>
+                إضافة موقع جديد بعلامة
+              </button>
+            )}
             {ctx?.canEditBoundaries && (
               <button className="button compact ghost" onClick={() => setImportFor(null)}>
                 استيراد حدود المواقع
@@ -655,7 +667,7 @@ export function MapPage() {
           </div>
         </div>
 
-        {(editingSite || selectedSiteId || app.wizardActive || relocating) && (
+        {(editing || selectedSiteId || app.wizardActive || relocating) && (
         <div className="map-side">
           {/* an open request is docked here, beside the map; the site details return when it is minimised */}
           <div className="request-slot" ref={app.setRequestSlot} />
@@ -676,6 +688,33 @@ export function MapPage() {
             onDone={(v) => {
               app.toast('حُفظت حدود «' + editingSite.name + '» بالإصدار ' + v);
               setEditingSite(null);
+              setLocalRevision((r) => r + 1);
+            }}
+          />
+        ) : addingSite && map ? (
+          <SiteMarkerEditor
+            mode="CREATE"
+            map={map}
+            onCancel={() => setAddingSite(false)}
+            onCreated={(created) => {
+              app.toast('أُضيف الموقع «' + created.name + '» بعلامة على الخريطة');
+              setAddingSite(false);
+              setLocalRevision((r) => r + 1);
+              select(created.id, true);
+            }}
+            onMoved={() => undefined}
+          />
+        ) : movingMarker && map ? (
+          <SiteMarkerEditor
+            key={movingMarker.id}
+            mode="MOVE"
+            map={map}
+            site={movingMarker}
+            onCancel={() => setMovingMarker(null)}
+            onCreated={() => undefined}
+            onMoved={() => {
+              app.toast('حُفظ موقع علامة «' + movingMarker.name + '»');
+              setMovingMarker(null);
               setLocalRevision((r) => r + 1);
             }}
           />

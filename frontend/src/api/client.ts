@@ -273,6 +273,16 @@ export const api = {
   removeUnitSymbol: (orgId: string, body: { expectedVersion: number; reason: string }) => post<void>(`/organizations/${orgId}/unit-symbol/remove`, body),
   unitSymbols: (orgIds: string[]) => get<UnitSymbolLookup>('/unit-symbols' + query({ orgIds: orgIds.join(',') })),
   siteRequestActions: (id: string, signal?: AbortSignal) => get<SiteRequestActions>(`/sites/${id}/request-actions`, { signal }),
+  createSite: (body: {
+    code: string;
+    name: string;
+    kind: string;
+    parentId?: string | null;
+    responsibleOrgId: string;
+    capacity?: number | null;
+    location: { lat: number; lng: number };
+  }) => post<Site>('/sites', body),
+  moveSiteMarker: (id: string, body: { location: { lat: number; lng: number }; reason: string }) => post<Site>(`/sites/${id}/location`, body),
   createResource: (body: {
     siteId: string;
     code: string;

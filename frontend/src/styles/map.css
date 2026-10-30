@@ -89,6 +89,10 @@
 .pin-badge{direction:rtl;background:var(--orange);color:#fff;border-radius:99px;font:bold 9px/16px Arial,sans-serif;padding:0 6px;margin-top:-6px;box-shadow:0 2px 6px #0002}
 .leaflet-marker-icon:focus-visible .pin-head{outline:3px solid #54ae96;outline-offset:3px}
 .map.adding-vertices,.map.adding-vertices .leaflet-interactive{cursor:crosshair}
+.map.placing-marker{cursor:crosshair}
+.marker-edit{background:none;border:none}
+.marker-edit-pin{display:block;width:18px;height:18px;border-radius:50%;background:var(--accent,#0d5d4e);border:3px solid #fff;box-shadow:0 1px 6px #0005;cursor:grab}
+.leaflet-marker-draggable:active .marker-edit-pin{cursor:grabbing}
 
 /* details */
 .map-detail h2{font-size:17px;margin:4px 0}
