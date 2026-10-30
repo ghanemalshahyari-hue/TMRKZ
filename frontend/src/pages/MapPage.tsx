@@ -6,6 +6,7 @@ import { BoundaryEditor } from '../components/map/BoundaryEditor';
 import { OrgTree, SiteTree } from '../components/map/BrowseTrees';
 import { ImportDialog, PackageManager } from '../components/map/MapAdmin';
 import { MapCanvas, featureBounds, type FitTarget, type SiteHit, type Viewport } from '../components/map/MapCanvas';
+import { OrgSymbolLayer } from '../components/map/OrgSymbolLayer';
 import { BackgroundPanel, CoverageNote, LayersPanel, Legend } from '../components/map/MapPanels';
 import { RelocationPanel } from '../components/map/RelocationPanel';
 import { SiteMarkerEditor } from '../components/map/SiteMarkerEditor';
@@ -631,6 +632,7 @@ export function MapPage() {
                 />
               )}
               {panel === 'layers' && <LayersPanel layers={layers} onChange={setLayers} canSeeRequests={can('VIEW')} />}
+              <OrgSymbolLayer map={map} features={features} enabled={layers.orgSymbols} hiddenSiteId={editingSite?.id ?? movingMarker?.id ?? null} onSelect={onSiteHit} />
               <Legend mode={mode} stale={!!stale} />
               <CoverageNote coverage={stale ? null : data?.coverage ?? null} background={shownBackground} />
               {(loading || stale) && (

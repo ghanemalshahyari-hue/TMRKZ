@@ -111,6 +111,10 @@ export function LayersPanel({ layers, onChange, canSeeRequests }: { layers: Laye
           شارات الطلبات قيد المراجعة المسموح لك برؤيتها
         </label>
       )}
+      <label className="check-label">
+        <input type="checkbox" checked={layers.orgSymbols} onChange={(e) => set({ orgSymbols: e.target.checked })} />
+        رموز الجهات المرتبطة بالمواقع (هوية معلوماتية، بجانب العلامة)
+      </label>
       <label className="range-row">
         شفافية الخلفية
         <input type="range" min={0.2} max={1} step={0.05} value={layers.backgroundOpacity} onChange={(e) => set({ backgroundOpacity: Number(e.target.value) })} aria-label="شفافية الخلفية" />

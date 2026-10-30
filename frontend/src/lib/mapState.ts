@@ -102,6 +102,8 @@ export type LayerSettings = {
   labels: boolean;
   colours: boolean;
   requests: boolean;
+  /** Informational organisation unit symbols beside the markers (off by default; never replaces the facility marker). */
+  orgSymbols: boolean;
   zonesOnTop: boolean;
   backgroundOpacity: number;
 };
@@ -113,6 +115,7 @@ export const DEFAULT_LAYERS: LayerSettings = {
   labels: true,
   colours: true,
   requests: true,
+  orgSymbols: false,
   zonesOnTop: true,
   backgroundOpacity: 1,
 };

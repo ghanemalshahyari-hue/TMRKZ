@@ -413,6 +413,15 @@ Owner continuation prompt (`docs/OWNER_CONTINUATION_PROMPT.md` §3 and §6).
   catalog or a manual SIDC checked for shape (20/30 digits, reality, friend, symbol set 10 or 11), with expected
   version, reason and audit; lookups return only organisations the reader may see. Rendering uses milsymbol 3.0.4
   (MIT, pinned; 3.0.5 was two days old), loaded lazily from the local bundle. A symbol grants nothing.
+- **Optional map layer (added 2026-10-30, forwarded owner request).** `OrgSymbolLayer` adds a toggleable layer «رموز
+  الجهات المرتبطة بالمواقع» (off by default) that draws the identity symbol of each visible site's responsible
+  organisation — and of the organisations using it in the period — as a small clickable strip beside the marker, never
+  instead of the facility marker or its geometry. It reuses the existing lookup and renderer, shows only organisations
+  the actor may see that have an approved assignment, keeps the symbol's standard colours independent of availability
+  and request state, and never invents a location. Clicking the strip selects the site and opens its existing actions
+  (same command as the marker); it does not change the organisation filter and writes nothing. Symbol identity stays
+  informational: no unit/formation is dragged to a position and no size/type is inferred (scope exclusion,
+  `docs/SCOPE_CLARIFICATION_AR.md` §2).
 
 ## ADR-022 Docked request panel, referral, decision communication and administrative completion — Accepted (2026-10-30)
 

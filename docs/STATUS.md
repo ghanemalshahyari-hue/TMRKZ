@@ -80,7 +80,10 @@ Date: 29 October 2026 · Version 1.0.0
   - Unit symbols (prompt §6, map brief §10) — done: V12 catalog and assignments as HR-safe local metadata, approved
     standard as a policy setting, CONFIGURE-only checked assignments, symbols in directory rows, organisation details
     and request summaries, Arabic legend, fallback mark «لم يحدد رمز الوحدة»; milsymbol 3.0.4 (MIT) bundled, loaded
-    lazily from the local build.
+    lazily from the local build. An optional toggleable map layer «رموز الجهات المرتبطة بالمواقع» (off by default,
+    `OrgSymbolLayer`, ADR-021 note of 30 Oct) draws the responsible/occupant organisations' symbols beside each marker,
+    clickable to select the site; informational only, independent of availability colours, never replacing geometry.
+    Frontend typecheck/build/tests pass; browser check MAP-21 pending for the consolidated checkpoint.
   - MOVER administrative integration — contract drafted (`docs/MOVER_ADMIN_INTEGRATION.md`), not implemented.
   - Relocation of an organisation's premises (owner request of 30 Oct, ADR-023) — done: two-option ring around the
     site on the desktop map, «نقل المقر» panel with the organisation (whole or section with branches), the new location
