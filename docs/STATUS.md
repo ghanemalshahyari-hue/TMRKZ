@@ -81,9 +81,12 @@ Date: 29 October 2026 · Version 1.0.0
     standard as a policy setting, CONFIGURE-only checked assignments, symbols in directory rows, organisation details
     and request summaries, Arabic legend, fallback mark «لم يحدد رمز الوحدة»; milsymbol 3.0.4 (MIT) bundled, loaded
     lazily from the local build. An optional toggleable map layer «رموز الجهات المرتبطة بالمواقع» (off by default,
-    `OrgSymbolLayer`, ADR-021 note of 30 Oct) draws the responsible/occupant organisations' symbols beside each marker,
-    clickable to select the site; informational only, independent of availability colours, never replacing geometry.
-    Frontend typecheck/build/tests pass; browser check MAP-21 pending for the consolidated checkpoint.
+    `OrgSymbolLayer`, ADR-021 refined 30 Oct) draws every visible responsible/occupant organisation's symbol beside each
+    marker (none dropped; the strip wraps), each its own button; clicking one selects that organisation as the map
+    filter (directory switches to the organisations tab) and the site, opening its actions. Informational only,
+    independent of availability colours, never replacing geometry, writes nothing. Frontend typecheck/build/tests pass;
+    browser check MAP-21 (now including per-symbol organisation+site selection and the uncapped strip) pending for the
+    consolidated checkpoint — the owner's own hands-on run on localhost:8088.
   - MOVER administrative integration — contract drafted (`docs/MOVER_ADMIN_INTEGRATION.md`), not implemented.
   - Relocation of an organisation's premises (owner request of 30 Oct, ADR-023) — done: two-option ring around the
     site on the desktop map, «نقل المقر» panel with the organisation (whole or section with branches), the new location

@@ -14,12 +14,14 @@ type Rendered = { url: string; title: string };
 const urlCache = new Map<string, Rendered | null>();
 
 /**
- * Informational layer (ADR-021): the identity symbol of the organisation responsible for a site — and of the
- * organisations using it in the period — shown as a small clickable strip beside the site's marker, never instead of
- * the facility marker or its geometry. The symbol keeps its standard colours and is independent of availability and
- * request state. Only organisations the actor may see and that have an approved assignment appear; a location is never
- * invented and selecting a symbol never writes anything. Clicking the strip selects the site and opens its actions,
- * exactly like clicking the marker — it does not change the organisation filter.
+ * Informational layer (ADR-021, refined 2026-10-30 after the owner's review): the identity symbol of the organisation
+ * responsible for a site — and of every organisation using it in the period — shown as a small strip of clickable
+ * symbols beside the site's marker, never instead of the facility marker or its geometry. Each symbol is one
+ * organisation's mark; every visible, assigned organisation is shown (none is silently dropped). The symbol keeps its
+ * standard colours and is independent of availability and request state. Only organisations the actor may see and that
+ * have an approved assignment appear; a location is never invented and selecting a symbol never writes anything.
+ * Clicking (or Enter/Space on) one symbol selects both that organisation — applying it as the map's organisation
+ * filter — and the site, opening the site's existing actions. So the symbol is a working tool, not only a picture.
  */
 export function OrgSymbolLayer({
   map,
@@ -27,16 +29,21 @@ export function OrgSymbolLayer({
   enabled,
   hiddenSiteId,
   onSelect,
+  onSelectOrg,
 }: {
   map: L.Map | null;
   features: MapFeature[];
   enabled: boolean;
   hiddenSiteId?: string | null;
   onSelect: (siteId: string, hit: SiteHit) => void;
+  /** Apply one organisation as the map's filter (the owner's review: a symbol click selects its organisation too). */
+  onSelectOrg: (org: Ref) => void;
 }) {
   const layerRef = useRef<L.LayerGroup | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const onSelectOrgRef = useRef(onSelectOrg);
+  onSelectOrgRef.current = onSelectOrg;
   // orgId -> rendered symbol (or null when the actor may not see it / it has no assignment)
   const [symbols, setSymbols] = useState<Map<string, Rendered | null>>(new Map());
 
@@ -120,14 +127,21 @@ export function OrgSymbolLayer({
       const refs: Ref[] = [];
       if (f.responsibleOrg) refs.push(f.responsibleOrg);
       for (const o of f.occupants ?? []) if (!refs.some((r) => r.id === o.id)) refs.push(o);
-      const imgs = refs
-        .map((r) => ({ r, sym: symbols.get(r.id) }))
-        .filter((x): x is { r: Ref; sym: Rendered } => !!x.sym)
-        .slice(0, 3);
+      // every visible organisation with an approved symbol is shown — nothing is silently dropped
+      const imgs = refs.map((r) => ({ r, sym: symbols.get(r.id) })).filter((x): x is { r: Ref; sym: Rendered } => !!x.sym);
       if (imgs.length === 0) continue;
       const html =
-        '<span class="org-symbol-wrap" role="button" tabindex="0" aria-label="رموز جهات ' + escapeHtml(f.name) + '">' +
-        imgs.map(({ r, sym }) => '<img class="map-org-symbol" src="' + sym.url + '" alt="' + escapeHtml(r.name) + '" title="' + escapeHtml(r.name + ' — ' + sym.title) + '" />').join('') +
+        '<span class="org-symbol-wrap" role="group" aria-label="رموز جهات ' + escapeHtml(f.name) + '">' +
+        imgs
+          .map(
+            ({ r, sym }, i) =>
+              '<button type="button" class="map-org-symbol-btn" data-i="' + i + '" ' +
+              'title="' + escapeHtml(r.name + ' — ' + sym.title) + '" ' +
+              'aria-label="' + escapeHtml('اختيار جهة ' + r.name + ' والموقع ' + f.name) + '">' +
+              '<img class="map-org-symbol" src="' + sym.url + '" alt="' + escapeHtml(r.name) + '" />' +
+              '</button>',
+          )
+          .join('') +
         '</span>';
       const marker = L.marker(anchor, {
         pane: 'orgSymbols',
@@ -135,14 +149,17 @@ export function OrgSymbolLayer({
         keyboard: false,
         icon: L.divIcon({ className: 'map-org-symbols', html, iconSize: [0, 0], iconAnchor: [0, 0] }),
       }).addTo(group);
-      const fire = (keyboard: boolean) => onSelectRef.current(f.siteId, { latlng: anchor, keyboard, element: marker.getElement() ?? null });
-      // marker clicks do not bubble to the map's background-click handler (Leaflet default), so selection is unambiguous
-      marker.on('click', (e: L.LeafletMouseEvent) => fire((e.originalEvent as MouseEvent | undefined)?.detail === 0));
-      const el = marker.getElement()?.querySelector('.org-symbol-wrap') as HTMLElement | null;
-      el?.addEventListener('keydown', (ev: KeyboardEvent) => {
-        if (ev.key !== 'Enter' && ev.key !== ' ') return;
-        ev.preventDefault();
-        fire(true);
+      // one symbol click selects that organisation (filter) and the site; keyboard activation of the real <button>
+      // produces the same click with detail 0. Marker clicks do not bubble to the map's background-click handler.
+      const fire = (ref: Ref, keyboard: boolean) => {
+        onSelectOrgRef.current(ref);
+        onSelectRef.current(f.siteId, { latlng: anchor, keyboard, element: marker.getElement() ?? null });
+      };
+      marker.on('click', (e: L.LeafletMouseEvent) => {
+        const target = (e.originalEvent as MouseEvent | undefined)?.target as HTMLElement | null;
+        const btn = target?.closest('.map-org-symbol-btn') as HTMLElement | null;
+        const ref = imgs[btn ? Number(btn.dataset.i) : 0]?.r ?? imgs[0].r;
+        fire(ref, (e.originalEvent as MouseEvent | undefined)?.detail === 0);
       });
     }
   }, [features, symbols, enabled, hiddenSiteId]);

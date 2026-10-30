@@ -418,10 +418,17 @@ Owner continuation prompt (`docs/OWNER_CONTINUATION_PROMPT.md` §3 and §6).
   organisation — and of the organisations using it in the period — as a small clickable strip beside the marker, never
   instead of the facility marker or its geometry. It reuses the existing lookup and renderer, shows only organisations
   the actor may see that have an approved assignment, keeps the symbol's standard colours independent of availability
-  and request state, and never invents a location. Clicking the strip selects the site and opens its existing actions
-  (same command as the marker); it does not change the organisation filter and writes nothing. Symbol identity stays
-  informational: no unit/formation is dragged to a position and no size/type is inferred (scope exclusion,
-  `docs/SCOPE_CLARIFICATION_AR.md` §2).
+  and request state, and never invents a location. Symbol identity stays informational: no unit/formation is dragged
+  to a position and no size/type is inferred (scope exclusion, `docs/SCOPE_CLARIFICATION_AR.md` §2).
+- **Refined 2026-10-30 (owner review).** Two points from the owner's review replace the first cut, which selected only
+  the site and capped the strip at three symbols. (1) Every visible organisation with an approved symbol is now drawn —
+  responsible plus each occupant — and none is silently dropped; the strip wraps when a site carries many. (2) Each
+  symbol is its own button, and clicking (or Enter/Space on) it selects **both** that organisation — applied as the
+  map's organisation filter, with the directory switched to the organisations tab so the selection is visible there —
+  **and** the site, opening the site's existing actions (same command as the marker). This makes a symbol a working
+  tool, not only a picture. It still writes nothing, invents no location, and leaves symbol identity informational.
+  Revealing a nested organisation's exact tree node on filter-apply is a later refinement (the context bar and the
+  organisation's site list already reflect the applied filter).
 
 ## ADR-022 Docked request panel, referral, decision communication and administrative completion — Accepted (2026-10-30)
 

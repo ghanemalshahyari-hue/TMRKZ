@@ -632,7 +632,17 @@ export function MapPage() {
                 />
               )}
               {panel === 'layers' && <LayersPanel layers={layers} onChange={setLayers} canSeeRequests={can('VIEW')} />}
-              <OrgSymbolLayer map={map} features={features} enabled={layers.orgSymbols} hiddenSiteId={editingSite?.id ?? movingMarker?.id ?? null} onSelect={onSiteHit} />
+              <OrgSymbolLayer
+                map={map}
+                features={features}
+                enabled={layers.orgSymbols}
+                hiddenSiteId={editingSite?.id ?? movingMarker?.id ?? null}
+                onSelect={onSiteHit}
+                onSelectOrg={(o) => {
+                  setOrg((cur) => ({ id: o.id, name: o.name, includeSub: cur?.includeSub ?? true }));
+                  setTab('orgs');
+                }}
+              />
               <Legend mode={mode} stale={!!stale} />
               <CoverageNote coverage={stale ? null : data?.coverage ?? null} background={shownBackground} />
               {(loading || stale) && (
