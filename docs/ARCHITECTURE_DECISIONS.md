@@ -500,3 +500,38 @@ interface, not an excluded capability.
 - **Not changed / not built.** No existing function or approved permission changed. The scope exclusions in
   `docs/SCOPE_CLARIFICATION_AR.md` §2 remain: no unit/formation dragging to deployment positions, no tactical graphics,
   no operational movement. A drawn/placed marker is an administrative register point, never an approved booking.
+
+## ADR-025 Map-first stationing workspace: drag a proposed location with configurable distance rules and occupancy — Accepted (2026-10-30)
+
+Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation and its premises, choose «تمركز /
+إعادة تمركز», drag the proposed marker, see the distance, the allowed range and occupied sites, confirm or cancel).
+
+- **Workspace.** `#stationing` (`StationingPage`): navy top bar with search, «شجرة الجهات» on the right (lazy, server
+  scoped, level badge per row, the selected organisation's linked sites under it), the map in the middle with layer
+  chips (allowed range, occupied areas, organisation symbols, sites — remembered per person), a distance-measuring tool
+  and a scale bar, and the request panel on the left. The existing `MapCanvas`, `OrgSymbolLayer`, background packages
+  and relocation request (ADR-023) are reused; the main map page and its ring are unchanged.
+- **Proposal, not a register edit.** The proposed point is a separate draggable marker; the current premises' marker is
+  never moved (that remains the ADR-024 register edit). Options: kind (premises or temporary work area), level (main or
+  branch premises), permanent or temporary (start and end), the organisations covered (branches at the current
+  premises pre-selected; a branch elsewhere is listed with its own site and never moved by default), a new location or
+  a registered site, an optional drawn footprint that follows the marker, coordinates typed instead of dragging.
+- **Rules are configuration.** `placement_rule` (V15): action, optional level, optional organisation (with or without
+  branches), minimum and maximum metres, measure (centre-to-centre or edge-to-edge). The most specific active rule
+  applies. No rule is seeded in production; without one the distance is shown with «لا توجد قاعدة مسافة مهيأة». Saving a
+  rule needs CONFIGURE, a reason and is audited (`PLACEMENT_RULE_SAVED`). While dragging, a centre-measured rule keeps the
+  marker inside the range (with a small margin for the sphere/ellipsoid difference).
+- **Occupancy.** `POST /placement/check` intersects the proposal with every registered boundary (not only its centre)
+  and the chosen registered site, for the requested period: an exclusive booking or a shared resource at its limit
+  blocks; shared use below the limit is allowed and noted; bookings of the moving organisation and the organisations it
+  covers never block. A site the actor may not see is reported as «منطقة مشغولة غير ظاهرة لك» without id or occupants;
+  occupants are named only with a full view.
+- **Server re-check.** The same evaluation runs when the proposal is saved (stored as `check_status`, distance, rule and
+  rule version), at submission (refused with the Arabic reason) and at approval (a site booked after submission refuses
+  the decision). A temporary stationing carries its end into the request period.
+- **Not built in this step.** Activation of an approved stationing into the dated organisation↔site record, automatic
+  end-of-term return with reminders (phase D), a rule editor screen (rules are managed through the API), the visual
+  workflow-editor changes of phase E. The scope exclusions of `docs/SCOPE_CLARIFICATION_AR.md` §2 remain: no movement of
+  forces, no tactical graphics, unit symbols stay informational and are not dragged.
+- **Verified.** `PlacementIT` on real PostgreSQL/PostGIS with OpenFGA; the browser journey in Chrome against the
+  acceptance environment with fictional data (`ops/test-env/stationing-demo.sql`).

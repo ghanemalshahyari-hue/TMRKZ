@@ -17,6 +17,7 @@ import { PermissionsPage } from './pages/PermissionsPage';
 import { RequestsPage } from './pages/RequestsPage';
 import { ReviewPage } from './pages/ReviewPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { StationingPage } from './pages/StationingPage';
 import { WorkflowStudio } from './pages/WorkflowStudio';
 
 const POLL_MS = 30_000;
@@ -32,7 +33,7 @@ function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: b
   if (['workflow', 'forms', 'settings'].includes(view)) return !can('CONFIGURE');
   if (view === 'permissions') return !can('MANAGE_ACCESS');
   if (view === 'org') return !(can('VIEW') || can('MANAGE_ACCESS') || can('MANAGE_FACILITIES') || can('CONFIGURE'));
-  if (['map', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
+  if (['map', 'stationing', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
   if (summaryOnly) return true;
   if (view === 'review') return !can('REVIEW');
   if (view === 'audit') return !can('AUDIT');
@@ -176,6 +177,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
 
   const pages: Record<View, () => ReactNode> = {
     map: () => <MapPage />,
+    stationing: () => <StationingPage />,
     requests: () => <RequestsPage />,
     review: () => <ReviewPage />,
     calendar: () => <CalendarPage />,
@@ -222,7 +224,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
         <nav id="navigation" aria-label="القائمة الرئيسية">
           {NAV.map(([id, ico, label], i) => (
             <Fragment key={id}>
-              {i === 5 && <div className="nav-divider" />}
+              {i === 6 && <div className="nav-divider" />}
               <a className={'nav-item ' + (view === id ? 'active' : '')} href={'#' + id}>
                 <Icon name={ico} />
                 <span>{label}</span>

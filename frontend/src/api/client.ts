@@ -69,6 +69,11 @@ import type {
   CommunicationChannel,
   RevisionComparison,
   Relocation,
+  PlacementAction,
+  PlacementCheck,
+  PlacementRule,
+  PlacementUnit,
+  StationLevel,
   UnitSymbolLookup,
   UnitSymbol,
   StudioItem,
@@ -350,8 +355,40 @@ export const api = {
   relocation: (id: string) => get<Relocation | null>(`/requests/${id}/relocation`),
   saveRelocation: (
     id: string,
-    body: { organizationId: string; includeDescendants: boolean; fromSiteId: string; proposedName: string; geometry: GeoJsonGeometry },
+    body: {
+      organizationId: string;
+      includeDescendants: boolean;
+      fromSiteId: string;
+      proposedName: string;
+      geometry: GeoJsonGeometry;
+      action?: PlacementAction;
+      stationLevel?: StationLevel;
+      temporary?: boolean;
+      temporaryEnd?: string | null;
+      targetSiteId?: string | null;
+      includedOrgIds?: string[];
+    },
   ) => put<Relocation>(`/requests/${id}/relocation`, body),
+  // stationing proposal on the map (ADR-025): rules, interactive check, organisations covered by a move
+  placementRules: () => get<PlacementRule[]>('/placement/rules'),
+  savePlacementRule: (id: string | null, body: Omit<PlacementRule, 'id' | 'organization' | 'version' | 'updatedAt'> & { organizationId?: string | null; expectedVersion?: number; reason: string }) =>
+    id ? put<PlacementRule>(`/placement/rules/${id}`, body) : post<PlacementRule>('/placement/rules', body),
+  placementCheck: (
+    body: {
+      action: PlacementAction;
+      organizationId?: string;
+      fromSiteId: string;
+      stationLevel?: StationLevel;
+      geometry: GeoJsonGeometry;
+      targetSiteId?: string | null;
+      start?: string;
+      end?: string | null;
+      excludeRequestId?: string;
+      includedOrgIds?: string[];
+    },
+    signal?: AbortSignal,
+  ) => call<PlacementCheck>('POST', '/placement/check', { body, signal }),
+  placementUnits: (orgId: string, siteId: string) => get<PlacementUnit[]>('/placement/units' + query({ orgId, siteId })),
   changes: (id: string, revision?: number) => get<RevisionComparison>(`/requests/${id}/changes` + query({ revision })),
   uploadAttachment: (id: string, fieldId: string, file: File) => {
     const form = new FormData();

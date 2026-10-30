@@ -56,3 +56,8 @@ test CA are also there. Everything under `.generated/` is git-ignored and is reg
 `docker compose -p tmrkz-test -f docker-compose.yml -f ops/test-env/compose.directory.yml -f ops/test-env/compose.data.yml down` (add `-v` to delete the data).
 
 The organisations, people and facilities are fictional and illustrative; they do not describe any real site.
+
+Stationing workspace demo (ADR-025, fictional): after `up.sh`, load example distance rules (1–6 km for premises, up to
+3 km for a work area), two sections of «الخدمات المشتركة», an occupied site 05 with an illustrative boundary and the
+sections' bookings with `docker exec -i tmrkz-test-db-1 sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < ops/test-env/stationing-demo.sql`,
+then sign in as `t.requester` and open `#stationing`. The acceptance suites run without it.

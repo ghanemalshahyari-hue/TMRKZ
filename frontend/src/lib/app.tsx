@@ -1,11 +1,12 @@
 import { createContext, useContext } from 'react';
 import type { Me, OrgNode, Permission, RequestType, Settings, Site } from '../api/types';
 
-export type View = 'map' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs';
+export type View = 'map' | 'stationing' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs';
 
 /** Same order, icons and labels as the prototype NAV (the last entry replaces «حزمة البناء»). */
 export const NAV: [View, string, string][] = [
   ['map', 'map', 'الخريطة والمرافق'],
+  ['stationing', 'map', 'مساحة التمركز'],
   ['requests', 'file', 'الطلبات'],
   ['review', 'check', 'صندوق المراجعة'],
   ['calendar', 'clock', 'الإشغال والحجوزات'],

@@ -408,9 +408,20 @@ public class RequestService {
                 if (start == null) {
                     problems.add(new Problem("period", "حدد التاريخ المطلوب للنقل."));
                 }
-                end = null;
+                // permanent: open from the requested date; temporary: until the proposal's end (ADR-025)
+                end = relocations.temporaryEnd(id);
                 if (relocations.find(id) == null) {
                     problems.add(new Problem("relocation", "ارسم الموقع المقترح وحدد الجهة المنقولة."));
+                } else if (start != null) {
+                    if (end != null && !end.isAfter(start)) {
+                        problems.add(new Problem("period", "نهاية المدة المؤقتة يجب أن تكون بعد تاريخ البداية."));
+                    } else {
+                        // the distance rule and the occupancy are checked again on the server, never trusted from the map
+                        ae.mover.facilities.PlacementService.Check c = relocations.recheck(id, start);
+                        if (c != null && !c.ok()) {
+                            problems.add(new Problem("relocation", c.messages().isEmpty() ? "الموقع المقترح لا يستوفي الشروط." : c.messages().get(0)));
+                        }
+                    }
                 }
             }
             default -> { // CANCELLATION, EVACUATION: start = effective date

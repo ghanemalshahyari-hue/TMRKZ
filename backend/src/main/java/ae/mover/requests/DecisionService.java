@@ -73,12 +73,15 @@ public class DecisionService {
     private final RequestViews views;
     private final ApprovalSigner signer;
     private final SigningJobs signingJobs;
+    private final RelocationService relocations;
 
     public DecisionService(JdbcClient jdbc, Json json, Clock clock, AccessService access, TaskService taskService,
                            RuntimeService runtime, TaskSync taskSync, WorkflowService workflows,
                            WorkflowRuntime workflowRuntime, ReservationService reservations, PolicyService policies,
                            SignatureService signatures, AuditService audit, OutboxService outbox,
-                           IdempotencyService idempotency, RequestViews views, ApprovalSigner signer, SigningJobs signingJobs) {
+                           IdempotencyService idempotency, RequestViews views, ApprovalSigner signer, SigningJobs signingJobs,
+                           RelocationService relocations) {
+        this.relocations = relocations;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -525,7 +528,14 @@ public class DecisionService {
             }
             case "RELOCATION" -> {
                 // administrative decision only: nothing is booked and the site register is not changed; the
-                // requester records the move and the request is closed with a completion statement
+                // requester records the move and the request is closed with a completion statement. The distance
+                // rule and occupancy are checked once more at the decision (ADR-025): a site booked since submission
+                // refuses the approval instead of approving an occupied place.
+                ae.mover.facilities.PlacementService.Check c = relocations.recheck(requestId, start);
+                if (c != null && !c.ok()) {
+                    throw ApiException.validation("لا يمكن اعتماد الطلب الآن: "
+                            + (c.messages().isEmpty() ? "الموقع المقترح لا يستوفي الشروط." : c.messages().get(0)));
+                }
             }
             case "EXTENSION" -> {
                 ReservationService.Reservation r = reservations.lock(targetId);

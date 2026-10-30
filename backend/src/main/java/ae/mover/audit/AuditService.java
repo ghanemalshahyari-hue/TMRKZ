@@ -75,6 +75,7 @@ public class AuditService {
             Map.entry("TASK_APPROVED", "موافقة"),
             Map.entry("TASK_REFERRED", "إحالة للدراسة"),
             Map.entry("RELOCATION_PROPOSAL_SAVED", "حفظ مقترح نقل المقر"),
+            Map.entry("PLACEMENT_RULE_SAVED", "حفظ قاعدة مسافة التمركز"),
             Map.entry("DECISION_COMMUNICATED", "تسجيل إبلاغ القرار"),
             Map.entry("REQUEST_RETURNED", "إرجاع للتعديل"),
             Map.entry("REQUEST_REJECTED", "رفض الطلب"),

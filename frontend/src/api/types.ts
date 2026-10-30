@@ -548,7 +548,59 @@ export type Relocation = {
   areaM2?: number;
   centroid: [number, number];
   completedAt?: string;
+  action?: PlacementAction;
+  stationLevel?: StationLevel | null;
+  temporary?: boolean;
+  temporaryEnd?: string;
+  targetSite?: Ref;
+  includedOrgs?: Ref[];
+  distanceM?: number;
+  checkStatus?: PlacementCheck['status'];
+  ruleName?: string;
 };
+
+// ---------- stationing proposal on the map (ADR-025) ----------
+export type PlacementAction = 'RELOCATE' | 'WORK_AREA';
+export type StationLevel = 'MAIN' | 'BRANCH';
+export type PlacementRule = {
+  id: string;
+  name: string;
+  action: PlacementAction;
+  stationLevel?: StationLevel;
+  organization?: Ref;
+  includeDescendants: boolean;
+  minM: number;
+  maxM?: number;
+  measure: 'CENTER' | 'EDGE';
+  active: boolean;
+  version: number;
+  updatedAt?: string;
+};
+export type PlacementConflict = {
+  siteId?: string;
+  label: string;
+  kind: 'OCCUPIED' | 'LIMIT' | 'SHARED' | 'FREE';
+  blocking: boolean;
+  until?: string;
+  occupants?: Ref[];
+  message: string;
+};
+export type PlacementCheck = {
+  ok: boolean;
+  status: 'OK' | 'OUT_OF_RANGE' | 'OCCUPIED';
+  range: 'IN_RANGE' | 'TOO_CLOSE' | 'TOO_FAR' | 'NO_RULE';
+  distanceM: number;
+  measure: 'CENTER' | 'EDGE';
+  rule?: PlacementRule;
+  from: [number, number];
+  point: [number, number];
+  targetSite?: Ref;
+  conflicts: PlacementConflict[];
+  messages: string[];
+  otherProposals?: number;
+  note: string;
+};
+export type PlacementUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; atSite: boolean; otherSites?: Ref[] };
 export type RevisionComparison = {
   fromRevision: number;
   toRevision: number;

@@ -213,4 +213,8 @@ drive Microsoft Edge against the acceptance environment with the real directory 
 | System administration separate from request content | ADR-013 roles; studio shows administrators as such | `AccessAcceptanceIT.independentActions` | Pass |
 | Raw HR identifiers withheld from ordinary users | VIEW_SOURCE_IDENTIFIERS (ADR-014) | `HrSyncAcceptanceIT` | Pass (unchanged) |
 | Explicit deny rules | — | — | Not implemented: no deny rule is configured; grants are additive |
-
+| Stationing on the map: drag a proposed location, live distance, allowed range, occupied areas (ADR-025) | `StationingPage`, `StationingPanel`, `PlacementService.evaluate`, `POST /placement/check` | `PlacementIT.range`, `PlacementIT.occupancy`; Chrome journey 30 Oct 2026 | Pass |
+| Distance rules as configuration (CONFIGURE, reason, audit) | `placement_rule` (V15), `PlacementService.saveRule` | `PlacementIT.rules` | Pass (API only; no editor screen yet) |
+| Covered organisations chosen, branch elsewhere not moved by default | `GET /placement/units`, panel step «الجهات المشمولة» | `PlacementIT.units` | Pass |
+| Server re-check at submission and approval; proposal never moves the site | `RequestService` (RELOCATION), `DecisionService.finalizeApproval` | `PlacementIT.serverRecheck` | Pass |
+| Temporary stationing: end-of-term return and reminders | — | — | Not implemented (phase D) |

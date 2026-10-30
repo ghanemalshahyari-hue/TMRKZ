@@ -111,6 +111,15 @@ a 10,000-site measurement and the authorisation suite), 21 browser checks for MA
 studio in Microsoft Edge, a 40-check end-to-end journey through nginx, a restore verification, an upgrade check of
 earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
 
+- **Map-first stationing workspace (30 Oct 2026, ADR-025):** `#stationing` with the organisation tree, the map and
+  the request panel; drag a proposed location away from the current premises with live distance, the configured allowed
+  range (`placement_rule`, V15, no seeded values) and occupied registered boundaries in red; refuse out-of-range or
+  occupied points in the browser and again on the server at save, submission and approval; covered organisations
+  chosen explicitly; permanent or temporary; draft save and reopen (`#stationing/<requestId>`); occupant identity masked
+  by view. The current premises' marker is never changed by a proposal. **Not yet:** activation into the dated
+  organisation↔site record after approval, automatic end-of-term return and reminders, a rule editor screen, workflow
+  studio changes (phases D–E of the brief).
+
 ## Known limitations
 
 | Area | Limitation | Planned handling |
