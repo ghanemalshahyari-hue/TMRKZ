@@ -87,14 +87,20 @@ class ReservationAcceptanceIT extends IntegrationTest {
         UUID reservedResource = jdbc.sql("select resource_id from reservation where request_id = :r").param("r", id).query(UUID.class).single();
         assertThat(reservedResource).isEqualTo(res1);
 
-        // AT-18: closing needs execution done, and closing never releases the reservation.
-        assertThat(req.post("/requests/" + id + "/close", Map.of()).status()).isEqualTo(400);
+        // AT-18: closing is its own right with a completion statement, needs execution done, and never releases the
+        // reservation (owner brief of 30 Oct 2026 §5F).
+        Map<String, Object> statement = Map.of("statement", "اكتمل التسليم والاستلام بمحضر رقم 12", "reference", "محضر 12");
+        assertThat(req.post("/requests/" + id + "/close", statement).status()).isEqualTo(403);
+        assertThat(fac.post("/requests/" + id + "/close", statement).status()).isEqualTo(400);
         JsonNode exec = req.get("/requests/" + id).body().path("executionTasks");
         String handover = exec.get(0).path("id").asText();
         assertThat(fac.post("/execution-tasks/" + handover + "/complete", Map.of("note", "")).status()).isEqualTo(400);
         assertThat(fac.post("/execution-tasks/" + handover + "/complete", Map.of("note", "تم التسليم بمحضر رقم 12")).status()).isEqualTo(200);
-        Res closed = req.post("/requests/" + id + "/close", Map.of());
+        assertThat(fac.post("/requests/" + id + "/close", Map.of()).status()).isEqualTo(400);
+        Res closed = fac.post("/requests/" + id + "/close", statement);
         assertThat(closed.body().path("status").asText()).isEqualTo("CLOSED");
+        assertThat(jdbc.sql("select completion_statement from request where id = :id").param("id", id).query(String.class).single())
+                .isEqualTo("اكتمل التسليم والاستلام بمحضر رقم 12");
         assertThat(activeReservations(res1)).isEqualTo(1);
     }
 
@@ -374,5 +380,90 @@ class ReservationAcceptanceIT extends IntegrationTest {
                 "start", day("2027-09-05"), "end", day("2027-09-06")));
         assertThat(free.body().path("available").asBoolean()).isTrue();
         assertThat(activeReservations(res2)).isEqualTo(1);
+    }
+
+    int revisionOf(Api api, UUID id) {
+        return api.get("/requests/" + id).body().path("revision").asInt();
+    }
+
+    @Test
+    @DisplayName("Owner brief 30 Oct §5: return, correct, see changes, refer for study, decide with reasons, record communication, complete and close")
+    void administrativePath() {
+        String type = requestType("NEW_RESERVATION", workflow(List.of(),
+                stage("completeness", "ALL", false, "FACILITIES_REVIEWER|RESOURCE_ORG"),
+                stage("study_decision", "ALL", true, "APPROVER|ANY")), null);
+        Api req = login("req");
+        Api fac = login("fac");
+        Api apr = login("apr");
+        UUID id = req.submitted(type, orgA, List.of(res1), day("2027-10-01"), day("2027-10-03"));
+
+        // completeness review returns with a reason; the requester corrects the period and resubmits under the same number
+        String number = req.get("/requests/" + id).body().path("number").asText();
+        assertThat(fac.decide(fac.taskFor(id), "RETURN", "", 1).status()).isEqualTo(400);
+        assertThat(fac.decide(fac.taskFor(id), "RETURN", "الفترة تتجاوز جدول الصيانة", 1).status()).isEqualTo(200);
+        assertThat(req.get("/requests/" + id).body().path("status").asText()).isEqualTo("RETURNED");
+        Map<String, Object> patch = new java.util.LinkedHashMap<>();
+        patch.put("expectedVersion", req.get("/requests/" + id).body().path("version").asInt());
+        patch.put("period", Map.of("start", day("2027-10-02"), "end", day("2027-10-04")));
+        assertThat(req.patch("/requests/" + id + "/draft", patch).status()).isEqualTo(200);
+        int version = req.get("/requests/" + id).body().path("version").asInt();
+        assertThat(req.post("/requests/" + id + "/submit", Map.of("expectedVersion", version, "resubmissionReason", "نقل الفترة يوماً"),
+                UUID.randomUUID().toString()).status()).isEqualTo(200);
+        assertThat(req.get("/requests/" + id).body().path("number").asText()).isEqualTo(number);
+
+        // the reviewer sees exactly what changed between the two submissions
+        JsonNode cmp = fac.get("/requests/" + id + "/changes").body();
+        assertThat(cmp.path("fromRevision").asInt()).isEqualTo(1);
+        assertThat(cmp.path("toRevision").asInt()).isEqualTo(2);
+        assertThat(cmp.path("reason").asText()).isEqualTo("نقل الفترة يوماً");
+        List<String> fields = new java.util.ArrayList<>();
+        cmp.path("changes").forEach(c -> fields.add(c.path("field").asText()));
+        assertThat(fields).containsExactlyInAnyOrder("period.start", "period.end");
+
+        // the completeness reviewer refers it for study; the final stage cannot "refer"
+        assertThat(fac.decide(fac.taskFor(id), "REFER", null, 2).status()).isEqualTo(200);
+        assertThat(jdbc.sql("select count(*) from decision where request_id = :id and decision = 'REFER'").param("id", id)
+                .query(Integer.class).single()).isEqualTo(1);
+        String finalTask = apr.taskFor(id);
+        assertThat(apr.decide(finalTask, "REFER", null, 2).status()).isEqualTo(400);
+        // a final rejection needs a reason (not sent here), then the approval goes through once despite a repeated click
+        assertThat(apr.decide(finalTask, "REJECT", "", 2).status()).isEqualTo(400);
+        Map<String, Object> approve = new java.util.LinkedHashMap<>();
+        approve.put("decision", "APPROVE");
+        approve.put("expectedRevision", 2);
+        approve.put("signature", Map.of("password", PASSWORD, "confirm", true));
+        String key = UUID.randomUUID().toString();
+        assertThat(apr.post("/tasks/" + finalTask + "/decision", approve, key).status()).isEqualTo(200);
+        assertThat(apr.post("/tasks/" + finalTask + "/decision", approve, key).status()).isEqualTo(200);
+        assertThat(jdbc.sql("select count(*) from decision where request_id = :id and decision = 'APPROVE'").param("id", id)
+                .query(Integer.class).single()).isEqualTo(1);
+        assertThat(req.get("/requests/" + id).body().path("status").asText()).isEqualTo("APPROVED");
+
+        // communication of the decision: recorded by the deciding side with the document version, not by the requester
+        Map<String, Object> comm = Map.of("recipientKind", "ORGANIZATION", "recipientOrgId", orgA.toString(), "channel", "OFFICIAL_LETTER",
+                "reference", "خطاب 77", "note", "أُبلغت الجهة الطالبة بالاعتماد");
+        assertThat(req.post("/requests/" + id + "/communications", comm).status()).isEqualTo(403);
+        assertThat(apr.post("/requests/" + id + "/communications", Map.of("recipientKind", "OTHER", "channel", "OFFICIAL_LETTER"))
+                .status()).isEqualTo(400);
+        Res recorded = apr.post("/requests/" + id + "/communications", comm, UUID.randomUUID().toString());
+        assertThat(recorded.status()).as(recorded.toString()).isEqualTo(200);
+        JsonNode c = recorded.body().get(0);
+        assertThat(c.path("outcome").asText()).isEqualTo("APPROVED");
+        assertThat(c.path("recipientOrg").path("id").asText()).isEqualTo(orgA.toString());
+        assertThat(c.path("documentRevision").asInt()).isEqualTo(2);
+        assertThat(c.path("documentSha256").asText()).hasSize(64);
+        assertThat(req.get("/requests/" + id + "/communications").body().size()).isEqualTo(1);
+        // the record is append-only
+        assertThat(org.assertj.core.api.Assertions.catchThrowable(() -> jdbc.sql("update decision_communication set note = 'x'").update()))
+                .isNotNull();
+
+        // approval does not close: completion is a separate right with a statement
+        assertThat(req.get("/requests/" + id).body().path("actions").path("canClose").asBoolean()).isFalse();
+        assertThat(fac.get("/requests/" + id).body().path("actions").path("canClose").asBoolean()).isTrue();
+        Res closed = fac.post("/requests/" + id + "/close", Map.of("statement", "سُلّم المرفق واستُلم وفق المحضر"), UUID.randomUUID().toString());
+        assertThat(closed.body().path("status").asText()).isEqualTo("CLOSED");
+        List<String> history = new java.util.ArrayList<>();
+        closed.body().path("history").forEach(h -> history.add(h.path("event").asText()));
+        assertThat(history).contains("إحالة للدراسة", "تسجيل إبلاغ القرار", "الإنجاز الإداري وإغلاق الطلب");
     }
 }

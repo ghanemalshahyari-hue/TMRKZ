@@ -20,7 +20,8 @@ export const external = [];
 export const consoleErrors = [];
 
 export async function launch() {
-  return chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: process.env.HEADED ? false : true });
+  // HEADED=1 shows the windows; SLOWMO=<ms> slows each action so a person can follow it
+  return chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: process.env.HEADED ? false : true, slowMo: Number(process.env.SLOWMO ?? 0) });
 }
 
 /** A fresh browser profile (one person). External requests are blocked and recorded. */

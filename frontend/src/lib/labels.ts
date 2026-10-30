@@ -13,9 +13,9 @@ import type {
 export const STATUS: Record<RequestStatus, [string, string]> = {
   DRAFT: ['مسودة', ''],
   SUBMITTED: ['قيد المراجعة', 'orange'],
-  RETURNED: ['معاد للتعديل', 'orange'],
-  APPROVED: ['معتمد', 'green'],
-  REJECTED: ['مرفوض', 'red'],
+  RETURNED: ['معاد للتصحيح', 'orange'],
+  APPROVED: ['معتمد — بانتظار الإنجاز الإداري', 'green'],
+  REJECTED: ['مرفوض نهائياً', 'red'],
   CLOSED: ['مغلق', 'blue'],
 };
 
@@ -33,6 +33,7 @@ export const PERMISSIONS: Permission[] = [
   'CONFIGURE',
   'AUDIT',
   'VIEW_SOURCE_IDENTIFIERS',
+  'CLOSE',
 ];
 export const PERMISSION_NAMES: Record<Permission, string> = {
   VIEW: 'عرض',
@@ -48,6 +49,7 @@ export const PERMISSION_NAMES: Record<Permission, string> = {
   CONFIGURE: 'تهيئة',
   AUDIT: 'تدقيق',
   VIEW_SOURCE_IDENTIFIERS: 'معرفات المصدر',
+  CLOSE: 'الإنجاز الإداري والإغلاق',
 };
 
 export const SCOPES: [Scope, string][] = [

@@ -69,7 +69,7 @@ public class Bootstrap implements ApplicationRunner {
                 // Configuration rights never imply reading request content or deciding (owner decision 2026-10-29).
                 {"SYSTEM_ADMIN", "مدير النظام", "CONFIGURE,MANAGE_ACCESS,MANAGE_FACILITIES,VIEW_SOURCE_IDENTIFIERS", "ALL", false, true, 1},
                 {"REQUESTER", "مقدم الطلب", "VIEW,CREATE,EDIT,EXECUTE", "ORGANIZATION", false, false, 2},
-                {"FACILITIES_REVIEWER", "مراجع المرافق", "VIEW,REVIEW,EXPORT,EXECUTE", "ALL", false, false, 3},
+                {"FACILITIES_REVIEWER", "مراجع المرافق", "VIEW,REVIEW,EXPORT,EXECUTE,CLOSE", "ALL", false, false, 3},
                 {"ORG_MANAGER", "مدير الجهة", "VIEW,CREATE,EDIT,REVIEW,EXPORT", "ORGANIZATION", false, false, 4},
                 {"APPROVER", "صاحب الاعتماد", "VIEW,REVIEW,APPROVE,EXPORT", "ALL", false, false, 5},
                 {"LIMITED_VIEWER", "اطلاع محدود", "VIEW_SUMMARY", "SITE", true, false, 6},

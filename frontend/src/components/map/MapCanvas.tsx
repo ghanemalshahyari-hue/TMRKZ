@@ -189,6 +189,9 @@ export function MapCanvas({
     const zones = zoneLayer.current;
     const markers = markerLayer.current;
     if (!sites || !zones || !markers) return;
+    // a redraw replaces the marker elements: keep keyboard focus on the same site's marker
+    const active = document.activeElement as HTMLElement | null;
+    const focusedSite = active?.classList.contains('pin-icon') ? active.querySelector('.pin-wrap')?.getAttribute('data-site') : null;
     sites.clearLayers();
     zones.clearLayers();
     markers.clearLayers();
@@ -254,6 +257,7 @@ export function MapCanvas({
           onSelectRef.current(f.siteId, { latlng: point, keyboard: true, element: marker.getElement() ?? null });
         });
       marker.getElement()?.setAttribute('aria-haspopup', 'dialog');
+      if (f.siteId === focusedSite) marker.getElement()?.focus({ preventScroll: true });
     }
   }, [features, mode, stale, selectedSiteId, layers, hiddenSiteId]);
 

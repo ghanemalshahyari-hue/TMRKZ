@@ -42,7 +42,16 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
 
   if (!target) return <Dialog open={false} onClose={onClose} className="small-dialog">{null}</Dialog>;
   const { request: r, task, decision } = target;
-  const title = decision === 'RETURN' ? 'إرجاع للتعديل' : decision === 'REJECT' ? 'رفض الطلب' : task.final ? 'اعتماد الطلب' : 'تسجيل الموافقة';
+  const title =
+    decision === 'RETURN'
+      ? task.final
+        ? 'طلب تصحيح قبل القرار'
+        : 'إرجاع للتصحيح'
+      : decision === 'REJECT'
+        ? 'رفض نهائي'
+        : decision === 'REFER'
+          ? 'إحالة للدراسة والقرار'
+          : 'اعتماد الطلب';
 
   // PKI: the approver's certificate and the organisation's seal sign the frozen document first; nothing is decided yet
   const sign = async () => {
@@ -60,7 +69,7 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
 
   const apply = async () => {
     const trimmed = note.trim();
-    if (decision !== 'APPROVE' && trimmed.length < 5) return setError('اكتب سبباً من 5 أحرف على الأقل.');
+    if ((decision === 'RETURN' || decision === 'REJECT') && trimmed.length < 5) return setError('اكتب سبباً من 5 أحرف على الأقل.');
     if (needsSignature && !pki && !ack) return setError('أكّد الاعتماد للتوثيق الداخلي.');
     if (needsSignature && pki && job?.status !== 'SIGNED') return setError('وقّع المستند بشهادتك أولاً.');
     setBusy(true);
@@ -84,8 +93,10 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
           : decision === 'RETURN'
             ? 'أعيد الطلب مع الملاحظة'
             : decision === 'REJECT'
-              ? 'سُجل الرفض'
-              : 'سُجلت الموافقة وانتقل مسار المراجعة',
+              ? 'سُجل الرفض النهائي؛ يبقى السجل محفوظاً'
+              : decision === 'REFER'
+                ? 'أُحيل الطلب للدراسة والقرار'
+                : 'سُجلت الموافقة وانتقل مسار المراجعة',
       );
       onDone(next);
       app.bump();
@@ -128,7 +139,7 @@ export function DecisionDialog({ target, onClose, onDone }: { target: DecisionTa
           </label>
         )}
         <label className="field">
-          <span>الملاحظة {decision === 'APPROVE' ? '— اختيارية' : '— مطلوبة'}</span>
+          <span>الملاحظة {decision === 'APPROVE' || decision === 'REFER' ? '— اختيارية' : '— مطلوبة'}</span>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="اكتب سبب القرار أو الملاحظة…" />
         </label>
         {needsSignature && (

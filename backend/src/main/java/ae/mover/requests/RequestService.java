@@ -488,7 +488,7 @@ public class RequestService {
                     select gen_random_uuid(), request_id, :rev, null, stage_key, stage_name, actor_person_id, actor_name,
                         actor_role_code, actor_role_name, actor_org_id, actor_org_name, via_delegation_id, 'CARRIED_FORWARD',
                         'موافقة محمولة من المراجعة ' || revision || ' وفق سياسة التعديل', coalesce(carried_from, id), :now
-                    from decision where request_id = :req and revision = :prev and decision in ('APPROVE', 'CARRIED_FORWARD')
+                    from decision where request_id = :req and revision = :prev and decision in ('APPROVE', 'REFER', 'CARRIED_FORWARD')
                       and stage_key = any(string_to_array(:carried, ','))""")
                     .param("rev", revision).param("now", Db.ts(now)).param("req", id).param("prev", revision - 1)
                     .param("carried", String.join(",", carried)).update();

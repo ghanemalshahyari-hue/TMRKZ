@@ -17,13 +17,25 @@ export function ReviewPage() {
   const [pinned, setPinned] = useState<RequestBoundaries | null>(null);
   const [decision, setDecision] = useState<DecisionTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // the inbox follows the server: reloaded every 30 s, when the window regains focus and when an item is opened, so a
+  // reviewer never acts on a state another person has already changed (the server refuses stale decisions anyway)
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const bump = () => setTick((t) => t + 1);
+    const timer = window.setInterval(bump, 30_000);
+    window.addEventListener('focus', bump);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', bump);
+    };
+  }, []);
 
   useEffect(() => {
     api
       .requests({ excludeDrafts: true, size: 200 })
       .then((p) => setList(p.items))
       .catch((e: Error) => setError(e.message));
-  }, [revision]);
+  }, [revision, tick]);
 
   const current = useMemo(() => list?.find((x) => x.id === selectedRequestId) ?? list?.[0], [list, selectedRequestId]);
 
@@ -40,7 +52,7 @@ export function ReviewPage() {
     return () => {
       live = false;
     };
-  }, [current?.id, revision]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [current?.id, revision, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // the request's sites for its period, drawn with the boundary versions recorded in the revision under review
   useEffect(() => {
@@ -95,6 +107,7 @@ export function ReviewPage() {
                 className={'inbox-item ' + (current?.id === x.id ? 'active' : '')}
                 onClick={() => {
                   setSelectedRequestId(x.id);
+                  setTick((t) => t + 1);
                   app.setMapDate(localDay(x.period.start));
                 }}
               >

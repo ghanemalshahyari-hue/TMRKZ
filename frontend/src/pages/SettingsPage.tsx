@@ -113,6 +113,24 @@ export function SettingsPage() {
               <option value="PKI">توقيع بشهادة المعتمد وختم الجهة (PKI)</option>
             </select>
           </label>
+          <label className="setting-row">
+            <span>
+              <b>معيار رموز الوحدات</b>
+              <small>المعيار والإصدار المعتمدان لرموز هوية الجهات (عرض معلوماتي)؛ دون اختيار لا يُسند رمز</small>
+            </span>
+            <select
+              value={s?.unitSymbolStandard ?? ''}
+              disabled={!s || busy}
+              onChange={(e) => saveSetting({ unitSymbolStandard: e.target.value || null })}
+              aria-label="معيار رموز الوحدات"
+            >
+              <option value="">لم يُحدد</option>
+              <option value="APP6-D">STANAG APP-6 D</option>
+              <option value="APP6-E">STANAG APP-6 E</option>
+              <option value="2525-D">MIL-STD-2525 D</option>
+              <option value="2525-E">MIL-STD-2525 E</option>
+            </select>
+          </label>
           <div className="setting-row">
             <span>
               <b>المرفقات</b>

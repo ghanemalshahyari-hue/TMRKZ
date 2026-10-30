@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, isAbort } from '../../api/client';
 import type { OrgBranch, Ref, SiteNode } from '../../api/types';
 import { Icon } from '../ui';
+import { OrgSymbol, SymbolLegend } from '../UnitSymbol';
 import { RowActionsButton } from './SiteActionMenu';
 
 type Loaded<T> = Record<string, T[] | 'loading' | undefined>;
@@ -113,7 +114,10 @@ export function OrgTree({
             <span className="tree-toggle" aria-hidden="true">·</span>
           )}
           <button className="tree-label" onClick={() => onSelect(selectedId === o.id ? null : { id: o.id, name: o.name })}>
-            <b>{o.name}</b>
+            <b className="with-symbol">
+              <OrgSymbol orgId={o.id} size={18} />
+              {o.name}
+            </b>
             <small>
               {o.siteCount ? o.siteCount + ' موقع مسؤولة عنه' : 'لا مواقع مسؤولة عنها مباشرة'}
               {o.childCount ? ' · ' + o.childCount + ' فرع' : ''}
@@ -149,7 +153,10 @@ export function OrgTree({
           {search.hits.map((o) => (
             <li key={o.id} role="option" aria-selected={selectedId === o.id}>
               <button className="tree-hit" onClick={() => reveal(o)}>
-                <b>{o.name}</b>
+                <b className="with-symbol">
+                  <OrgSymbol orgId={o.id} size={18} />
+                  {o.name}
+                </b>
                 <PathLine path={o.path} />
               </button>
             </li>
@@ -162,6 +169,7 @@ export function OrgTree({
         </ul>
       )}
       {search.error && <div className="note red micro">{search.error}</div>}
+      <SymbolLegend />
     </div>
   );
 }

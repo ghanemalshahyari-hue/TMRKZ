@@ -163,10 +163,18 @@ public class ExecutionService {
         if (ctx.viewLevel(scope) == ae.mover.access.ViewLevel.NONE) {
             throw ApiException.notFound();
         }
-        boolean allowed = ctx.personId().equals(r.get("created_by"))
-                || ctx.grants().stream().anyMatch(g -> g.has(Permission.REVIEW) && g.coversRequest(scope));
-        if (!allowed) {
-            throw ApiException.forbidden();
+        // a separate right: neither creating, reviewing nor approving a request allows closing it
+        if (ctx.grants().stream().noneMatch(g -> g.has(Permission.CLOSE) && g.coversRequest(scope))) {
+            throw ApiException.forbidden("إغلاق الطلب إدارياً يتطلب صلاحية الإغلاق على نطاقه.");
+        }
+        ctx.confirmTask("", null, scope, Permission.CLOSE);
+        String statement = in == null || in.statement() == null ? "" : in.statement().trim();
+        if (statement.length() < 10 || statement.length() > 2000) {
+            throw ApiException.validation("اكتب بيان الإنجاز الإداري (10 أحرف على الأقل): ما الذي نُفّذ وسُلّم.");
+        }
+        String reference = in.reference() == null || in.reference().isBlank() ? null : in.reference().trim();
+        if (reference != null && reference.length() > 120) {
+            throw ApiException.validation("مرجع الإثبات أطول من 120 حرفاً.");
         }
         if (!"APPROVED".equals(r.get("status"))) {
             throw ApiException.validation("يُغلق الطلب بعد اعتماده فقط.");
@@ -177,9 +185,18 @@ public class ExecutionService {
             throw ApiException.validation("توجد مهام تنفيذ أو استلام مفتوحة؛ أكملها قبل إغلاق الطلب.");
         }
         Instant now = clock.instant();
-        jdbc.sql("update request set status = 'CLOSED', closed_at = :now, updated_at = :now, version = version + 1 where id = :id")
-                .param("now", Db.ts(now)).param("id", requestId).update();
-        audit.recordAs(ctx.actor(), "REQUEST_CLOSED", "REQUEST", requestId.toString(), (String) r.get("number"),
-                Map.of("note", "إغلاق المعاملة لا يغيّر فترة الحجز"), in == null ? null : in.note());
+        jdbc.sql("""
+                update request set status = 'CLOSED', closed_at = :now, updated_at = :now, version = version + 1,
+                       completion_statement = :st, completion_reference = :ref, completed_by = :by where id = :id""")
+                .param("now", Db.ts(now)).param("st", statement).param("ref", reference).param("by", ctx.personId())
+                .param("id", requestId).update();
+        Map<String, Object> detail = new java.util.LinkedHashMap<>();
+        detail.put("note", "إغلاق المعاملة لا يغيّر فترة الحجز");
+        detail.put("statement", statement);
+        if (reference != null) {
+            detail.put("reference", reference);
+        }
+        audit.recordAs(ctx.actor(), "REQUEST_CLOSED", "REQUEST", requestId.toString(), (String) r.get("number"), detail,
+                statement);
     }
 }

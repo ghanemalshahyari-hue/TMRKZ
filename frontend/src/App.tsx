@@ -73,6 +73,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [counts, setCounts] = useState({ tasks: 0, submitted: 0 });
   const [navOpen, setNavOpen] = useState(false);
+  const [requestSlot, setRequestSlot] = useState<HTMLElement | null>(null);
 
   const can = useCallback((p: Permission) => me.permissions.includes(p), [me]);
   const toast = useCallback((message: string) => {
@@ -168,6 +169,9 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     settings,
     counts,
     navigate,
+    requestSlot,
+    setRequestSlot,
+    wizardActive: !!wizard && wizard.layout === 'drawer',
   };
 
   const pages: Record<View, () => ReactNode> = {
@@ -254,7 +258,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
             <a className="text-link handoff-link" href="#docs">
               دليل التشغيل
             </a>
-            <button className="button primary compact" onClick={() => ctx.openWizard({ origin: 'LIST' })} disabled={!can('CREATE')}>
+            <button className="button primary compact" onClick={() => ctx.openWizard({ origin: 'LIST', layout: view === 'map' ? 'drawer' : 'dialog' })} disabled={!can('CREATE')}>
               <span>＋</span>طلب جديد
             </button>
             <IdentitySwitch me={me} setMe={setMe} onSwitched={bump} toast={toast} />

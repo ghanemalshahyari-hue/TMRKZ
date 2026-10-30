@@ -64,6 +64,11 @@ export type AppContextValue = {
   settings: Settings | null;
   counts: { tasks: number; submitted: number };
   navigate: (view: View) => void;
+  /** The map's left column where an open request is docked (null when the map is not shown). */
+  requestSlot: HTMLElement | null;
+  setRequestSlot: (el: HTMLElement | null) => void;
+  /** A request started beside the map is open (docked or minimised). */
+  wizardActive: boolean;
 };
 
 export const AppContext = createContext<AppContextValue | null>(null);

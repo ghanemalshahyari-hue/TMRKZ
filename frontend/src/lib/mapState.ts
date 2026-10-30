@@ -92,6 +92,7 @@ export type SavedMapContext = {
   mode?: MapMode;
   tab?: 'orgs' | 'sites';
   toolsCollapsed?: boolean;
+  dirCollapsed?: boolean;
 };
 
 export type LayerSettings = {

@@ -46,11 +46,16 @@ public class RequestController {
     private final AttachmentService attachments;
     private final ae.mover.signing.SigningJobs signingJobs;
     private final SiteRequestActions siteActions;
+    private final CommunicationService communications;
+    private final RevisionChanges changes;
 
     public RequestController(AccessService access, RequestTypes types, RequestService requests, RequestViews views,
                              DecisionService decisions, ExecutionService execution, AttachmentService attachments,
-                             ae.mover.signing.SigningJobs signingJobs, SiteRequestActions siteActions) {
+                             ae.mover.signing.SigningJobs signingJobs, SiteRequestActions siteActions,
+                             CommunicationService communications, RevisionChanges changes) {
         this.access = access;
+        this.changes = changes;
+        this.communications = communications;
         this.siteActions = siteActions;
         this.types = types;
         this.requests = requests;
@@ -114,10 +119,28 @@ public class RequestController {
         return requests.submit(access.context(actor), id, in, key);
     }
 
+    /** What changed between a submitted revision and the one before it (default: the latest). */
+    @GetMapping("/requests/{id}/changes")
+    public RevisionChanges.Comparison changes(Actor actor, @PathVariable UUID id, @RequestParam(required = false) Integer revision) {
+        return changes.compare(access.context(actor), id, revision);
+    }
+
+    /** Recorded communications of the request's decisions (full view only). */
+    @GetMapping("/requests/{id}/communications")
+    public List<CommunicationService.View> communications(Actor actor, @PathVariable UUID id) {
+        return communications.list(access.context(actor), id);
+    }
+
+    @PostMapping("/requests/{id}/communications")
+    public List<CommunicationService.View> communicate(Actor actor, @PathVariable UUID id, @RequestBody CommunicationService.Input in,
+                                                       @RequestHeader(value = "Idempotency-Key", required = false) String key) {
+        return communications.record(access.context(actor), id, in, key);
+    }
+
     @PostMapping("/requests/{id}/close")
     public RequestViews.RequestDetail close(Actor actor, @PathVariable UUID id, @RequestBody(required = false) CloseInput in,
                                             @RequestHeader(value = "Idempotency-Key", required = false) String key) {
-        return execution.close(access.context(actor), id, in == null ? new CloseInput(null) : in, key);
+        return execution.close(access.context(actor), id, in == null ? new CloseInput(null, null, null) : in, key);
     }
 
     @PostMapping(value = "/requests/{id}/attachments", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

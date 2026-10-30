@@ -17,6 +17,8 @@ import { BASE, apiSession, consoleErrors, evidenceDir, expectServerErrors, exter
 const FIX = new URL('./fixtures/', import.meta.url);
 const OUT = evidenceDir();
 const results = [];
+// ONLY=MAP-19,MAP-16 runs just those checks (setup still runs); the evidence file is then results-only.json
+const ONLY = process.env.ONLY ? process.env.ONLY.split(',') : null;
 const setup = [];
 const t0 = Date.now();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -26,6 +28,7 @@ function record(id, title, pass, details) {
   console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${title}${details ? '  — ' + details : ''}`);
 }
 async function step(id, title, page, fn) {
+  if (ONLY && !ONLY.includes(id)) return;
   try {
     const details = await fn();
     record(id, title, true, details ?? '');
@@ -525,7 +528,7 @@ await step('MAP-11', 'طلب من الخريطة يحتفظ بالجهة وال�
   const inputs = drawer.locator('input[type="datetime-local"]');
   check((await inputs.nth(0).inputValue()) === H1 + 'T09:00' && (await inputs.nth(1).inputValue()) === H1 + 'T11:00', 'period not carried');
   await shot(pageB, 'map-11-drawer-beside-map');
-  await drawer.getByRole('button', { name: 'تصغير والعودة للخريطة' }).click();
+  await drawer.getByRole('button', { name: /^تصغير/ }).click();
   await pageB.locator('.request-drawer.minimized').waitFor();
   await pageB.getByLabel('اختيار مركز التدريب الإداري — قاعة التدريب ب').check();
   await requestAction(pageB.locator('.map-detail'), 'طلب استخدام مؤقت');
@@ -603,12 +606,13 @@ await step('MAP-19', 'نقر الموقع على الخريطة يفتح قائ�
   await pageB.getByRole('button', { name: 'إغلاق التفاصيل' }).click();
   const pin = pageB.locator(`.pin-wrap[data-site="${S.id}"]`);
   const menu = pageB.locator('.site-menu');
+  const menuOpen = (label) => menu.waitFor({ timeout: 8000 }).catch(() => { throw new Error('menu not shown after ' + label); });
   const mapBox = await pageB.locator('.map').boundingBox();
   const within = (b, box) => b.x >= box.x - 1 && b.y >= box.y - 1 && b.x + b.width <= box.x + box.width + 1 && b.y + b.height <= box.y + box.height + 1;
 
   // 1. one click on the marker: compact menu at the site, two labelled actions from the published types
   await pin.click();
-  await menu.waitFor();
+  await menuOpen('marker click');
   check((await menu.innerText()).includes(S.name), 'menu does not show the site name');
   const temp = menu.getByRole('button', { name: 'طلب استخدام مؤقت', exact: true });
   const open = menu.getByRole('button', { name: 'طلب استخدام مفتوح المدة', exact: true });
@@ -644,7 +648,7 @@ await step('MAP-19', 'نقر الموقع على الخريطة يفتح قائ�
   const focused = await pageB.evaluate(() => document.activeElement?.querySelector('.pin-wrap')?.getAttribute('data-site'));
   check(focused === S.id, 'focus not returned to the marker');
   await pageB.keyboard.press('Enter');
-  await menu.waitFor();
+  await menuOpen('Enter on the focused marker');
   await pageB.waitForFunction(() => document.activeElement?.closest('.site-menu') && document.activeElement.textContent.includes('طلب استخدام مؤقت'), null, { timeout: 5000 });
 
   // 4. a click on the empty map closes; a click on the registered boundary opens it at that point
@@ -654,7 +658,7 @@ await step('MAP-19', 'نقر الموقع على الخريطة يفتح قائ�
   const bp = await boundaryPoint(pageB, S.id);
   check(bp, 'no clickable point inside the boundary of ' + S.code);
   await pageB.mouse.click(bp.x, bp.y);
-  await menu.waitFor();
+  await menuOpen('boundary click');
   const mb3 = await menu.boundingBox();
   check(Math.abs(mb3.x + mb3.width / 2 - bp.x) <= mb3.width / 2 + 2, 'boundary menu not anchored at the clicked point');
 
@@ -678,7 +682,7 @@ await step('MAP-19', 'نقر الموقع على الخريطة يفتح قائ�
 
   // 6. open-ended use from the same menu: the drawer opens with an open end
   await pin.click();
-  await menu.waitFor();
+  await menuOpen('second marker click');
   await pageB.waitForFunction(() => document.querySelector('.site-menu .site-actions:not([aria-busy])'));
   await requestAction(menu, 'طلب استخدام مفتوح المدة');
   await drawer.waitFor();
@@ -691,7 +695,7 @@ await step('MAP-19', 'نقر الموقع على الخريطة يفتح قائ�
   await openTab(pageB, 'المواقع');
   const rowButton = pageB.getByRole('button', { name: 'طلب استخدام «' + S.name + '»' }).first();
   await rowButton.click();
-  await menu.waitFor();
+  await menuOpen('tree row button');
   check((await menu.innerText()).includes(S.name), 'tree menu shows another site');
   check(await menu.getByRole('button', { name: 'طلب استخدام مؤقت', exact: true }).isVisible(), 'tree menu without the actions');
   await shot(pageB, 'map-19-tree-menu');
@@ -750,7 +754,7 @@ await step('MAP-12b', 'المراجع يرى الطلب بحدوده المسج�
   await pageC.locator('.pinned-boundaries').filter({ hasText: 'المراجعة 1' }).waitFor({ timeout: 10000 });
   check((await pageC.locator('.pinned-boundaries').innerText()).includes('الإصدار'), 'boundary version not shown to the reviewer');
   await shot(pageC, 'map-12-review-with-pinned-boundaries');
-  await pageC.getByRole('button', { name: 'إرجاع', exact: true }).click();
+  await pageC.getByRole('button', { name: /^(إرجاع للتصحيح|طلب تصحيح)$/ }).click();
   await pageC.getByPlaceholder('اكتب سبب القرار أو الملاحظة…').fill('يرجى تعديل وقت الانتهاء إلى الظهر');
   await pageC.getByRole('button', { name: 'تأكيد القرار' }).click();
   await pageC.locator('#toast').filter({ hasText: 'أعيد الطلب' }).waitFor({ timeout: 10000 });
@@ -1053,7 +1057,7 @@ const summary = {
   consoleErrors,
   setupCalls: setup.length,
 };
-writeFileSync(new URL('results.json', OUT), JSON.stringify(summary, null, 2));
+writeFileSync(new URL(ONLY ? 'results-only.json' : 'results.json', OUT), JSON.stringify(summary, null, 2));
 console.log(`\n${summary.passed} passed, ${summary.failed} failed · ${setup.length} setup API calls · external requests ${external.length} · console errors ${consoleErrors.length}`);
 if (consoleErrors.length) console.log(consoleErrors.slice(0, 10).join('\n'));
 process.exit(summary.failed ? 1 : 0);

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { api, newIdempotencyKey, urls } from '../api/client';
-import type { ApprovalVerification, ExecutionTask, MyTask, RequestDetail, StageView } from '../api/types';
+import type { ApprovalVerification, DecisionKind, ExecutionTask, MyTask, RequestDetail, StageView } from '../api/types';
 import { useApp } from '../lib/app';
 import { fullDate, fullTime } from '../lib/dates';
 import { RESERVATION_STATUS, SIGNATURE_DISCLAIMER, TASK_STATE } from '../lib/labels';
+import { ClosureForm, CommunicationLog, RecordSummary, RevisionChangesBlock } from './RequestRecord';
 import { StatusPill } from './ui';
 
 function stageModeLabel(s: StageView): string {
@@ -119,14 +120,13 @@ export function RequestDocument({
 }: {
   request: RequestDetail;
   actions?: boolean;
-  onDecision?: (task: MyTask, decision: 'APPROVE' | 'RETURN' | 'REJECT') => void;
+  onDecision?: (task: MyTask, decision: DecisionKind) => void;
   onChanged?: (r?: RequestDetail) => void;
 }) {
   const app = useApp();
   const summary = r.view === 'SUMMARY';
   const reason = (r.values?.reason as string | undefined) ?? '';
   const sig = r.approvalDocument;
-  const [closing, setClosing] = useState(false);
   const [verification, setVerification] = useState<ApprovalVerification | null>(null);
   const [verifying, setVerifying] = useState(false);
 
@@ -138,20 +138,6 @@ export function RequestDocument({
       app.toast((e as Error).message);
     } finally {
       setVerifying(false);
-    }
-  };
-
-  const close = async () => {
-    setClosing(true);
-    try {
-      const next = await api.closeRequest(r.id, undefined, newIdempotencyKey());
-      app.toast('أُغلق الطلب؛ الحجز يحتفظ بفترته المعتمدة');
-      onChanged?.(next);
-      app.bump();
-    } catch (e) {
-      app.toast((e as Error).message);
-    } finally {
-      setClosing(false);
     }
   };
 
@@ -170,6 +156,8 @@ export function RequestDocument({
           </span>
         </div>
       </div>
+      <RecordSummary r={r} />
+      <RevisionChangesBlock r={r} />
       <div className="meta-grid">
         <div>
           <dt>المرافق</dt>
@@ -309,17 +297,11 @@ export function RequestDocument({
         </div>
       )}
       {!summary && <ExecutionList request={r} tasks={r.executionTasks} onChanged={(x) => (onChanged?.(x), app.bump())} />}
+      {!summary && <CommunicationLog r={r} canRecord={app.can('REVIEW') || app.can('APPROVE') || app.can('CLOSE')} />}
       {actions && (
         <div className="review-actions">
           {r.status === 'APPROVED' ? (
-            <>
-              <button className="button primary" disabled={!r.actions.canClose || closing} onClick={close}>
-                تأكيد التنفيذ والإغلاق
-              </button>
-              <span className="micro muted">
-                {r.actions.canClose ? 'ينهي الطلب الإداري؛ لا يغيّر نهاية الحجز تلقائياً.' : 'يتاح الإغلاق بعد إكمال مهام التنفيذ والاستلام.'}
-              </span>
-            </>
+            <ClosureForm r={r} onClosed={(x) => onChanged?.(x)} />
           ) : r.status !== 'SUBMITTED' ? (
             <>
               <span className="micro muted">لا توجد مهمة مراجعة مفتوحة لهذا الطلب.</span>
@@ -332,16 +314,16 @@ export function RequestDocument({
           ) : (
             <>
               {r.actions.myTasks.map((t) => (
-                <button key={t.taskId} className="button primary" onClick={() => onDecision?.(t, 'APPROVE')}>
-                  {t.final && t.requiresSignature ? 'اعتماد وتوقيع' : 'موافقة'} — {t.roleName}
+                <button key={t.taskId} className="button primary" onClick={() => onDecision?.(t, t.final ? 'APPROVE' : 'REFER')}>
+                  {t.final ? (t.requiresSignature ? 'اعتماد وتوقيع' : 'اعتماد') : 'إحالة للدراسة'} — {t.stageName}
                 </button>
               ))}
               {!r.actions.myTasks.length && <span className="micro muted">لا توجد مهمة مسندة إليك في المرحلة الحالية.</span>}
               <button className="button" disabled={!r.actions.myTasks.length} onClick={() => onDecision?.(r.actions.myTasks[0], 'RETURN')}>
-                إرجاع
+                {r.actions.myTasks[0]?.final ? 'طلب تصحيح' : 'إرجاع للتصحيح'}
               </button>
               <button className="button danger" disabled={!r.actions.myTasks.length} onClick={() => onDecision?.(r.actions.myTasks[0], 'REJECT')}>
-                رفض
+                رفض نهائي
               </button>
             </>
           )}

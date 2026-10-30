@@ -1,6 +1,7 @@
 // Mirrors docs/api/API_V1.md. Keep in sync with the backend contract.
 
 export type Permission =
+  | 'CLOSE'
   | 'VIEW'
   | 'VIEW_SUMMARY'
   | 'CREATE'
@@ -515,7 +516,33 @@ export type ApprovalDocument = {
   signatureLabel: string;
   lines: { label: string; value: string }[];
 };
-export type DecisionKind = 'APPROVE' | 'RETURN' | 'REJECT';
+/** REFER sends a request onward for study (non-final stages); APPROVE at the final stage approves it. */
+export type DecisionKind = 'APPROVE' | 'REFER' | 'RETURN' | 'REJECT';
+export type CommunicationChannel = 'IN_APP' | 'INTERNAL_MAIL' | 'OFFICIAL_LETTER' | 'HAND_DELIVERY' | 'OTHER';
+/** A recorded communication of a decision (append-only). */
+export type Communication = {
+  id: string;
+  revision: number;
+  outcome: 'APPROVED' | 'REJECTED' | 'RETURNED' | 'CLOSED';
+  recipientKind: 'ORGANIZATION' | 'PERSON' | 'OTHER';
+  recipientOrg?: Ref;
+  recipientPerson?: Ref;
+  recipientText?: string;
+  channel: CommunicationChannel;
+  reference?: string;
+  documentRevision?: number;
+  documentSha256?: string;
+  communicatedAt: string;
+  recordedBy: string;
+  recordedAt: string;
+  note?: string;
+};
+export type RevisionComparison = {
+  fromRevision: number;
+  toRevision: number;
+  reason: string | null;
+  changes: { field: string; label: string; before: string | null; after: string | null }[];
+};
 export type ReasonCode = 'INCOMPLETE_DATA' | 'PERIOD_CONFLICT' | 'WRONG_FACILITY' | 'MISSING_ATTACHMENT' | 'OTHER';
 export type DecisionInput = {
   decision: DecisionKind;

@@ -351,8 +351,8 @@ public class DecisionService {
 
     private UUID doDecide(AccessContext ctx, UUID taskId, DecisionInput in) {
         String decision = in.decision() == null ? "" : in.decision();
-        if (!Set.of("APPROVE", "RETURN", "REJECT").contains(decision)) {
-            throw ApiException.validation("القرار يجب أن يكون APPROVE أو RETURN أو REJECT.");
+        if (!Set.of("APPROVE", "REFER", "RETURN", "REJECT").contains(decision)) {
+            throw ApiException.validation("القرار يجب أن يكون APPROVE أو REFER أو RETURN أو REJECT.");
         }
         TaskRow peek = task(taskId, false);
         // Lock the request first, then the task: all decisions on one request are serialised.
@@ -379,12 +379,17 @@ public class DecisionService {
         }
         ctx.confirmTask(t.roleCode(), t.targetOrgId(), scope,
                 t.finalStage() ? new Permission[] {Permission.REVIEW, Permission.APPROVE} : new Permission[] {Permission.REVIEW});
+        // REFER sends the request onward for study; only a non-final stage can refer, only the final stage approves it
+        if ("REFER".equals(decision) && t.finalStage()) {
+            throw ApiException.validation("هذه مرحلة القرار النهائي: اعتمد أو ارفض أو اطلب التصحيح؛ الإحالة للدراسة في المراحل السابقة لها.");
+        }
+        boolean forward = "APPROVE".equals(decision) || "REFER".equals(decision);
         int currentRevision = ((Number) req.get("current_revision")).intValue();
         if (in.expectedRevision() == null || in.expectedRevision() != currentRevision || t.revision() != currentRevision) {
             throw ApiException.staleRevision();
         }
         String note = in.note() == null ? null : in.note().trim();
-        if (!"APPROVE".equals(decision) && (note == null || note.length() < 5)) {
+        if (!forward && (note == null || note.length() < 5)) {
             throw ApiException.validation("اكتب سبب " + ("RETURN".equals(decision) ? "الإرجاع" : "الرفض") + " بخمسة أحرف على الأقل.");
         }
         if (note != null && note.length() > 2000) {
@@ -436,7 +441,7 @@ public class DecisionService {
                 .param("dec", decision).param("rcode", reasonCode).param("note", note).param("now", Db.ts(now))
                 .param("self", byRequester).update();
 
-        if (!"APPROVE".equals(decision)) {
+        if (!forward) {
             String status = "RETURN".equals(decision) ? "RETURNED" : "REJECTED";
             jdbc.sql("update task_assignment set status = :s, closed_at = :now where id = :id")
                     .param("s", status).param("now", Db.ts(now)).param("id", t.id()).update();
@@ -462,7 +467,8 @@ public class DecisionService {
         if (note != null && !note.isEmpty()) {
             jdbc.sql("update request set last_note = :note where id = :id").param("note", note).param("id", requestIdValue).update();
         }
-        audit.record(ctx.actor(), capacity, "TASK_APPROVED", "REQUEST", requestIdValue.toString(), number,
+        audit.record(ctx.actor(), capacity, "REFER".equals(decision) ? "TASK_REFERRED" : "TASK_APPROVED", "REQUEST",
+                requestIdValue.toString(), number,
                 Map.of("stage", t.stageName(), "byRequester", byRequester), note, currentRevision);
         taskService.complete(t.flowableTaskId());
         WorkflowDefinition def = workflows.definition((UUID) req.get("workflow_version_id"));

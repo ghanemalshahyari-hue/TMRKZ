@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import type { Delegation, Member, OrgDetail, RoleDef } from '../api/types';
 import { PersonPicker } from '../components/access/pickers';
-import { Dialog, DialogHead, Heading, Icon } from '../components/ui';
+import { OrgSymbol, SymbolAssignment, SymbolLegend } from '../components/UnitSymbol';
+import { Dialog, DialogHead, Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { addDays, dubaiISO, fullDate, todayDubai } from '../lib/dates';
 
@@ -128,7 +129,7 @@ export function OrgPage() {
                 style={o.depth > 1 ? { marginRight: (o.depth - 1) * 14 } : undefined}
                 onClick={() => setSelected(o.id)}
               >
-                <Icon name={o.depth === 0 ? 'tree' : 'building'} />
+                <OrgSymbol orgId={o.id} size={20} />
                 {o.name}
                 <small>{String(o.depth === 0 ? o.children.length : o.siteCount).padStart(2, '0')}</small>
               </button>
@@ -138,7 +139,12 @@ export function OrgPage() {
         <div className="stack">
           <section className="card org-summary">
             <span className="eyebrow">ORGANIZATION / {detail?.org.code ?? 'PROFILE'}</span>
-            <h2>{name}</h2>
+            <div className="org-identity">
+              <OrgSymbol orgId={current} size={44} withText />
+              <h2>{name}</h2>
+            </div>
+            <SymbolLegend />
+            {app.can('CONFIGURE') && current && <SymbolAssignment key={current} orgId={current} orgName={name} />}
             <p className="micro muted" style={{ marginTop: 7 }}>
               العضويات مؤرخة؛ انتهاء العضوية يسحب صلاحية الجهة فوراً في الخادم.
             </p>

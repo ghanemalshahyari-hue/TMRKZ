@@ -139,4 +139,16 @@ insert into membership_scope_target(membership_id, kind, target_id, include_desc
   (md5('t:m:t.manager.it:custom')::uuid, 'SITE', md5('t:site:11')::uuid, true)
 on conflict do nothing;
 
+
+-- informational unit symbol catalog (fictional acceptance data, ADR-021): generic administrative functions as land
+-- unit SIDCs of APP-6 D, friend, no echelon. A production installation starts with an empty catalog.
+insert into unit_symbol_catalog(code, standard, edition, sidc, name_ar) values
+  ('ADM-C2', 'APP6', 'D', '10031000001100000000', 'قيادة وسيطرة'),
+  ('ADM-ADMIN', 'APP6', 'D', '10031000001601000000', 'شؤون إدارية'),
+  ('ADM-PERSONNEL', 'APP6', 'D', '10031000001624000000', 'خدمات الأفراد'),
+  ('ADM-FINANCE', 'APP6', 'D', '10031000001607000000', 'الشؤون المالية'),
+  ('ADM-MAINTENANCE', 'APP6', 'D', '10031000001611000000', 'الصيانة'),
+  ('ADM-TRANSPORT', 'APP6', 'D', '10031000001636000000', 'النقل'),
+  ('ADM-SUSTAINMENT', 'APP6', 'D', '10031000001600000000', 'الإسناد والدعم')
+on conflict do nothing;
 commit;

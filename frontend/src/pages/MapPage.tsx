@@ -54,6 +54,7 @@ export function MapPage() {
   const [layers, setLayers] = useState<LayerSettings>(() => ({ ...DEFAULT_LAYERS, ...(saved.current.layers ?? {}) }));
   const [tab, setTab] = useState<'orgs' | 'sites'>(saved.current.tab ?? 'sites');
   const [toolsCollapsed, setToolsCollapsed] = useState(saved.current.toolsCollapsed ?? false);
+  const [dirCollapsed, setDirCollapsed] = useState(saved.current.dirCollapsed ?? false);
   const [statsOpen, setStatsOpen] = useState(false);
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [data, setData] = useState<MapFeatures | null>(null);
@@ -97,8 +98,9 @@ export function MapPage() {
       mode,
       tab,
       toolsCollapsed,
+      dirCollapsed,
     });
-  }, [me.id, org, selectedSiteId, period, background?.id, layers, mode, tab, toolsCollapsed, viewport]);
+  }, [me.id, org, selectedSiteId, period, background?.id, layers, mode, tab, toolsCollapsed, dirCollapsed, viewport]);
 
   // context: extent of what this person may see, installed backgrounds, rights
   useEffect(() => {
@@ -463,62 +465,80 @@ export function MapPage() {
         </div>
       )}
 
-      <div className={'map-grid ' + (editing ? 'editing ' : '') + (editing || selectedSiteId ? 'with-detail' : '')}>
-        <aside className="card browse-panel" aria-label="التصفح">
-          <div className="tabs" role="tablist">
-            <button role="tab" aria-selected={tab === 'orgs'} className={tab === 'orgs' ? 'active' : ''} onClick={() => setTab('orgs')}>
-              الجهات
+      <div
+        className={
+          'map-grid ' + (editing ? 'editing ' : '') + (editing || selectedSiteId || app.wizardActive ? 'with-detail ' : '') + (dirCollapsed ? 'dir-collapsed' : '')
+        }
+      >
+        {dirCollapsed ? (
+          <aside className="card browse-rail" aria-label="دليل الجهات والمواقع (مطوي)">
+            <button className="rail-button" onClick={() => setDirCollapsed(false)} aria-expanded={false}>
+              ‹ الجهات والمواقع
             </button>
-            <button role="tab" aria-selected={tab === 'sites'} className={tab === 'sites' ? 'active' : ''} onClick={() => setTab('sites')}>
-              المواقع
-            </button>
-          </div>
-          {tab === 'orgs' ? (
-            <OrgTree
-              selectedId={org?.id ?? null}
-              includeSub={org?.includeSub ?? true}
-              onSelect={(o) => (o ? setOrg({ ...o, includeSub: org?.includeSub ?? true }) : setOrg(null))}
-              onIncludeSub={(v) => org && setOrg({ ...org, includeSub: v })}
-              revision={revision}
-            />
-          ) : (
-            <SiteTree
-              selectedId={selectedSiteId}
-              onSelect={(id) => select(id, true)}
-              onActions={openMenuFromRow}
-              menuSiteId={menu?.anchor.kind === 'element' ? menu.siteId : null}
-              revision={revision + localRevision}
-              revealPath={reveal}
-            />
-          )}
-          {org && (
-            <div className="org-sites">
-              <h3>مواقع مرتبطة بـ«{org.name}» في نافذة العرض</h3>
-              {features.length === 0 && <p className="micro muted">{loading ? 'جارٍ التحميل…' : 'لا مواقع ضمن نافذة العرض؛ حرّك الخريطة أو كبّر النطاق.'}</p>}
-              <ul>
-                {features.map((f) => (
-                  <li key={f.siteId} className="site-row-item">
-                    <button className={'site-row ' + (selectedSiteId === f.siteId ? 'active' : '')} onClick={() => select(f.siteId, true)}>
-                      <span>{f.code}</span>
-                      <div>
-                        <b>{f.name}</b>
-                        <small>
-                          {(f.relations ?? []).map((r) => (r === 'RESPONSIBLE' ? 'الجهة مسؤولة' : 'الجهة شاغلة في الفترة')).join(' · ')}
-                        </small>
-                      </div>
-                      <i className="dot" style={{ color: AVAILABILITY_STYLE[f.availability].color }} title={AVAILABILITY_STYLE[f.availability].label} />
-                    </button>
-                    <RowActionsButton
-                      name={f.name}
-                      open={menu?.siteId === f.siteId && menu.anchor.kind === 'element'}
-                      onOpen={(el, kb) => openMenuFromRow(f.siteId, f.name, el, kb)}
-                    />
-                  </li>
-                ))}
-              </ul>
+          </aside>
+        ) : (
+          <aside className="card browse-panel" aria-label="دليل الجهات والمواقع">
+            <div className="browse-head">
+              <b>دليل الجهات والمواقع</b>
+              <button className="icon-button" onClick={() => setDirCollapsed(true)} aria-expanded={true} aria-label="طي دليل الجهات والمواقع" title="طي الدليل">
+                ›
+              </button>
             </div>
-          )}
-        </aside>
+            <div className="tabs" role="tablist">
+              <button role="tab" aria-selected={tab === 'orgs'} className={tab === 'orgs' ? 'active' : ''} onClick={() => setTab('orgs')}>
+                الجهات
+              </button>
+              <button role="tab" aria-selected={tab === 'sites'} className={tab === 'sites' ? 'active' : ''} onClick={() => setTab('sites')}>
+                المواقع
+              </button>
+            </div>
+            {tab === 'orgs' ? (
+              <OrgTree
+                selectedId={org?.id ?? null}
+                includeSub={org?.includeSub ?? true}
+                onSelect={(o) => (o ? setOrg({ ...o, includeSub: org?.includeSub ?? true }) : setOrg(null))}
+                onIncludeSub={(v) => org && setOrg({ ...org, includeSub: v })}
+                revision={revision}
+              />
+            ) : (
+              <SiteTree
+                selectedId={selectedSiteId}
+                onSelect={(id) => select(id, true)}
+                onActions={openMenuFromRow}
+                menuSiteId={menu?.anchor.kind === 'element' ? menu.siteId : null}
+                revision={revision + localRevision}
+                revealPath={reveal}
+              />
+            )}
+            {org && (
+              <div className="org-sites">
+                <h3>مواقع مرتبطة بـ«{org.name}» في نافذة العرض</h3>
+                {features.length === 0 && <p className="micro muted">{loading ? 'جارٍ التحميل…' : 'لا مواقع ضمن نافذة العرض؛ حرّك الخريطة أو كبّر النطاق.'}</p>}
+                <ul>
+                  {features.map((f) => (
+                    <li key={f.siteId} className="site-row-item">
+                      <button className={'site-row ' + (selectedSiteId === f.siteId ? 'active' : '')} onClick={() => select(f.siteId, true)}>
+                        <span>{f.code}</span>
+                        <div>
+                          <b>{f.name}</b>
+                          <small>
+                            {(f.relations ?? []).map((r) => (r === 'RESPONSIBLE' ? 'الجهة مسؤولة' : 'الجهة شاغلة في الفترة')).join(' · ')}
+                          </small>
+                        </div>
+                        <i className="dot" style={{ color: AVAILABILITY_STYLE[f.availability].color }} title={AVAILABILITY_STYLE[f.availability].label} />
+                      </button>
+                      <RowActionsButton
+                        name={f.name}
+                        open={menu?.siteId === f.siteId && menu.anchor.kind === 'element'}
+                        onOpen={(el, kb) => openMenuFromRow(f.siteId, f.name, el, kb)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </aside>
+        )}
 
         <div className="map-column">
           {ctx ? (
@@ -627,6 +647,10 @@ export function MapPage() {
           </div>
         </div>
 
+        {(editingSite || selectedSiteId || app.wizardActive) && (
+        <div className="map-side">
+          {/* an open request is docked here, beside the map; the site details return when it is minimised */}
+          <div className="request-slot" ref={app.setRequestSlot} />
         {editingSite && map ? (
           <BoundaryEditor
             key={editingSite.id}
@@ -655,6 +679,8 @@ export function MapPage() {
             onClose={() => select(null, false)}
           />
         ) : null}
+        </div>
+        )}
       </div>
 
       {menu && (

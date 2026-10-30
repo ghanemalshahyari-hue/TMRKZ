@@ -388,7 +388,7 @@ and is never labelled as a certificate signature.
   that depends on the enterprise provider's services and policy. The fictional test PKI proves the mechanism, not a
   trust level.
 
-## ADR-021 On-site request menu and informational unit symbols — In progress (2026-10-29)
+## ADR-021 On-site request menu and informational unit symbols — Accepted (2026-10-29, completed 2026-10-30)
 
 Owner continuation prompt (`docs/OWNER_CONTINUATION_PROMPT.md` §3 and §6).
 
@@ -406,9 +406,35 @@ Owner continuation prompt (`docs/OWNER_CONTINUATION_PROMPT.md` §3 and §6).
 - **Explicit type and resources.** The selected type code goes to the drawer; the wizard no longer picks the first
   type (from the list it asks). A multi-resource site preselects no resource (the parent is never claimed silently);
   the drawer lists the site's resources first and shows site, type, resources and period on every step.
-- **Unit symbols (backend done, UI not yet).** V12 adds `unit_symbol_catalog` and `org_unit_symbol`, local metadata
+- **Unit symbols.** The UI shows them in the organisation directory (map and organisation page), the organisation
+  details and the request summary, with an Arabic legend and an assignment panel with live preview for CONFIGURE. V12 adds `unit_symbol_catalog` and `org_unit_symbol`, local metadata
   keyed by the organisation id that the HR publication never writes. The approved standard and edition are a policy
   setting (`unitSymbolStandard`: APP6-D, APP6-E, 2525-D, 2525-E; null blocks assignment). CONFIGURE assigns from the
   catalog or a manual SIDC checked for shape (20/30 digits, reality, friend, symbol set 10 or 11), with expected
   version, reason and audit; lookups return only organisations the reader may see. Rendering uses milsymbol 3.0.4
   (MIT, pinned; 3.0.5 was two days old), loaded lazily from the local bundle. A symbol grants nothing.
+
+## ADR-022 Docked request panel, referral, decision communication and administrative completion — Accepted (2026-10-30)
+
+Owner brief of 30 Oct 2026 (map-centred administrative workspace, review and decision workflow).
+
+- **Layout.** The request form is never a floating form over the map: beside the map it is docked in the map's left
+  column (the site details return when it is minimised); on phones and away from the map it is the bottom drawer, and
+  a draft survives navigation to the request register as a minimised bar. The organisation directory on the right is
+  collapsible. The on-site menu remains the compact action bar of the selected facility.
+- **Referral.** A non-final stage refers a request onward for study with the decision `REFER` (V13); `APPROVE` at the
+  final stage approves. The final stage cannot refer. Change-impact carry-forward and reports count `REFER` like a
+  forward approval. `RETURN` (correction) and `REJECT` (final) keep their mandatory reasons.
+- **What changed.** `GET /requests/{id}/changes` compares two submitted revisions from the immutable snapshots
+  (`RevisionChanges`); the reviewer sees each changed field, before and after, with the requester's reason.
+- **Communication.** `decision_communication` (append-only) records who communicated which outcome to whom (an
+  organisation, a person or a named other), by which channel, when, with which document revision and hash
+  (`CommunicationService`). Recording needs REVIEW, APPROVE or CLOSE over the request (OpenFGA-confirmed); reading
+  needs the full view. Information recipients stay a separate list without tasks.
+- **Completion.** Approval no longer leads to closing by the requester: closing is its own right `CLOSE` (new action;
+  the generated OpenFGA model gains `close` relations, `docs/authz/model.fga` regenerated), held by the facilities
+  review role by default (V13 and bootstrap) and assignable through the policy studio, and it needs a completion
+  statement (and an optional evidence reference), stored on the request and in the audit trail.
+- **Record summary.** The request document opens with reference, requesting organisation (with its unit symbol),
+  facility/resource, type, plain-language state (completeness review, referred for study, returned, finally rejected,
+  approved awaiting completion, closed), current stage, who holds it, last action and next action.

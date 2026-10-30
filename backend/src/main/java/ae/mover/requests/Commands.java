@@ -38,7 +38,8 @@ public final class Commands {
                                 SignatureInput signature, String signingJobId) {
     }
 
-    public record CloseInput(String note) {
+    /** Administrative completion: a statement of what was done (required) and an optional evidence reference. */
+    public record CloseInput(String note, String statement, String reference) {
     }
 
     public record CompleteInput(String note, String evidenceAttachmentId) {

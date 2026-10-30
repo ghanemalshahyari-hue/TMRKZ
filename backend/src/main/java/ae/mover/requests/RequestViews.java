@@ -321,7 +321,7 @@ public class RequestViews {
         boolean editable = ctx.mayModify((UUID) r.get("created_by"), (UUID) r.get("owner_org_id"), status);
         List<ExecutionTaskView> exec = executionTasks(ctx, id, scope);
         boolean canClose = "APPROVED".equals(status) && exec.stream().allMatch(e -> "DONE".equals(e.status()))
-                && (creator || ctx.grants().stream().anyMatch(g -> g.has(Permission.REVIEW) && g.coversRequest(scope)));
+                && ctx.grants().stream().anyMatch(g -> g.has(Permission.CLOSE) && g.coversRequest(scope));
 
         UUID targetId = (UUID) r.get("target_reservation_id");
         TargetReservation target = targetId == null ? null : jdbc.sql("""

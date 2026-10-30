@@ -65,7 +65,11 @@ import type {
   SiteDetail,
   SiteNode,
   SiteRequestActions,
+  Communication,
+  CommunicationChannel,
+  RevisionComparison,
   UnitSymbolLookup,
+  UnitSymbol,
   StudioItem,
   SystemInfo,
   TaskItem,
@@ -261,6 +265,11 @@ export const api = {
   // facilities & map
   sites: () => get<Site[]>('/sites'),
   site: (id: string) => get<SiteDetail>(`/sites/${id}`),
+  unitSymbolCatalog: () =>
+    get<{ code: string; sidc: string; name: string; standard: string; edition: string; description?: string; active: boolean }[]>('/unit-symbols/catalog'),
+  assignUnitSymbol: (orgId: string, body: { catalogCode?: string; sidc?: string; description?: string; expectedVersion: number; reason: string }) =>
+    put<UnitSymbol>(`/organizations/${orgId}/unit-symbol`, body),
+  removeUnitSymbol: (orgId: string, body: { expectedVersion: number; reason: string }) => post<void>(`/organizations/${orgId}/unit-symbol/remove`, body),
   unitSymbols: (orgIds: string[]) => get<UnitSymbolLookup>('/unit-symbols' + query({ orgIds: orgIds.join(',') })),
   siteRequestActions: (id: string, signal?: AbortSignal) => get<SiteRequestActions>(`/sites/${id}/request-actions`, { signal }),
   createResource: (body: {
@@ -319,7 +328,15 @@ export const api = {
   updateDraft: (id: string, body: DraftInput & { expectedVersion: number }) => patch<RequestDetail>(`/requests/${id}/draft`, body),
   submit: (id: string, expectedVersion: number, resubmissionReason: string | undefined, key: string) =>
     post<RequestDetail>(`/requests/${id}/submit`, { expectedVersion, resubmissionReason }, key),
-  closeRequest: (id: string, note: string | undefined, key: string) => post<RequestDetail>(`/requests/${id}/close`, { note }, key),
+  closeRequest: (id: string, body: { statement: string; reference?: string; note?: string }, key: string) =>
+    post<RequestDetail>(`/requests/${id}/close`, body, key),
+  communications: (id: string) => get<Communication[]>(`/requests/${id}/communications`),
+  communicate: (
+    id: string,
+    body: { recipientKind: Communication['recipientKind']; recipientOrgId?: string; recipientText?: string; channel: CommunicationChannel; reference?: string; communicatedAt?: string; note?: string },
+    key: string,
+  ) => post<Communication[]>(`/requests/${id}/communications`, body, key),
+  changes: (id: string, revision?: number) => get<RevisionComparison>(`/requests/${id}/changes` + query({ revision })),
   uploadAttachment: (id: string, fieldId: string, file: File) => {
     const form = new FormData();
     form.append('fieldId', fieldId);

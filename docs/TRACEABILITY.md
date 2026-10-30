@@ -93,8 +93,10 @@ decision. Backend tests live in `backend/src/test/java/ae/mover/*IT.java`; `jour
 
 ## Map workspace MAP-01 … MAP-19 (`docs/MAP_WORKSPACE_COMPLETION_AR.md` §8; MAP-19 from the owner continuation prompt §3)
 
-Latest browser run (29 Oct 2026, after the on-site menu change): 17 pass / 5 fail (MAP-11, MAP-12a, MAP-12b, MAP-17,
-MAP-19) — work in progress; the earlier all-pass run below is history, not the current state.
+History: the run of 29 Oct after the first on-site menu change had 17 pass / 5 fail (MAP-11, MAP-12a, MAP-12b, MAP-17,
+MAP-19); causes fixed on 30 Oct (panel action list stuck on the type step, request drawer covering the panel,
+marker focus lost on redraw, status banner over the zoom buttons, a harness date window reused every 200 minutes).
+Current result: see the run recorded in `docs/evidence/map/results.json`.
 
 Backend tests run on real PostgreSQL 17.11 + PostGIS 3.5 (`sh ops/test-backend.sh`). Browser tests drive Microsoft Edge
 with clicks and the keyboard against the acceptance environment started without internet egress
@@ -123,11 +125,30 @@ errors; screenshots in `docs/evidence/map/`.
 | MAP-16 | Slow, reversed or failed responses and a scope change: nothing stale shown as current; no forced re-zoom | `MapPage` (abort + sequence), neutral `UNKNOWN_STYLE`, `MapCanvas` (no fit on data), per-request access | `MapWorkspaceAcceptanceIT.scopeChangeInSession` | MAP-16 | Pass | Late answer never shown; failure → neutral; removed scope → site and details gone |
 | MAP-17 | Phone width and keyboard: select and complete a request without dragging, hidden buttons or horizontal scrolling | `map.css` (single column, bottom-sheet drawer), focusable markers and trees | — | MAP-17 | Pass | 390×844; sign-in, selection, request and submission by keyboard |
 | MAP-18 | Internet blocked with acceptance packages local: backgrounds, boundaries, request and review work | local packages, CSP, `compose.offline.yml` | — | MAP-18 (all steps) | Pass | 0 external browser requests; backend has no egress (`up-offline.sh`) |
-| MAP-19 | Owner prompt §3: one click on a site opens two actions at the site; same command from tree, list and panel; type and resources handed over explicitly; nothing written | `SiteActionMenu`, `MapCanvas` (SiteHit, background click), `MapPage.startRequest`, `SiteRequestActions`, `RequestWizard` (no silent type/parent) | `MapWorkspaceAcceptanceIT.siteRequestActions` (pass) | MAP-19 | **Open** — browser run of 29 Oct failed (see STATUS) | Backend: published types, open-end rule, no-CREATE and no-resource reasons, 404 outside view, no rows written |
+| MAP-19 | Owner prompt §3: one click on a site opens two actions at the site; same command from tree, list and panel; type and resources handed over explicitly; nothing written | `SiteActionMenu`, `MapCanvas` (SiteHit, background click), `MapPage.startRequest`, `SiteRequestActions`, `RequestWizard` (no silent type/parent) | `MapWorkspaceAcceptanceIT.siteRequestActions` | MAP-19 | Pass (30 Oct) | Backend: published types, open-end rule, no-CREATE and no-resource reasons, 404 outside view, no rows written |
 
 Scale (separate from the organisation tree volume): `MapScaleIT` — 10,000 sites with boundaries and 2,000 reservations;
 see `docs/PERFORMANCE.md`. Migration from the earlier release: V7 acceptance data upgraded in place, 130/130 earlier rows
 unchanged (`ops/upgrade-check.sh`, ADR-017).
+
+## Administrative journey through the UI (owner brief of 30 Oct 2026 §11)
+
+`node tests/acceptance/admin-journey.mjs` drives Microsoft Edge against the acceptance environment, each persona signed
+in through the directory sign-in page; the API only cross-checks. Evidence: `docs/evidence/admin-journey/`.
+
+| Check | Scenario | Code | Backend test | Result |
+|---|---|---|---|---|
+| J1 | Select a facility on the map, open the docked request, nothing written; repeated click → one request | `SiteActionMenu`, `RequestWizard` (docked), idempotent submit | `MapWorkspaceAcceptanceIT.siteRequestActions` | Pass |
+| J2 | Completeness review returns for correction with a reason | `DecisionService` RETURN | `ReservationAcceptanceIT.administrativePath` | Pass |
+| J3 | Requester corrects and resubmits under the same reference | `RequestWizard`, `RequestService.submit` | same | Pass |
+| J4 | Reviewer sees what changed, refers for study | `RevisionChanges`, `RevisionChangesBlock`, `REFER` | same | Pass |
+| J5 | Organisation stage refers to the final decision | workflow stages | same | Pass |
+| J6 | Final rejection needs a reason; approval with attestation | `DecisionDialog`, `DecisionService` | same | Pass |
+| J7 | Communication of the decision recorded with the document revision | `CommunicationService`, `CommunicationLog` | same | Pass |
+| J8 | Handover, receipt, completion statement and closing under `CLOSE`; history retained | `ExecutionService.close`, `ClosureForm` | `ReservationAcceptanceIT.fullJourney/administrativePath` | Pass |
+| J9 | Out-of-scope requester gets 404 for the request and its communications | `AccessContext`, `CommunicationService` | — | Pass |
+| J10 | Draft kept across navigation to the register; closing without saving writes nothing | docked/minimised wizard | — | Pass |
+| J11 | Phone: tapping a facility opens a bottom sheet with both actions on screen | `SiteActionMenu` sheet | — | Pass |
 
 ## Production acceptance PA-01 … PA-30 (`docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md` §15)
 

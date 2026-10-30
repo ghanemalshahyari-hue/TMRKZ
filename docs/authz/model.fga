@@ -36,6 +36,8 @@ type system
     define audit_any: [grant#holder]
     define view_source_identifiers: [grant#holder]
     define view_source_identifiers_any: [grant#holder]
+    define close: [grant#holder]
+    define close_any: [grant#holder]
 
 type organization
   relations
@@ -94,6 +96,10 @@ type organization
     define view_source_identifiers_tree: [grant#holder]
     define view_source_identifiers_inh: view_source_identifiers_tree or view_source_identifiers_inh from parent
     define view_source_identifiers: view_source_identifiers_here or view_source_identifiers_inh or view_source_identifiers from system
+    define close_here: [grant#holder]
+    define close_tree: [grant#holder]
+    define close_inh: close_tree or close_inh from parent
+    define close: close_here or close_inh or close from system
 
 type site
   relations
@@ -191,6 +197,13 @@ type site
     define view_source_identifiers_direct: view_source_identifiers_here or view_source_identifiers_inh
     define view_source_identifiers_req: view_source_identifiers_direct or view_source_identifiers from responsible
     define view_source_identifiers: view_source_identifiers_req or view_source_identifiers_contains or view_source_identifiers from system
+    define close_here: [grant#holder]
+    define close_tree: [grant#holder]
+    define close_contains: [grant#holder]
+    define close_inh: close_tree or close_inh from parent
+    define close_direct: close_here or close_inh
+    define close_req: close_direct or close from responsible
+    define close: close_req or close_contains or close from system
 
 type resource
   relations
@@ -221,6 +234,8 @@ type resource
     define audit: audit_here or audit from system
     define view_source_identifiers_here: [grant#holder]
     define view_source_identifiers: view_source_identifiers_here or view_source_identifiers from system
+    define close_here: [grant#holder]
+    define close: close_here or close from system
 
 type request
   relations
@@ -256,6 +271,8 @@ type request
     define audit_task: audit from related_org or audit_direct from site or audit from resource or audit from system
     define view_source_identifiers: view_source_identifiers from related_org or view_source_identifiers_req from site or view_source_identifiers from resource or view_source_identifiers from system
     define view_source_identifiers_task: view_source_identifiers from related_org or view_source_identifiers_direct from site or view_source_identifiers from resource or view_source_identifiers from system
+    define close: close from related_org or close_req from site or close from resource or close from system
+    define close_task: close from related_org or close_direct from site or close from resource or close from system
     define view_full: creator or view
     define view_any: view_full or view_summary
     define info_view: info_member from info_org

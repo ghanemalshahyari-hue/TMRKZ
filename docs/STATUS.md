@@ -66,19 +66,28 @@ Date: 29 October 2026 · Version 1.0.0
     connected.
   - Step 7 open — isolated bundle with UI and load acceptance. See the PA matrix in `TRACEABILITY.md`.
 
-- **Owner continuation prompt (`docs/OWNER_CONTINUATION_PROMPT.md`) — in progress, 29 Oct 2026 (ADR-021):**
-  - §3 on-site menu — implemented and running at port 8088 (acceptance stack): marker/boundary click, keyboard, phone
-    bottom sheet, tree and list «طلب» buttons, server-decided actions (`GET /sites/{id}/request-actions`), explicit type
-    and resource handoff to the drawer. Backend MAP-19 passes. **Browser acceptance not yet green:** the last
-    `map-workspace.mjs` run (189 s) passed 17 and failed 5 — MAP-11 (panel action button not found after the drawer is
-    minimised), MAP-12a and MAP-12b (follow-on), MAP-17 (phone run: tree search result not visible after the new
-    bottom-sheet step), MAP-19 (menu did not reopen at a later step). Evidence and `fail-*.png` in `docs/evidence/map/`.
-    A harness defect was fixed on the way: the suite's date windows recycled every 200 minutes and one run aborted in
-    setup with a 409 on a day an earlier run had booked; it now asks the server for a free window.
-  - §6 unit symbols — backend, V12 migration, policy setting and API done; `AdministrationAcceptanceIT.unitSymbols` and the
-    HR-survival check in `HrSyncAcceptanceIT.identityAndLocalAdditions` pass; frontend store/renderer
-    (`lib/unitSymbols.ts`) started; tree/detail/summary components, legend, assignment UI and settings field not done.
-  - §5, §7–§15 of the prompt not started in this session.
+- **Owner continuation prompt and owner brief of 30 Oct 2026 (ADR-021, ADR-022):**
+  - On-site menu (prompt §3) — done: marker/boundary click, Enter/Space, phone bottom sheet, tree and list «طلب»
+    buttons, server-decided actions (`GET /sites/{id}/request-actions`), explicit type and resource handoff, nothing
+    written by selecting. Browser MAP-19 passes alone and passed in one full run; in the last full run (30 Oct,
+    81 s, 21/22) it failed once at «Enter on the refocused marker after Escape» — an intermittent failure inside the
+    full suite whose cause is not yet found (a marker-focus fix on redraw is in place). Recorded, not rerun to green.
+  - Map workspace layout (brief §2) — done: the request is docked in the map's left column (no floating form over the
+    map), bottom drawer on phones, collapsible directory, draft kept across navigation as a minimised bar.
+  - Review and decision workflow (brief §5) — done: referral for study (`REFER`), return for correction and final
+    rejection with mandatory reasons, «what changed» between submissions, recorded communication of decisions
+    (append-only), administrative completion with a statement under the separate `CLOSE` right, plain-language states.
+  - Unit symbols (prompt §6, map brief §10) — done: V12 catalog and assignments as HR-safe local metadata, approved
+    standard as a policy setting, CONFIGURE-only checked assignments, symbols in directory rows, organisation details
+    and request summaries, Arabic legend, fallback mark «لم يحدد رمز الوحدة»; milsymbol 3.0.4 (MIT) bundled, loaded
+    lazily from the local build.
+  - MOVER administrative integration — contract drafted (`docs/MOVER_ADMIN_INTEGRATION.md`), not implemented.
+  - Unit relocation request (owner request of 30 Oct) — administrative design proposed for decision
+    (`docs/STATIONING_REQUEST_DESIGN_AR.md`), not implemented. Deployment planning, dragging units or formations to
+    positions, tactical graphics and operational movement integration are not built (scope exclusion).
+  - Not started: tiled offline backgrounds (prompt §7), scoped explicit denies and delegations in the studio (§8),
+    governed migration of running requests (§9), the browser PKI journey (§10), Node failure diagnostics (§13), load
+    measurement (§14), release bundle and restore (§15).
 
 Test evidence: backend acceptance tests on PostgreSQL + PostGIS with OpenFGA in the loop (including the map criteria,
 a 10,000-site measurement and the authorisation suite), 21 browser checks for MAP-01 … MAP-18 and 6 for the permissions
@@ -100,6 +109,7 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
 | Malware scanning | Built-in checks (type sniffing, EICAR, macros, active PDF content); no AV engine. | Connect an internal scanner (e.g. ClamAV) behind `ContentInspector`. |
 | Notifications | In-app only. | Correspondence connector after D-04. |
 | SLA timers | Overdue review tasks are detected every minute and notified; no automatic escalation/reassignment. | Add escalation rules to the workflow definition. |
+| Request closing | Closing needs the `CLOSE` right (facilities review role by default) and a completion statement; evidence is a reference text, not an uploaded file. | Add evidence attachments to the completion if the owner asks. |
 | Org tree UI | The map and the permissions studio use lazily loaded organisation and site trees with search (ADR-017/018). The organisation page and the request form's organisation list still load the whole visible tree (7,000 nodes ≈ 1.5 MB, ~0.1 s). | Move those two screens to the lazy endpoints. |
 | High availability | Single instance per service in compose; no HA or failover tested. | Out of scope until D-03/D-05 targets are set. |
 

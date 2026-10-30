@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ApiError, api, newIdempotencyKey } from '../api/client';
 import type {
   Attachment,
@@ -83,6 +84,16 @@ export function RequestWizard({
   const [expanded, setExpanded] = useState(false);
   const [pending, setPending] = useState<WizardRequest | null>(null);
   const [showOthers, setShowOthers] = useState(false);
+  const narrow = useNarrow();
+  // beside the map the request is a panel in the map's left column (never a form floating over the map); on a phone,
+  // or away from the map, it is the bottom drawer
+  const docked = request?.layout === 'drawer' && !!app.requestSlot && !narrow;
+  const hadSlot = useRef(false);
+  useEffect(() => {
+    // leaving the map (e.g. for the request register) keeps the draft as a minimised bar
+    if (hadSlot.current && !app.requestSlot && request?.layout === 'drawer') setMinimized(true);
+    hadSlot.current = !!app.requestSlot;
+  }, [app.requestSlot, request?.layout]);
 
   const facilities = useMemo(() => facilitySites(sites), [sites]);
   const resourceOptions = useMemo(
@@ -192,7 +203,7 @@ export function RequestWizard({
       status: d.status,
       revision: d.revision,
       origin: d.origin,
-      siteId: null,
+      siteId: d.resources[0]?.siteId ?? null,
       typeCode: d.type.code,
       ownerOrgId: d.ownerOrg?.id ?? '',
       participantOrgIds: (d.participantOrgs ?? []).map((o) => o.id),
@@ -794,10 +805,11 @@ export function RequestWizard({
     </div>
   );
 
-  const drawer = request.layout === 'drawer' && !expanded;
+  const drawer = request.layout === 'drawer' && (docked || !expanded);
+  const place = (node: ReactNode) => (docked ? createPortal(node, app.requestSlot!) : node);
   if (drawer && minimized)
-    return (
-      <div className="request-drawer minimized" role="region" aria-label="طلب قيد الإعداد">
+    return place(
+      <div className={'request-drawer minimized' + (docked ? ' docked' : '')} role="region" aria-label="طلب قيد الإعداد">
         <span>
           <b>طلب قيد الإعداد</b>
           <small>
@@ -807,7 +819,7 @@ export function RequestWizard({
         <button className="button compact primary" onClick={() => setMinimized(false)}>
           متابعة الطلب
         </button>
-      </div>
+      </div>,
     );
 
   const body = (
@@ -821,12 +833,14 @@ export function RequestWizard({
         <span className="drawer-buttons">
           {request.layout === 'drawer' && (
             <>
-              <button className="button compact ghost" onClick={() => (setExpanded((v) => !v), setMinimized(false))}>
-                {expanded ? 'عرض بجوار الخريطة' : 'توسيع النموذج'}
-              </button>
-              {!expanded && (
+              {!docked && (
+                <button className="button compact ghost" onClick={() => (setExpanded((v) => !v), setMinimized(false))}>
+                  {expanded ? 'عرض بجوار الخريطة' : 'توسيع النموذج'}
+                </button>
+              )}
+              {(docked || !expanded) && (
                 <button className="button compact ghost" onClick={() => setMinimized(true)}>
-                  تصغير والعودة للخريطة
+                  {docked ? 'تصغير وعرض تفاصيل الموقع' : 'تصغير والعودة للخريطة'}
                 </button>
               )}
             </>
@@ -884,16 +898,34 @@ export function RequestWizard({
     </>
   );
   if (drawer)
-    return (
-      <aside className="request-drawer" role="dialog" aria-modal="false" aria-label="طلب إداري من الخريطة">
+    return place(
+      <aside
+        className={'request-drawer' + (docked ? ' docked' : '')}
+        role={docked ? 'region' : 'dialog'}
+        aria-modal={docked ? undefined : false}
+        aria-label={'طلب إداري' + (focusSite ? ' — ' + focusSite.name : '')}
+      >
         {body}
-      </aside>
+      </aside>,
     );
   return (
     <Dialog open onClose={onClose} className="large-dialog">
       {body}
     </Dialog>
   );
+}
+
+function useNarrow(): boolean {
+  const q = '(max-width: 820px)';
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia?.(q);
+    if (!m) return;
+    const on = () => setNarrow(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return narrow;
 }
 
 /** Pre-fills autofill fields once when they are still empty. */

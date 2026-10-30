@@ -78,7 +78,7 @@ public class ReportService {
                        percentile_cont(0.95) within group (order by h) as p95
                 from (select extract(epoch from d.decided_at - t.created_at) / 3600.0 as h
                       from decision d join task_assignment t on t.id = d.task_id join request r on r.id = d.request_id
-                      where d.decision in ('APPROVE', 'RETURN', 'REJECT') and d.decided_at >= :a and d.decided_at < :b
+                      where d.decision in ('APPROVE', 'REFER', 'RETURN', 'REJECT') and d.decided_at >= :a and d.decided_at < :b
                         and""" + " " + scope + ") x").params(params).query().singleRow();
         Map<String, Object> rt = new LinkedHashMap<>();
         rt.put("count", ((Number) review.get("n")).longValue());
@@ -88,7 +88,7 @@ public class ReportService {
         rt.put("byStage", jdbc.sql("""
                 select d.stage_name, count(*) as n, avg(extract(epoch from d.decided_at - t.created_at) / 3600.0) as h
                 from decision d join task_assignment t on t.id = d.task_id join request r on r.id = d.request_id
-                where d.decision in ('APPROVE', 'RETURN', 'REJECT') and d.decided_at >= :a and d.decided_at < :b and""" + " " + scope + " group by d.stage_name order by d.stage_name").params(params)
+                where d.decision in ('APPROVE', 'REFER', 'RETURN', 'REJECT') and d.decided_at >= :a and d.decided_at < :b and""" + " " + scope + " group by d.stage_name order by d.stage_name").params(params)
                 .query((rs, n) -> Map.of("stageName", rs.getString("stage_name"), "count", rs.getLong("n"),
                         "avgHours", round(rs.getObject("h")))).list());
         out.put("reviewTime", rt);
