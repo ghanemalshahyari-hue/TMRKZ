@@ -90,7 +90,8 @@ public class Bootstrap implements ApplicationRunner {
                 {"EXTENSION", "تمديد", "EXTENSION", false, 3},
                 {"MODIFICATION", "تعديل", "MODIFICATION", false, 4},
                 {"CANCELLATION", "إلغاء", "CANCELLATION", false, 5},
-                {"EVACUATION", "إخلاء", "EVACUATION", false, 6}};
+                {"EVACUATION", "إخلاء", "EVACUATION", false, 6},
+                {"ORG_RELOCATION", "نقل مقر جهة", "RELOCATION", false, 7}};
         for (Object[] t : types) {
             int inserted = jdbc.sql("""
                     insert into request_type(code, name, kind, multi_sites, multi_orgs, sort_order)
@@ -142,7 +143,12 @@ public class Bootstrap implements ApplicationRunner {
     }
 
     public static Map<String, Object> defaultWorkflow(String kind) {
-        List<Map<String, Object>> stages = List.of(
+        // relocation: the requesting organisation's manager endorses, the facilities reviewers check completeness and
+        // refer for study, the approver decides; the requester then records the move (ADR-023)
+        List<Map<String, Object>> stages = "RELOCATION".equals(kind) ? List.of(
+                stage("org_approval", "موافقة الجهة الطالبة", "ORG_MANAGER", "REQUEST_ORG", 2, false),
+                stage("facilities_review", "دراسة الاكتمال", "FACILITIES_REVIEWER", "RESOURCE_ORG", 2, false),
+                stage("final_approval", "الدراسة والقرار", "APPROVER", "ANY", 2, true)) : List.of(
                 stage("facilities_review", "دراسة المرفق", "FACILITIES_REVIEWER", "RESOURCE_ORG", 2, false),
                 stage("org_approval", "موافقة الجهة", "ORG_MANAGER", "REQUEST_ORG", 2, false),
                 stage("final_approval", "الاعتماد النهائي", "APPROVER", "ANY", 1, true));
@@ -151,6 +157,7 @@ public class Bootstrap implements ApplicationRunner {
                     exec("handover", "تسليم المرفق", "FACILITIES_REVIEWER", "RESOURCE_ORG", 1, true),
                     exec("receipt", "استلام المرفق", "REQUESTER", "REQUEST_ORG", 1, false));
             case "EVACUATION" -> List.of(exec("handover", "تسليم المرفق وإثبات الإخلاء", "FACILITIES_REVIEWER", "RESOURCE_ORG", 1, true));
+            case "RELOCATION" -> List.of(exec("relocated", "تنفيذ النقل وفق القرار", "REQUESTER", "REQUEST_ORG", 7, true));
             default -> List.of();
         };
         Map<String, Object> def = new LinkedHashMap<>();

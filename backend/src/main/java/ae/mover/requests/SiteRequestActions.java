@@ -24,6 +24,7 @@ public class SiteRequestActions {
 
     public static final String TEMPORARY = "TEMPORARY";
     public static final String OPEN_ENDED = "OPEN_ENDED";
+    public static final String RELOCATE = "RELOCATE";
 
     private final SiteService sites;
     private final RequestTypes types;
@@ -58,7 +59,14 @@ public class SiteRequestActions {
 
         List<ActionType> temporary = new ArrayList<>();
         List<ActionType> open = new ArrayList<>();
+        List<ActionType> relocate = new ArrayList<>();
         for (RequestTypes.Type t : types.all()) {
+            if ("RELOCATION".equals(t.kind())) {
+                boolean ready = workflows.latestPublished(t.code()) != null;
+                relocate.add(new ActionType(t.code(), t.name(), false, ready,
+                        ready ? null : "لم يُنشر تدفق اعتماد لهذا النوع بعد؛ ينشره مسؤول الإعداد من استوديو التدفقات."));
+                continue;
+            }
             if (t.requiresTarget()) {
                 continue;
             }
@@ -78,7 +86,11 @@ public class SiteRequestActions {
         if (!open.isEmpty()) {
             actions.add(action(OPEN_ENDED, "طلب استخدام مفتوح المدة", blocked, open));
         }
-        return new View(s.id(), s.name(), s.view(), s.resources().size(), canCreate, actions);
+        // moving an organisation's premises away from this site, to a location proposed on the map
+        if (!relocate.isEmpty()) {
+            actions.add(action(RELOCATE, "نقل المقر", blocked, relocate));
+        }
+                return new View(s.id(), s.name(), s.view(), s.resources().size(), canCreate, actions);
     }
 
     private static Action action(String code, String label, String blocked, List<ActionType> list) {

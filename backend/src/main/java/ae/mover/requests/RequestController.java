@@ -48,12 +48,14 @@ public class RequestController {
     private final SiteRequestActions siteActions;
     private final CommunicationService communications;
     private final RevisionChanges changes;
+    private final RelocationService relocations;
 
     public RequestController(AccessService access, RequestTypes types, RequestService requests, RequestViews views,
                              DecisionService decisions, ExecutionService execution, AttachmentService attachments,
                              ae.mover.signing.SigningJobs signingJobs, SiteRequestActions siteActions,
-                             CommunicationService communications, RevisionChanges changes) {
+                             CommunicationService communications, RevisionChanges changes, RelocationService relocations) {
         this.access = access;
+        this.relocations = relocations;
         this.changes = changes;
         this.communications = communications;
         this.siteActions = siteActions;
@@ -117,6 +119,17 @@ public class RequestController {
     public RequestViews.RequestDetail submit(Actor actor, @PathVariable UUID id, @RequestBody SubmitInput in,
                                              @RequestHeader(value = "Idempotency-Key", required = false) String key) {
         return requests.submit(access.context(actor), id, in, key);
+    }
+
+    /** The relocation proposal of a request (organisation, current site, proposed location). */
+    @GetMapping("/requests/{id}/relocation")
+    public RelocationService.View relocation(Actor actor, @PathVariable UUID id) {
+        return relocations.get(access.context(actor), id);
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/requests/{id}/relocation")
+    public RelocationService.View saveRelocation(Actor actor, @PathVariable UUID id, @RequestBody RelocationService.Input in) {
+        return relocations.save(access.context(actor), id, in);
     }
 
     /** What changed between a submitted revision and the one before it (default: the latest). */

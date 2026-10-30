@@ -68,12 +68,14 @@ public class RequestService {
     private final IdempotencyService idempotency;
     private final RequestViews views;
     private final BoundaryService boundaries;
+    private final RelocationService relocations;
 
     public RequestService(JdbcClient jdbc, Json json, Clock clock, AccessService access, RequestTypes types,
                           FormService forms, WorkflowService workflows, PolicyService policies,
                           ReservationService reservations, RuntimeService runtime, TaskSync taskSync,
                           AuditService audit, OutboxService outbox, IdempotencyService idempotency, RequestViews views,
-                          BoundaryService boundaries) {
+                          BoundaryService boundaries, RelocationService relocations) {
+        this.relocations = relocations;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -402,6 +404,15 @@ public class RequestService {
                     problems.add(new Problem("period", "حدد فترة صحيحة للتعديل."));
                 }
             }
+            case "RELOCATION" -> {
+                if (start == null) {
+                    problems.add(new Problem("period", "حدد التاريخ المطلوب للنقل."));
+                }
+                end = null;
+                if (relocations.find(id) == null) {
+                    problems.add(new Problem("relocation", "ارسم الموقع المقترح وحدد الجهة المنقولة."));
+                }
+            }
             default -> { // CANCELLATION, EVACUATION: start = effective date
                 if (start == null) {
                     problems.add(new Problem("period", "حدد تاريخ السريان."));
@@ -456,6 +467,9 @@ public class RequestService {
         data.put("infoOrgIds", d.infoOrgIds().stream().map(UUID::toString).toList());
         data.put("targetReservationId", targetId == null ? null : targetId.toString());
         data.put("values", cleanValues);
+        if ("RELOCATION".equals(type.kind())) {
+            data.put("relocation", relocations.snapshot(id));
+        }
         data.put("attachments", jdbc.sql("""
                 select id, field_id, file_name, sha256 from attachment where request_id = :r and scan_status = 'CLEAN'
                   and superseded_by is null order by field_id, version""").param("r", id)

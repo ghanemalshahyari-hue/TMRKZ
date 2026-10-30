@@ -466,4 +466,71 @@ class ReservationAcceptanceIT extends IntegrationTest {
         closed.body().path("history").forEach(h -> history.add(h.path("event").asText()));
         assertThat(history).contains("إحالة للدراسة", "تسجيل إبلاغ القرار", "الإنجاز الإداري وإغلاق الطلب");
     }
+
+    @Test
+    @DisplayName("Relocation request (ADR-023): proposal drawn on the map, snapshot per revision, approval books nothing, closing records the move")
+    void relocationRequest() {
+        String type = requestType("RELOCATION", finalOnly(), null);
+        Api req = login("req");
+        int sites = jdbc.sql("select count(*) from site").query(Integer.class).single();
+        // the site menu offers the relocation from a visible site
+        JsonNode actions = req.get("/sites/" + siteA + "/request-actions").body();
+        boolean offered = false;
+        for (JsonNode a : actions.path("actions")) {
+            if (a.path("action").asText().equals("RELOCATE")) {
+                for (JsonNode t : a.path("types")) {
+                    offered |= t.path("code").asText().equals(type);
+                }
+            }
+        }
+        assertThat(offered).isTrue();
+
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("typeCode", type);
+        body.put("origin", "MAP");
+        body.put("ownerOrgId", orgA.toString());
+        body.put("resourceIds", List.of(res1.toString()));
+        body.put("subject", "نقل مقر الجهة أ");
+        body.put("period", Map.of("start", day("2028-02-01")));
+        body.put("values", Map.of("reason", "انتهاء عقد المبنى الحالي ونقل المقر"));
+        Res created = req.post("/requests", body);
+        assertThat(created.status()).as(created.toString()).isEqualTo(200);
+        UUID id = UUID.fromString(created.body().path("id").asText());
+
+        // submitting without a proposal is refused
+        int v0 = req.get("/requests/" + id).body().path("version").asInt();
+        assertThat(req.post("/requests/" + id + "/submit", Map.of("expectedVersion", v0), UUID.randomUUID().toString()).status())
+                .isEqualTo(400);
+        Map<String, Object> square = Map.of("type", "Polygon", "coordinates",
+                List.of(List.of(List.of(55.30, 25.20), List.of(55.302, 25.20), List.of(55.302, 25.202), List.of(55.30, 25.202), List.of(55.30, 25.20))));
+        Map<String, Object> bow = Map.of("type", "Polygon", "coordinates",
+                List.of(List.of(List.of(55.30, 25.20), List.of(55.302, 25.202), List.of(55.302, 25.20), List.of(55.30, 25.202), List.of(55.30, 25.20))));
+        Map<String, Object> proposal = new java.util.LinkedHashMap<>();
+        proposal.put("organizationId", orgA.toString());
+        proposal.put("includeDescendants", true);
+        proposal.put("fromSiteId", siteA.toString());
+        proposal.put("proposedName", "المقر الجديد المقترح");
+        proposal.put("geometry", bow);
+        assertThat(req.put("/requests/" + id + "/relocation", proposal).status()).isEqualTo(400);
+        proposal.put("geometry", square);
+        Res saved = req.put("/requests/" + id + "/relocation", proposal);
+        assertThat(saved.status()).as(saved.toString()).isEqualTo(200);
+        assertThat(saved.body().path("areaM2").asDouble()).isGreaterThan(40000);
+        assertThat(login("reqb").put("/requests/" + id + "/relocation", proposal).status()).isEqualTo(404);
+        assertThat(req.submit(id).status()).isEqualTo(200);
+        assertThat(jdbc.sql("select data->'relocation'->>'proposedName' from request_revision where request_id = :id and revision = 1")
+                .param("id", id).query(String.class).single()).isEqualTo("المقر الجديد المقترح");
+
+        Api apr = login("apr");
+        assertThat(apr.approve(apr.taskFor(id), 1).status()).isEqualTo(200);
+        JsonNode d = req.get("/requests/" + id).body();
+        assertThat(d.path("status").asText()).isEqualTo("APPROVED");
+        assertThat(d.path("reservations").size()).isZero();
+        Res closed = login("fac").post("/requests/" + id + "/close", Map.of("statement", "انتقلت الجهة إلى المقر الجديد وفق القرار"),
+                UUID.randomUUID().toString());
+        assertThat(closed.body().path("status").asText()).isEqualTo("CLOSED");
+        assertThat(req.get("/requests/" + id + "/relocation").body().path("completedAt").asText()).isNotBlank();
+        // the proposal never rewrote the site register
+        assertThat(jdbc.sql("select count(*) from site").query(Integer.class).single()).isEqualTo(sites);
+    }
 }

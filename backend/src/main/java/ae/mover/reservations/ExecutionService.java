@@ -40,9 +40,12 @@ public class ExecutionService {
     private final IdempotencyService idempotency;
     private final RequestViews views;
     private final ae.mover.common.Json json;
+    private final ae.mover.requests.RelocationService relocations;
 
     public ExecutionService(JdbcClient jdbc, Clock clock, AccessService access, ReservationService reservations,
-                            AuditService audit, IdempotencyService idempotency, RequestViews views, ae.mover.common.Json json) {
+                            AuditService audit, IdempotencyService idempotency, RequestViews views, ae.mover.common.Json json,
+                            ae.mover.requests.RelocationService relocations) {
+        this.relocations = relocations;
         this.json = json;
         this.jdbc = jdbc;
         this.clock = clock;
@@ -190,6 +193,8 @@ public class ExecutionService {
                        completion_statement = :st, completion_reference = :ref, completed_by = :by where id = :id""")
                 .param("now", Db.ts(now)).param("st", statement).param("ref", reference).param("by", ctx.personId())
                 .param("id", requestId).update();
+        // an approved relocation is recorded as carried out; the site register stays for facilities administration
+        relocations.complete(requestId);
         Map<String, Object> detail = new java.util.LinkedHashMap<>();
         detail.put("note", "إغلاق المعاملة لا يغيّر فترة الحجز");
         detail.put("statement", statement);

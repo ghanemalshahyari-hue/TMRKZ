@@ -647,9 +647,10 @@ class MapWorkspaceAcceptanceIT extends IntegrationTest {
             assertThat(typesOf(temporary).get(unpublished).path("reason").asText()).contains("تدفق");
             // open-ended use only where the published type permits an open end; change requests never appear here
             assertThat(typesOf(open)).containsKey(type).doesNotContainKey(closed);
+            // use actions list new reservations only, the relocation action relocation types only (ADR-023)
             v.path("actions").forEach(a -> a.path("types").forEach(t ->
                     assertThat(jdbc.sql("select kind from request_type where code = :c").param("c", t.path("code").asText())
-                            .query(String.class).single()).isEqualTo("NEW_RESERVATION")));
+                            .query(String.class).single()).isEqualTo("RELOCATE".equals(a.path("action").asText()) ? "RELOCATION" : "NEW_RESERVATION")));
 
             // a site without resources explains what is missing instead of offering a request
             JsonNode none = req.get("/sites/" + empty + "/request-actions").body();

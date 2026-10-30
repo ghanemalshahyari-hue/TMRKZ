@@ -92,6 +92,17 @@ async function openDetails(page, number) {
   return doc;
 }
 
+/** Desktop map: the ring around the site first; «طلب استخدام» opens the card with the use types. */
+async function openUse(page) {
+  const ring = page.locator('.site-ring');
+  await page.locator('.site-ring, .site-menu').first().waitFor();
+  if (await ring.isVisible().catch(() => false)) {
+    await page.waitForFunction(() => !document.querySelector('.site-ring .ring-seg.right:disabled'));
+    await ring.getByRole('button', { name: /طلب استخدام/ }).click();
+  }
+  await page.locator('.site-menu').waitFor();
+}
+
 let id = null;
 let number = null;
 const R = await persona('t.requester');
@@ -107,8 +118,8 @@ await step('J1', 'اختيار المرفق على الخريطة وفتح ال�
   await R.locator('.map-detail h2').filter({ hasText: SITE.name }).waitFor();
   await R.waitForTimeout(800);
   await R.locator(`.pin-wrap[data-site="${SITE.id}"]`).click();
+  await openUse(R);
   const menu = R.locator('.site-menu');
-  await menu.waitFor();
   await R.waitForFunction(() => document.querySelector('.site-menu .site-actions:not([aria-busy])'));
   await shot(R, 'j1-facility-workspace');
   await menu.getByRole('button', { name: 'طلب استخدام مؤقت', exact: true }).click();
@@ -273,8 +284,8 @@ await step('J10', 'المسودة تبقى عند التنقل إلى سجل ا�
   await R.locator(`.pin-wrap[data-site="${SITE.id}"]`).waitFor();
   await R.waitForTimeout(600);
   await R.locator(`.pin-wrap[data-site="${SITE.id}"]`).click();
+  await openUse(R);
   const menu = R.locator('.site-menu');
-  await menu.waitFor();
   await R.waitForFunction(() => document.querySelector('.site-menu .site-actions:not([aria-busy])'));
   await menu.getByRole('button', { name: 'طلب استخدام مؤقت', exact: true }).click();
   const types = menu.locator('.site-actions.types');
@@ -289,6 +300,41 @@ await step('J10', 'المسودة تبقى عند التنقل إلى سجل ا�
   await R.getByRole('button', { name: 'إغلاق الطلب دون حفظ' }).click();
   check((await total()) === before, 'closing without saving created a request');
   return 'المسودة مصغرة في سجل الطلبات ومحفوظة عند العودة · لا طلب بلا حفظ';
+});
+
+await step('J12', 'نقل المقر: خياران حول الموقع، رسم الموقع الجديد على الخريطة، إرسال الطلب دون تغيير سجل المواقع', R, async () => {
+  const sitesBefore = (await requesterApi.get('/sites')).body.length;
+  await R.goto(BASE + '/#map');
+  const pin = R.locator(`.pin-wrap[data-site="${SITE.id}"]`);
+  await pin.waitFor();
+  await R.waitForTimeout(600);
+  await pin.click();
+  const ring = R.locator('.site-ring');
+  await ring.waitFor();
+  await R.waitForFunction(() => !document.querySelector('.site-ring .ring-seg.left:disabled'));
+  await shot(R, 'j12-ring');
+  await ring.getByRole('button', { name: /نقل المقر/ }).click();
+  const panel = R.locator('.relocation-panel');
+  await panel.waitFor();
+  await panel.getByPlaceholder('مثال: المبنى الإداري الجديد').fill('المقر الجديد — رحلة القبول');
+  await panel.getByPlaceholder('لماذا تنتقل الجهة؟').fill('انتهاء عقد المبنى الحالي والحاجة إلى مساحة أكبر');
+  await panel.getByRole('button', { name: /ارسم الموقع الجديد/ }).click();
+  await R.waitForTimeout(400);
+  const m = await R.locator('.map').boundingBox();
+  const x0 = m.x + m.width * 0.66, y0 = m.y + m.height * 0.3;
+  await R.mouse.click(x0, y0);
+  await R.mouse.move(x0 + 110, y0 + 70, { steps: 8 });
+  await R.mouse.click(x0 + 110, y0 + 70);
+  await panel.getByText('الموقع المقترح مرسوم').waitFor();
+  await shot(R, 'j12-relocation-proposal');
+  await panel.getByRole('button', { name: 'إرسال طلب النقل' }).click();
+  await R.locator('#toast').filter({ hasText: 'طلب نقل المقر' }).waitFor({ timeout: 15000 });
+  const sent = (await requesterApi.get('/requests?size=50')).body.items.find((x) => x.type.code === 'ORG_RELOCATION' && x.status === 'SUBMITTED');
+  check(sent, 'relocation request not submitted');
+  const rel = (await requesterApi.get('/requests/' + sent.id + '/relocation')).body;
+  check(rel.proposedName === 'المقر الجديد — رحلة القبول' && rel.geometry.type === 'Polygon' && rel.fromSite.id === SITE.id, 'proposal not stored');
+  check((await requesterApi.get('/sites')).body.length === sitesBefore, 'the proposal changed the site register');
+  return sent.number + ' · مستطيل ' + Math.round(rel.areaM2) + ' م² · سجل المواقع دون تغيير';
 });
 
 await step('J11', 'الهاتف: لمسة على المرفق تفتح ورقة سفلية بالإجراءين داخل الشاشة', null, async () => {

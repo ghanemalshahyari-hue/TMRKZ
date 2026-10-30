@@ -27,8 +27,9 @@ public class RequestTypes {
     }
 
     public record Type(String code, String name, String kind, boolean multiSites, boolean multiOrgs, boolean openEndAllowed) {
+        /** Change requests act on an existing reservation; new reservations and relocations do not. */
         public boolean requiresTarget() {
-            return !"NEW_RESERVATION".equals(kind);
+            return !"NEW_RESERVATION".equals(kind) && !"RELOCATION".equals(kind);
         }
     }
 

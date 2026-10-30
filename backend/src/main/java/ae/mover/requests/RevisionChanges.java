@@ -70,6 +70,15 @@ public class RevisionChanges {
         diff(out, "participantOrgIds", "الجهات المشاركة", names(b.path("participantOrgIds"), "organization"),
                 names(a.path("participantOrgIds"), "organization"));
         diff(out, "infoOrgIds", "جهات للعلم", names(b.path("infoOrgIds"), "organization"), names(a.path("infoOrgIds"), "organization"));
+        JsonNode ra = a.path("relocation");
+        JsonNode rb = b.path("relocation");
+        if (!ra.isMissingNode() || !rb.isMissingNode()) {
+            diff(out, "relocation.organizationId", "الجهة المنقولة", names(arr(rb.path("organizationId")), "organization"),
+                    names(arr(ra.path("organizationId")), "organization"));
+            diff(out, "relocation.includeDescendants", "تشمل الفروع", text(rb.path("includeDescendants")), text(ra.path("includeDescendants")));
+            diff(out, "relocation.proposedName", "اسم الموقع المقترح", text(rb.path("proposedName")), text(ra.path("proposedName")));
+            diff(out, "relocation.geometry", "حدود الموقع المقترح", shape(rb), shape(ra));
+        }
         java.util.Set<String> keys = new java.util.LinkedHashSet<>();
         a.path("values").fieldNames().forEachRemaining(keys::add);
         b.path("values").fieldNames().forEachRemaining(keys::add);
@@ -98,6 +107,24 @@ public class RevisionChanges {
             return null;
         }
         return n.isValueNode() ? n.asText() : n.toString();
+    }
+
+    private static JsonNode arr(JsonNode one) {
+        com.fasterxml.jackson.databind.node.ArrayNode n = com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.arrayNode();
+        if (one != null && one.isTextual()) {
+            n.add(one.asText());
+        }
+        return n;
+    }
+
+    /** A drawn proposal compared by its shape (a different drawing shows as changed, with its area). */
+    private static String shape(JsonNode relocation) {
+        JsonNode g = relocation.path("geometry");
+        if (g.isMissingNode() || g.isNull()) {
+            return null;
+        }
+        String area = relocation.path("areaM2").isNumber() ? " · " + relocation.path("areaM2").asLong() + " م²" : "";
+        return g.path("type").asText() + area + " · " + Integer.toHexString(g.toString().hashCode());
     }
 
     private static String orOpen(JsonNode n) {

@@ -126,6 +126,23 @@
 .vertex-actions{display:flex;gap:4px}
 .vertex-actions .icon-button{width:30px;height:30px}
 
+/* two-option ring around the selected site (desktop map): use on the right, moving the premises on the left */
+.site-ring{position:fixed;z-index:1050;width:200px;height:200px;pointer-events:none;outline:none}
+.site-ring .ring-seg{pointer-events:auto;position:absolute;top:0;width:98px;height:200px;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:12px;font-weight:600;line-height:1.25;cursor:pointer;box-shadow:0 10px 28px #19363838;transition:filter .12s}
+.site-ring .ring-seg>span{font-size:16px}
+.site-ring .ring-seg.right{right:0;border-radius:0 100px 100px 0;background:var(--accent);color:#fff;padding-left:34px;-webkit-mask:radial-gradient(circle at 0 50%,transparent 36px,#000 37px);mask:radial-gradient(circle at 0 50%,transparent 36px,#000 37px)}
+.site-ring .ring-seg.left{left:0;border-radius:100px 0 0 100px;background:#fff;color:var(--accent);padding-right:34px;-webkit-mask:radial-gradient(circle at 100% 50%,transparent 36px,#000 37px);mask:radial-gradient(circle at 100% 50%,transparent 36px,#000 37px)}
+.site-ring .ring-seg:hover:not(:disabled),.site-ring .ring-seg:focus-visible{filter:brightness(1.08);outline:3px solid #54ae9688;outline-offset:2px}
+.site-ring .ring-seg:disabled{cursor:not-allowed;opacity:.55}
+.site-ring .ring-hole{position:absolute;left:50%;top:50%;width:76px;height:76px;transform:translate(-50%,-50%);border-radius:50%;pointer-events:auto}
+.site-ring-title{position:absolute;bottom:100%;left:50%;transform:translate(-50%,-6px);background:#fff;border:1px solid #d3e1da;border-radius:99px;padding:4px 12px;font-size:12px;white-space:nowrap;box-shadow:0 6px 18px #19363822;pointer-events:auto}
+.site-ring-title small{font-size:10px;color:var(--muted)}
+.site-ring .ring-close{position:absolute;top:100%;left:50%;transform:translate(-50%,6px);width:30px;height:30px;pointer-events:auto;box-shadow:0 6px 18px #19363822}
+.site-ring .ring-note{position:absolute;top:100%;left:50%;transform:translate(-50%,42px);width:240px;text-align:center;font-size:10px;color:#5f7572;background:#ffffffee;border-radius:8px;padding:4px 8px;pointer-events:auto}
+/* the relocation proposal: dashed outline, explanatory arrow and its name (display only) */
+.relocation-tag span{display:inline-block;transform:translate(-50%,-50%);background:#fff;border:1px dashed var(--accent);color:var(--accent);border-radius:6px;padding:2px 8px;font-size:11px;white-space:nowrap}
+.relocation-panel .segmented{margin:4px 0}
+
 /* request drawer: docked in the map's left column; a bottom drawer on phones or away from the map */
 .request-drawer{position:fixed;z-index:1100;top:64px;bottom:12px;left:12px;width:min(470px,calc(100vw - 24px));background:var(--paper);border:1px solid #dae4d4;border-radius:15px;box-shadow:0 26px 80px #001b2338;overflow:auto;display:flex;flex-direction:column}
 .request-drawer .dialog-head{padding:14px 16px;position:sticky;top:0;background:#fffffff5;z-index:6}

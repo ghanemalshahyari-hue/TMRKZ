@@ -2,17 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import L from '../../lib/leaflet';
 import { api, type ApiError } from '../../api/client';
 import type { GeoJsonGeometry, GeometryCheck, SiteDetail } from '../../api/types';
+import { loadGeoman } from '../../lib/geoman';
 import { formatArea } from '../../lib/mapState';
 
 type Ring = [number, number][]; // [lng, lat] (GeoJSON order)
 type Shape = { type: 'Polygon'; coordinates: Ring[] } | { type: 'MultiPolygon'; coordinates: Ring[][] };
 
-let geoman: Promise<unknown> | null = null;
 /** Leaflet-Geoman Free (MIT), loaded on first use. Only free features are used: draw polygon, edit vertices. */
-function loadGeoman() {
-  if (!geoman) geoman = Promise.all([import('@geoman-io/leaflet-geoman-free'), import('@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css')]);
-  return geoman;
-}
 
 function polygons(s: Shape | null): Ring[][] {
   if (!s) return [];

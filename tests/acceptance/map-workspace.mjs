@@ -606,13 +606,27 @@ await step('MAP-19', 'نقر الموقع على الخريطة يفتح قائ�
   await pageB.getByRole('button', { name: 'إغلاق التفاصيل' }).click();
   const pin = pageB.locator(`.pin-wrap[data-site="${S.id}"]`);
   const menu = pageB.locator('.site-menu');
-  const menuOpen = (label) => menu.waitFor({ timeout: 8000 }).catch(() => { throw new Error('menu not shown after ' + label); });
+  const ring = pageB.locator('.site-ring');
+  const anyMenu = pageB.locator('.site-menu, .site-ring');
+  const menuOpen = (label) => anyMenu.first().waitFor({ timeout: 8000 }).catch(() => { throw new Error('menu not shown after ' + label); });
+  // on the desktop map the two options first appear as a ring around the site; «طلب استخدام» opens the card
+  const useCard = async () => {
+    if (await ring.isVisible().catch(() => false)) {
+      await pageB.waitForFunction(() => !document.querySelector('.site-ring .ring-seg.right:disabled'));
+      await ring.getByRole('button', { name: /طلب استخدام/ }).click();
+    }
+    await menu.waitFor();
+  };
   const mapBox = await pageB.locator('.map').boundingBox();
   const within = (b, box) => b.x >= box.x - 1 && b.y >= box.y - 1 && b.x + b.width <= box.x + box.width + 1 && b.y + b.height <= box.y + box.height + 1;
 
   // 1. one click on the marker: compact menu at the site, two labelled actions from the published types
   await pin.click();
   await menuOpen('marker click');
+  check((await ring.innerText()).includes(S.name), 'ring does not show the site name');
+  check(await ring.getByRole('button', { name: /نقل المقر/ }).isVisible(), 'relocation option missing from the ring');
+  await shot(pageB, 'map-19-site-ring');
+  await useCard();
   check((await menu.innerText()).includes(S.name), 'menu does not show the site name');
   const temp = menu.getByRole('button', { name: 'طلب استخدام مؤقت', exact: true });
   const open = menu.getByRole('button', { name: 'طلب استخدام مفتوح المدة', exact: true });
@@ -644,23 +658,24 @@ await step('MAP-19', 'نقر الموقع على الخريطة يفتح قائ�
 
   // 3. Escape closes and returns focus to the marker; Enter on the marker reopens it with focus on the first action
   await pageB.keyboard.press('Escape');
-  await menu.waitFor({ state: 'detached' });
+  await anyMenu.first().waitFor({ state: 'detached' });
   const focused = await pageB.evaluate(() => document.activeElement?.querySelector('.pin-wrap')?.getAttribute('data-site'));
   check(focused === S.id, 'focus not returned to the marker');
   await pageB.keyboard.press('Enter');
   await menuOpen('Enter on the focused marker');
-  await pageB.waitForFunction(() => document.activeElement?.closest('.site-menu') && document.activeElement.textContent.includes('طلب استخدام مؤقت'), null, { timeout: 5000 });
+  await pageB.waitForFunction(() => document.activeElement?.closest('.site-menu, .site-ring') && document.activeElement.textContent.includes('طلب استخدام'), null, { timeout: 5000 });
 
   // 4. a click on the empty map closes; a click on the registered boundary opens it at that point
   const e2 = await emptyMapPoint(pageB);
   await pageB.mouse.click(e2.x, e2.y);
-  await menu.waitFor({ state: 'detached' });
+  await anyMenu.first().waitFor({ state: 'detached' });
   const bp = await boundaryPoint(pageB, S.id);
   check(bp, 'no clickable point inside the boundary of ' + S.code);
   await pageB.mouse.click(bp.x, bp.y);
   await menuOpen('boundary click');
-  const mb3 = await menu.boundingBox();
-  check(Math.abs(mb3.x + mb3.width / 2 - bp.x) <= mb3.width / 2 + 2, 'boundary menu not anchored at the clicked point');
+  const rb3 = await ring.boundingBox();
+  check(rb3 && Math.abs(rb3.x + rb3.width / 2 - bp.x) <= 40, 'boundary ring not centred at the clicked point');
+  await useCard();
 
   // 5. temporary use: the chosen type and the site go to the drawer; with several resources none is claimed silently
   await requestAction(menu, 'طلب استخدام مؤقت');
@@ -683,6 +698,7 @@ await step('MAP-19', 'نقر الموقع على الخريطة يفتح قائ�
   // 6. open-ended use from the same menu: the drawer opens with an open end
   await pin.click();
   await menuOpen('second marker click');
+  await useCard();
   await pageB.waitForFunction(() => document.querySelector('.site-menu .site-actions:not([aria-busy])'));
   await requestAction(menu, 'طلب استخدام مفتوح المدة');
   await drawer.waitFor();

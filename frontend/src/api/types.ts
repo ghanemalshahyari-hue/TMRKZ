@@ -21,7 +21,7 @@ export type Period = { start: string; end: string | null };
 export type Page<T> = { items: T[]; page: number; size: number; total: number };
 
 export type RequestStatus = 'DRAFT' | 'SUBMITTED' | 'RETURNED' | 'REJECTED' | 'APPROVED' | 'CLOSED';
-export type RequestKind = 'NEW_RESERVATION' | 'EXTENSION' | 'MODIFICATION' | 'CANCELLATION' | 'EVACUATION';
+export type RequestKind = 'NEW_RESERVATION' | 'EXTENSION' | 'MODIFICATION' | 'CANCELLATION' | 'EVACUATION' | 'RELOCATION';
 export type ViewLevel = 'FULL' | 'SUMMARY' | 'CONTEXT';
 /** Site availability for a period: BUSY only when every requested resource is blocked; PARTIAL when some are. */
 export type Availability = 'FREE' | 'PARTIAL' | 'BUSY' | 'NO_RESOURCES';
@@ -240,7 +240,7 @@ export type SiteNode = {
   path?: Ref[];
 };
 /** Administrative use requests a person may start from one site (decided by the server from published types and rights). */
-export type SiteRequestActionCode = 'TEMPORARY' | 'OPEN_ENDED';
+export type SiteRequestActionCode = 'TEMPORARY' | 'OPEN_ENDED' | 'RELOCATE';
 export type SiteRequestActionType = { code: string; name: string; multiSites: boolean; ready: boolean; reason: string | null };
 export type SiteRequestAction = {
   action: SiteRequestActionCode;
@@ -536,6 +536,17 @@ export type Communication = {
   recordedBy: string;
   recordedAt: string;
   note?: string;
+};
+/** The proposal of a relocation request: who moves, from which site, to which location drawn on the map. */
+export type Relocation = {
+  organization: Ref;
+  includeDescendants: boolean;
+  fromSite: Ref;
+  proposedName: string;
+  geometry: GeoJsonGeometry;
+  areaM2?: number;
+  centroid: [number, number];
+  completedAt?: string;
 };
 export type RevisionComparison = {
   fromRevision: number;

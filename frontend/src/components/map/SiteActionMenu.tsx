@@ -195,6 +195,14 @@ export function SiteActionMenu({
   const ref = useRef<HTMLDivElement>(null);
   const narrow = useNarrow();
   const [pos, setPos] = useState<{ x: number; y: number; arrow: number | null; below: boolean } | null>(null);
+  // on the map (not on a phone) the two actions first appear as a ring around the site: use on one side, moving the
+  // premises on the other; «طلب استخدام» then opens the card with the published use types
+  const data = actions?.data ?? null;
+  const relocate = data?.actions.find((a) => a.action === 'RELOCATE') ?? null;
+  const useActions = data?.actions.filter((a) => a.action !== 'RELOCATE') ?? [];
+  const [card, setCard] = useState(false);
+  const ring = anchor.kind === 'map' && !narrow && !card && (!data || (!!relocate && useActions.length > 0));
+  const R = 100;
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
@@ -213,6 +221,13 @@ export function SiteActionMenu({
         const p = map.latLngToContainerPoint(anchor.latlng);
         px = box.left + p.x;
         py = box.top + p.y;
+        if (ring) {
+          // centred on the marker's head (or the clicked boundary point), kept inside the map
+          const cx = clamp(px, box.left + R + 6, box.right - R - 6);
+          const cy = clamp(py - (anchor.offset > 20 ? 13 : 0), box.top + R + 30, box.bottom - R - 30);
+          setPos({ x: cx - R, y: cy - R, arrow: null, below: false });
+          return;
+        }
       } else {
         if (!anchor.el.isConnected) return onCloseRef.current(false);
         const r = anchor.el.getBoundingClientRect();
@@ -246,7 +261,7 @@ export function SiteActionMenu({
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };
-  }, [map, anchor, narrow]);
+  }, [map, anchor, narrow, ring]);
 
   // Escape closes and returns focus; a press outside the menu and the map closes (map clicks are handled by the map)
   useEffect(() => {
@@ -272,7 +287,60 @@ export function SiteActionMenu({
 
   useEffect(() => {
     if (!keyboard) ref.current?.focus({ preventScroll: true });
-  }, [keyboard]);
+    else if (ring) ref.current?.querySelector<HTMLButtonElement>('.ring-seg:not(:disabled)')?.focus({ preventScroll: true });
+  }, [keyboard, ring, data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (ring) {
+    const readyRelocate = relocate?.types.filter((t) => t.ready) ?? [];
+    return createPortal(
+      <div
+        ref={ref}
+        className="site-ring"
+        style={pos ? { left: pos.x, top: pos.y } : { left: -9999, top: -9999 }}
+        role="dialog"
+        aria-modal="false"
+        aria-label={'إجراءات «' + title + '»'}
+        tabIndex={-1}
+      >
+        <span className="site-ring-title">
+          <b>{title}</b>
+          {state && (
+            <small>
+              {' '}
+              · {state.symbol} {state.label}
+            </small>
+          )}
+        </span>
+        <button
+          type="button"
+          className="ring-seg right"
+          disabled={!data || !useActions.some((a) => a.available)}
+          title={useActions.find((a) => a.reason)?.reason ?? undefined}
+          onClick={() => setCard(true)}
+        >
+          <span aria-hidden="true">◷</span>
+          طلب استخدام
+        </button>
+        <button
+          type="button"
+          className="ring-seg left"
+          disabled={!relocate?.available}
+          title={relocate?.reason ?? undefined}
+          onClick={() => (readyRelocate.length === 1 ? onChoose('RELOCATE', readyRelocate[0].code) : setCard(true))}
+        >
+          <span aria-hidden="true">⇄</span>
+          نقل المقر
+        </button>
+        <i className="ring-hole" aria-hidden="true" />
+        <button type="button" className="ring-close icon-button" onClick={() => onClose(true)} aria-label="إغلاق قائمة الموقع">
+          ✕
+        </button>
+        {!data && <span className="ring-note">جارٍ التحقق من الإجراءات…</span>}
+        {data && relocate?.reason && <span className="ring-note">{relocate.reason}</span>}
+      </div>,
+      document.body,
+    );
+  }
 
   const style: CSSProperties | undefined = narrow ? undefined : pos ? { left: pos.x, top: pos.y } : { left: -9999, top: -9999 };
   return createPortal(

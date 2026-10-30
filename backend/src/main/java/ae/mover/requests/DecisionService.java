@@ -523,6 +523,10 @@ public class DecisionService {
                     effects.add(rid.toString());
                 }
             }
+            case "RELOCATION" -> {
+                // administrative decision only: nothing is booked and the site register is not changed; the
+                // requester records the move and the request is closed with a completion statement
+            }
             case "EXTENSION" -> {
                 ReservationService.Reservation r = reservations.lock(targetId);
                 reservations.changePeriod(r, r.start(), end, requestId, "EXTENSION", ctx.personId());

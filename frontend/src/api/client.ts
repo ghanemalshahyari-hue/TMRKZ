@@ -68,6 +68,7 @@ import type {
   Communication,
   CommunicationChannel,
   RevisionComparison,
+  Relocation,
   UnitSymbolLookup,
   UnitSymbol,
   StudioItem,
@@ -336,6 +337,11 @@ export const api = {
     body: { recipientKind: Communication['recipientKind']; recipientOrgId?: string; recipientText?: string; channel: CommunicationChannel; reference?: string; communicatedAt?: string; note?: string },
     key: string,
   ) => post<Communication[]>(`/requests/${id}/communications`, body, key),
+  relocation: (id: string) => get<Relocation | null>(`/requests/${id}/relocation`),
+  saveRelocation: (
+    id: string,
+    body: { organizationId: string; includeDescendants: boolean; fromSiteId: string; proposedName: string; geometry: GeoJsonGeometry },
+  ) => put<Relocation>(`/requests/${id}/relocation`, body),
   changes: (id: string, revision?: number) => get<RevisionComparison>(`/requests/${id}/changes` + query({ revision })),
   uploadAttachment: (id: string, fieldId: string, file: File) => {
     const form = new FormData();

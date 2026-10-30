@@ -149,6 +149,7 @@ in through the directory sign-in page; the API only cross-checks. Evidence: `doc
 | J9 | Out-of-scope requester gets 404 for the request and its communications | `AccessContext`, `CommunicationService` | — | Pass |
 | J10 | Draft kept across navigation to the register; closing without saving writes nothing | docked/minimised wizard | — | Pass |
 | J11 | Phone: tapping a facility opens a bottom sheet with both actions on screen | `SiteActionMenu` sheet | — | Pass |
+| J12 | Ring around the site, «نقل المقر», new location drawn on the map, request submitted, site register unchanged (ADR-023) | `SiteActionMenu` ring, `RelocationPanel`, `RelocationService` | `ReservationAcceptanceIT.relocationRequest` | Pass |
 
 ## Production acceptance PA-01 … PA-30 (`docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md` §15)
 

@@ -82,9 +82,12 @@ Date: 29 October 2026 · Version 1.0.0
     and request summaries, Arabic legend, fallback mark «لم يحدد رمز الوحدة»; milsymbol 3.0.4 (MIT) bundled, loaded
     lazily from the local build.
   - MOVER administrative integration — contract drafted (`docs/MOVER_ADMIN_INTEGRATION.md`), not implemented.
-  - Unit relocation request (owner request of 30 Oct) — administrative design proposed for decision
-    (`docs/STATIONING_REQUEST_DESIGN_AR.md`), not implemented. Deployment planning, dragging units or formations to
-    positions, tactical graphics and operational movement integration are not built (scope exclusion).
+  - Relocation of an organisation's premises (owner request of 30 Oct, ADR-023) — done: two-option ring around the
+    site on the desktop map, «نقل المقر» panel with the organisation (whole or section with branches), the new location
+    drawn on the map (dashed outline and arrow), the configured review and decision, the move recorded at closing; the
+    site register is never changed by a proposal. Main-unit skip rule and automatic registration of the new site are
+    not implemented (`docs/STATIONING_REQUEST_DESIGN_AR.md`). Deployment planning, moving groups with preserved
+    spacing, tactical graphics and operational movement integration are not built (scope exclusion).
   - Not started: tiled offline backgrounds (prompt §7), scoped explicit denies and delegations in the studio (§8),
     governed migration of running requests (§9), the browser PKI journey (§10), Node failure diagnostics (§13), load
     measurement (§14), release bundle and restore (§15).

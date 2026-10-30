@@ -75,6 +75,7 @@ export const KIND_ICON: Record<RequestKind, string> = {
   MODIFICATION: 'building',
   CANCELLATION: 'close',
   EVACUATION: 'building',
+  RELOCATION: 'map',
 };
 
 export const REASON_CODES: [ReasonCode, string][] = [

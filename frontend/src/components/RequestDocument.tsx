@@ -4,7 +4,7 @@ import type { ApprovalVerification, DecisionKind, ExecutionTask, MyTask, Request
 import { useApp } from '../lib/app';
 import { fullDate, fullTime } from '../lib/dates';
 import { RESERVATION_STATUS, SIGNATURE_DISCLAIMER, TASK_STATE } from '../lib/labels';
-import { ClosureForm, CommunicationLog, RecordSummary, RevisionChangesBlock } from './RequestRecord';
+import { ClosureForm, CommunicationLog, RecordSummary, RelocationBlock, RevisionChangesBlock } from './RequestRecord';
 import { StatusPill } from './ui';
 
 function stageModeLabel(s: StageView): string {
@@ -157,6 +157,7 @@ export function RequestDocument({
         </div>
       </div>
       <RecordSummary r={r} />
+      <RelocationBlock r={r} />
       <RevisionChangesBlock r={r} />
       <div className="meta-grid">
         <div>

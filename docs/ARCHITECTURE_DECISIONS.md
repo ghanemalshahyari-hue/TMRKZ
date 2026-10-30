@@ -438,3 +438,19 @@ Owner brief of 30 Oct 2026 (map-centred administrative workspace, review and dec
 - **Record summary.** The request document opens with reference, requesting organisation (with its unit symbol),
   facility/resource, type, plain-language state (completeness review, referred for study, returned, finally rejected,
   approved awaiting completion, closed), current stage, who holds it, last action and next action.
+
+## ADR-023 Relocation of an organisation's premises and the two-option ring — Accepted (2026-10-30)
+
+Owner request of 30 Oct 2026 (two options around the site; draw the new location; then move).
+
+- **Ring.** On the desktop map a click on a site shows two options as a ring around it: «طلب استخدام» (opens the card
+  with the published use types) and «نقل المقر». Phones keep the bottom sheet; tree and list rows keep the card.
+- **Request.** Request kind `RELOCATION` (V14), type `ORG_RELOCATION` «نقل مقر جهة» seeded by the bootstrap with its
+  form and workflow (organisation endorsement → completeness → study and decision; execution «تنفيذ النقل» by the
+  requester). The proposal — organisation (whole or a section with its branches), current site, proposed name and
+  location drawn on the map (rectangle, polygon or point, validated in PostGIS) — lives in `request_relocation`,
+  editable with the draft, copied into every submitted revision and compared by «what changed».
+- **Effects.** Approval books nothing. Closing (CLOSE right, completion statement) records that the move was carried
+  out. The site register is never changed by a proposal; a facilities administrator registers a new site separately.
+- **Not built.** Deployment planning, moving groups with preserved spacing, tactical graphics and operational
+  movement integration (scope exclusion, `docs/STATIONING_REQUEST_DESIGN_AR.md` §1).

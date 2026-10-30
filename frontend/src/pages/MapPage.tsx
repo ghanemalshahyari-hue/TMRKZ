@@ -7,6 +7,7 @@ import { OrgTree, SiteTree } from '../components/map/BrowseTrees';
 import { ImportDialog, PackageManager } from '../components/map/MapAdmin';
 import { MapCanvas, featureBounds, type FitTarget, type SiteHit, type Viewport } from '../components/map/MapCanvas';
 import { BackgroundPanel, CoverageNote, LayersPanel, Legend } from '../components/map/MapPanels';
+import { RelocationPanel } from '../components/map/RelocationPanel';
 import { RowActionsButton, SiteActionMenu, type MenuAnchor, type SiteActionsState } from '../components/map/SiteActionMenu';
 import { SiteDetailPanel, type SiteAction } from '../components/map/SiteDetailPanel';
 import { useApp } from '../lib/app';
@@ -70,6 +71,8 @@ export function MapPage() {
   const [siteError, setSiteError] = useState<string | null>(null);
   const [resources, setResources] = useState<string[]>([]);
   const [menu, setMenu] = useState<MenuState | null>(null);
+  /** A relocation request being prepared for the selected site (docked panel; the proposal is drawn on the map). */
+  const [relocating, setRelocating] = useState<{ siteId: string; typeCode: string } | null>(null);
   const [siteActions, setSiteActions] = useState<SiteActionsState | null>(null);
   const [fit, setFit] = useState<FitTarget | null>(null);
   const [reveal, setReveal] = useState<{ ids: string[]; key: number } | null>(null);
@@ -317,6 +320,11 @@ export function MapPage() {
    */
   const startRequest = (siteId: string, action: SiteRequestActionCode, typeCode: string) => {
     setMenu(null);
+    if (action === 'RELOCATE') {
+      if (siteId !== selectedSiteId) select(siteId, false);
+      setRelocating({ siteId, typeCode });
+      return;
+    }
     const f = siteFeature?.siteId === siteId ? siteFeature : features.find((x) => x.siteId === siteId);
     const own = f?.resources ?? [];
     const chosen = resources.filter((id) => own.some((r) => r.id === id));
@@ -467,7 +475,7 @@ export function MapPage() {
 
       <div
         className={
-          'map-grid ' + (editing ? 'editing ' : '') + (editing || selectedSiteId || app.wizardActive ? 'with-detail ' : '') + (dirCollapsed ? 'dir-collapsed' : '')
+          'map-grid ' + (editing ? 'editing ' : '') + (editing || selectedSiteId || app.wizardActive || relocating ? 'with-detail ' : '') + (dirCollapsed ? 'dir-collapsed' : '')
         }
       >
         {dirCollapsed ? (
@@ -647,11 +655,19 @@ export function MapPage() {
           </div>
         </div>
 
-        {(editingSite || selectedSiteId || app.wizardActive) && (
+        {(editingSite || selectedSiteId || app.wizardActive || relocating) && (
         <div className="map-side">
           {/* an open request is docked here, beside the map; the site details return when it is minimised */}
           <div className="request-slot" ref={app.setRequestSlot} />
-        {editingSite && map ? (
+        {relocating && (siteFeature?.siteId === relocating.siteId ? siteFeature : features.find((x) => x.siteId === relocating.siteId)) ? (
+          <RelocationPanel
+            key={relocating.siteId}
+            map={map}
+            site={(siteFeature?.siteId === relocating.siteId ? siteFeature : features.find((x) => x.siteId === relocating.siteId))!}
+            typeCode={relocating.typeCode}
+            onClose={() => setRelocating(null)}
+          />
+        ) : editingSite && map ? (
           <BoundaryEditor
             key={editingSite.id}
             map={map}

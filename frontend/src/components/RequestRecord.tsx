@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api, newIdempotencyKey } from '../api/client';
-import type { Communication, CommunicationChannel, RequestDetail, RevisionComparison } from '../api/types';
+import type { Communication, CommunicationChannel, Relocation, RequestDetail, RevisionComparison } from '../api/types';
 import { useApp } from '../lib/app';
 import { fullTime } from '../lib/dates';
 import { OrgSymbol } from './UnitSymbol';
@@ -88,6 +88,61 @@ export function RecordSummary({ r }: { r: RequestDetail }) {
 }
 
 const shown = (v: string | null) => (v == null ? '—' : /^\d{4}-\d{2}-\d{2}T/.test(v) ? fullTime(v) : v);
+
+/** A relocation request's proposal: who moves, from where, to which drawn location (never the site register). */
+export function RelocationBlock({ r }: { r: RequestDetail }) {
+  const [rel, setRel] = useState<Relocation | null>(null);
+  useEffect(() => {
+    if (r.type.kind !== 'RELOCATION' || r.view !== 'FULL') return setRel(null);
+    let live = true;
+    api
+      .relocation(r.id)
+      .then((x) => live && setRel(x))
+      .catch(() => live && setRel(null));
+    return () => {
+      live = false;
+    };
+  }, [r.id, r.type.kind, r.view, r.revision]);
+  if (!rel) return null;
+  return (
+    <section className="relocation-block" aria-label="تفاصيل نقل المقر">
+      <h3>نقل المقر</h3>
+      <div className="record-summary">
+        <div>
+          <span>الجهة المنقولة</span>
+          <b className="with-symbol">
+            <OrgSymbol orgId={rel.organization.id} size={18} />
+            {rel.organization.name}
+            {rel.includeDescendants ? ' — مع فروعها' : ''}
+          </b>
+        </div>
+        <div>
+          <span>من الموقع</span>
+          <b>{rel.fromSite.name}</b>
+        </div>
+        <div>
+          <span>إلى الموقع المقترح</span>
+          <b>{rel.proposedName}</b>
+        </div>
+        <div>
+          <span>المساحة التقريبية</span>
+          <b>{rel.areaM2 ? Math.round(rel.areaM2).toLocaleString('ar-AE') + ' م²' : 'نقطة'}</b>
+        </div>
+        <div>
+          <span>الإحداثيات (المركز)</span>
+          <b className="latin">
+            {rel.centroid[0].toFixed(5)}, {rel.centroid[1].toFixed(5)}
+          </b>
+        </div>
+        <div>
+          <span>التنفيذ</span>
+          <b>{rel.completedAt ? 'سُجّل تنفيذ النقل ' + fullTime(rel.completedAt) : 'لم يُسجَّل بعد'}</b>
+        </div>
+      </div>
+      <p className="micro muted">الموقع المقترح جزء من الطلب ولا يغيّر سجل المواقع؛ يسجله مسؤول المرافق بعد القرار إن لزم.</p>
+    </section>
+  );
+}
 
 /** For the reviewer of a resubmission: each changed field with its previous and new value. */
 export function RevisionChangesBlock({ r }: { r: RequestDetail }) {
