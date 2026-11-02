@@ -1,0 +1,230 @@
+/* Stationing UX prototype. Built on the application's own tokens (prototype.css :root: --ink, --muted, --line, --paper,
+   --canvas, --nav, --accent, --soft, --green, --blue, --red, --radius, --shadow) and its local Arabic font. Map labels and
+   markers are placed from their point with left/top 0, so the page's RTL direction never shifts them. */
+
+/* ---- the application frame, as it is today; on tablets the sidebar is an icon rail (frame-level proposal) ---- */
+.proto-ribbon .proto-ribbon-note{opacity:.85}
+.proto-main{padding:12px 14px 14px}
+@media (min-width:761px) and (max-width:1100px){
+  .proto-sidebar{width:72px!important}
+  .proto-sidebar .brand>span:last-child,.proto-sidebar .workspace-label,.proto-sidebar .nav-section,.proto-sidebar .nav-item>span{display:none}
+  .proto-sidebar .brand{justify-content:center;padding-inline:0}
+  .proto-sidebar .nav-item{justify-content:center;padding-inline:0}
+  .proto-shell{margin-right:72px!important}
+}
+@media (max-width:760px){.proto-main{padding:8px}}
+
+/* ---- the workspace: the map is the page ---- */
+.ux{position:relative;height:calc(100dvh - 128px);min-height:460px;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);background:#e6ece9;isolation:isolate;color:var(--ink)}
+.ux.phone{height:calc(100dvh - 116px);border-radius:12px}
+.ux-map{position:absolute;inset:0}
+.ux .leaflet-container{font:inherit;background:#e6ece9}
+.ux-overlay{z-index:700}
+.ux button{font:inherit}
+.ux button:focus-visible,.ux input:focus-visible,.ux summary:focus-visible,.ux .leaflet-marker-icon:focus-visible{outline:3px solid #54ae96;outline-offset:2px}
+
+/* one search and the hierarchy toggle (top, start side) */
+.ux-top{position:absolute;top:12px;inset-inline-start:12px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;max-width:calc(100% - 84px)}
+.ux .ux-top{z-index:720}
+.ux.editing .ux-top{display:none}
+.ux-search{position:relative;width:min(360px,62vw)}
+.ux-search input{width:100%;height:44px;border:1px solid var(--line);border-radius:12px;padding:0 14px;background:#fff;box-shadow:0 4px 14px #19363818;font-size:13px;color:var(--ink)}
+.ux-hits{position:absolute;top:48px;inset-inline:0;background:#fff;border-radius:12px;box-shadow:0 12px 30px #19363826;padding:6px;max-height:360px;overflow:auto}
+.ux-hits button{display:flex;gap:10px;align-items:center;width:100%;border:0;background:none;text-align:start;padding:8px;border-radius:8px;cursor:pointer;color:var(--ink);min-height:44px}
+.ux-hits button:hover,.ux-hits button:focus-visible{background:var(--soft)}
+.ux-hits b{display:block;font-size:13px}.ux-hits small{display:block;font-size:11px;color:var(--muted)}
+.ux-chip{height:44px;border:1px solid var(--line);background:#fff;border-radius:12px;padding:0 14px;font-weight:600;color:var(--ink);box-shadow:0 4px 14px #19363818;cursor:pointer;white-space:nowrap}
+.ux-chip.on{background:var(--soft);border-color:var(--accent);color:var(--accent)}
+.ux-chip:disabled{opacity:.5}
+.ux-context{display:inline-flex;align-items:center;gap:8px;height:44px;background:var(--accent);color:#fff;border-radius:12px;padding-inline:14px 6px;font-weight:600;box-shadow:0 4px 14px #19363826;max-width:100%}
+.ux-context button{border:0;background:#ffffff2e;color:#fff;border-radius:8px;width:32px;height:32px;cursor:pointer;flex:none}
+
+/* the organisation hierarchy, over the map (never beside it) */
+.ux-tree{position:absolute;top:66px;inset-inline-start:12px;width:300px;max-height:calc(100% - 150px);display:flex;flex-direction:column;background:#fff;border-radius:14px;box-shadow:0 12px 30px #19363826;overflow:hidden}
+.ux-tree header{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
+.ux-tree-list,.ux-tree-list ul{list-style:none;margin:0;padding:0}
+.ux-tree-list{overflow:auto;padding:6px}
+.ux-tree-row{display:flex;align-items:flex-start;gap:2px;border-radius:9px}
+.ux-tree-row.on{background:var(--soft)}
+.ux-toggle{width:28px;height:36px;flex:none;border:0;background:none;color:var(--muted);cursor:pointer}
+.ux-tree-label{flex:1;display:grid;grid-template-columns:26px 1fr auto;align-items:center;gap:8px;border:0;background:none;text-align:start;padding:6px 4px;font-size:13px;color:var(--ink);cursor:pointer;min-height:36px;min-width:0}
+.ux-tree-label span{overflow-wrap:anywhere;line-height:1.4}
+.ux-tree-label small{font-size:11px;color:var(--muted);background:var(--canvas);border-radius:6px;padding:0 6px}
+.ux-tree-row.on .ux-tree-label span{color:var(--accent);font-weight:700}
+
+/* map tools (top, end side) and their popovers */
+.ux-controls{position:absolute;top:12px;inset-inline-end:12px;display:flex;flex-direction:column;gap:6px}
+.ux-controls button{width:44px;height:44px;border:1px solid var(--line);background:#fff;border-radius:11px;font-size:17px;color:var(--ink);box-shadow:0 4px 14px #19363818;cursor:pointer}
+.ux-controls button.on{background:var(--soft);color:var(--accent);border-color:var(--accent)}
+.ux-pop{position:absolute;top:12px;inset-inline-end:66px;width:min(300px,calc(100% - 90px));max-height:calc(100% - 24px);overflow:auto;background:#fff;border-radius:14px;box-shadow:0 12px 30px #19363826;padding:10px 14px}
+.ux-pop h3{font-size:12px;margin:8px 0 4px;color:var(--muted)}
+.ux-check{display:flex;gap:8px;align-items:center;font-size:12.5px;margin:4px 0;cursor:pointer}
+.ux-legend{list-style:none;margin:0;padding:0;display:grid;gap:7px;font-size:12.5px}
+.ux-legend li{display:flex;gap:8px;align-items:center}
+.ux-cl-swatch{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#fff;border:4px solid var(--green);font:700 10px/1 Arial}
+
+/* sites: markers, clusters, names, boundaries */
+.ux-pin-icon{background:none;border:0}
+.ux-pin{position:absolute;left:0;top:0;width:0;height:0}
+.st-FREE{--pin:var(--green)}.st-PARTIAL{--pin:var(--blue)}.st-BUSY{--pin:var(--red)}
+.ux-dot{position:absolute;left:0;top:0;transform:translate(-50%,-50%);width:24px;height:24px;border-radius:50%;background:var(--pin);border:2.5px solid #fff;box-shadow:0 2px 8px #0003;display:grid;place-items:center;color:#fff;font:700 11px/1 Arial,sans-serif;cursor:pointer}
+.ux-pin.point .ux-dot{border:2.5px dashed #fff;outline:1.5px dashed #6f7f83}
+.ux-pin.hl .ux-dot{box-shadow:0 0 0 4px #137c6855,0 2px 8px #0003}
+.ux-pin.sel .ux-dot{width:32px;height:32px;font-size:13px;box-shadow:0 0 0 6px #137c6840,0 3px 10px #0004}
+.ux-pin.dim{opacity:.38}
+.ux-lbl{position:absolute;left:0;top:0;white-space:nowrap;background:#fff;border:1px solid var(--line);border-radius:7px;padding:1px 8px;font-size:12px;font-weight:600;line-height:18px;color:var(--ink);box-shadow:0 2px 6px #0002;direction:rtl;pointer-events:none}
+.ux-pin.sel .ux-lbl{border-color:var(--accent);color:var(--accent)}
+.ux-lbl.below{transform:translate(-50%,16px)}
+.ux-lbl.above{transform:translate(-50%,calc(-100% - 16px))}
+.ux-lbl.side-start{transform:translate(18px,-50%)}
+.ux-lbl.side-end{transform:translate(calc(-100% - 18px),-50%)}
+.ux-syms{position:absolute;left:0;top:0;transform:translate(-50%,calc(-100% - 22px));display:flex;gap:3px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:8px;padding:3px 5px;box-shadow:0 2px 6px #0002;direction:ltr;pointer-events:none}
+.ux-sym{display:block;width:auto;flex:none}
+.ux-sym.generic{display:inline-block;box-sizing:border-box;border:2px dashed #7b8b8f;border-radius:3px;background:#fff}
+.ux-cluster{position:absolute;left:0;top:0;transform:translate(-50%,-50%);width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--red) 0 var(--busy),var(--green) var(--busy) 100%);box-shadow:0 2px 10px #0003;cursor:pointer}
+.ux-cluster b{width:30px;height:30px;border-radius:50%;background:#fff;display:grid;place-items:center;font:700 12px/1 Arial,sans-serif;color:var(--ink)}
+.ux-cluster.dim{opacity:.4}
+.ux-cluster.hl{outline:3px solid var(--accent);outline-offset:2px}
+.ux-cluster.hl b{color:var(--accent)}
+.ux-edge-note{position:absolute;left:50%;bottom:calc(var(--sheet,0px) + 34px);transform:translateX(-50%);z-index:690;margin:0;max-width:calc(100% - 140px);background:#ffffffe6;border:1px dashed #9aa9ac;border-radius:9px;padding:4px 10px;font-size:11.5px;color:var(--muted);text-align:center;pointer-events:none}
+path.ux-boundary{stroke:#56767b;fill:#56767b;fill-opacity:.07}
+path.ux-boundary.hl{stroke:var(--accent);fill:var(--accent);fill-opacity:.13}
+path.ux-boundary.sel{stroke:var(--accent);fill:var(--accent);fill-opacity:.2}
+path.ux-boundary.dim{stroke-opacity:.3;fill-opacity:.03}
+
+/* the relocation editor on the map */
+path.ux-orig{stroke:#2f6db0;stroke-width:2.5;stroke-dasharray:7 5;fill:#2f6db0;fill-opacity:.07}
+.ux-orig-tag{position:absolute;left:0;top:0;transform:translate(-50%,calc(-100% - 8px));background:#fff;border:1px solid #b9cde6;color:#2f6db0;border-radius:7px;padding:1px 8px;font-size:11.5px;font-weight:600;white-space:nowrap;direction:rtl}
+path.ux-busy{stroke:var(--red);stroke-width:1.5;fill:var(--red);fill-opacity:.18}
+.ux-busy-tag{position:absolute;left:0;top:0;transform:translate(-50%,-50%);background:var(--red);color:#fff;border-radius:7px;padding:1px 8px;font-size:11px;font-weight:700;white-space:nowrap;direction:rtl}
+.ux-ring-tag{position:absolute;left:0;top:0;transform:translate(-50%,-50%);background:#fff;border-radius:7px;padding:1px 8px;font-size:11px;font-weight:700;white-space:nowrap;border:1px solid;direction:rtl}
+.ux-unmoved .stw-dist{display:none}
+.ux-orig-tag[data-at=below],.ux-busy-tag[data-at=below]{transform:translate(-50%,8px)}
+.ux-busy-tag[data-at=above]{transform:translate(-50%,calc(-100% - 8px))}
+.ux-orig-tag[data-at=east]{transform:translate(8px,-50%)}
+.ux-orig-tag[data-at=west]{transform:translate(calc(-100% - 8px),-50%)}
+.ux-busy-tag b{font-weight:inherit}
+.ux-busy-tag.compact b{display:none}
+.ux-orig-tag.hidden,.ux-ring-tag.hidden{visibility:hidden}
+.ux-ring-tag.min{color:var(--red);border-color:#e9b9b7}
+.ux-ring-tag.max{color:var(--green);border-color:#9bd6b4}
+.ux-edit-tools{position:absolute;top:12px;inset-inline-start:12px;display:flex;gap:4px;background:#fff;border-radius:12px;box-shadow:0 8px 24px #19363826;padding:4px;flex-wrap:wrap;max-width:calc(100% - 480px)}
+.ux-edit-tools button{height:40px;border:0;background:none;border-radius:8px;padding:0 10px;font-size:12.5px;font-weight:600;color:var(--ink);cursor:pointer;white-space:nowrap}
+.ux-edit-tools button:hover{background:var(--canvas)}
+.ux-edit-tools button.on{background:var(--soft);color:var(--accent)}
+.ux-edit-tools button:disabled{opacity:.4;cursor:not-allowed}
+
+/* the contextual card / editor (a floating panel on large screens, a bottom sheet below 1100px) */
+.ux-dock{position:absolute;inset-inline-end:12px;bottom:12px;width:min(380px,calc(100% - 24px));max-height:calc(100% - 270px);display:flex}
+.ux.editing .ux-dock{top:12px;max-height:none}
+.ux.editing .ux-controls{inset-inline-end:404px}
+.ux.editing .ux-pop{inset-inline-end:458px}
+.ux-card{flex:1;min-height:0;overflow:auto;background:#fff;border-radius:14px;box-shadow:0 12px 30px #19363826;padding:12px 16px 14px;outline:none}
+.ux-card:focus-visible{box-shadow:0 0 0 3px #54ae9666,0 12px 30px #19363826}
+.ux-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
+.ux-card h2{font-size:17px;margin:2px 0;line-height:1.5}
+.ux-sub{font-size:12px;color:var(--muted);margin:0 0 10px}
+.ux-mono{font-family:Consolas,monospace;direction:ltr;unicode-bidi:isolate}
+.ux-x{width:36px;height:36px;border:0;border-radius:9px;background:var(--canvas);color:var(--muted);cursor:pointer;flex:none}
+.ux-state{font-size:12px;font-weight:700;border-radius:7px;padding:1px 9px;color:#fff;background:var(--pin)}
+.ux-crumbs{font-size:11.5px;color:var(--muted)}
+.ux-with-sym{display:flex;align-items:center;gap:8px}
+.ux-orgs{border:0;padding:0;margin:0 0 6px;min-width:0}
+.ux-orgs legend{font-size:12px;font-weight:700;color:var(--muted);margin-bottom:4px;padding:0}
+.ux-org-row{display:grid;grid-template-columns:auto 30px 1fr;gap:8px;align-items:center;padding:6px 10px;border:1.5px solid var(--line);border-radius:10px;margin-bottom:6px;cursor:pointer;min-height:44px}
+.ux-org-row.on{border-color:var(--accent);background:var(--soft)}
+.ux-org-row input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.ux-org-row b{display:block;font-size:13px}.ux-org-row small{display:block;font-size:11px;color:var(--muted)}
+.ux-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center}
+.ux-actions.sticky{position:sticky;bottom:-14px;background:#fff;padding:10px 0 4px;margin-top:10px;border-top:1px solid var(--line)}
+.ux-btn{min-height:44px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:0 14px;font-weight:700;cursor:pointer}
+.ux-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;flex:1}
+.ux-btn.danger{background:var(--red);border-color:var(--red);color:#fff}
+.ux-btn:disabled{opacity:.45;cursor:not-allowed}
+.ux-link{border:0;background:none;color:var(--accent);text-decoration:underline;cursor:pointer;padding:6px}
+.ux-note{font-size:11.5px;color:var(--muted);margin:8px 0 0}
+.ux-site-list{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:2px}
+.ux-site-list button{display:flex;gap:10px;align-items:center;width:100%;border:0;background:none;text-align:start;padding:6px 8px;border-radius:9px;cursor:pointer;min-height:44px;color:var(--ink)}
+.ux-site-list button:hover,.ux-site-list button:focus-visible{background:var(--canvas)}
+.ux-site-list b{display:block;font-size:13px}.ux-site-list small{display:block;font-size:11px;color:var(--muted)}
+.ux-mini{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--pin);color:#fff;font:700 10px/1 Arial,sans-serif;flex:none;border:2px solid #fff;box-shadow:0 1px 3px #0003}
+.ux-mini.point{--pin:var(--green);border:2px dashed #7b8b8f}
+.ux-steps{display:flex;gap:6px;font-size:11.5px}
+.ux-steps b{padding:2px 9px;border-radius:99px;background:var(--canvas);color:var(--muted);font-weight:600}
+.ux-steps b.on{background:var(--accent);color:#fff}
+.ux-steps b.done{background:var(--soft);color:var(--accent)}
+.ux-seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--canvas);border-radius:12px;padding:4px;margin:8px 0}
+.ux-seg button{min-height:40px;border:0;border-radius:9px;background:none;font-weight:600;color:var(--muted);cursor:pointer}
+.ux-seg button.on{background:#fff;color:var(--accent);box-shadow:0 1px 4px #0002}
+.ux-hint{font-size:12.5px;line-height:1.65;margin:4px 0 10px}
+.ux-readout{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px}
+.ux-readout.ok{border-color:#9bd6b4;background:#effaf4}
+.ux-readout.bad{border-color:#f0b3b3;background:#fdf1f1}
+.ux-readout.idle{background:var(--canvas)}
+.ux-dist{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:0 10px}
+.ux-dist span{font-size:12px;color:var(--muted)}
+.ux-dist b{font-size:22px}
+.ux-dist small{grid-column:1/-1;font-size:12px}
+.ux-readout.ok .ux-dist b,.ux-readout.ok .ux-dist small{color:var(--green)}
+.ux-readout.bad .ux-dist b,.ux-readout.bad .ux-dist small{color:var(--red)}
+.ux-bar{position:relative;height:8px;border-radius:99px;background:#e3e9e8;margin:8px 0 10px}
+.ux-bar .band{position:absolute;top:0;bottom:0;background:#9bd6b4;border-radius:99px}
+.ux-bar .mark{position:absolute;top:-4px;width:4px;height:16px;border-radius:2px;background:var(--ink);transform:translateX(50%)}
+.ux-readout dl,.ux-summary{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;font-size:12.5px}
+.ux-readout dt,.ux-summary dt{color:var(--muted)}
+.ux-readout dd,.ux-summary dd{margin:0;font-weight:600}
+.ux-readout dd.n{color:var(--red)}
+.ux-summary{background:var(--canvas);border-radius:10px;padding:8px 12px;margin:4px 0 10px}
+.ux-key{list-style:none;display:flex;flex-wrap:wrap;gap:6px 14px;padding:0;margin:10px 0;font-size:11.5px;color:var(--muted)}
+.ux-key li{display:flex;align-items:center;gap:6px}
+.ux-key i{width:18px;height:12px;border-radius:3px;display:inline-block;box-sizing:border-box}
+.ux-key .k-orig{border:2px dashed #2f6db0;background:#2f6db012}
+.ux-key .k-prop{background:#2bb36a66;border:2px solid #1f9d55}
+.ux-key .k-ring{border:2px dashed var(--green);border-radius:50%;width:14px;height:14px}
+.ux-key .k-busy{background:#c5625f40;border:1.5px solid var(--red)}
+.ux-field{display:grid;gap:3px;font-size:12px;color:var(--muted);margin:8px 0}
+.ux-field input,.ux-field textarea{border:1px solid var(--line);border-radius:9px;padding:8px 10px;color:var(--ink);background:#fff;width:100%;box-sizing:border-box;font:inherit;font-size:13px}
+.ux-field.inline{display:flex;align-items:center;gap:10px}
+.ux-field.inline input{width:84px}
+.ux-more{border:1px solid var(--line);border-radius:10px;padding:6px 10px;margin:8px 0}
+.ux-more summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--accent);min-height:28px}
+.ux-coords{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:8px}
+.ux-coords input{direction:ltr;border:1px solid var(--line);border-radius:9px;padding:8px;font:inherit;font-size:13px;min-width:0}
+.ux-edges{columns:2;font-size:12px;margin:6px 0 0;padding-inline-start:18px}
+.ux-error{color:var(--red);font-size:12px;margin:6px 0 0}
+.ux-confirm{border:1.5px solid #f0b3b3;background:#fdf1f1;border-radius:12px;padding:10px 12px;margin:6px 0 10px;font-size:13px}
+.ux-chipset{border:0;padding:0;margin:8px 0;display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.ux-chipset legend{font-size:12px;color:var(--muted);margin-bottom:4px;padding:0;width:100%}
+.ux-chipset .ux-chip{height:38px;box-shadow:none;border-radius:99px}
+.ux-dates{display:flex;gap:8px}
+.ux-dates .ux-field{flex:1;min-width:0}
+.ux-toast{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:1200;background:var(--nav);color:#fff;border-radius:10px;padding:8px 14px;font-size:12.5px;max-width:calc(100% - 32px);box-shadow:0 8px 24px #0004}
+
+/* tablets and phones: the card and the editor are a bottom sheet; tools stay reachable above it */
+.ux-dock.sheet{inset-inline:0;bottom:0;width:auto;max-height:none;display:block}
+.ux.editing .ux-dock.sheet{top:auto}
+.ux.narrow.editing .ux-controls{inset-inline-end:12px}
+.ux.narrow.editing .ux-pop{inset-inline-end:66px}
+.ux.narrow .ux-edit-tools{max-width:calc(100% - 84px)}
+.ux-sheet{width:100%;display:flex;flex-direction:column;background:#fff;border-radius:16px 16px 0 0;box-shadow:0 -10px 30px #19363830;transition:height .2s ease}
+.ux-sheet.peek{height:150px}
+.ux-compact{margin:0 0 6px;padding:6px 10px;border-radius:10px;font-size:12.5px;font-weight:600;background:var(--canvas)}
+.ux-compact.ok{background:#effaf4;color:var(--green)}
+.ux-compact.bad{background:#fdf1f1;color:var(--red)}
+.ux-compact b{font-size:15px}
+.ux-sheet.half{height:min(46dvh,460px)}
+.ux-sheet.full{height:calc(100dvh - 190px)}
+.ux-handle{height:30px;border:0;background:none;display:grid;place-items:center;cursor:grab;touch-action:none;flex:none;width:100%}
+.ux-handle i{width:46px;height:5px;border-radius:99px;background:#c9d4d2}
+.ux-sheet-body{flex:1;min-height:0;overflow:auto;display:flex}
+.ux .leaflet-bottom{bottom:var(--sheet,0px);transition:bottom .2s ease}
+.ux-sheet .ux-editor .ux-card-head{position:sticky;top:0;z-index:2;background:#fff;padding-top:2px}
+.ux-card-head .ux-compact{flex:1;min-width:0;margin:0}
+.ux-sheet .ux-card{box-shadow:none;border-radius:0;padding-top:0}
+.ux.phone .ux-top{max-width:calc(100% - 72px)}
+.ux.phone .ux-search{width:calc(100vw - 150px)}
+.ux.phone .ux-tree{inset-inline:8px;width:auto;top:62px;max-height:60%}
+.ux.phone .ux-context{display:none}
+.ux.phone .ux-edit-tools span{display:none}
+.ux.phone .ux-edit-tools button{width:44px;padding:0;font-size:16px}
+@media (prefers-reduced-motion:reduce){.ux-sheet{transition:none}}

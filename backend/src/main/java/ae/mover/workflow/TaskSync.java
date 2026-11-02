@@ -3,6 +3,7 @@ package ae.mover.workflow;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -15,11 +16,13 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 import ae.mover.common.Db;
+import ae.mover.hr.TaskRealignment;
 import ae.mover.workflow.WorkflowDefinition.Stage;
 
 /**
  * Mirrors Flowable's active user tasks into {@code task_assignment} (the business view of who must decide what,
- * with SLA). Runs in the same transaction as the engine operation that created or removed the tasks.
+ * with SLA). Runs in the same transaction as the engine operation that created or removed the tasks. New tasks pass the
+ * separation-of-duties routing (ADR-027) before the transaction commits.
  */
 @Component
 public class TaskSync {
@@ -28,17 +31,20 @@ public class TaskSync {
     private final TaskService taskService;
     private final RuntimeService runtimeService;
     private final Clock clock;
+    private final TaskRealignment realignment;
 
-    public TaskSync(JdbcClient jdbc, TaskService taskService, RuntimeService runtimeService, Clock clock) {
+    public TaskSync(JdbcClient jdbc, TaskService taskService, RuntimeService runtimeService, Clock clock, TaskRealignment realignment) {
         this.jdbc = jdbc;
         this.taskService = taskService;
         this.runtimeService = runtimeService;
         this.clock = clock;
+        this.realignment = realignment;
     }
 
     public void sync(UUID requestId, int revision, String processInstanceId, WorkflowDefinition def) {
         List<Task> active = taskService.createTaskQuery().processInstanceId(processInstanceId).list();
         Set<String> activeIds = new HashSet<>();
+        List<UUID> created = new ArrayList<>();
         Instant now = clock.instant();
         for (Task t : active) {
             activeIds.add(t.getId());
@@ -52,11 +58,13 @@ public class TaskSync {
             Stage stage = def.stage(stageKey).orElseThrow();
             String[] parts = slot.split("\\|", 2);
             UUID targetOrg = "*".equals(parts[1]) ? null : UUID.fromString(parts[1]);
+            UUID id = UUID.randomUUID();
+            created.add(id);
             jdbc.sql("""
                     insert into task_assignment(id, request_id, revision, flowable_task_id, process_instance_id, stage_key,
                         stage_name, role_code, target_org_id, final, requires_signature, status, created_at, due_at)
                     values (:id, :req, :rev, :tid, :pid, :sk, :sn, :role, :org, :fin, :sig, 'OPEN', :now, :due)""")
-                    .param("id", UUID.randomUUID()).param("req", requestId).param("rev", revision).param("tid", t.getId())
+                    .param("id", id).param("req", requestId).param("rev", revision).param("tid", t.getId())
                     .param("pid", processInstanceId).param("sk", stageKey).param("sn", stage.name()).param("role", parts[0])
                     .param("org", targetOrg).param("fin", stage.finalStage()).param("sig", stage.requiresSignature())
                     .param("now", Db.ts(now)).param("due", Db.ts(now.plus(Duration.ofDays(stage.slaDays()))))
@@ -67,5 +75,6 @@ public class TaskSync {
                 update task_assignment set status = 'CLOSED_BY_POLICY', closed_at = :now
                 where request_id = :req and status = 'OPEN' and not (flowable_task_id = any(string_to_array(:ids, ',')))""")
                 .param("now", Db.ts(now)).param("req", requestId).param("ids", Db.texts(activeIds)).update();
+        realignment.separate(requestId, created, now);
     }
 }

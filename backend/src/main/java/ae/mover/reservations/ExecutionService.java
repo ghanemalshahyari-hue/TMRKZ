@@ -28,6 +28,11 @@ import ae.mover.system.IdempotencyService;
 /**
  * Execution, handover and receipt tasks after approval (separate from the approval decision), and closing of the
  * administrative file. Closing never changes a reservation's period; only an evacuation's handover evidence does.
+ *
+ * <p>Independence (owner decisions of 2 Nov 2026, ADR-028): a HANDOVER is never made by the requester or through their
+ * delegation; a RECEIPT is the authorised receiving party's confirmation of a completed handover, by a human other than
+ * the one who handed over; an ACKNOWLEDGEMENT lets the requester record completing their own work and is recorded as
+ * such, never as an approval; closing needs an authorised actor independent of the requester.
  */
 @Service
 public class ExecutionService {
@@ -41,10 +46,12 @@ public class ExecutionService {
     private final RequestViews views;
     private final ae.mover.common.Json json;
     private final ae.mover.requests.RelocationService relocations;
+    private final ae.mover.access.SeparationOfDuties separation;
 
     public ExecutionService(JdbcClient jdbc, Clock clock, AccessService access, ReservationService reservations,
                             AuditService audit, IdempotencyService idempotency, RequestViews views, ae.mover.common.Json json,
-                            ae.mover.requests.RelocationService relocations) {
+                            ae.mover.requests.RelocationService relocations, ae.mover.access.SeparationOfDuties separation) {
+        this.separation = separation;
         this.relocations = relocations;
         this.json = json;
         this.jdbc = jdbc;
@@ -102,13 +109,21 @@ public class ExecutionService {
                 .param("id", taskId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         UUID requestId = (UUID) t.get("request_id");
         RequestScope scope = access.requestScope(requestId);
-        Grant grant = ctx.executionGrant((String) t.get("role_code"), (UUID) t.get("target_org_id"), scope)
-                .filter(g -> ctx.assignedToMe((UUID) t.get("assigned_person_id"), (Boolean) t.get("awaiting_assignment"))).orElse(null);
-        if (grant == null) {
+        String purpose = (String) t.get("purpose");
+        boolean holds = ctx.executionGrant((String) t.get("role_code"), (UUID) t.get("target_org_id"), scope).isPresent()
+                && ctx.assignedToMe((UUID) t.get("assigned_person_id"), (Boolean) t.get("awaiting_assignment"));
+        if (!holds) {
             if (ctx.viewLevel(scope) == ae.mover.access.ViewLevel.NONE) {
                 throw ApiException.notFound();
             }
             throw ApiException.forbidden("هذه المهمة مسندة إلى دور أو جهة أخرى.");
+        }
+        // independence by purpose (ADR-028): who may not complete the step, and whether it must wait for another one
+        ae.mover.access.SeparationOfDuties.StepRule rule = separation.step(purpose, requestId, separation.requester(requestId));
+        Grant grant = separation.of(ctx).executionGrant((String) t.get("role_code"), (UUID) t.get("target_org_id"), scope, rule.excluded())
+                .orElseThrow(() -> ae.mover.access.SeparationOfDuties.stepRefusal(purpose));
+        if (rule.waiting() != null && "OPEN".equals(t.get("status"))) {
+            throw ApiException.validation(rule.waiting());
         }
         ctx.confirmTask((String) t.get("role_code"), (UUID) t.get("target_org_id"), scope, Permission.EXECUTE);
         if (!"OPEN".equals(t.get("status")) || !"APPROVED".equals(t.get("request_status"))) {
@@ -134,9 +149,10 @@ public class ExecutionService {
                        evidence_attachment_id = :att where id = :id""")
                 .param("by", ctx.personId()).param("now", Db.ts(now)).param("note", note).param("att", attachment)
                 .param("id", taskId).update();
+        // the requester's own work is acknowledged, never recorded as an approval
         audit.record(ctx.actor(), new Capacity(grant.roleName(), grant.orgName(), grant.delegationId()),
-                "EXECUTION_COMPLETED", "REQUEST", requestId.toString(), (String) t.get("number"),
-                Map.of("task", t.get("name")), note, null);
+                "ACKNOWLEDGEMENT".equals(purpose) ? "EXECUTION_ACKNOWLEDGED" : "EXECUTION_COMPLETED", "REQUEST",
+                requestId.toString(), (String) t.get("number"), Map.of("task", t.get("name"), "purpose", purpose), note, null);
         if ("EVACUATION".equals(t.get("kind")) && evidence) {
             int openEvidence = jdbc.sql("select count(*) from execution_task where request_id = :r and evidence_required and status = 'OPEN'")
                     .param("r", requestId).query(Integer.class).single();
@@ -169,6 +185,11 @@ public class ExecutionService {
         // a separate right: neither creating, reviewing nor approving a request allows closing it
         if (ctx.grants().stream().noneMatch(g -> g.has(Permission.CLOSE) && g.coversRequest(scope))) {
             throw ApiException.forbidden("إغلاق الطلب إدارياً يتطلب صلاحية الإغلاق على نطاقه.");
+        }
+        // and an actor independent of the requester (ADR-028): nobody closes a file they opened, nor through their delegation
+        if (!separation.of(ctx).mayClose(scope, separation.requester(requestId))) {
+            throw new ApiException(ae.mover.common.ErrorCode.SEPARATION_OF_DUTIES,
+                    "لا يُغلق مقدم الطلب ملفه إدارياً؛ يغلقه صاحب صلاحية إغلاق مستقل.");
         }
         ctx.confirmTask("", null, scope, Permission.CLOSE);
         String statement = in == null || in.statement() == null ? "" : in.statement().trim();

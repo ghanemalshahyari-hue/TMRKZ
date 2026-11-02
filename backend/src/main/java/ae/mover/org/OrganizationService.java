@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ae.mover.access.AccessContext;
+import ae.mover.access.DirectoryScope;
 import ae.mover.access.Grant;
 import ae.mover.access.Permission;
 import ae.mover.audit.AuditService;
@@ -37,11 +38,17 @@ public class OrganizationService {
     private final AuditService audit;
     private final SiteService sites;
 
-    public OrganizationService(JdbcClient jdbc, Clock clock, AuditService audit, SiteService sites) {
+    private final DirectoryScope directory;
+    private final ae.mover.access.PersonKeys keys;
+
+    public OrganizationService(JdbcClient jdbc, Clock clock, AuditService audit, SiteService sites, DirectoryScope directory,
+                               ae.mover.access.PersonKeys keys) {
+        this.keys = keys;
         this.jdbc = jdbc;
         this.clock = clock;
         this.audit = audit;
         this.sites = sites;
+        this.directory = directory;
     }
 
     public record OrgNode(String id, String code, String name, String parentId, String status, List<OrgNode> children,
@@ -294,44 +301,102 @@ public class OrganizationService {
                 .query((rs, n) -> new OrgNode(rs.getString("id"), rs.getString("code"), rs.getString("name"),
                         rs.getString("parent_id"), rs.getString("status"), List.of(), 0, 0))
                 .optional().orElseThrow(ApiException::notFound);
-        boolean summary = ctx.summaryOnly();
-        List<Member> members = summary ? List.of() : jdbc.sql("""
+        // the roster only inside the reader's own scope, never for an organisation shown as context (an ancestor), and a
+        // grant's site only when the reader may see that site (ADR-027, independent review)
+        boolean roster = !ctx.summaryOnly() && (ctx.canFor(Permission.VIEW, id) || ctx.canFor(Permission.MANAGE_ACCESS, id));
+        List<Member> members = !roster ? List.of() : jdbc.sql("""
                 select m.id, p.id as person_id, p.display_name, p.employee_no, r.code as role_code, r.name as role_name,
-                       m.position_title, s.id as site_id, s.name as site_name, m.valid_from, m.valid_to,
+                       m.position_title, s.id as site_id, s.name as site_name, sr.organization_id as site_org, m.valid_from, m.valid_to,
                        (m.valid_from <= now() and (m.valid_to is null or m.valid_to > now())) as active
                 from membership m join person p on p.id = m.person_id join role_def r on r.code = m.role_code
                 left join site s on s.id = m.site_scope_id
+                left join site_responsibility sr on sr.site_id = s.id and sr.valid_to is null
                 where m.organization_id = :id order by active desc, r.sort_order, p.display_name limit 500""")
-                .param("id", id).query((rs, n) -> new Member(rs.getString("id"),
-                        Map.of("id", rs.getString("person_id"), "displayName", rs.getString("display_name"),
-                                "employeeNo", rs.getString("employee_no")),
-                        Map.of("code", rs.getString("role_code"), "name", rs.getString("role_name")),
-                        rs.getString("position_title"), Ref.of(Db.uuid(rs, "site_id"), rs.getString("site_name")),
-                        Db.iso(rs, "valid_from"), Db.iso(rs, "valid_to"), rs.getBoolean("active"))).list();
+                .param("id", id).query((rs, n) -> {
+                    UUID site = Db.uuid(rs, "site_id");
+                    boolean siteVisible = site != null
+                            && ctx.siteView(site, Set.of(), Db.uuid(rs, "site_org")) != ae.mover.access.ViewLevel.NONE;
+                    return new Member(rs.getString("id"),
+                            Map.of("id", rs.getString("person_id"), "displayName", rs.getString("display_name"),
+                                    "employeeNo", rs.getString("employee_no")),
+                            Map.of("code", rs.getString("role_code"), "name", rs.getString("role_name")),
+                            rs.getString("position_title"), siteVisible ? Ref.of(site, rs.getString("site_name")) : null,
+                            Db.iso(rs, "valid_from"), Db.iso(rs, "valid_to"), rs.getBoolean("active"));
+                }).list();
         List<SiteService.SiteView> orgSites = sites.list(ctx).stream()
                 .filter(s -> s.responsibleOrg() != null && s.responsibleOrg().id().equals(id.toString())).toList();
         return new OrgDetail(org, members, orgSites);
     }
 
+    /**
+     * Organisations inside the actor's MANAGE_ACCESS authority (every org-limited access grant's subtree). Global access
+     * managers are handled by the callers; an access grant limited to sites only reaches no organisation here.
+     */
+    private static Set<UUID> manageAccessOrgs(AccessContext ctx) {
+        Set<UUID> out = new java.util.HashSet<>();
+        for (Grant g : ctx.grants()) {
+            if (g.has(Permission.MANAGE_ACCESS) && g.hasOrgLimit()) {
+                out.addAll(g.orgSubtree());
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The directory for granting and delegating (audit P0-4; ADR-027 withdrew the cross-organisation search). A global
+     * access manager searches everyone. A scoped one searches only the people inside their authority
+     * ({@link DirectoryScope}): members with employee number, account and status, bridges — a current grant on a site the
+     * manager administers — by name and organisation only. Nobody outside is found, by name or by identifier.
+     */
     public PageResult<Map<String, Object>> people(AccessContext ctx, String q, Integer page, Integer size) {
         ctx.require(Permission.MANAGE_ACCESS);
         int p = PageResult.page(page);
         int s = PageResult.size(size);
-        String like = q == null || q.isBlank() ? "%" : "%" + q.trim().replace("%", "") + "%";
-        long total = jdbc.sql("select count(*) from person where display_name ilike :q or employee_no ilike :q or coalesce(username,'') ilike :q")
-                .param("q", like).query(Long.class).single();
+        String term = q == null ? "" : q.trim().replace("%", "");
+        String like = term.isEmpty() ? "%" : "%" + term + "%";
+        DirectoryScope.Reach reach = directory.reach(ctx);
+        String reached = reach.global() ? "(select true as member) reach" : """
+                (select id, bool_or(member) as member from (
+                   select a.person_id as id, true as member from affiliation a
+                   where a.valid_to is null and a.organization_id = any(string_to_array(:dir_orgs, ',')::uuid[])
+                   union all
+                   select m.person_id, true from membership m
+                   where (m.valid_to is null or m.valid_to > now()) and m.organization_id = any(string_to_array(:dir_orgs, ',')::uuid[])
+                   union all
+                   select m.person_id, false from membership m
+                   where (m.valid_to is null or m.valid_to > now())
+                     and (m.site_scope_id = any(string_to_array(:dir_sites, ',')::uuid[])
+                          or exists (select 1 from membership_scope_target t left join resource r on t.kind = 'RESOURCE' and r.id = t.target_id
+                                     where t.membership_id = m.id
+                                       and ((t.kind = 'SITE' and t.target_id = any(string_to_array(:dir_sites, ',')::uuid[]))
+                                            or r.site_id = any(string_to_array(:dir_sites, ',')::uuid[]))))) c
+                 group by id) reach""";
+        String from = " from person " + (reach.global() ? "cross join " + reached : "join " + reached + " on reach.id = person.id")
+                // a bridge is found by name only: matching its identifiers would let them be rebuilt one character at a time
+                + " where (person.display_name ilike :q or (reach.member"
+                + " and (person.employee_no ilike :q or coalesce(person.username, '') ilike :q)))";
+        String orgs = Db.ids(reach.orgs());
+        String siteIds = Db.ids(reach.sites());
+        long total = jdbc.sql("select count(*)" + from).param("q", like).param("dir_orgs", orgs).param("dir_sites", siteIds)
+                .query(Long.class).single();
         List<Map<String, Object>> items = jdbc.sql("""
-                select id, display_name, employee_no, username, status from person
-                where display_name ilike :q or employee_no ilike :q or coalesce(username,'') ilike :q
-                order by display_name limit :l offset :o""")
-                .param("q", like).param("l", s).param("o", p * s)
+                select person.id, person.display_name, person.employee_no, person.username, person.status, reach.member,
+                       coalesce((select o.name from affiliation a join organization o on o.id = a.organization_id
+                                 where a.person_id = person.id and a.valid_to is null limit 1),
+                                (select o.name from membership m join organization o on o.id = m.organization_id
+                                 where m.person_id = person.id and (m.valid_to is null or m.valid_to > now()) order by m.valid_from limit 1))
+                         as org_name""" + from + " order by reach.member desc, person.display_name limit :l offset :o")
+                .param("q", like).param("dir_orgs", orgs).param("dir_sites", siteIds).param("l", s).param("o", p * s)
                 .query((rs, n) -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("id", rs.getString("id"));
                     m.put("displayName", rs.getString("display_name"));
-                    m.put("employeeNo", rs.getString("employee_no"));
-                    m.put("username", rs.getString("username"));
-                    m.put("status", rs.getString("status"));
+                    if (rs.getBoolean("member")) {
+                        m.put("employeeNo", rs.getString("employee_no"));
+                        m.put("username", rs.getString("username"));
+                        m.put("status", rs.getString("status"));
+                    }
+                    m.put("organization", rs.getString("org_name"));
                     return m;
                 }).list();
         return new PageResult<>(items, p, s, total);
@@ -343,8 +408,13 @@ public class OrganizationService {
                                  String validFrom, String validTo, String reason, String revokedAt, boolean active) {
     }
 
+    /**
+     * Delegations the actor may see: their own (as delegator or delegate), every one for a global access manager, and
+     * for a scoped access manager those on grants inside their authority (audit P0-4).
+     */
     public List<DelegationView> delegations(AccessContext ctx) {
-        boolean all = ctx.has(Permission.MANAGE_ACCESS);
+        boolean all = ctx.canEverywhere(Permission.MANAGE_ACCESS);
+        String orgs = all || !ctx.has(Permission.MANAGE_ACCESS) ? "" : Db.ids(manageAccessOrgs(ctx));
         return jdbc.sql("""
                 select d.*, a.display_name as delegator_name, b.display_name as delegate_name, r.code as role_code,
                        r.name as role_name, o.id as org_id, o.name as org_name,
@@ -352,8 +422,10 @@ public class OrganizationService {
                 from delegation d join person a on a.id = d.delegator_id join person b on b.id = d.delegate_id
                 join membership m on m.id = d.membership_id join role_def r on r.code = m.role_code
                 join organization o on o.id = m.organization_id
-                where :all or d.delegator_id = :me or d.delegate_id = :me order by d.created_at desc limit 300""")
-                .param("all", all).param("me", ctx.personId())
+                where :all or d.delegator_id = :me or d.delegate_id = :me
+                   or m.organization_id = any(string_to_array(:orgs, ',')::uuid[])
+                order by d.created_at desc limit 300""")
+                .param("all", all).param("me", ctx.personId()).param("orgs", orgs)
                 .query((rs, n) -> new DelegationView(rs.getString("id"), Ref.of(Db.uuid(rs, "delegator_id"), rs.getString("delegator_name")),
                         Ref.of(Db.uuid(rs, "delegate_id"), rs.getString("delegate_name")),
                         Map.of("code", rs.getString("role_code"), "name", rs.getString("role_name")),
@@ -381,8 +453,21 @@ public class OrganizationService {
             throw ApiException.validation("حدد نهاية للتفويض بعد بدايته.");
         }
         UUID delegate = UUID.fromString(in.delegateId());
-        if (delegate.equals(ctx.personId())) {
+        if (keys.same(ctx.personId(), delegate)) {
             throw ApiException.validation("لا يجوز التفويض للنفس.");
+        }
+        // a delegation is a grant the delegator makes without an access manager (ADR-027, independent review): never to
+        // the temporary first administrator, and never of administration rights, which only an access manager grants
+        boolean bootstrap = jdbc.sql("select coalesce(bootstrap, false) from person where id = :p").param("p", delegate)
+                .query(Boolean.class).optional().orElseThrow(() -> ApiException.validation("المفوض إليه غير موجود."));
+        if (bootstrap) {
+            throw ApiException.forbidden("هوية التهيئة الأولى مؤقتة ولا يُفوض إليها.");
+        }
+        Grant delegated = ctx.grants().stream().filter(g -> membership.equals(g.membershipId()) && g.delegationId() == null)
+                .findFirst().orElseThrow();
+        if (delegated.has(Permission.MANAGE_ACCESS) || delegated.has(Permission.CONFIGURE)
+                || delegated.has(Permission.VIEW_SOURCE_IDENTIFIERS)) {
+            throw ApiException.forbidden("لا تُفوض صلاحيات الإدارة (الصلاحيات أو التهيئة أو معرفات المصدر)؛ يمنحها مدير صلاحيات.");
         }
         UUID id = UUID.randomUUID();
         jdbc.sql("""

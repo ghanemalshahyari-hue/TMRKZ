@@ -105,7 +105,28 @@ public class ReservationService {
                 effective, actor);
     }
 
+    /**
+     * Row-locks every resource whose scope locks the given resources can touch (their ancestors and descendants), in id
+     * order. Concurrent approvals over overlapping trees then queue in the same order, so the later one meets the
+     * exclusion constraint as a conflict instead of a deadlock (the set-based lock insert has no stable row order).
+     */
+    public void lockTrees(java.util.Collection<UUID> resourceIds) {
+        if (resourceIds.isEmpty()) {
+            return;
+        }
+        jdbc.sql("""
+                with recursive down(id) as (
+                    select id from resource where id = any(string_to_array(:ids, ',')::uuid[])
+                    union select r.id from resource r join down on r.parent_resource_id = down.id),
+                up(id, parent_id) as (
+                    select id, parent_resource_id from resource where id = any(string_to_array(:ids, ',')::uuid[])
+                    union select p.id, p.parent_resource_id from resource p join up on p.id = up.parent_id)
+                select id from resource where id in (select id from down union select id from up) order by id for update""")
+                .param("ids", Db.ids(resourceIds)).query(UUID.class).list();
+    }
+
     private void insertLocks(UUID reservationId, UUID resourceId, Instant start, Instant end) {
+        lockTrees(List.of(resourceId));
         Map<String, Object> res = jdbc.sql("select name, policy, handover_minutes, shared_limit from resource where id = :id")
                 .param("id", resourceId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         if (!"EXCLUSIVE".equals(res.get("policy"))) {

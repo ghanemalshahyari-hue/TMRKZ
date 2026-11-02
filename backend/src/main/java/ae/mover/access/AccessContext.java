@@ -182,13 +182,19 @@ public final class AccessContext {
     }
 
     /**
-     * Grant that lets this actor decide a review task: same role, REVIEW permission (APPROVE for the final stage),
-     * and a data scope that reaches the task's target organisation (or the request when the task has no target).
-     * The requester is held to exactly the same rule (owner decision 2026-10-29): holding the stage's permission over
-     * its scope lets them decide; the decision is then recorded as taken by the requester.
+     * Grant that holds a review task: same role, REVIEW permission (APPROVE for the final stage), and a data scope that
+     * reaches the task's target organisation (or the request when the task has no target). Holding it is not enough to
+     * decide: separation of duties ({@link SeparationOfDuties}, ADR-027) excludes the requester and their delegations.
      */
     public Optional<Grant> taskGrant(String roleCode, UUID targetOrgId, RequestScope r, boolean finalStage) {
+        return taskGrant(roleCode, targetOrgId, r, finalStage, g -> true);
+    }
+
+    /** {@link #taskGrant} among the grants that pass {@code allowed}. */
+    public Optional<Grant> taskGrant(String roleCode, UUID targetOrgId, RequestScope r, boolean finalStage,
+                                     java.util.function.Predicate<Grant> allowed) {
         return grants.stream()
+                .filter(allowed)
                 .filter(g -> g.roleCode().equals(roleCode))
                 .filter(g -> g.has(Permission.REVIEW) && (!finalStage || g.has(Permission.APPROVE)))
                 .filter(g -> targetOrgId == null
@@ -207,7 +213,13 @@ public final class AccessContext {
 
     /** Grant that lets this actor complete an execution task (role + EXECUTE + scope over the target). */
     public Optional<Grant> executionGrant(String roleCode, UUID targetOrgId, RequestScope r) {
+        return executionGrant(roleCode, targetOrgId, r, g -> true);
+    }
+
+    /** {@link #executionGrant} among the grants that pass {@code allowed}. */
+    public Optional<Grant> executionGrant(String roleCode, UUID targetOrgId, RequestScope r, java.util.function.Predicate<Grant> allowed) {
         return grants.stream()
+                .filter(allowed)
                 .filter(g -> g.roleCode().equals(roleCode) && g.has(Permission.EXECUTE))
                 .filter(g -> targetOrgId == null
                         ? g.coversRequest(r)

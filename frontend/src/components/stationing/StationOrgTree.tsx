@@ -18,6 +18,7 @@ export function StationOrgTree({
   selectedSiteId,
   onSite,
   revision,
+  revealPath,
 }: {
   selectedId: string | null;
   onSelect: (org: { id: string; name: string } | null) => void;
@@ -26,6 +27,8 @@ export function StationOrgTree({
   selectedSiteId: string | null;
   onSite: (f: MapFeature) => void;
   revision: number;
+  /** Ancestors to open so an organisation selected elsewhere (a link) is visible in the tree (key changes per request). */
+  revealPath?: { ids: string[]; key: number } | null;
 }) {
   const [roots, setRoots] = useState<OrgBranch[] | null>(null);
   const [kids, setKids] = useState<Kids>({});
@@ -65,6 +68,16 @@ export function StationOrgTree({
       ctl.abort();
     };
   }, [q]);
+
+  // an organisation selected from a link: open its ancestors one level at a time
+  useEffect(() => {
+    if (!revealPath?.ids.length) return;
+    (async () => {
+      for (const id of revealPath.ids) await load(id);
+      setOpen((o) => new Set([...o, ...revealPath.ids]));
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealPath?.key]);
 
   function load(id: string) {
     if (kids[id]) return Promise.resolve();

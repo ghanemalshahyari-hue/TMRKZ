@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -19,6 +20,7 @@ import ae.mover.access.AccessContext;
 import ae.mover.access.AccessService;
 import ae.mover.access.Permission;
 import ae.mover.access.RequestScope;
+import ae.mover.access.SeparationOfDuties;
 import ae.mover.access.ViewLevel;
 import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
@@ -50,9 +52,12 @@ public class RequestViews {
     private final BoundaryService boundaries;
     private final ApprovalSigner signer;
     private final SigningJobs signingJobs;
+    private final SeparationOfDuties separation;
 
     public RequestViews(JdbcClient jdbc, Json json, Clock clock, AccessService access, WorkflowService workflows,
-                        FormService forms, BoundaryService boundaries, ApprovalSigner signer, SigningJobs signingJobs) {
+                        FormService forms, BoundaryService boundaries, ApprovalSigner signer, SigningJobs signingJobs,
+                        SeparationOfDuties separation) {
+        this.separation = separation;
         this.boundaries = boundaries;
         this.signer = signer;
         this.signingJobs = signingJobs;
@@ -306,10 +311,13 @@ public class RequestViews {
         }
         List<MyTask> myTasks = new ArrayList<>();
         if ("SUBMITTED".equals(status)) {
+            // separation of duties (ADR-027): the requester and their delegations are never offered a decision
+            Set<UUID> requesters = separation.requester(id);
+            SeparationOfDuties.Independence independent = separation.of(ctx);
             jdbc.sql("select t.*, rd.name as role_name from task_assignment t join role_def rd on rd.code = t.role_code where t.request_id = :id and t.status = 'OPEN' order by t.created_at")
                     .param("id", id).query((rs, n) -> {
                         UUID target = Db.uuid(rs, "target_org_id");
-                        if (ctx.taskGrant(rs.getString("role_code"), target, scope, rs.getBoolean("final")).isPresent()
+                        if (independent.taskGrant(rs.getString("role_code"), target, scope, rs.getBoolean("final"), requesters).isPresent()
                                 && ctx.assignedToMe(Db.uuid(rs, "assigned_person_id"), rs.getBoolean("awaiting_assignment"))) {
                             myTasks.add(new MyTask(rs.getString("id"), rs.getString("stage_key"), rs.getString("stage_name"),
                                     rs.getString("role_name"), rs.getBoolean("final"), rs.getBoolean("requires_signature")));
@@ -321,7 +329,7 @@ public class RequestViews {
         boolean editable = ctx.mayModify((UUID) r.get("created_by"), (UUID) r.get("owner_org_id"), status);
         List<ExecutionTaskView> exec = executionTasks(ctx, id, scope);
         boolean canClose = "APPROVED".equals(status) && exec.stream().allMatch(e -> "DONE".equals(e.status()))
-                && ctx.grants().stream().anyMatch(g -> g.has(Permission.CLOSE) && g.coversRequest(scope));
+                && separation.of(ctx).mayClose(scope, separation.requester(id));
 
         UUID targetId = (UUID) r.get("target_reservation_id");
         TargetReservation target = targetId == null ? null : jdbc.sql("""
@@ -503,6 +511,8 @@ public class RequestViews {
 
     public List<ExecutionTaskView> executionTasks(AccessContext ctx, UUID requestId, RequestScope scope) {
         Instant now = clock.instant();
+        Set<UUID> requesters = separation.requester(requestId);
+        SeparationOfDuties.Independence independent = separation.of(ctx);
         return jdbc.sql("""
                 select e.*, rd.name as role_name, o.name as org_name, p.display_name as completer
                 from execution_task e join role_def rd on rd.code = e.role_code left join organization o on o.id = e.target_org_id
@@ -511,7 +521,10 @@ public class RequestViews {
                 .query((rs, n) -> {
                     boolean open = "OPEN".equals(rs.getString("status"));
                     Instant due = Db.instant(rs, "due_at");
-                    boolean can = open && ctx.executionGrant(rs.getString("role_code"), Db.uuid(rs, "target_org_id"), scope).isPresent()
+                    // offered only when the server would accept it: role, assignment and independence by purpose (ADR-028)
+                    SeparationOfDuties.StepRule rule = open ? separation.step(rs.getString("purpose"), requestId, requesters) : null;
+                    boolean can = open && rule.waiting() == null
+                            && independent.executionGrant(rs.getString("role_code"), Db.uuid(rs, "target_org_id"), scope, rule.excluded()).isPresent()
                             && ctx.assignedToMe(Db.uuid(rs, "assigned_person_id"), rs.getBoolean("awaiting_assignment"));
                     return new ExecutionTaskView(rs.getString("id"), rs.getString("key"), rs.getString("name"),
                             rs.getString("role_name"), rs.getString("org_name"), due.toString(), rs.getString("status"),

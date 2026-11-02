@@ -11,7 +11,7 @@ decision. Backend tests live in `backend/src/test/java/ae/mover/*IT.java`; `jour
 | R-01 | Main/sub sites, stable ids, no cycles, no destructive delete | `V1__core_schema.sql` (`site_no_cycle`, `site_no_delete`), `SiteService.retire` | `AdministrationAcceptanceIT.siteTree`, `ReservationAcceptanceIT.fullJourney` | Done |
 | R-02 | Organisation structure independent of sites | separate `organization` / `site` trees; `site_responsibility` history | schema; `AccessAcceptanceIT.transfer` | Done |
 | R-03 | Many organisations ↔ many facilities over time | `reservation`, `site_responsibility` (dated, non-overlapping), `GET /sites/{id}` occupancy history | `ReservationAcceptanceIT` | Done |
-| R-04 | Map and list linked, filters kept | `frontend/src/pages/MapPage.tsx` | screen review | Done (UI) |
+| R-04 | Map and list linked, filters kept | the retired `MapPage.tsx` until 2 Nov 2026; merged into `StationingPage.tsx` (ADR-029), merge removed the same day | screen review | **No screen** until the planned rebuild |
 | R-05 | Backgrounds only from available data | `MapService` serves installed packages only; caption says illustrative | `AdministrationAcceptanceIT.mapCoverage` | Done |
 | R-06 | Works without internet | local font, Leaflet bundled, local map package, strict CSP | journey (AT-29 checks) | Done |
 | R-07 | Local map packages with source/licence/coverage/version/date | `map-packages/*/manifest.json`, `map_package`, checksum verification | `mapCoverage` | Done |
@@ -96,7 +96,9 @@ decision. Backend tests live in `backend/src/test/java/ae/mover/*IT.java`; `jour
 History: the run of 29 Oct after the first on-site menu change had 17 pass / 5 fail (MAP-11, MAP-12a, MAP-12b, MAP-17,
 MAP-19); causes fixed on 30 Oct (panel action list stuck on the type step, request drawer covering the panel,
 marker focus lost on redraw, status banner over the zoom buttons, a harness date window reused every 200 minutes).
-Current result: see the run recorded in `docs/evidence/map/results.json`.
+Current result: see the run recorded in `docs/evidence/map/results.json` (22/22 on 2 Nov 2026 in the merged workspace of
+ADR-029). The merge was removed the same day by owner decision and «الخريطة والمرافق» stays retired, so this suite
+(committed version, targeting `#map`) cannot run until the planned rebuild; the rows below record the last results.
 
 Backend tests run on real PostgreSQL 17.11 + PostGIS 3.5 (`sh ops/test-backend.sh`). Browser tests drive Microsoft Edge
 with clicks and the keyboard against the acceptance environment started without internet egress
@@ -151,7 +153,7 @@ in through the directory sign-in page; the API only cross-checks. Evidence: `doc
 | J9 | Out-of-scope requester gets 404 for the request and its communications | `AccessContext`, `CommunicationService` | — | Pass |
 | J10 | Draft kept across navigation to the register; closing without saving writes nothing | docked/minimised wizard | — | Pass |
 | J11 | Phone: tapping a facility opens a bottom sheet with both actions on screen | `SiteActionMenu` sheet | — | Pass |
-| J12 | Ring around the site, «نقل المقر», new location drawn on the map, request submitted, site register unchanged (ADR-023) | `SiteActionMenu` ring, `RelocationPanel`, `RelocationService` | `ReservationAcceptanceIT.relocationRequest` | Pass |
+| J12 | Ring around the site, «نقل المقر», new location drawn on the map, request submitted, site register unchanged (ADR-023) | `SiteActionMenu` ring, `RelocationPanel` (removed 2 Nov 2026), `RelocationService` | `ReservationAcceptanceIT.relocationRequest` | Passed 2 Nov in the merged workspace (polygon panel); cannot run since the merge removal — a relocation is proposed from «مساحة التمركز» (S4–S11) |
 
 ## Production acceptance PA-01 … PA-30 (`docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md` §15)
 
@@ -218,3 +220,145 @@ drive Microsoft Edge against the acceptance environment with the real directory 
 | Covered organisations chosen, branch elsewhere not moved by default | `GET /placement/units`, panel step «الجهات المشمولة» | `PlacementIT.units` | Pass |
 | Server re-check at submission and approval; proposal never moves the site | `RequestService` (RELOCATION), `DecisionService.finalizeApproval` | `PlacementIT.serverRecheck` | Pass |
 | Temporary stationing: end-of-term return and reminders | — | — | Not implemented (phase D) |
+
+## Enterprise audit remediation (2026-11-02, ADR-026; `docs/audit/enterprise-launch/`)
+
+Each regression test was run red against 6d07014 before its fix. Runtime re-runs of the exploits against the rebuilt
+environments: `evidence/P0-verify.json`, `evidence/P1-verify.json`.
+
+| Finding | Fix | Test | Status |
+|---|---|---|---|
+| P0-1 SYSTEM_ADMIN (or any role beyond authority) through an HR position seat | `HrAdminService.createSeat/deactivateSeat` → `GrantAdminService.requireAuthorityForRole`; no seat for a position the actor holds | `SecurityRemediationIT.seatEscalation`, `.seatSelfGrant` | Pass |
+| P0-2 grant to oneself; the 72-hour bootstrap admin made permanent | `GrantAdminService.requireGrantee` (self and `person.bootstrap`) | `SecurityRemediationIT.selfGrant` | Pass |
+| P0-3 hidden site named/dated at submission, as target, through a guessed occupant | `PlacementService.evaluate` fails closed, masked conflicts without date/limit; `RelocationService.recheck(ctx, …)`; target visibility at save; `includedOrgIds` validated at check | `PlacementIT.hiddenSiteNeverDisclosed` | Pass |
+| P0-4 people directory and delegations ignore the access manager's scope | `OrganizationService.people/delegations`: scoped managers browse only their MANAGE_ACCESS subtrees; a ≥3-character search also finds active outsiders by name or exact employee no./account, returned as name + organisation only | `SecurityRemediationIT.scopedListings`; `access-studio.mjs` STUDIO-06 (cross-organisation grant on a shared site); `audit/p0-verify.mjs` | Pass |
+| P1-1 earlier approvals carried after the relocation proposal moved | `RequestService.carriedStages` compares the relocation snapshot | `PlacementIT.materialChangeReapproval` | Pass |
+| P1-2 stale import preview silently reverting a newer change; leftover PREVIEWED run | structure fingerprint + 30-minute validity; commit re-validates without a new run | `AdministrationAcceptanceIT.staleImportPreview` | Pass |
+| P1-3 invalid latitude saved as 0 | `frontend/src/lib/coords.ts`, `SiteMarkerEditor` | `coords.test.ts`; browser `tests/acceptance/audit/p1-verify.mjs` | Pass |
+| P1-4 overlapping registered boundaries accepted | `BoundaryService.overlaps` in `publishVersion` and `checkFor` (site tree exempt; edge ≤ 1 m²; hidden sites unnamed) | `BoundaryOverlapIT` | Pass |
+| Refusal reason showed the «no rule» note instead of the occupancy | `PlacementService.Check.refusal()` | `PlacementIT.refusalStatesTheRealReason` | Pass |
+| `relocationRequest` failed in the full suite (shared fixture point) | test-only: the proposal gets its own place | `ReservationAcceptanceIT.relocationRequest` | Pass |
+| Separation of duties: no self-approval, including via delegation/multiple roles (owner decision 2026-11-02) | ADR-027, see the next table | `SeparationOfDutiesIT` | Pass |
+| Identity-issue resolution bounded by the target person's grants | ADR-027, see the next table | `IdentityScopeIT.linkBounded` | Pass |
+| Scoped `/identity-issues` list | ADR-027, see the next table | `IdentityScopeIT.issuesScoped` | Pass |
+| Local provisioning of people; controlled unit creation in the UI (owner decision 2026-11-02) | — | — | Not implemented (planned) |
+
+Final checkpoint (2026-11-02, rebuilt offline acceptance environment): backend 116/116 (`evidence/remediation-final-full.log`),
+frontend typecheck + 26/26 + production build, `map-workspace.mjs` 22/22 with 0 external requests, `journey.mjs` passed
+(41 checks), `access-studio.mjs` 5/6 — STUDIO-03 expects 13 actions while 14 exist since `CLOSE` was added on 30 Oct
+(7d21b10); a stale expectation unrelated to this remediation, left unchanged. Before the map suite, the two open-ended
+stationing-demo bookings in the fictional environment were ended on 31 Dec 2026 (`testenv-demo-window.sql`), because
+the suite cannot find a free window while they are open-ended.
+
+## Separation of duties, identity and directory scope (2026-11-02, ADR-027)
+
+Each test was run red against the code before ADR-027 (`docs/audit/enterprise-launch/evidence/phase2-red.log`: 15 failing
+assertions), then green.
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| The requester decides no stage of their own request (approve, refer, return, reject), whatever roles they hold | `SeparationOfDuties.Independence.require` in `DecisionService.doDecide/signForTask/approvalDocument`; `myTasks`, `RequestViews` actions | `SeparationOfDutiesIT.requesterNeverDecides`; `AccessAcceptanceIT.requesterDecision` (AT-24 revised) | Pass |
+| Delegation both ways: requester as deputy; requester's authority delegated to a deputy | grants through a requester's delegation excluded | `SeparationOfDutiesIT.delegationBothWays` | Pass |
+| Approval role in another organisation or through an HR position seat | person-level check, any grant source | `SeparationOfDutiesIT.otherAssignments` | Pass |
+| Another person record of the same human (linked sign-in claiming the requester's key) | `PersonKeys.samePeople` | `SeparationOfDutiesIT.alternateRecord` | Pass |
+| No independent holder: routed to access managers, requester neither notified, shown, candidate nor assignable | `TaskSync` → `TaskRealignment.separate/route/pending/candidates/assign` | `SeparationOfDutiesIT.noIndependentApprover` | Pass |
+| Last independent holder leaves: routed, never handed to the requester | `TaskRealignment.realign/holders` | `SeparationOfDutiesIT.departureLeavesOnlyRequester` | Pass |
+| A task row assigned to the requester still refuses them | check before assignment | `SeparationOfDutiesIT.assignedTaskStillRefusesRequester` | Pass |
+| Assignment screen for routed tasks | `frontend/src/components/TaskRoutings.tsx` (#permissions/tasks) | `tests/acceptance/audit/sod-browser.mjs` (12/12) | Pass |
+| Unlinked sign-ins scoped to the manager's members | `IdentityService.issues/visibility` | `IdentityScopeIT.issuesScoped` | Pass |
+| Linking bounded by authority over the person's grants; never self, bootstrap, or a person other than the key's owner | `IdentityService.requireLinkable` | `IdentityScopeIT.linkBounded` | Pass |
+| No cross-organisation search by name or identifier; site-grant bridges with name + organisation only | `DirectoryScope`, `OrganizationService.people` | `IdentityScopeIT.directoryStrict`, `SecurityRemediationIT.scopedListings` | Pass |
+| Grants only to people in the manager's reach; ending a grant needs the authority to give it | `GrantAdminService.requireGrantee/end` | `IdentityScopeIT.grantsBounded`; `AuthorizationIT.grantAuthorityBounds` (fixture given an HR affiliation) | Pass |
+| Access explanation only for people in reach; an ended grant no longer relates someone | `AccessPolicyService.explain` | `IdentityScopeIT.explainScoped` | Pass |
+| Boundary overlap along the tree only as containment; a move can neither gain nor leave an overlap | `SiteOverlapRule`, `SiteService.update` | `BoundaryOverlapIT.treeExemptionIsContainment` | Pass |
+| Load tool signs in through the supported directory flow, synthetic accounts, disposable environment | `ops/load/load-test.mjs`, `up-load-env.sh`, `synthetic-identities.sql` | `SMOKE=1` run (`evidence/load-smoke.log`) | Pass |
+| Review H1: organisation roster only inside the reader's scope; grant sites only when visible | `OrganizationService.detail` | `IdentityScopeIT.rosterAndExplainBounded` | Pass |
+| Review M5: explanation for members only; targets named only when visible; bridges found by name only | `AccessPolicyService.explain`, `OrganizationService.people` | `IdentityScopeIT.rosterAndExplainBounded` | Pass |
+| Review M7/M1: self checks compare humans (grant, link, seat, delegation); bootstrap tied to its HR record; no delegation to bootstrap or of administration rights | `PersonKeys.same`, `GrantAdminService`, `IdentityService`, `HrAdminService.holdsPosition`, `OrganizationService.delegate` | `IdentityScopeIT.aliasesAndDelegations` | Pass |
+| Review: a stage the requester decided before ADR-027 is not carried into a resubmission | `RequestService.carriedStages` | `SeparationOfDutiesIT.legacySelfDecisionNotCarried` | Pass |
+| Review P1: NaN coordinates refused | `SiteService.validate` | `IdentityScopeIT.nanCoordinates` | Pass |
+| Review M2: relocation origin/target unnamed for a reader who may not see the site | `RelocationService.masked` | — (no dedicated test) | Code only |
+| Review P2: boundary registrations and tree moves serialised | `SiteOverlapRule.serialise` | — (race not reproduced in a test) | Code only |
+| Concurrent final approvals: conflict, not deadlock | `ReservationService.lockTrees` | `map-workspace.mjs` MAP-13; `ReservationAcceptanceIT` | Pass |
+
+Final checkpoint (2026-11-02, ADR-027, rebuilt offline acceptance environment and clean install): backend 133/133
+(`evidence/final-backend-full.log`); frontend typecheck + 26/26; `journey.mjs` passed (41); `sod-browser.mjs` 12/12;
+`audit/p0-verify.mjs` all FIXED; clean installation passed; `map-workspace.mjs` 21/22 — MAP-19 fails at a client-side
+keyboard step only in full-suite order (3 of 3 runs) and passes alone (2 of 2, `final-map19-only-*.log`); `access-studio.mjs`
+5/6 (STUDIO-03 stale count of actions) with one Leaflet `_leaflet_pos` page error during navigation (a map animation after
+the map was removed; not seen in earlier runs). Load tool: `SMOKE=1` passed and a 5-user, 15-second run had 0 errors
+(`evidence/load-smoke.log`, `load-small.log`) on the disposable `tmrkz-load` environment.
+
+## Stationing footprint interaction (2026-11-02, ADR-025 amendment)
+
+| Owner step | Code | Evidence (`tests/acceptance/stationing-footprint.mjs`, `docs/evidence/stationing/`) | Status |
+|---|---|---|---|
+| Open «مساحة التمركز»; select an organisation from the tree and from its map symbol (shared sites: one symbol per organisation) | `StationingPage` (symbols on by default; symbol pick kept over the responsible organisation) | S1, S2 | Pass |
+| Registered symbol and polygon visible; proposal is a copy, original unchanged | `StationingPanel` reference layer, `FootprintEditor.startMove` | S3, S4 | Pass |
+| Drag the whole polygon and symbol together, shape and area kept; drag again after drop | `FootprintEditor.startBodyDrag`, `lib/footprint.moveRigid` | S5; `footprint.test.ts` (rigid move keeps area, also at 60°N) | Pass |
+| Edit vertices; undo, redo, reset | `FootprintEditor.setVertex/undo/redo/reset` | S6 | Pass |
+| Draw a new polygon by vertex count; numbered vertices, edge lengths, area, validity | `FootprintEditor.startDraw/addVertex`, `lib/footprint.kinks/areaM2` | S7 | Pass |
+| Precise coordinates per vertex | panel vertex table, `lib/coords.parseCoordinates` | S8 | Pass |
+| Compare old and proposed | `FootprintEditor.compare` | S9 | Pass |
+| Cancel without changing authoritative data | panel cancel; boundary version and request count checked | S10 | Pass |
+| Save and reopen the preview as a draft | `StationingPanel.run(false)`, `#stationing/<id>` | S11 | Pass |
+
+During ADR-029 the proposal started from the shared site menu («نقل المقر»); after the merge was removed it starts again
+from the stationing popup «طلب تمركز / إعادة تمركز». Last run (2 Nov 2026, after the merge removal): 11/11 with the
+accepted measurements.
+
+## One GIS workspace — retirement of «الخريطة والمرافق» (2026-11-02, ADR-029)
+
+*Superseded the same day: the merge was removed by owner decision. The table below records the merged workspace's
+results; the merge-removal acceptance follows it.*
+
+| Owner acceptance item | Code | Evidence | Status |
+|---|---|---|---|
+| 1. Only «مساحة التمركز» in the navigation | `lib/app.NAV`, `App` | `gis-workspace.mjs` G1, `docs/evidence/gis-workspace/g01-navigation.png` | Pass |
+| 2. The old route redirects | `App.viewFromHash` (`#map`, `#map/…`, unknown → `#stationing`) | G2, `g02-legacy-redirect.png` | Pass |
+| 3. The workspace opens without errors | `StationingPage` | G3 (console errors 0 in every suite) | Pass |
+| 4. Existing sites and facilities remain accessible | `SiteTree`, `SiteDetailPanel`, organisation page link | G4, G6; MAP-02, MAP-03, MAP-10 | Pass |
+| 5. Organisational symbols work | `OrgSymbolLayer`, `StationingPage.followOrg` | G5; S2 | Pass |
+| 6. Polygon drawing and relocation still work | `StationingPanel`, `FootprintEditor` | S4–S11; J12; MAP-06 (boundary editing) | Pass |
+| 7. The 11 stationing steps pass | — | `stationing-footprint.mjs` 11/11 | Pass |
+| 8. Site management permissions unchanged | server flags in `/map/context`, `site.canManage`, `/sites/{id}/request-actions` | G7 (three roles), G8 (two roles); MAP-07a, MAP-04–06, MAP-15; `resources.mjs` 3/3 | Pass |
+| 9. Request creation and approvals still work | `SiteActionMenu`, `RequestWizard` drawer, review desk | MAP-11, MAP-12a/b, MAP-13, MAP-14; `admin-journey.mjs` J1–J12; `journey.mjs` | Pass |
+| 10. No API, component or database dependency broken | backend and OpenAPI unchanged; shared components kept | all suites above against the unchanged backend; frontend 30/30, type check, build | Pass |
+
+## Removal of the GIS merge (2026-11-02, owner decision; ADR-029 amendment)
+
+| Owner verification item | Evidence (`stationing-footprint.mjs` S1–S11; merge-removal check U1–U5, `docs/evidence/stationing-unmerge/`) | Status |
+|---|---|---|
+| 1. «مساحة التمركز» opens correctly | S1, U1 | Pass |
+| 2. The legacy page is absent from navigation | U2 (and `#map` opens `#stationing`) | Pass |
+| 3. Back to the simpler pre-merge layout | U3 (no context bar, period tools, old toolbar, facility tools, two-tab directory, side column, legend, coverage note); `before-*.png` / `after-*.png` | Pass |
+| 4. Organisations and their symbols | S2 | Pass |
+| 5. Registered polygons visible | S3, S4 | Pass |
+| 6. Full-polygon dragging | S5 (area difference 0٪ after two drags) | Pass |
+| 7. New polygon drawing and coordinate entry | S7, S8 | Pass |
+| 8. Vertex editing, undo, redo, reset | S6, S8 | Pass |
+| 9. Comparison and draft saving | S9, S11 | Pass |
+| 10. Cancel changes no registered data | S10 (boundary version and request count unchanged) | Pass |
+| 11. No merge-only controls or panels | U3, U4 (stationing popup, no ring or details panel), U5 (no facility tools for the facilities administrator) | Pass |
+
+Frontend type check, 30/30 unit tests and production build pass. Merge-removal check: `tests/acceptance/stationing-layout.mjs`
+(5/5); report `docs/GIS_MERGE_REMOVAL_AR.md`.
+
+## Stationing defect fixes (2026-11-02, stage 1 of the stationing UX brief)
+
+Defect numbers are those of `docs/audit/stationing-ux/VISUAL_AUDIT_AR.md`. Regression suite:
+`tests/acceptance/stationing-fixes.mjs` (Edge, test environment, evidence in `docs/evidence/stationing-fixes/`).
+
+| Defect | Fix | Regression test | Status |
+|---|---|---|---|
+| V-02 touch dragging moved the map, not the proposal | `FootprintEditor` starts the body drag from a capture-phase `pointerdown` (mouse, touch, pen); `touch-action:none` on the proposal (`stationing.css`) | F-02 (390×844, touch events) | Pass |
+| V-03 proposal and validation colours missing | `stationing.css`: self-referential `--green`/`--red` removed, the design-system tokens apply | F-03 | Pass |
+| V-04 vertices, edge lengths and proposal symbol shifted in RTL | `stationing.css`: explicit `left:0;top:0` for `.stw-prop-sym`, `.stw-orig-sym`, `.stw-vtx`, `.stw-edge` | F-04 (offset 0 px) | Pass |
+| V-06 overlapping site markers unreachable | `StationingPage.onSiteHit` asks which site when markers share a spot; `map.css`: the empty part of a marker no longer catches clicks | F-06 | Pass |
+| V-09 «على الخريطة» did not select the organisation | `lib/stationingLink` (`#stationing/site/<id>/org/<id>`), `OrgPage`, deep-link handling in `StationingPage`, `StationOrgTree.revealPath` | F-09; `stationingLink.test.ts` (3) | Pass |
+| V-15 organisations without a symbol missing on the map | `OrgSymbolLayer` draws a neutral mark; `map.css` keeps the strip left-to-right | F-15 | Pass |
+| V-16 keyboard: menu focus and Escape | `StationingPage`: the menu takes the focus; Escape closes it and returns the focus to the marker | F-16 | Pass |
+
+Results (2 Nov 2026): F-02…F-16 7/7, the 11 accepted polygon scenarios `stationing-footprint.mjs` 11/11, layout check
+`stationing-layout.mjs` 5/5, frontend type check and 33/33 unit tests. Backend, API and database unchanged.
+

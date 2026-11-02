@@ -6,6 +6,7 @@ import { OrgSymbol, SymbolAssignment, SymbolLegend } from '../components/UnitSym
 import { Dialog, DialogHead, Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { addDays, dubaiISO, fullDate, todayDubai } from '../lib/dates';
+import { stationingSiteHash } from '../lib/stationingLink';
 
 type MembershipForm = { personId: string; roleCode: string; positionTitle: string; validFrom: string; validTo: string };
 type DelegationForm = { membership: Member; delegateId: string; validFrom: string; validTo: string; reason: string };
@@ -263,8 +264,9 @@ export function OrgPage() {
                         <button
                           className="button compact"
                           onClick={() => {
+                            // opens «مساحة التمركز» on this site with this organisation selected (V-09)
                             app.setSelectedSiteId(s.id);
-                            app.navigate('map');
+                            location.hash = stationingSiteHash(s.id, current);
                           }}
                         >
                           على الخريطة

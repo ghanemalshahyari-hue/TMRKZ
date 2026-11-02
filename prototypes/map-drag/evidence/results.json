@@ -1,0 +1,224 @@
+{
+  "base": "http://127.0.0.1:5191",
+  "when": "2026-11-02T02:28:18.982Z",
+  "external": [],
+  "results": [
+    {
+      "scene": "10 موقع",
+      "url": "http://127.0.0.1:5191/?p=a&n=10&mode=opt",
+      "crossedOut": true,
+      "crossedOcc": true,
+      "proto": "Leaflet (A)",
+      "mode": "opt",
+      "instFps": 74.6,
+      "dragStarts": 1,
+      "dragEnds": 1,
+      "live": {
+        "distanceM": 3599.6606252748566,
+        "inRange": true,
+        "occupied": "",
+        "clamped": ""
+      },
+      "lastDrag": {
+        "frames": 165,
+        "durationMs": 2188,
+        "meanMs": 13.34,
+        "p50Ms": 13.3,
+        "p95Ms": 13.4,
+        "worstMs": 13.5,
+        "fpsMean": 75,
+        "janky": 0,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "heavyUpdates": 1,
+        "serverValidations": 1
+      }
+    },
+    {
+      "scene": "100 موقع",
+      "url": "http://127.0.0.1:5191/?p=a&n=100&mode=opt",
+      "crossedOut": true,
+      "crossedOcc": true,
+      "proto": "Leaflet (A)",
+      "mode": "opt",
+      "instFps": 75.2,
+      "dragStarts": 1,
+      "dragEnds": 1,
+      "live": {
+        "distanceM": 3599.6606252748566,
+        "inRange": true,
+        "occupied": "",
+        "clamped": ""
+      },
+      "lastDrag": {
+        "frames": 170,
+        "durationMs": 2258,
+        "meanMs": 13.34,
+        "p50Ms": 13.3,
+        "p95Ms": 13.5,
+        "worstMs": 13.7,
+        "fpsMean": 75,
+        "janky": 0,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "heavyUpdates": 1,
+        "serverValidations": 1
+      }
+    },
+    {
+      "scene": "1000 موقع",
+      "url": "http://127.0.0.1:5191/?p=a&n=1000&mode=opt",
+      "crossedOut": true,
+      "crossedOcc": true,
+      "proto": "Leaflet (A)",
+      "mode": "opt",
+      "instFps": 75.8,
+      "dragStarts": 1,
+      "dragEnds": 1,
+      "live": {
+        "distanceM": 3599.6606252748566,
+        "inRange": true,
+        "occupied": "",
+        "clamped": ""
+      },
+      "lastDrag": {
+        "frames": 162,
+        "durationMs": 2156,
+        "meanMs": 13.34,
+        "p50Ms": 13.3,
+        "p95Ms": 13.4,
+        "worstMs": 13.6,
+        "fpsMean": 75,
+        "janky": 0,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "heavyUpdates": 1,
+        "serverValidations": 1
+      }
+    },
+    {
+      "scene": "100 موقع",
+      "url": "http://127.0.0.1:5191/?p=a&n=100&mode=naive",
+      "crossedOut": false,
+      "crossedOcc": true,
+      "proto": "Leaflet (A)",
+      "mode": "naive",
+      "instFps": 74.6,
+      "dragStarts": 1,
+      "dragEnds": 1,
+      "live": {
+        "distanceM": 3599.6606252748566,
+        "inRange": true,
+        "occupied": "",
+        "clamped": ""
+      },
+      "lastDrag": {
+        "frames": 175,
+        "durationMs": 2326,
+        "meanMs": 13.34,
+        "p50Ms": 13.3,
+        "p95Ms": 13.5,
+        "worstMs": 13.6,
+        "fpsMean": 75,
+        "janky": 0,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "heavyUpdates": 84,
+        "serverValidations": 1
+      }
+    },
+    {
+      "scene": "10 موقع",
+      "url": "http://127.0.0.1:5191/?p=b&n=10",
+      "crossedOut": true,
+      "crossedOcc": true,
+      "proto": "MapLibre + Terra Draw (B)",
+      "mode": "opt",
+      "instFps": 75.2,
+      "dragStarts": 1,
+      "dragEnds": 1,
+      "live": {
+        "distanceM": 2683.1205819236457,
+        "inRange": true,
+        "occupied": "منطقة محجوزة — شرق",
+        "clamped": ""
+      },
+      "lastDrag": {
+        "frames": 170,
+        "durationMs": 2263,
+        "meanMs": 13.34,
+        "p50Ms": 13.3,
+        "p95Ms": 13.5,
+        "worstMs": 14.3,
+        "fpsMean": 75,
+        "janky": 0,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "heavyUpdates": 1,
+        "serverValidations": 1
+      }
+    },
+    {
+      "scene": "100 موقع",
+      "url": "http://127.0.0.1:5191/?p=b&n=100",
+      "crossedOut": true,
+      "crossedOcc": true,
+      "proto": "MapLibre + Terra Draw (B)",
+      "mode": "opt",
+      "instFps": 75.2,
+      "dragStarts": 1,
+      "dragEnds": 1,
+      "live": {
+        "distanceM": 2683.1205819236457,
+        "inRange": true,
+        "occupied": "منطقة محجوزة — شرق",
+        "clamped": ""
+      },
+      "lastDrag": {
+        "frames": 166,
+        "durationMs": 2207,
+        "meanMs": 13.34,
+        "p50Ms": 13.3,
+        "p95Ms": 13.4,
+        "worstMs": 14.3,
+        "fpsMean": 75,
+        "janky": 0,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "heavyUpdates": 1,
+        "serverValidations": 1
+      }
+    },
+    {
+      "scene": "1000 موقع",
+      "url": "http://127.0.0.1:5191/?p=b&n=1000",
+      "crossedOut": true,
+      "crossedOcc": true,
+      "proto": "MapLibre + Terra Draw (B)",
+      "mode": "opt",
+      "instFps": 76.3,
+      "dragStarts": 1,
+      "dragEnds": 1,
+      "live": {
+        "distanceM": 2683.1205819236457,
+        "inRange": true,
+        "occupied": "منطقة محجوزة — شرق",
+        "clamped": ""
+      },
+      "lastDrag": {
+        "frames": 160,
+        "durationMs": 2124,
+        "meanMs": 13.34,
+        "p50Ms": 13.3,
+        "p95Ms": 13.5,
+        "worstMs": 13.5,
+        "fpsMean": 75,
+        "janky": 0,
+        "longTasks": 0,
+        "longTaskMs": 0,
+        "heavyUpdates": 1,
+        "serverValidations": 1
+      }
+    }
+  ]
+}

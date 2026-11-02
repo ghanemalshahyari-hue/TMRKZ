@@ -195,6 +195,18 @@ public class PlacementService {
     public record Check(boolean ok, String status, String range, double distanceM, String measure, Rule rule,
                         double[] from, double[] point, Ref targetSite, List<Conflict> conflicts, List<String> messages,
                         Integer otherProposals, String note) {
+
+        /**
+         * Why the proposal is refused, for a submission or decision error: the range problem, else the first blocking
+         * conflict — never the informational «no rule» note, which may come first in {@link #messages()}.
+         */
+        public String refusal() {
+            if ("TOO_CLOSE".equals(range) || "TOO_FAR".equals(range)) {
+                return messages.isEmpty() ? "الموقع المقترح خارج النطاق المسموح." : messages.get(0);
+            }
+            return conflicts.stream().filter(Conflict::blocking).map(Conflict::message).findFirst()
+                    .orElse("الموقع المقترح لا يستوفي الشروط.");
+        }
     }
 
     /** Interactive check from the map (preview only: the server checks again at save, submission and approval). */
@@ -225,9 +237,21 @@ public class PlacementService {
         if (end != null && !end.isAfter(start)) {
             throw ApiException.validation("نهاية المدة يجب أن تكون بعد بدايتها.");
         }
+        // covered organisations are limited exactly as when saving: otherwise guessing an occupant's id would make its
+        // masked booking disappear and so confirm who occupies a hidden site (audit P0-3)
         List<UUID> included = new ArrayList<>();
-        if (in.includedOrgIds() != null) {
-            in.includedOrgIds().forEach(s -> included.add(uuid(s, "الجهات المشمولة")));
+        if (in.includedOrgIds() != null && !in.includedOrgIds().isEmpty()) {
+            if (org == null) {
+                throw ApiException.validation("حدد الجهة المنقولة قبل الجهات المشمولة.");
+            }
+            Set<UUID> branch = orgs.requireVisibleBranch(ctx, org, true);
+            for (String s : in.includedOrgIds()) {
+                UUID u = uuid(s, "الجهات المشمولة");
+                if (!branch.contains(u)) {
+                    throw ApiException.validation("الجهات المشمولة يجب أن تكون الجهة المختارة أو من فروعها.");
+                }
+                included.add(u);
+            }
         }
         UUID exclude = in.excludeRequestId() == null || in.excludeRequestId().isBlank() ? null : uuid(in.excludeRequestId(), "الطلب");
         return evaluate(ctx, action, org, included, from, in.stationLevel(), json.write(in.geometry()), target, start, end, exclude);
@@ -302,9 +326,11 @@ public class PlacementService {
         List<Conflict> conflicts = new ArrayList<>();
         for (Map<String, Object> h : hits) {
             UUID siteId = (UUID) h.get("id");
-            ViewLevel view = ctx == null ? ViewLevel.FULL : ctx.siteView(siteId, Set.of(), (UUID) h.get("resp"));
-            String label = view == ViewLevel.NONE ? "منطقة مشغولة غير ظاهرة لك" : (String) h.get("name");
-            String shownId = view == ViewLevel.NONE ? null : siteId.toString();
+            // fail closed: without the actor's context nothing is named (audit P0-3)
+            ViewLevel view = ctx == null ? ViewLevel.NONE : ctx.siteView(siteId, Set.of(), (UUID) h.get("resp"));
+            boolean hidden = view == ViewLevel.NONE;
+            String label = hidden ? "منطقة مشغولة غير ظاهرة لك" : (String) h.get("name");
+            String shownId = hidden ? null : siteId.toString();
             boolean exclusive = false;
             boolean limit = false;
             boolean shared = false;
@@ -344,10 +370,12 @@ public class PlacementService {
             List<Ref> shownUsers = view == ViewLevel.FULL && !users.isEmpty() ? users : null;
             String untilIso = exclusive || limit ? (openEnded ? null : Times.iso(until)) : null;
             if (exclusive || limit) {
+                // a hidden site blocks without telling when it frees up or whether it is a shared limit
                 String msg = "لا يمكن استخدام هذا الموقع؛ «" + label + "» محجوز للفترة المطلوبة"
-                        + (openEnded ? "." : "، ويصبح متاحاً بعد " + until.atZone(Times.DISPLAY_ZONE).toLocalDate() + ".");
-                conflicts.add(new Conflict(shownId, label, limit && !exclusive ? "LIMIT" : "OCCUPIED", true, untilIso, shownUsers, msg));
-            } else if (shared) {
+                        + (openEnded || hidden ? "." : "، ويصبح متاحاً بعد " + until.atZone(Times.DISPLAY_ZONE).toLocalDate() + ".");
+                conflicts.add(new Conflict(shownId, label, limit && !exclusive && !hidden ? "LIMIT" : "OCCUPIED", true,
+                        hidden ? null : untilIso, shownUsers, msg));
+            } else if (shared && !hidden) {
                 conflicts.add(new Conflict(shownId, label, "SHARED", false, null, shownUsers,
                         "«" + label + "» مستخدم استخداماً مشتركاً مسموحاً؛ لا يمنع الاختيار."));
             } else if (target != null && target.equals(siteId)) {
@@ -439,7 +467,8 @@ public class PlacementService {
 
     // ---- helpers --------------------------------------------------------------------------------------------
 
-    private void requireVisibleSite(AccessContext ctx, UUID siteId) {
+    /** 404 unless the site exists, is active and the actor may see it (the same answer as for a random id). */
+    public void requireVisibleSite(AccessContext ctx, UUID siteId) {
         UUID resp = jdbc.sql("select organization_id from site_responsibility where site_id = :s and valid_to is null")
                 .param("s", siteId).query(UUID.class).optional().orElse(null);
         boolean exists = jdbc.sql("select count(*) from site where id = :s and status = 'ACTIVE'").param("s", siteId)

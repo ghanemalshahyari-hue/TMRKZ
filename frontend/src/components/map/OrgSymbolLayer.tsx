@@ -18,8 +18,9 @@ const urlCache = new Map<string, Rendered | null>();
  * responsible for a site — and of every organisation using it in the period — shown as a small strip of clickable
  * symbols beside the site's marker, never instead of the facility marker or its geometry. Each symbol is one
  * organisation's mark; every visible, assigned organisation is shown (none is silently dropped). The symbol keeps its
- * standard colours and is independent of availability and request state. Only organisations the actor may see and that
- * have an approved assignment appear; a location is never invented and selecting a symbol never writes anything.
+ * standard colours and is independent of availability and request state. Only organisations the actor may see appear;
+ * one without an approved assignment keeps a neutral mark (2 Nov 2026, V-15). A location is never invented and selecting
+ * a symbol never writes anything.
  * Clicking (or Enter/Space on) one symbol selects both that organisation — applying it as the map's organisation
  * filter — and the site, opening the site's existing actions. So the symbol is a working tool, not only a picture.
  */
@@ -127,8 +128,9 @@ export function OrgSymbolLayer({
       const refs: Ref[] = [];
       if (f.responsibleOrg) refs.push(f.responsibleOrg);
       for (const o of f.occupants ?? []) if (!refs.some((r) => r.id === o.id)) refs.push(o);
-      // every visible organisation with an approved symbol is shown — nothing is silently dropped
-      const imgs = refs.map((r) => ({ r, sym: symbols.get(r.id) })).filter((x): x is { r: Ref; sym: Rendered } => !!x.sym);
+      // every visible organisation is shown — one without an approved symbol keeps a neutral mark (V-15), so a shared
+      // site lists all its organisations and each stays selectable; nothing is drawn before the lookup has answered
+      const imgs = refs.map((r) => ({ r, sym: symbols.get(r.id) })).filter((x): x is { r: Ref; sym: Rendered | null } => x.sym !== undefined);
       if (imgs.length === 0) continue;
       const html =
         '<span class="org-symbol-wrap" role="group" aria-label="رموز جهات ' + escapeHtml(f.name) + '">' +
@@ -136,9 +138,11 @@ export function OrgSymbolLayer({
           .map(
             ({ r, sym }, i) =>
               '<button type="button" class="map-org-symbol-btn" data-i="' + i + '" ' +
-              'title="' + escapeHtml(r.name + ' — ' + sym.title) + '" ' +
+              'title="' + escapeHtml(r.name + ' — ' + (sym ? sym.title : 'لم يُحدد رمز للوحدة')) + '" ' +
               'aria-label="' + escapeHtml('اختيار جهة ' + r.name + ' والموقع ' + f.name) + '">' +
-              '<img class="map-org-symbol" src="' + sym.url + '" alt="' + escapeHtml(r.name) + '" />' +
+              (sym
+                ? '<img class="map-org-symbol" src="' + sym.url + '" alt="' + escapeHtml(r.name) + '" />'
+                : '<span class="map-org-symbol generic" aria-hidden="true"></span>') +
               '</button>',
           )
           .join('') +

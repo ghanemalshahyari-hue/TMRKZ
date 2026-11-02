@@ -69,12 +69,15 @@ public class RequestService {
     private final RequestViews views;
     private final BoundaryService boundaries;
     private final RelocationService relocations;
+    private final ae.mover.access.SeparationOfDuties separation;
 
     public RequestService(JdbcClient jdbc, Json json, Clock clock, AccessService access, RequestTypes types,
                           FormService forms, WorkflowService workflows, PolicyService policies,
                           ReservationService reservations, RuntimeService runtime, TaskSync taskSync,
                           AuditService audit, OutboxService outbox, IdempotencyService idempotency, RequestViews views,
-                          BoundaryService boundaries, RelocationService relocations) {
+                          BoundaryService boundaries, RelocationService relocations,
+                          ae.mover.access.SeparationOfDuties separation) {
+        this.separation = separation;
         this.relocations = relocations;
         this.jdbc = jdbc;
         this.json = json;
@@ -417,9 +420,9 @@ public class RequestService {
                         problems.add(new Problem("period", "نهاية المدة المؤقتة يجب أن تكون بعد تاريخ البداية."));
                     } else {
                         // the distance rule and the occupancy are checked again on the server, never trusted from the map
-                        ae.mover.facilities.PlacementService.Check c = relocations.recheck(id, start);
+                        ae.mover.facilities.PlacementService.Check c = relocations.recheck(ctx, id, start);
                         if (c != null && !c.ok()) {
-                            problems.add(new Problem("relocation", c.messages().isEmpty() ? "الموقع المقترح لا يستوفي الشروط." : c.messages().get(0)));
+                            problems.add(new Problem("relocation", c.refusal()));
                         }
                     }
                 }
@@ -562,8 +565,9 @@ public class RequestService {
     }
 
     /**
-     * Change-impact policy (decision D-06, conservative default): changes to period, facilities, owner, participants or
-     * target reservation require full re-approval; field changes follow each field's changePolicy. Stages fully
+     * Change-impact policy (decision D-06, conservative default): changes to period, facilities, owner, participants,
+     * target reservation or the relocation proposal (its geometry, organisation, level, duration, covered units or
+     * target site — audit P1-1) require full re-approval; field changes follow each field's changePolicy. Stages fully
      * approved in the previous cycle and not affected are carried forward; the final stage always runs again because
      * its signature binds a specific revision.
      */
@@ -571,7 +575,8 @@ public class RequestService {
                                        WorkflowDefinition def) {
         Map<String, Object> prev = jdbc.sql("select data::text from request_revision where request_id = :r and revision = :v")
                 .param("r", requestId).param("v", previous).query(String.class).optional().map(json::map).orElse(Map.of());
-        for (String key : List.of("period", "resourceIds", "ownerOrgId", "participantOrgIds", "targetReservationId", "boundaries")) {
+        for (String key : List.of("period", "resourceIds", "ownerOrgId", "participantOrgIds", "targetReservationId", "boundaries",
+                "relocation")) {
             if (!sameValue(prev.get(key), data.get(key))) {
                 return List.of();
             }
@@ -606,6 +611,11 @@ public class RequestService {
                 .param("r", requestId).param("v", previous).query(String.class).list());
         approved.addAll(jdbc.sql("select unnest(carried_stages) from request_revision where request_id = :r and revision = :v")
                 .param("r", requestId).param("v", previous).query(String.class).list());
+        // a stage decided by the requester (allowed before ADR-027) is never carried: it is decided again independently
+        approved.removeAll(jdbc.sql("""
+                select distinct stage_key from decision where request_id = :r and decision in ('APPROVE', 'REFER')
+                  and (by_requester or actor_person_id = any(string_to_array(:p, ',')::uuid[]))""")
+                .param("r", requestId).param("p", Db.ids(separation.requester(requestId))).query(String.class).list());
         List<String> carried = new ArrayList<>();
         for (WorkflowDefinition.Stage s : def.stages()) {
             if (!s.finalStage() && approved.contains(s.key()) && !restart.contains(s.key())) {

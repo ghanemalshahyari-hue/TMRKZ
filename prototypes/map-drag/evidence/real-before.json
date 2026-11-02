@@ -1,0 +1,20 @@
+{
+  "label": "before",
+  "base": "http://localhost:8088",
+  "user": "t.requester",
+  "when": "2026-11-02T02:46:22.898Z",
+  "external": [],
+  "errors": [],
+  "stats": {
+    "frames": 182,
+    "meanMs": 13.34,
+    "p95Ms": 13.5,
+    "worstMs": 13.5,
+    "fpsMean": 75,
+    "janky": 0,
+    "longTasks": 0,
+    "longTaskMs": 0,
+    "panelMutations": 2220,
+    "markerChildMutations": 570
+  }
+}

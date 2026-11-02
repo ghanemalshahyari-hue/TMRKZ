@@ -501,10 +501,13 @@ class ReservationAcceptanceIT extends IntegrationTest {
         int v0 = req.get("/requests/" + id).body().path("version").asInt();
         assertThat(req.post("/requests/" + id + "/submit", Map.of("expectedVersion", v0), UUID.randomUUID().toString()).status())
                 .isEqualTo(400);
+        // a place of its own: every IntegrationTest.site() marker sits at (25.2, 55.3), and the submission re-check
+        // rightly refuses a proposal touching one that another test has booked (shared test database)
+        double x = 56 + Math.random(), y = 24 + Math.random();
         Map<String, Object> square = Map.of("type", "Polygon", "coordinates",
-                List.of(List.of(List.of(55.30, 25.20), List.of(55.302, 25.20), List.of(55.302, 25.202), List.of(55.30, 25.202), List.of(55.30, 25.20))));
+                List.of(List.of(List.of(x, y), List.of(x + 0.002, y), List.of(x + 0.002, y + 0.002), List.of(x, y + 0.002), List.of(x, y))));
         Map<String, Object> bow = Map.of("type", "Polygon", "coordinates",
-                List.of(List.of(List.of(55.30, 25.20), List.of(55.302, 25.202), List.of(55.302, 25.20), List.of(55.30, 25.202), List.of(55.30, 25.20))));
+                List.of(List.of(List.of(x, y), List.of(x + 0.002, y + 0.002), List.of(x + 0.002, y), List.of(x, y + 0.002), List.of(x, y))));
         Map<String, Object> proposal = new java.util.LinkedHashMap<>();
         proposal.put("organizationId", orgA.toString());
         proposal.put("includeDescendants", true);
@@ -517,7 +520,8 @@ class ReservationAcceptanceIT extends IntegrationTest {
         assertThat(saved.status()).as(saved.toString()).isEqualTo(200);
         assertThat(saved.body().path("areaM2").asDouble()).isGreaterThan(40000);
         assertThat(login("reqb").put("/requests/" + id + "/relocation", proposal).status()).isEqualTo(404);
-        assertThat(req.submit(id).status()).isEqualTo(200);
+        Res sent = req.submit(id);
+        assertThat(sent.status()).as(sent.toString()).isEqualTo(200);
         assertThat(jdbc.sql("select data->'relocation'->>'proposedName' from request_revision where request_id = :id and revision = 1")
                 .param("id", id).query(String.class).single()).isEqualTo("المقر الجديد المقترح");
 

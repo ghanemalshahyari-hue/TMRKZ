@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import ae.mover.access.AccessContext;
 import ae.mover.access.Permission;
 import ae.mover.audit.AuditService;
+import ae.mover.authz.GrantAdminService;
 import ae.mover.common.ApiException;
 import ae.mover.common.Db;
 import ae.mover.common.ErrorCode;
@@ -37,9 +38,13 @@ public class HrAdminService {
     private final HrSourceAdapter adapter;
     private final HrSyncService sync;
     private final AuditService audit;
+    private final GrantAdminService grants;
+    private final ae.mover.access.PersonKeys keys;
 
     public HrAdminService(JdbcClient jdbc, Json json, Clock clock, HrProperties props, HrSettingsCipher cipher,
-                          HrSourceAdapter adapter, HrSyncService sync, AuditService audit) {
+                          HrSourceAdapter adapter, HrSyncService sync, AuditService audit, GrantAdminService grants,
+                          ae.mover.access.PersonKeys keys) {
+        this.keys = keys;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -48,6 +53,7 @@ public class HrAdminService {
         this.adapter = adapter;
         this.sync = sync;
         this.audit = audit;
+        this.grants = grants;
     }
 
     // ---- status -----------------------------------------------------------------------------------------------
@@ -478,14 +484,20 @@ public class HrAdminService {
         if (!ctx.canFor(Permission.MANAGE_ACCESS, org)) {
             throw ApiException.forbidden("لا تملك إدارة الصلاحيات على هذه الجهة.");
         }
+        UUID siteScope = in.siteScopeId() == null || in.siteScopeId().isBlank() ? null : UUID.fromString(in.siteScopeId());
+        // a seat hands the role to whoever holds the position: the same authority as granting it (audit P0-1) ...
+        grants.requireAuthorityForRole(ctx, org, in.roleCode(), siteScope);
+        // ... and a seat for a position the actor holds would be a grant to themselves
+        if (holdsPosition(ctx.personId(), org, in.positionId().trim())) {
+            throw ApiException.forbidden("لا يجوز إنشاء مقعد لمنصب تشغله أنت؛ ينشئه مدير صلاحيات آخر.");
+        }
         UUID id = UUID.randomUUID();
         try {
             jdbc.sql("""
                     insert into position_seat(id, organization_id, position_id, name, role_code, site_scope_id, created_by)
                     values (:id, :o, :p, :n, :r, :s, :by)""")
                     .param("id", id).param("o", org).param("p", in.positionId().trim()).param("n", in.name().trim())
-                    .param("r", in.roleCode()).param("s", in.siteScopeId() == null ? null : UUID.fromString(in.siteScopeId()))
-                    .param("by", ctx.personId()).update();
+                    .param("r", in.roleCode()).param("s", siteScope).param("by", ctx.personId()).update();
         } catch (org.springframework.dao.DataAccessException e) {
             throw ApiException.validation("تعذر حفظ مقعد المسؤولية: الدور غير موجود أو المقعد مكرر.");
         }
@@ -494,14 +506,26 @@ public class HrAdminService {
         return Map.of("id", id.toString());
     }
 
+    /** Whether the person — any record of the same human — holds the HR position now. */
+    private boolean holdsPosition(UUID person, UUID org, String positionId) {
+        return person != null && jdbc.sql("""
+                select count(*) from affiliation where person_id = any(string_to_array(:p, ',')::uuid[]) and organization_id = :o
+                  and position_id = :pos and valid_to is null""")
+                .param("p", Db.ids(keys.samePeople(List.of(person)).get(person))).param("o", org).param("pos", positionId)
+                .query(Integer.class).single() > 0;
+    }
+
     @Transactional
     public void deactivateSeat(AccessContext ctx, UUID id, String reason) {
         ctx.require(Permission.MANAGE_ACCESS);
-        Map<String, Object> seat = jdbc.sql("select organization_id from position_seat where id = :id and active").param("id", id)
-                .query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
+        Map<String, Object> seat = jdbc.sql("select organization_id, role_code, site_scope_id from position_seat where id = :id and active")
+                .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         if (!ctx.canFor(Permission.MANAGE_ACCESS, (UUID) seat.get("organization_id"))) {
             throw ApiException.notFound();
         }
+        // only someone who could have created the seat may withdraw it (no removal of a higher role's seat)
+        grants.requireAuthorityForRole(ctx, (UUID) seat.get("organization_id"), (String) seat.get("role_code"),
+                (UUID) seat.get("site_scope_id"));
         jdbc.sql("update position_seat set active = false where id = :id").param("id", id).update();
         audit.recordAs(ctx.actor(), "POSITION_SEAT_DEACTIVATED", "POSITION_SEAT", id.toString(), null, Map.of(), reason);
     }

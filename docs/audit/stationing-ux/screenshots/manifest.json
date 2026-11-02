@@ -1,0 +1,2675 @@
+{
+  "run": "2026-11-02T09:05:30.371Z",
+  "base": "http://localhost:8088",
+  "browser": "Microsoft Edge (playwright-core), headed",
+  "timings": {
+    "A-firstPin-t.requester": 13,
+    "A-firstPin-t.manager": 818,
+    "A-firstPin-t.facilities": 13,
+    "A-firstPin-t.admin": 14,
+    "A-firstPin-t.limited": 13,
+    "D-drag-wall-ms": 2010,
+    "D-drag-frames": {
+      "frames": 124,
+      "medianMs": 13.3,
+      "p95Ms": 13.5,
+      "maxMs": 133.4
+    }
+  },
+  "consoleErrors": [],
+  "externalRequests": [],
+  "entries": [
+    {
+      "file": "01-A-initial-requester.png",
+      "closeup": "01b-A-initial-requester-closeup.png",
+      "scenario": "A — الفتح الأول دون اختيار",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "فتح «مساحة التمركز» دون اختيار أي شيء",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13.5,
+        "pinsInView": 4,
+        "labelsInView": 4,
+        "symbolStripsInView": 4,
+        "symbolButtonsInView": 4,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 4,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "02-A-controls-requester.png",
+      "closeup": "02b-A-controls-requester-closeup.png",
+      "scenario": "A — الفتح الأول: أدوات الطبقات والتكبير",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "قراءة أدوات الخريطة (الطبقات، التكبير، القياس)",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13.5,
+        "pinsInView": 4,
+        "labelsInView": 4,
+        "symbolStripsInView": 4,
+        "symbolButtonsInView": 4,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 4,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "scenario": "A — المرور فوق علامة",
+      "role": "t.requester",
+      "viewport": "1920×1080",
+      "measured": {
+        "title": "مركز الخدمات — ✓ متاح",
+        "tooltips": 0
+      }
+    },
+    {
+      "file": "03-A-selected-requester.png",
+      "closeup": "03b-A-selected-requester-closeup.png",
+      "scenario": "A — موقع محدد مقابل غير محدد",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "النقر على علامة موقع",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": [
+          967,
+          301,
+          250,
+          164
+        ],
+        "zoom": 13.5,
+        "pinsInView": 4,
+        "labelsInView": 4,
+        "symbolStripsInView": 4,
+        "symbolButtonsInView": 4,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 4,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "04-A-initial-manager.png",
+      "closeup": "04b-A-initial-manager-closeup.png",
+      "scenario": "A — الفتح الأول دون اختيار",
+      "role": "t.manager — مسؤول صلاحيات الجهة (إداري جهة)",
+      "viewport": "1920×1080",
+      "attempted": "فتح «مساحة التمركز» دون اختيار أي شيء",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13.5,
+        "pinsInView": 4,
+        "labelsInView": 4,
+        "symbolStripsInView": 4,
+        "symbolButtonsInView": 4,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 4,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "05-A-initial-facilities.png",
+      "closeup": "05b-A-initial-facilities-closeup.png",
+      "scenario": "A — الفتح الأول دون اختيار",
+      "role": "t.facilities — مراجع المرافق",
+      "viewport": "1920×1080",
+      "attempted": "فتح «مساحة التمركز» دون اختيار أي شيء",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13,
+        "pinsInView": 12,
+        "labelsInView": 12,
+        "symbolStripsInView": 12,
+        "symbolButtonsInView": 13,
+        "overlaps": {
+          "labelOverLabel": 1,
+          "symbolOverLabel": 1,
+          "symbolOverPin": 13,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 1,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "06-A-initial-admin.png",
+      "closeup": "06b-A-initial-admin-closeup.png",
+      "scenario": "A — الفتح الأول دون اختيار",
+      "role": "t.admin — مدير النظام (ومدير سجل المواقع)",
+      "viewport": "1920×1080",
+      "attempted": "فتح «مساحة التمركز» دون اختيار أي شيء",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13,
+        "pinsInView": 12,
+        "labelsInView": 12,
+        "symbolStripsInView": 12,
+        "symbolButtonsInView": 13,
+        "overlaps": {
+          "labelOverLabel": 1,
+          "symbolOverLabel": 1,
+          "symbolOverPin": 13,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 1,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "scenario": "A t.admin",
+      "error": "locator.click: Timeout 30000ms exceeded."
+    },
+    {
+      "file": "07-A-initial-limited.png",
+      "closeup": "07b-A-initial-limited-closeup.png",
+      "scenario": "A — الفتح الأول دون اختيار",
+      "role": "t.limited — اطلاع محدود (ملخص فقط)",
+      "viewport": "1920×1080",
+      "attempted": "فتح «مساحة التمركز» دون اختيار أي شيء",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13.5,
+        "pinsInView": 3,
+        "labelsInView": 3,
+        "symbolStripsInView": 0,
+        "symbolButtonsInView": 0,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 0,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "08-A-menu-limited.png",
+      "closeup": "08b-A-menu-limited-closeup.png",
+      "scenario": "A — قائمة الموقع حسب الدور",
+      "role": "t.limited — اطلاع محدود (ملخص فقط)",
+      "viewport": "1920×1080",
+      "attempted": "النقر على علامة موقع لرؤية الإجراءات المتاحة للدور",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": [
+          743,
+          379,
+          250,
+          210
+        ],
+        "zoom": 13.5,
+        "pinsInView": 2,
+        "labelsInView": 2,
+        "symbolStripsInView": 0,
+        "symbolButtonsInView": 0,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 0,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "09-B-shared-site.png",
+      "closeup": "09b-B-shared-site-closeup.png",
+      "scenario": "B — موقع مشترك برمزين",
+      "role": "t.approver — صاحب الاعتماد",
+      "viewport": "1920×1080",
+      "attempted": "تكبير موقع «مركز الخدمات» الذي ترتبط به جهتان",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13.5,
+        "pinsInView": 8,
+        "labelsInView": 8,
+        "symbolStripsInView": 8,
+        "symbolButtonsInView": 9,
+        "overlaps": {
+          "labelOverLabel": 1,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 8,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "10-B-symbol-1.png",
+      "closeup": "10b-B-symbol-1-closeup.png",
+      "scenario": "B — اختيار كل رمز على حدة",
+      "role": "t.approver — صاحب الاعتماد",
+      "viewport": "1920×1080",
+      "attempted": "النقر على الرمز 1 من 1 (اختيار جهة الخدمات المشتركة والموقع مركز الخدمات)",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": [
+          743,
+          379,
+          250,
+          210
+        ],
+        "zoom": 13.5,
+        "pinsInView": 10,
+        "labelsInView": 10,
+        "symbolStripsInView": 10,
+        "symbolButtonsInView": 11,
+        "overlaps": {
+          "labelOverLabel": 1,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 10,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 2
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "scenario": "B — نتيجة اختيار كل رمز",
+      "role": "t.approver",
+      "viewport": "1920×1080",
+      "measured": [
+        {
+          "symbol": "اختيار جهة الخدمات المشتركة والموقع مركز الخدمات",
+          "popupOrganisation": "الخدمات المشتركة",
+          "treeActive": "‹ الخدمات المشتركة م1 4"
+        }
+      ]
+    },
+    {
+      "file": "11-B-zoomed-out.png",
+      "closeup": "11b-B-zoomed-out-closeup.png",
+      "scenario": "B — تداخل الرموز والأسماء عند التصغير",
+      "role": "t.approver — صاحب الاعتماد",
+      "viewport": "1920×1080",
+      "attempted": "التصغير ثلاث درجات من الموقع المشترك",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 10.5,
+        "pinsInView": 12,
+        "labelsInView": 12,
+        "symbolStripsInView": 12,
+        "symbolButtonsInView": 13,
+        "overlaps": {
+          "labelOverLabel": 36,
+          "symbolOverLabel": 35,
+          "symbolOverPin": 45,
+          "symbolOverSymbol": 11,
+          "pinOverPin": 27,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "12-C-parent.png",
+      "closeup": "12b-C-parent-closeup.png",
+      "scenario": "C — اختيار جهة أم",
+      "role": "t.approver — صاحب الاعتماد",
+      "viewport": "1920×1080",
+      "attempted": "اختيار الجهة الأم «المؤسسة» من الشجرة",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13,
+        "pinsInView": 12,
+        "labelsInView": 12,
+        "symbolStripsInView": 12,
+        "symbolButtonsInView": 13,
+        "overlaps": {
+          "labelOverLabel": 1,
+          "symbolOverLabel": 1,
+          "symbolOverPin": 13,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 1,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "13-C-child.png",
+      "closeup": "13b-C-child-closeup.png",
+      "scenario": "C — اختيار جهة فرعية",
+      "role": "t.approver — صاحب الاعتماد",
+      "viewport": "1920×1080",
+      "attempted": "اختيار الجهة الفرعية «الخدمات المشتركة»",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13.5,
+        "pinsInView": 8,
+        "labelsInView": 8,
+        "symbolStripsInView": 8,
+        "symbolButtonsInView": 9,
+        "overlaps": {
+          "labelOverLabel": 1,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 8,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "14-C-grandchild.png",
+      "closeup": "14b-C-grandchild-closeup.png",
+      "scenario": "C — اختيار وحدة دون مواقع",
+      "role": "t.approver — صاحب الاعتماد",
+      "viewport": "1920×1080",
+      "attempted": "اختيار «قسم الخدمات العامة» (وحدة فرعية)",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 15,
+        "pinsInView": 3,
+        "labelsInView": 3,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 3,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "15-C-back-to-parent.png",
+      "closeup": "15b-C-back-to-parent-closeup.png",
+      "scenario": "C — العودة إلى الجهة الأم",
+      "role": "t.approver — صاحب الاعتماد",
+      "viewport": "1920×1080",
+      "attempted": "العودة إلى «المؤسسة» بعد اختيار فرعها",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 15,
+        "pinsInView": 3,
+        "labelsInView": 3,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 3,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "scenario": "C — تغيّر عرض الخريطة عند كل اختيار",
+      "role": "t.approver",
+      "viewport": "1920×1080",
+      "measured": {
+        "initial": "13,25.213716,55.306034",
+        "parent": "13,25.213716,55.306034",
+        "child": "13.5,25.193251,55.289000",
+        "grandchild": "15,25.207000,55.316250",
+        "backToParent": "15,25.207000,55.316250"
+      }
+    },
+    {
+      "file": "16-D-site-menu.png",
+      "closeup": "16b-D-site-menu-closeup.png",
+      "scenario": "D — قائمة المقر قبل بدء المقترح",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "اختيار الجهة ثم مقرها «مركز الخدمات»",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": [
+          743,
+          425,
+          250,
+          164
+        ],
+        "zoom": 13.5,
+        "pinsInView": 3,
+        "labelsInView": 3,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 3,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "17-D-proposal-start.png",
+      "closeup": "17b-D-proposal-start-closeup.png",
+      "scenario": "D — بداية المقترح: الأصل والنسخة متطابقان",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "بدء «طلب تمركز / إعادة تمركز»",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 1,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "file": "18-D-dragged.png",
+      "closeup": "18b-D-dragged-closeup.png",
+      "scenario": "D — بعد سحب المضلع والرمز",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "سحب نسخة المضلع من رمزها 150×90 بكسل",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 1,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "file": "19-D-panel-readouts.png",
+      "closeup": "19b-D-panel-readouts-closeup.png",
+      "scenario": "D — لوحة القراءات أثناء المقترح",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "قراءة المسافة والنطاق والمساحة",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 1,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "file": "20-D-compare.png",
+      "closeup": "20b-D-compare-closeup.png",
+      "scenario": "D — مقارنة الموقعين",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "مقارنة الموقع المعتمد بالمقترح",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 15.5,
+        "pinsInView": 0,
+        "labelsInView": 0,
+        "symbolStripsInView": 1,
+        "symbolButtonsInView": 1,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 0,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "21-D-vertex-mode.png",
+      "closeup": "21b-D-vertex-mode-closeup.png",
+      "scenario": "D — وضع تعديل الرؤوس",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "تفعيل «تعديل الرؤوس» والتكبير على المقترح",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          218,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          218,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          218,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 17,
+        "pinsInView": 0,
+        "labelsInView": 0,
+        "symbolStripsInView": 0,
+        "symbolButtonsInView": 0,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 0,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "22-D-vertex-moved.png",
+      "closeup": "22b-D-vertex-moved-closeup.png",
+      "scenario": "D — بعد تحريك رأس",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "سحب الرأس 1 مسافة 30×30 بكسل",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          218,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          218,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          218,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 17,
+        "pinsInView": 0,
+        "labelsInView": 0,
+        "symbolStripsInView": 0,
+        "symbolButtonsInView": 0,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 0,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "23-E-draw-instructions.png",
+      "closeup": "23b-E-draw-instructions-closeup.png",
+      "scenario": "E — تعليمات رسم حدود جديدة",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "التبديل إلى «ب · رسم حدود جديدة»",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          218,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          218,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          218,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 1,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "file": "24-E-drawn.png",
+      "closeup": "24b-E-drawn-closeup.png",
+      "scenario": "E — مضلع جديد من خمسة رؤوس",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "رسم خمسة رؤوس بالنقر على الخريطة",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          218,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          218,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          218,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 15.5,
+        "pinsInView": 0,
+        "labelsInView": 0,
+        "symbolStripsInView": 0,
+        "symbolButtonsInView": 0,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 0,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "25-E-coordinates.png",
+      "closeup": "25b-E-coordinates-closeup.png",
+      "scenario": "E — إدخال الإحداثيات",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "إدخال ثلاثة رؤوس بخطوط العرض والطول",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          218,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          218,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          218,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 17,
+        "pinsInView": 0,
+        "labelsInView": 0,
+        "symbolStripsInView": 0,
+        "symbolButtonsInView": 0,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 0,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "26-E-undo.png",
+      "closeup": "26b-E-undo-closeup.png",
+      "scenario": "E — بعد التراجع",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "التراجع خطوة",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          218,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          218,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          218,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 17,
+        "pinsInView": 0,
+        "labelsInView": 0,
+        "symbolStripsInView": 0,
+        "symbolButtonsInView": 0,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 0,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "27-E-reset.png",
+      "closeup": "27b-E-reset-closeup.png",
+      "scenario": "E — بعد إعادة الضبط",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "الإعادة ثم «إعادة الضبط»",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          218,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          218,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          218,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 17,
+        "pinsInView": 0,
+        "labelsInView": 0,
+        "symbolStripsInView": 0,
+        "symbolButtonsInView": 0,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 0,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "28-F-draft-reopened.png",
+      "closeup": "28b-F-draft-reopened-closeup.png",
+      "scenario": "F — فتح مسودة محفوظة",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "فتح مسودة تمركز محفوظة من رابطها",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 2,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "file": "29-F-details.png",
+      "closeup": "29b-F-details-closeup.png",
+      "scenario": "F — خطوة تفاصيل الطلب",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "المتابعة إلى «تفاصيل الطلب»",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 2,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "file": "30-F-back-to-map.png",
+      "closeup": "30b-F-back-to-map-closeup.png",
+      "scenario": "F — العودة من التفاصيل إلى الخريطة",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "«العودة إلى الخريطة» من خطوة التفاصيل",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 2,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "file": "31-F-saved.png",
+      "closeup": "31b-F-saved-closeup.png",
+      "scenario": "F — حفظ المسودة",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "حفظ كمسودة (تحديث المسودة نفسها، لا سجل جديد)",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 2,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "file": "32-F-reopened-after-save.png",
+      "closeup": "32b-F-reopened-after-save-closeup.png",
+      "scenario": "F — المسودة بعد إعادة التحميل",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "إعادة تحميل الصفحة بعد الحفظ",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 2,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "scenario": "F — المسودة المستخدمة",
+      "role": "t.requester",
+      "measured": {
+        "draftId": "0c1c89fe-3a73-4113-9953-03de23c0f7b4",
+        "note": "مسودة وهمية قائمة من تشغيل سابق؛ أُعيد حفظها دون إنشاء طلب جديد"
+      }
+    },
+    {
+      "file": "33-G-desktop-open.png",
+      "closeup": null,
+      "scenario": "G — مقاس desktop",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "فتح «مساحة التمركز»",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 13.5,
+        "pinsInView": 4,
+        "labelsInView": 4,
+        "symbolStripsInView": 4,
+        "symbolButtonsInView": 4,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 4,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "34-G-desktop-menu.png",
+      "closeup": "34b-G-desktop-menu-closeup.png",
+      "scenario": "G — مقاس desktop: قائمة الموقع",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "اختيار «مركز الخدمات» من البحث",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": [
+          967,
+          301,
+          250,
+          164
+        ],
+        "zoom": 13.5,
+        "pinsInView": 4,
+        "labelsInView": 4,
+        "symbolStripsInView": 4,
+        "symbolButtonsInView": 4,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 4,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "35-G-desktop-proposal.png",
+      "closeup": null,
+      "scenario": "G — مقاس desktop: المقترح",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "بدء المقترح",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 2,
+        "labelsInView": 1,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 2,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 7
+      },
+      "note": null
+    },
+    {
+      "file": "36-G-laptop-open.png",
+      "closeup": null,
+      "scenario": "G — مقاس laptop",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1366×768",
+      "attempted": "فتح «مساحة التمركز»",
+      "measured": {
+        "viewport": [
+          1366,
+          768
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 818,
+        "map": [
+          393,
+          235,
+          420,
+          517
+        ],
+        "tree": [
+          827,
+          235,
+          270,
+          517
+        ],
+        "panel": [
+          29,
+          235,
+          350,
+          517
+        ],
+        "popup": null,
+        "zoom": 12,
+        "pinsInView": 4,
+        "labelsInView": 4,
+        "symbolStripsInView": 4,
+        "symbolButtonsInView": 4,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 1,
+          "symbolOverPin": 4,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "37-G-laptop-menu.png",
+      "closeup": "37b-G-laptop-menu-closeup.png",
+      "scenario": "G — مقاس laptop: قائمة الموقع",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1366×768",
+      "attempted": "اختيار «مركز الخدمات» من البحث",
+      "measured": {
+        "viewport": [
+          1366,
+          768
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 818,
+        "map": [
+          393,
+          235,
+          420,
+          517
+        ],
+        "tree": [
+          827,
+          235,
+          270,
+          517
+        ],
+        "panel": [
+          29,
+          235,
+          350,
+          517
+        ],
+        "popup": [
+          476,
+          284,
+          250,
+          164
+        ],
+        "zoom": 13,
+        "pinsInView": 3,
+        "labelsInView": 3,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 3,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "38-G-laptop-proposal.png",
+      "closeup": null,
+      "scenario": "G — مقاس laptop: المقترح",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1366×768",
+      "attempted": "بدء المقترح",
+      "measured": {
+        "viewport": [
+          1366,
+          768
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 818,
+        "map": [
+          393,
+          235,
+          420,
+          517
+        ],
+        "tree": [
+          827,
+          235,
+          270,
+          517
+        ],
+        "panel": [
+          29,
+          235,
+          350,
+          517
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 1,
+        "labelsInView": 1,
+        "symbolStripsInView": 2,
+        "symbolButtonsInView": 2,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 1,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "39-G-tablet-open.png",
+      "closeup": null,
+      "scenario": "G — مقاس tablet",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "768×1024",
+      "attempted": "فتح «مساحة التمركز»",
+      "measured": {
+        "viewport": [
+          768,
+          1024
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1026,
+        "map": [
+          17,
+          427,
+          549,
+          420
+        ],
+        "tree": [
+          17,
+          269,
+          549,
+          144
+        ],
+        "panel": [
+          17,
+          821,
+          549,
+          144
+        ],
+        "popup": null,
+        "zoom": 12.5,
+        "pinsInView": 4,
+        "labelsInView": 4,
+        "symbolStripsInView": 4,
+        "symbolButtonsInView": 4,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 4,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 2
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "40-G-tablet-menu.png",
+      "closeup": "40b-G-tablet-menu-closeup.png",
+      "scenario": "G — مقاس tablet: قائمة الموقع",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "768×1024",
+      "attempted": "اختيار «مركز الخدمات» من البحث",
+      "measured": {
+        "viewport": [
+          768,
+          1024
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1026,
+        "map": [
+          17,
+          427,
+          549,
+          420
+        ],
+        "tree": [
+          17,
+          269,
+          549,
+          144
+        ],
+        "panel": [
+          17,
+          821,
+          549,
+          144
+        ],
+        "popup": [
+          165,
+          427,
+          250,
+          164
+        ],
+        "zoom": 13,
+        "pinsInView": 3,
+        "labelsInView": 3,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 3,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "41-G-tablet-proposal.png",
+      "closeup": null,
+      "scenario": "G — مقاس tablet: المقترح",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "768×1024",
+      "attempted": "بدء المقترح",
+      "measured": {
+        "viewport": [
+          768,
+          1024
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1026,
+        "map": [
+          17,
+          434,
+          549,
+          420
+        ],
+        "tree": [
+          17,
+          269,
+          549,
+          151
+        ],
+        "panel": [
+          17,
+          828,
+          549,
+          137
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 1,
+        "labelsInView": 1,
+        "symbolStripsInView": 2,
+        "symbolButtonsInView": 2,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 1,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "42-G-mobile-open.png",
+      "closeup": null,
+      "scenario": "G — مقاس mobile",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "390×844",
+      "attempted": "فتح «مساحة التمركز»",
+      "measured": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 845,
+        "map": [
+          13,
+          320,
+          364,
+          430
+        ],
+        "tree": [
+          13,
+          249,
+          364,
+          57
+        ],
+        "panel": [
+          13,
+          714,
+          364,
+          57
+        ],
+        "popup": null,
+        "zoom": 12,
+        "pinsInView": 4,
+        "labelsInView": 4,
+        "symbolStripsInView": 4,
+        "symbolButtonsInView": 4,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 1,
+          "symbolOverPin": 4,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 2
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "43-G-mobile-menu.png",
+      "closeup": "43b-G-mobile-menu-closeup.png",
+      "scenario": "G — مقاس mobile: قائمة الموقع",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "390×844",
+      "attempted": "اختيار «مركز الخدمات» من البحث",
+      "measured": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 845,
+        "map": [
+          13,
+          320,
+          364,
+          430
+        ],
+        "tree": [
+          13,
+          249,
+          364,
+          57
+        ],
+        "panel": [
+          13,
+          714,
+          364,
+          57
+        ],
+        "popup": [
+          68,
+          325,
+          250,
+          164
+        ],
+        "zoom": 13,
+        "pinsInView": 3,
+        "labelsInView": 3,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 3,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 2
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "44-G-mobile-proposal.png",
+      "closeup": null,
+      "scenario": "G — مقاس mobile: المقترح",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "390×844",
+      "attempted": "بدء المقترح",
+      "measured": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 845,
+        "map": [
+          13,
+          327,
+          364,
+          430
+        ],
+        "tree": [
+          13,
+          249,
+          364,
+          64
+        ],
+        "panel": [
+          13,
+          721,
+          364,
+          50
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 1,
+        "labelsInView": 1,
+        "symbolStripsInView": 2,
+        "symbolButtonsInView": 2,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 1,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "scenario": "G — سحب باللمس على الهاتف",
+      "role": "t.requester",
+      "viewport": "390×844",
+      "measured": {
+        "distanceBefore": "15 م",
+        "distanceAfter": "15 م"
+      }
+    },
+    {
+      "file": "45-G-mobile-touch-drag.png",
+      "closeup": null,
+      "scenario": "G — الهاتف بعد محاولة السحب باللمس",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "390×844",
+      "attempted": "سحب رمز المقترح بأحداث لمس حقيقية (CDP)",
+      "measured": {
+        "viewport": [
+          390,
+          844
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 845,
+        "map": [
+          13,
+          327,
+          364,
+          430
+        ],
+        "tree": [
+          13,
+          249,
+          364,
+          64
+        ],
+        "panel": [
+          13,
+          721,
+          364,
+          50
+        ],
+        "popup": null,
+        "zoom": 14,
+        "pinsInView": 1,
+        "labelsInView": 1,
+        "symbolStripsInView": 2,
+        "symbolButtonsInView": 2,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 1,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 6
+      },
+      "note": null
+    },
+    {
+      "file": "46-H-all-sites.png",
+      "closeup": "46b-H-all-sites-closeup.png",
+      "scenario": "H — كل المواقع عند تصغير الخريطة",
+      "role": "t.admin — مدير النظام (ومدير سجل المواقع)",
+      "viewport": "1920×1080",
+      "attempted": "التصغير لرؤية كل المواقع المسموحة (12 موقعاً)",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 11,
+        "pinsInView": 12,
+        "labelsInView": 12,
+        "symbolStripsInView": 12,
+        "symbolButtonsInView": 13,
+        "overlaps": {
+          "labelOverLabel": 27,
+          "symbolOverLabel": 30,
+          "symbolOverPin": 29,
+          "symbolOverSymbol": 5,
+          "pinOverPin": 8,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "scenario": "H — الشجرة كاملة",
+      "role": "t.admin",
+      "viewport": "1920×1080",
+      "measured": {
+        "rows": 10,
+        "maxIndentPx": 68,
+        "namesClipped": 4
+      }
+    },
+    {
+      "file": "47-H-tree-expanded.png",
+      "closeup": "47b-H-tree-expanded-closeup.png",
+      "scenario": "H — الشجرة التنظيمية كاملة",
+      "role": "t.admin — مدير النظام (ومدير سجل المواقع)",
+      "viewport": "1920×1080",
+      "attempted": "فتح كل مستويات شجرة الجهات",
+      "measured": {
+        "viewport": [
+          1920,
+          1080
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 1102,
+        "map": [
+          402,
+          240,
+          936,
+          791
+        ],
+        "tree": [
+          1352,
+          240,
+          270,
+          791
+        ],
+        "panel": [
+          38,
+          240,
+          350,
+          791
+        ],
+        "popup": null,
+        "zoom": 11,
+        "pinsInView": 12,
+        "labelsInView": 12,
+        "symbolStripsInView": 12,
+        "symbolButtonsInView": 13,
+        "overlaps": {
+          "labelOverLabel": 27,
+          "symbolOverLabel": 30,
+          "symbolOverPin": 29,
+          "symbolOverSymbol": 5,
+          "pinOverPin": 8,
+          "markersUnderControls": 0
+        },
+        "selectedPins": 0,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "file": "48-K-keyboard-enter.png",
+      "closeup": "48b-K-keyboard-enter-closeup.png",
+      "scenario": "K — لوحة المفاتيح: Enter على علامة",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1366×768",
+      "attempted": "التركيز على علامة موقع ثم Enter",
+      "measured": {
+        "viewport": [
+          1366,
+          768
+        ],
+        "horizontalScroll": false,
+        "pageHeight": 818,
+        "map": [
+          393,
+          235,
+          420,
+          517
+        ],
+        "tree": [
+          827,
+          235,
+          270,
+          517
+        ],
+        "panel": [
+          29,
+          235,
+          350,
+          517
+        ],
+        "popup": [
+          476,
+          284,
+          250,
+          164
+        ],
+        "zoom": 13,
+        "pinsInView": 3,
+        "labelsInView": 3,
+        "symbolStripsInView": 3,
+        "symbolButtonsInView": 3,
+        "overlaps": {
+          "labelOverLabel": 0,
+          "symbolOverLabel": 0,
+          "symbolOverPin": 3,
+          "symbolOverSymbol": 0,
+          "pinOverPin": 0,
+          "markersUnderControls": 1
+        },
+        "selectedPins": 1,
+        "polygons": 0
+      },
+      "note": null
+    },
+    {
+      "scenario": "K — لوحة المفاتيح",
+      "role": "t.requester",
+      "viewport": "1366×768",
+      "measured": {
+        "tabStops": [
+          "page:البحث عن جهة أو موقع",
+          "tree:البحث في الجهات",
+          "tree:طي المؤسسة",
+          "tree:لم يحدد رمز الوحدةالمؤسسةم0",
+          "tree:فتح الخدمات المشتركة",
+          "tree:الخدمات المشتركةم1",
+          "map:خريطة التمركز",
+          "marker:✓مركز الخدمات",
+          "marker:✕مركز التدريب الإداري",
+          "marker:✕مبنى الخدمات الغربية · حدود غير مسجلة",
+          "marker:✓المبنى المشترك",
+          "map:path",
+          "map:path",
+          "map:path",
+          "map:اختيار جهة الخدمات المشتركة والموقع مركز",
+          "map:اختيار جهة الخدمات المشتركة والموقع مركز",
+          "map:اختيار جهة الخدمات المشتركة والموقع مبنى",
+          "map:اختيار جهة الخدمات المشتركة والموقع المب",
+          "map:Leaflet",
+          "map:OpenFreeMap",
+          "map:OpenMapTiles",
+          "map:OpenStreetMap",
+          "chips:INPUT",
+          "chips:INPUT",
+          "chips:INPUT",
+          "chips:INPUT",
+          "chips:☰ الطبقات",
+          "zoom:تكبير",
+          "zoom:تصغير",
+          "zoom:ملاءمة الاختيار",
+          "zoom:قياس المسافة",
+          "other:TMRKZ · تشغيل داخل شبكة معزولةالتوثيق وا",
+          "other:التوثيق والتشغيل ↖",
+          "other:حزمة التسليم الأصلية ↓",
+          "sidebar:TMRKZ.المواقع · المرافق · الإجراءات",
+          "sidebar:مساحة التمركز",
+          "sidebar:الطلبات77",
+          "sidebar:صندوق المراجعة0",
+          "sidebar:الإشغال والحجوزات",
+          "sidebar:الهيكل التنظيمي",
+          "sidebar:استوديو التدفقات",
+          "sidebar:استوديو النماذج",
+          "sidebar:مركز الصلاحيات",
+          "sidebar:إعدادات النظام",
+          "sidebar:سجل الإجراءات",
+          "sidebar:التوثيق والتشغيل",
+          "header:الإشعارات — 100 غير مقروءة",
+          "header:دليل التشغيل",
+          "header:＋طلب جديد",
+          "header:خروج",
+          "page:البحث عن جهة أو موقع",
+          "tree:البحث في الجهات",
+          "tree:طي المؤسسة",
+          "tree:لم يحدد رمز الوحدةالمؤسسةم0",
+          "tree:فتح الخدمات المشتركة",
+          "tree:الخدمات المشتركةم1",
+          "map:خريطة التمركز",
+          "marker:✓مركز الخدمات",
+          "marker:✕مركز التدريب الإداري",
+          "marker:✕مبنى الخدمات الغربية · حدود غير مسجلة"
+        ],
+        "firstMarkerAtTab": 8,
+        "enterOpensMenu": true,
+        "focusMovesIntoMenu": false,
+        "escapeClosesMenu": false
+      }
+    },
+    {
+      "file": "49-I-org-page-link.png",
+      "scenario": "I — رابط «على الخريطة» في الهيكل التنظيمي",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "صفحة الهيكل التنظيمي، جهة «الخدمات المشتركة»، صف «مركز الخدمات»",
+      "measured": null
+    },
+    {
+      "file": "50-I-org-link-lands.png",
+      "scenario": "I — رابط «على الخريطة» في الهيكل التنظيمي",
+      "role": "t.requester — مقدم طلب (عادي)",
+      "viewport": "1920×1080",
+      "attempted": "النقر على «على الخريطة» لـ«مركز الخدمات»",
+      "measured": {
+        "hash": "#stationing",
+        "selectedPins": 0,
+        "popup": false,
+        "activeOrg": null,
+        "view": "13.5,25.193296,55.289023"
+      }
+    }
+  ]
+}

@@ -2,19 +2,27 @@ package ae.mover.security;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.Instant;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ae.mover.access.AccessContext;
+import ae.mover.access.DirectoryScope;
+import ae.mover.access.GrantSource;
 import ae.mover.access.Permission;
+import ae.mover.access.PersonKeys;
+import ae.mover.access.RawGrant;
 import ae.mover.audit.AuditService;
+import ae.mover.authz.GrantAdminService;
 import ae.mover.common.ApiException;
 import ae.mover.common.Db;
 import ae.mover.common.ErrorCode;
@@ -36,13 +44,22 @@ public class IdentityService {
     private final HrAdminService hr;
     private final AuditService audit;
     private final OidcProperties props;
+    private final PersonKeys keys;
+    private final DirectoryScope directory;
+    private final GrantSource source;
+    private final GrantAdminService grants;
 
-    public IdentityService(JdbcClient jdbc, Clock clock, HrAdminService hr, AuditService audit, OidcProperties props) {
+    public IdentityService(JdbcClient jdbc, Clock clock, HrAdminService hr, AuditService audit, OidcProperties props,
+                           PersonKeys keys, DirectoryScope directory, GrantSource source, GrantAdminService grants) {
         this.jdbc = jdbc;
         this.clock = clock;
         this.hr = hr;
         this.audit = audit;
         this.props = props;
+        this.keys = keys;
+        this.directory = directory;
+        this.source = source;
+        this.grants = grants;
     }
 
     /** Returns the linked person, linking on first sign-in when unambiguous; otherwise records an issue and refuses. */
@@ -211,11 +228,22 @@ public class IdentityService {
 
     // ---- review list -------------------------------------------------------------------------------------------
 
+    /**
+     * Sign-ins waiting for a decision (ADR-027): all of them for a global access manager; for a scoped one only those whose
+     * claimed key belongs to a member of their directory — a sign-in without a key, or with a key nobody inside holds,
+     * is decided by a global access manager.
+     */
     public List<Map<String, Object>> issues(AccessContext ctx) {
         ctx.require(Permission.MANAGE_ACCESS);
         boolean ids = ctx.has(Permission.VIEW_SOURCE_IDENTIFIERS);
-        return jdbc.sql("select * from identity_link_issue where resolved_at is null order by last_seen_at desc limit 200")
+        List<String> claimed = jdbc.sql("select claimed_key from identity_link_issue where resolved_at is null and claimed_key is not null")
+                .query(String.class).list();
+        Predicate<String> visible = visibility(ctx, claimed);
+        return jdbc.sql("select * from identity_link_issue where resolved_at is null order by last_seen_at desc")
                 .query((rs, n) -> {
+                    if (!visible.test(rs.getString("claimed_key"))) {
+                        return null;
+                    }
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("id", rs.getString("id"));
                     m.put("displayName", rs.getString("display_name"));
@@ -227,7 +255,56 @@ public class IdentityService {
                         m.put("subject", rs.getString("subject"));
                     }
                     return m;
-                }).list();
+                }).list().stream().filter(java.util.Objects::nonNull).limit(200).toList();
+    }
+
+    private static String normal(String key) {
+        return key == null ? null : key.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** Which claimed keys the manager may handle: every one for a global manager, else those a directory member holds. */
+    private Predicate<String> visibility(AccessContext ctx, List<String> claimedKeys) {
+        if (directory.reach(ctx).global()) {
+            return k -> true;
+        }
+        Map<String, Set<UUID>> holders = keys.holders(claimedKeys);
+        Set<UUID> all = new HashSet<>();
+        holders.values().forEach(all::addAll);
+        Set<UUID> members = directory.members(ctx, all);
+        return k -> k != null && holders.getOrDefault(normal(k), Set.of()).stream().anyMatch(members::contains);
+    }
+
+    /**
+     * Linking a sign-in hands it the person's roles (ADR-027): only an active person inside the linker's directory, all
+     * of whose current and future grants the linker could give; never the linker themselves or the temporary first
+     * administrator; and never anyone but the person whose key the sign-in claims.
+     */
+    private void requireLinkable(AccessContext ctx, UUID person, String claimedKey) {
+        if (keys.same(ctx.personId(), person)) {
+            throw ApiException.forbidden("لا يجوز ربط حساب دخول بسجلك أنت؛ يربطه مدير صلاحيات آخر.");
+        }
+        Map<String, Object> p = jdbc.sql("select status, coalesce(bootstrap, false) as bootstrap from person where id = :p")
+                .param("p", person).query().listOfRows().stream().findFirst()
+                .orElseThrow(() -> ApiException.forbidden("لا تملك ربط هذا الشخص أو أنه غير نشط."));
+        if (Boolean.TRUE.equals(p.get("bootstrap"))) {
+            throw ApiException.forbidden("هوية التهيئة الأولى مؤقتة ولا يُربط بها حساب دخول آخر.");
+        }
+        if (!"ACTIVE".equals(p.get("status")) || !directory.covers(ctx, person)) {
+            throw ApiException.forbidden("لا تملك ربط هذا الشخص أو أنه غير نشط.");
+        }
+        if (claimedKey != null) {
+            Set<UUID> owners = keys.holders(List.of(claimedKey)).getOrDefault(normal(claimedKey), Set.of());
+            if (!owners.isEmpty() && !owners.contains(person)) {
+                throw ApiException.forbidden("الحساب يحمل مفتاح شخص آخر؛ لا يُربط بسجل غيره.");
+            }
+        }
+        for (RawGrant g : source.unended(person, clock.instant())) {
+            try {
+                grants.requireAuthority(ctx, g);
+            } catch (ApiException e) {
+                throw ApiException.forbidden("للشخص أدوار تتجاوز ما تملك منحه؛ يربط حسابه مدير صلاحيات يملك منحها.");
+            }
+        }
     }
 
     public record ResolveInput(String personId, String reason) {
@@ -242,17 +319,14 @@ public class IdentityService {
         }
         Map<String, Object> issue = jdbc.sql("select * from identity_link_issue where id = :id and resolved_at is null for update")
                 .param("id", issueId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
+        String claimed = (String) issue.get("claimed_key");
+        if (!visibility(ctx, claimed == null ? List.of() : List.of(claimed)).test(claimed)) {
+            throw ApiException.notFound();
+        }
         UUID person = null;
         if (in.personId() != null) {
             person = UUID.fromString(in.personId());
-            UUID org = jdbc.sql("select organization_id from affiliation where person_id = :p and valid_to is null")
-                    .param("p", person).query(UUID.class).optional().orElse(null);
-            boolean active = jdbc.sql("select count(*) from person where id = :p and status = 'ACTIVE'").param("p", person)
-                    .query(Integer.class).single() > 0;
-            if (!active || (org == null ? !ctx.canEverywhere(Permission.MANAGE_ACCESS)
-                    : !ctx.canFor(Permission.MANAGE_ACCESS, org))) {
-                throw ApiException.forbidden("لا تملك ربط هذا الشخص أو أنه غير نشط.");
-            }
+            requireLinkable(ctx, person, claimed);
             int existing = jdbc.sql("select count(*) from identity_link where person_id = :p and issuer = :i")
                     .param("p", person).param("i", issue.get("issuer")).query(Integer.class).single();
             if (existing > 0) {

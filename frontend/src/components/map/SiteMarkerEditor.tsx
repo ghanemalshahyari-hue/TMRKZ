@@ -3,6 +3,7 @@ import L from '../../lib/leaflet';
 import { api, type ApiError } from '../../api/client';
 import type { Site, SiteDetail } from '../../api/types';
 import { useApp } from '../../lib/app';
+import { parseCoordinates } from '../../lib/coords';
 
 const round = (v: number) => Math.round(v * 1e7) / 1e7;
 
@@ -61,6 +62,16 @@ export function SiteMarkerEditor({
   }, [mode, site]);
 
   const [pos, setPos] = useState<Pos | null>(startPos);
+  // what is typed in the coordinate fields; the marker follows only a complete, valid pair (never a 0 filled in)
+  const [latText, setLatText] = useState(startPos ? String(startPos.lat) : '');
+  const [lngText, setLngText] = useState(startPos ? String(startPos.lng) : '');
+  const [coordError, setCoordError] = useState('');
+  const placeAt = (p: Pos) => {
+    setPos(p);
+    setLatText(String(p.lat));
+    setLngText(String(p.lng));
+    setCoordError('');
+  };
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [kind, setKind] = useState('مرفق');
@@ -82,7 +93,7 @@ export function SiteMarkerEditor({
     const onClick = (e: L.LeafletMouseEvent) => {
       // the first click places the marker; afterwards the map is only dragged/panned and the marker is moved by drag
       if (posRef.current) return;
-      setPos({ lat: round(e.latlng.lat), lng: round(e.latlng.lng) });
+      placeAt({ lat: round(e.latlng.lat), lng: round(e.latlng.lng) });
     };
     map.on('click', onClick);
     map.getContainer().classList.add('placing-marker');
@@ -114,7 +125,7 @@ export function SiteMarkerEditor({
       }).addTo(group);
       m.on('dragend', () => {
         const ll = m.getLatLng();
-        setPos({ lat: round(ll.lat), lng: round(ll.lng) });
+        placeAt({ lat: round(ll.lat), lng: round(ll.lng) });
       });
       markerRef.current = m;
     } else {
@@ -124,12 +135,13 @@ export function SiteMarkerEditor({
   }, [pos, mode, site]);
 
   const setCoord = (axis: 'lat' | 'lng', value: string) => {
-    const n = Number(value);
-    if (!Number.isFinite(n)) return;
-    if (axis === 'lat' && Math.abs(n) > 90) return setError('خط العرض بين −90 و90.');
-    if (axis === 'lng' && Math.abs(n) > 180) return setError('خط الطول بين −180 و180.');
-    setError('');
-    setPos((p) => ({ lat: axis === 'lat' ? round(n) : p?.lat ?? 0, lng: axis === 'lng' ? round(n) : p?.lng ?? 0 }));
+    const lt = axis === 'lat' ? value : latText;
+    const gt = axis === 'lng' ? value : lngText;
+    if (axis === 'lat') setLatText(value);
+    else setLngText(value);
+    const r = parseCoordinates(lt, gt);
+    setCoordError(r.error);
+    if (r.point) setPos(r.point);
   };
 
   const fit = () => {
@@ -137,6 +149,8 @@ export function SiteMarkerEditor({
   };
 
   const submit = async () => {
+    // typed coordinates that are not a valid pair block saving, even if an earlier marker position exists
+    if (coordError) return setError(coordError);
     if (!pos) return setError(mode === 'CREATE' ? 'انقر على الخريطة لتحديد موقع العلامة، أو أدخل الإحداثيات.' : 'حدد موقع العلامة الجديد.');
     setBusy(true);
     setError('');
@@ -225,11 +239,11 @@ export function SiteMarkerEditor({
       <div className="row">
         <label className="field">
           <span>خط العرض</span>
-          <input type="number" step="0.000001" value={pos ? pos.lat : ''} onChange={(e) => setCoord('lat', e.target.value)} aria-label="خط العرض" />
+          <input type="number" step="0.000001" value={latText} onChange={(e) => setCoord('lat', e.target.value)} aria-label="خط العرض" />
         </label>
         <label className="field">
           <span>خط الطول</span>
-          <input type="number" step="0.000001" value={pos ? pos.lng : ''} onChange={(e) => setCoord('lng', e.target.value)} aria-label="خط الطول" />
+          <input type="number" step="0.000001" value={lngText} onChange={(e) => setCoord('lng', e.target.value)} aria-label="خط الطول" />
         </label>
       </div>
       <p className="micro note" role="status">
@@ -252,7 +266,7 @@ export function SiteMarkerEditor({
       )}
 
       <div className="error-text" role="alert">
-        {error}
+        {coordError || error}
       </div>
       <div className="editor-actions">
         <button className="button primary" onClick={submit} disabled={busy || !pos}>

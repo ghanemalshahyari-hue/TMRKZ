@@ -97,7 +97,7 @@ export function IdentityIssues() {
                   <option value="">— اختر الشخص —</option>
                   {people.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.displayName} · {p.employeeNo}
+                      {p.displayName} · {p.employeeNo ?? p.organization ?? ''}
                     </option>
                   ))}
                 </select>

@@ -46,7 +46,10 @@ public class BoundaryService {
     private final SiteService sites;
     private final AuditService audit;
 
-    public BoundaryService(JdbcClient jdbc, Json json, Clock clock, SiteService sites, AuditService audit) {
+    private final SiteOverlapRule overlapRule;
+
+    public BoundaryService(JdbcClient jdbc, Json json, Clock clock, SiteService sites, AuditService audit, SiteOverlapRule overlapRule) {
+        this.overlapRule = overlapRule;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -129,6 +132,21 @@ public class BoundaryService {
                 List.of(x1, y1, x2, y2), crsKey, transform);
     }
 
+    /** Overlap and containment problems of a boundary for a site ({@link SiteOverlapRule}, audit P1-4, ADR-027). */
+    public List<String> overlaps(AccessContext ctx, UUID siteId, JsonNode geojson4326) {
+        return overlapRule.problems(ctx, siteId, json.write(geojson4326));
+    }
+
+    /** The validation preview of one site's boundary, including the overlap rule. */
+    public Check checkFor(AccessContext ctx, UUID siteId, JsonNode geometry, String crs) {
+        Check c = check(geometry, crs);
+        if (!c.valid()) {
+            return c;
+        }
+        List<String> clash = overlaps(ctx, siteId, c.normalized());
+        return clash.isEmpty() ? c : new Check(false, c.type(), c.vertices(), c.areaM2(), clash, c.normalized(), c.bbox(), c.crs(), c.transform());
+    }
+
     private static String explainInvalid(String reason) {
         if (reason == null) {
             return "سبب غير معروف";
@@ -199,6 +217,7 @@ public class BoundaryService {
         if (expectedVersion == null) {
             throw ApiException.validation("حدد إصدار الحدود الذي بدأ منه التعديل (0 إن لم توجد حدود).");
         }
+        SiteOverlapRule.serialise(jdbc);
         Map<String, Object> site = jdbc.sql("""
                 select s.id, s.code, s.name, s.status, coalesce(s.geometry_version, 0) as gv, sr.organization_id
                 from site s left join site_responsibility sr on sr.site_id = s.id and sr.valid_to is null
@@ -211,6 +230,11 @@ public class BoundaryService {
         SiteService.requireFacilityManager(ctx, org);
         if (!"ACTIVE".equals(site.get("status"))) {
             throw ApiException.validation("الموقع موقوف؛ لا تُسجل له حدود جديدة.");
+        }
+        // every way of registering a boundary (drawing, coordinates, import publication) passes here (audit P1-4)
+        List<String> clash = overlaps(ctx, siteId, c.normalized());
+        if (!clash.isEmpty()) {
+            throw ApiException.validation(clash.get(0), Map.of("problems", clash));
         }
         int current = ((Number) site.get("gv")).intValue();
         if (current != expectedVersion) {

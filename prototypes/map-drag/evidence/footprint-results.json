@@ -1,0 +1,188 @@
+{
+  "errs": [],
+  "external": [],
+  "A": {
+    "origVertices": 6,
+    "origArea": 434484.79280026734
+  },
+  "B_drag": {
+    "frames": 150,
+    "meanMs": 13.34,
+    "p95Ms": 13.5,
+    "worstMs": 13.6,
+    "janky": 0,
+    "longTasks": 0
+  },
+  "B_overlapState": {
+    "mode": "moveA",
+    "verts": 0,
+    "closed": false,
+    "server": "none",
+    "area": 434484.7926731957,
+    "origArea": 434484.79280026734,
+    "dist": 2047.9341757478576,
+    "valid": false,
+    "blocking": 1,
+    "kinks": 0,
+    "naiveDelta": -0.01511909001737756
+  },
+  "B_outState": {
+    "mode": "moveA",
+    "verts": 0,
+    "closed": false,
+    "server": "none",
+    "area": 434484.7927999923,
+    "origArea": 434484.79280026734,
+    "dist": 5447.0451508229635,
+    "valid": false,
+    "blocking": 0,
+    "kinks": 0,
+    "naiveDelta": 0
+  },
+  "B_dropped": {
+    "mode": "moveA",
+    "verts": 0,
+    "closed": false,
+    "server": "ok",
+    "area": 434484.7929021722,
+    "origArea": 434484.79280026734,
+    "dist": 1900.9526508936226,
+    "valid": true,
+    "blocking": 0,
+    "kinks": 0,
+    "naiveDelta": 0.012110907307431728
+  },
+  "B_afterUndo": {
+    "mode": "moveA",
+    "verts": 0,
+    "closed": false,
+    "server": "pending",
+    "area": 434484.79279957974,
+    "origArea": 434484.79280026734,
+    "dist": 3.9504428256099156e-10,
+    "valid": false,
+    "blocking": 0,
+    "kinks": 0,
+    "naiveDelta": 0
+  },
+  "B_afterRedo": {
+    "mode": "moveA",
+    "verts": 0,
+    "closed": false,
+    "server": "pending",
+    "area": 434484.7929021722,
+    "origArea": 434484.79280026734,
+    "dist": 1900.9526508936226,
+    "valid": true,
+    "blocking": 0,
+    "kinks": 0,
+    "naiveDelta": 0.012110907307431728
+  },
+  "B_afterReset": {
+    "mode": "moveA",
+    "verts": 0,
+    "closed": false,
+    "server": "none",
+    "area": 434484.79279957974,
+    "origArea": 434484.79280026734,
+    "dist": 3.9504428256099156e-10,
+    "valid": false,
+    "blocking": 0,
+    "kinks": 0,
+    "naiveDelta": 0
+  },
+  "C_drawn": {
+    "mode": "drawB",
+    "verts": 4,
+    "closed": true,
+    "server": "ok",
+    "area": 200248.53819248846,
+    "origArea": 434484.79280026734,
+    "dist": 2306.3784779995653,
+    "valid": true,
+    "blocking": 0,
+    "kinks": 0,
+    "naiveDelta": 0
+  },
+  "D_drag": {
+    "frames": 34,
+    "meanMs": 13.34,
+    "p95Ms": 13.5,
+    "worstMs": 13.5,
+    "janky": 0,
+    "longTasks": 0
+  },
+  "D_edited": {
+    "mode": "drawB",
+    "verts": 4,
+    "closed": true,
+    "server": "ok",
+    "area": 231866.28404640418,
+    "origArea": 434484.79280026734,
+    "dist": 2308.35555366385,
+    "valid": true,
+    "blocking": 0,
+    "kinks": 0,
+    "naiveDelta": 0
+  },
+  "D_bowtie": {
+    "mode": "drawB",
+    "verts": 4,
+    "closed": true,
+    "server": "pending",
+    "area": 93735.46138778857,
+    "origArea": 434484.79280026734,
+    "dist": 2407.9869817879144,
+    "valid": false,
+    "blocking": 0,
+    "kinks": 1,
+    "naiveDelta": 0
+  },
+  "D_bowtieUndone": {
+    "mode": "drawB",
+    "verts": 4,
+    "closed": true,
+    "server": "pending",
+    "area": 231866.28404640418,
+    "origArea": 434484.79280026734,
+    "dist": 2308.35555366385,
+    "valid": true,
+    "blocking": 0,
+    "kinks": 0,
+    "naiveDelta": 0
+  },
+  "E_grabTarget": "fp-prop-path leaflet-interactive",
+  "E_drag": {
+    "frames": 89,
+    "meanMs": 13.34,
+    "p95Ms": 13.5,
+    "worstMs": 14.3,
+    "janky": 0,
+    "longTasks": 0
+  },
+  "E_moved": {
+    "mode": "drawB",
+    "verts": 4,
+    "closed": true,
+    "server": "ok",
+    "area": 231866.28404640418,
+    "origArea": 434484.79280026734,
+    "dist": 2251.4598116007733,
+    "valid": true,
+    "blocking": 0,
+    "kinks": 0,
+    "naiveDelta": 0,
+    "areaBefore": 231866.28404640418,
+    "areaDeltaPct": 0
+  },
+  "H": {
+    "state": {
+      "mode": "idle",
+      "verts": 0,
+      "closed": false,
+      "server": "none",
+      "origArea": 434484.79280026734
+    },
+    "originalUnchanged": true
+  }
+}

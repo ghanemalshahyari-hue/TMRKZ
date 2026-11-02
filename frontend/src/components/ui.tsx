@@ -76,8 +76,8 @@ export function NoAccess({ message }: { message?: string }) {
       <Icon name="shield" />
       <h2>هذا القسم خارج صلاحياتك الحالية</h2>
       <p>{message ?? 'تُحدد الصلاحيات في الخادم حسب عضويتك ودورك ونطاقك. تواصل مع مدير النظام إذا احتجت الوصول.'}</p>
-      <a className="button primary" href="#map">
-        العودة إلى الخريطة
+      <a className="button primary" href="#stationing">
+        العودة إلى مساحة التمركز
       </a>
     </section>
   );

@@ -95,7 +95,8 @@ export type Member = {
 };
 export type SiteSummary = { id: string; code: string; name: string; kind: string; capacity: number | null };
 export type OrgDetail = { org: Omit<OrgNode, 'children'> & { children?: OrgNode[] }; members: Member[]; sites: SiteSummary[] };
-export type Person = { id: string; displayName: string; employeeNo: string; username: string; status: string };
+/** A directory entry. For someone outside a scoped access manager's authority only the name and organisation come back. */
+export type Person = { id: string; displayName: string; employeeNo?: string; username?: string; status?: string; organization?: string };
 export type Delegation = {
   id: string;
   delegator: Ref;
@@ -845,6 +846,20 @@ export type IdentityIssue = {
   claimedKey?: string;
   subject?: string;
 };
+
+/** An open task waiting for an access manager's choice (after a departure, or no holder independent of the requester). */
+export type TaskRouting = {
+  id: string;
+  requestNumber: string;
+  taskName: string;
+  roleCode: string;
+  organization: string | null;
+  reason: string;
+  createdAt: string;
+};
+
+/** A person who may take a routed task; the employee number only for people inside the manager's directory. */
+export type TaskCandidate = { id: string; displayName: string; employeeNo?: string };
 
 // ---- permissions studio (ADR-018) ----------------------------------------------------------------------------------
 export type PolicyRole = {

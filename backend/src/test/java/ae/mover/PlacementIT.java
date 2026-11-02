@@ -172,6 +172,141 @@ class PlacementIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("P0-3: a hidden occupied site is never named or dated — at check, save, submission or as a target — but its viewers see it")
+    void hiddenSiteNeverDisclosed() {
+        rule(1000, 6000);
+        String hiddenName = "موقع BUSY " + sfx;
+        double lat = lat0 + 3 * kmLat;
+        Api req = login("req");
+        JsonNode check = req.post("/placement/check", check(lat, lng0 + 0.1 * kmLng, day("2026-12-01"), null)).body();
+        JsonNode c = check.path("conflicts").get(0);
+        assertThat(c.path("label").asText()).isEqualTo("منطقة مشغولة غير ظاهرة لك");
+        assertThat(c.has("until")).as("availability date of a hidden booking: " + c).isFalse();
+        assertThat(c.path("kind").asText()).isEqualTo("OCCUPIED");
+        assertThat(check.toString()).doesNotContain(hiddenName).doesNotContain("2027-07");
+
+        // guessing the occupant through the covered organisations is refused, as it is when saving
+        Map<String, Object> guess = check(lat, lng0 + 0.1 * kmLng, day("2026-12-01"), null);
+        guess.put("includedOrgIds", List.of(orgB.toString()));
+        assertThat(req.post("/placement/check", guess).status()).as("occupant oracle").isEqualTo(400);
+
+        String type = requestType("RELOCATION", finalOnly(), null);
+        UUID id = req.draft(type, "MAP", orgA, List.of(hqRes), day("2026-12-01"), null, Map.of("reason", "مبرر اختبار كافٍ للطلب"));
+        Map<String, Object> proposal = new LinkedHashMap<>();
+        proposal.put("organizationId", orgA.toString());
+        proposal.put("fromSiteId", hq.toString());
+        proposal.put("proposedName", "المقر المقترح");
+        proposal.put("geometry", point(lat, lng0 + 0.1 * kmLng));
+        proposal.put("action", "RELOCATE");
+        proposal.put("stationLevel", "BRANCH");
+        Res saved = req.put("/requests/" + id + "/relocation", proposal);
+        assertThat(saved.status()).as(saved.toString()).isEqualTo(200);
+        assertThat(saved.toString()).doesNotContain(hiddenName);
+        Res refused = req.submit(id);
+        assertThat(refused.status()).isEqualTo(400);
+        assertThat(refused.toString()).as("submission error").doesNotContain(hiddenName).doesNotContain("2027-07");
+
+        // a hidden registered site cannot be chosen as the target, and its name does not come back
+        proposal.put("targetSiteId", busy.toString());
+        Res target = req.put("/requests/" + id + "/relocation", proposal);
+        assertThat(target.status()).as(target.toString()).isEqualTo(404);
+        assertThat(target.toString()).doesNotContain(hiddenName);
+
+        // authorised: someone who may see every site gets the name and the date
+        JsonNode full = login("apr").post("/placement/check", check(lat, lng0 + 0.1 * kmLng, day("2026-12-01"), null)).body();
+        assertThat(full.toString()).as("approver with full view").contains(hiddenName);
+        assertThat(full.path("conflicts").get(0).has("until")).isTrue();
+    }
+
+    @Test
+    @DisplayName("P1-1: a returned relocation whose proposal moved is re-approved by every stage; an unchanged one keeps earlier approvals")
+    void materialChangeReapproval() {
+        rule(1000, 6000);
+        person("fac", "FACILITIES_REVIEWER", root);
+        String type = requestType("RELOCATION", workflow(List.of(),
+                stage("review", "ALL", false, "FACILITIES_REVIEWER|ANY"),
+                stage("final_approval", "ALL", true, "APPROVER|ANY")), null);
+        Api req = login("req");
+        Api fac = login("fac");
+        Api apr = login("apr");
+        Map<String, Object> p1 = point(lat0 - 2 * kmLat, lng0 + 2 * kmLng);
+        Map<String, Object> p2 = point(lat0 - 2 * kmLat, lng0 - 2 * kmLng);
+
+        UUID moved = submitReturned(type, req, fac, apr, p1);
+        Res resent = resubmitWith(req, moved, p2);
+        assertThat(resent.status()).as(resent.toString()).isEqualTo(200);
+        assertThat(stageState(resent, "review")).as("the reviewer must see the new location: " + resent).isNotEqualTo("CARRIED");
+        assertThat(fac.taskFor(moved)).as("a new review task").isNotNull();
+
+        // control: resubmitting the same proposal still keeps the earlier stage (change policy unaffected)
+        UUID same = submitReturned(type, req, fac, apr, p1);
+        Res unchanged = resubmitWith(req, same, p1);
+        assertThat(unchanged.status()).as(unchanged.toString()).isEqualTo(200);
+        assertThat(stageState(unchanged, "review")).isEqualTo("CARRIED");
+    }
+
+    private UUID submitReturned(String type, Api req, Api fac, Api apr, Map<String, Object> where) {
+        UUID id = req.draft(type, "MAP", orgA, List.of(hqRes), day("2026-12-01"), null, Map.of("reason", "مبرر اختبار كافٍ للطلب"));
+        assertThat(req.put("/requests/" + id + "/relocation", proposalAt(where)).status()).isEqualTo(200);
+        assertThat(req.submit(id).status()).isEqualTo(200);
+        assertThat(fac.approve(fac.taskFor(id), 1).status()).isEqualTo(200);
+        Map<String, Object> ret = new LinkedHashMap<>();
+        ret.put("decision", "RETURN");
+        ret.put("note", "يرجى مراجعة الموقع المقترح");
+        ret.put("reasonCode", "INCOMPLETE_DATA");
+        ret.put("expectedRevision", 1);
+        Res r = apr.post("/tasks/" + apr.taskFor(id) + "/decision", ret, UUID.randomUUID().toString());
+        assertThat(r.status()).as(r.toString()).isEqualTo(200);
+        return id;
+    }
+
+    private Res resubmitWith(Api req, UUID id, Map<String, Object> where) {
+        assertThat(req.put("/requests/" + id + "/relocation", proposalAt(where)).status()).isEqualTo(200);
+        int version = req.get("/requests/" + id).body().path("version").asInt();
+        return req.post("/requests/" + id + "/submit", Map.of("expectedVersion", version, "resubmissionReason", "تعديل بعد الإرجاع"),
+                UUID.randomUUID().toString());
+    }
+
+    private Map<String, Object> proposalAt(Map<String, Object> where) {
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("organizationId", orgA.toString());
+        p.put("fromSiteId", hq.toString());
+        p.put("proposedName", "المقر المقترح");
+        p.put("geometry", where);
+        p.put("action", "RELOCATE");
+        p.put("stationLevel", "BRANCH");
+        return p;
+    }
+
+    private static String stageState(Res r, String key) {
+        for (JsonNode s : r.body().path("stages")) {
+            if (s.path("key").asText().equals(key)) {
+                return s.path("state").asText();
+            }
+        }
+        return null;
+    }
+
+    @Test
+    @DisplayName("A refused submission states the real reason (the occupancy), not the informational «no rule» note")
+    void refusalStatesTheRealReason() {
+        // no rule is configured for this organisation tree here: the check is NO_RULE, and the proposal is occupied
+        String type = requestType("RELOCATION", finalOnly(), null);
+        Api req = login("req");
+        UUID id = req.draft(type, "MAP", orgA, List.of(hqRes), day("2026-12-01"), null, Map.of("reason", "مبرر اختبار كافٍ للطلب"));
+        Map<String, Object> proposal = new LinkedHashMap<>();
+        proposal.put("organizationId", orgA.toString());
+        proposal.put("fromSiteId", hq.toString());
+        proposal.put("proposedName", "المقر المقترح");
+        proposal.put("geometry", point(lat0 + 3 * kmLat, lng0 + 0.1 * kmLng));
+        proposal.put("action", "RELOCATE");
+        assertThat(req.put("/requests/" + id + "/relocation", proposal).status()).isEqualTo(200);
+        Res refused = req.submit(id);
+        assertThat(refused.status()).isEqualTo(400);
+        assertThat(refused.toString()).as(refused.toString()).contains("محجوز").doesNotContain("لا توجد قاعدة مسافة");
+    }
+
+    @Test
     @DisplayName("Covered organisations: branches at the current premises are marked, a branch elsewhere is listed with its site")
     void units() {
         JsonNode units = login("req").get("/placement/units?orgId=" + orgA + "&siteId=" + hq).body();

@@ -4,10 +4,11 @@ import { ExplainPanel } from '../components/access/ExplainPanel';
 import { GrantsStudio } from '../components/access/GrantsStudio';
 import { PolicyStudio } from '../components/access/PolicyStudio';
 import { IdentityIssues } from '../components/IdentityIssues';
+import { TaskRoutings } from '../components/TaskRoutings';
 import { Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 
-type Tab = 'policy' | 'grants' | 'explain' | 'service' | 'identity';
+type Tab = 'policy' | 'grants' | 'explain' | 'service' | 'identity' | 'tasks';
 
 const TABS: [Tab, string][] = [
   ['policy', 'الأدوار والإصدارات'],
@@ -15,6 +16,7 @@ const TABS: [Tab, string][] = [
   ['explain', 'المعاينة والاختبار'],
   ['service', 'خدمة القرار'],
   ['identity', 'قضايا الربط'],
+  ['tasks', 'مهام بانتظار الإسناد'],
 ];
 
 /**
@@ -55,6 +57,7 @@ export function PermissionsPage() {
         {tab === 'explain' && <ExplainPanel />}
         {tab === 'service' && <AuthzStatusPanel global={global} />}
         {tab === 'identity' && (app.can('MANAGE_ACCESS') ? <IdentityIssues /> : null)}
+        {tab === 'tasks' && (app.can('MANAGE_ACCESS') ? <TaskRoutings /> : null)}
       </div>
     </>
   );

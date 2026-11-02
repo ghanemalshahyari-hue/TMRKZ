@@ -16,7 +16,25 @@ public record WorkflowDefinition(String name, List<Stage> stages, List<ExecTempl
                         boolean finalStage, boolean requiresSignature) {
     }
 
-    public record ExecTemplate(String key, String name, String role, String orgFrom, int dueDays, boolean evidenceRequired) {
+    /**
+     * An execution step after approval. {@code purpose} fixes its independence rule (ADR-028): HANDOVER — the delivering
+     * side, never the requester; RECEIPT — the authorised receiving party confirms a completed handover, never the same
+     * human who handed over; ACKNOWLEDGEMENT — the requester records completing their own work, which is not an approval;
+     * TASK — any other step. Definitions without it take it from the key (handover, receipt, relocated).
+     */
+    public record ExecTemplate(String key, String name, String role, String orgFrom, int dueDays, boolean evidenceRequired,
+                               String purpose) {
+
+        public static final java.util.Set<String> PURPOSES = java.util.Set.of("HANDOVER", "RECEIPT", "ACKNOWLEDGEMENT", "TASK");
+
+        public static String purposeOf(String key) {
+            return switch (key == null ? "" : key) {
+                case "handover" -> "HANDOVER";
+                case "receipt" -> "RECEIPT";
+                case "relocated" -> "ACKNOWLEDGEMENT";
+                default -> "TASK";
+            };
+        }
     }
 
     public Optional<Stage> stage(String key) {
@@ -37,8 +55,10 @@ public record WorkflowDefinition(String name, List<Stage> stages, List<ExecTempl
         }
         List<ExecTemplate> exec = new ArrayList<>();
         for (JsonNode e : node.path("execution")) {
+            String purpose = e.path("purpose").asText(ExecTemplate.purposeOf(e.path("key").asText()));
             exec.add(new ExecTemplate(e.path("key").asText(), e.path("name").asText(), e.path("role").asText(),
-                    e.path("orgFrom").asText("ANY"), e.path("dueDays").asInt(1), e.path("evidenceRequired").asBoolean(false)));
+                    e.path("orgFrom").asText("ANY"), e.path("dueDays").asInt(1), e.path("evidenceRequired").asBoolean(false),
+                    ExecTemplate.PURPOSES.contains(purpose) ? purpose : ExecTemplate.purposeOf(e.path("key").asText())));
         }
         return new WorkflowDefinition(node.path("name").asText(), stages, exec);
     }

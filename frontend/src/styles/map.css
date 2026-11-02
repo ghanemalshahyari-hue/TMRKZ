@@ -84,16 +84,25 @@
 .map-status{position:absolute;z-index:600;bottom:72px;right:16px;background:#ffffffee;border:1px solid var(--line);border-radius:7px;padding:5px 10px;font-size:10px;color:#5d7470;max-width:60%}
 .map-status.error{background:#fcf1ef;border-color:#f1d5cf;color:#a3594f}
 
+/* only the drawn pin (head, name, badge) takes the pointer: the empty corners of its box no longer cover the organisation
+   symbols beside it or a neighbouring marker (2 Nov 2026, V-06/V-15) */
+.pin-wrap{pointer-events:none}
+.pin-wrap>*{pointer-events:auto}
 .pin-wrap.no-boundary .pin-head{border-style:dashed;border-color:#ffffff;outline:2px dashed #6f7f83;outline-offset:1px}
 .pin-label em{font-style:normal;color:#a3594f}
 .pin-badge{direction:rtl;background:var(--orange);color:#fff;border-radius:99px;font:bold 9px/16px Arial,sans-serif;padding:0 6px;margin-top:-6px;box-shadow:0 2px 6px #0002}
 .leaflet-marker-icon:focus-visible .pin-head{outline:3px solid #54ae96;outline-offset:3px}
 .map.adding-vertices,.map.adding-vertices .leaflet-interactive{cursor:crosshair}
+/* the strip is laid out left to right from its anchor, beside the pin: in the RTL page it would otherwise run back under
+   the site's own pin and hide its symbols (2 Nov 2026, V-06/V-15) */
+.map-org-symbols{direction:ltr}
 .org-symbol-wrap{display:inline-flex;flex-wrap:wrap;gap:2px;align-items:center;justify-content:flex-start;max-width:132px;transform:translate(10px,-54px);background:#ffffffd9;border:1px solid #d7e0dd;border-radius:8px;padding:2px 4px;box-shadow:0 1px 4px #0003}
 .map-org-symbol-btn{display:inline-flex;align-items:center;justify-content:center;padding:1px;margin:0;border:0;background:none;border-radius:5px;cursor:pointer}
 .map-org-symbol-btn:hover{background:#e7f1ee}
 .map-org-symbol-btn:focus-visible{outline:3px solid #54ae96;outline-offset:1px}
 .map-org-symbol{width:22px;height:22px;display:block;pointer-events:none}
+/* an organisation without an approved symbol keeps a neutral mark, so it stays visible and selectable */
+.map-org-symbol.generic{width:22px;height:16px;margin:3px 0;box-sizing:border-box;border:2px dashed #7b8b8f;border-radius:3px;background:#fff}
 .map.placing-marker{cursor:crosshair}
 .marker-edit{background:none;border:none}
 .marker-edit-pin{display:block;width:18px;height:18px;border-radius:50%;background:var(--accent,#0d5d4e);border:3px solid #fff;box-shadow:0 1px 6px #0005;cursor:grab}

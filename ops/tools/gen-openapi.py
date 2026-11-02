@@ -15,7 +15,7 @@ METHOD = re.compile(r'public\s+[\w<>\[\], .?]+\s+(\w+)\s*\(([^)]*(?:\([^)]*\)[^)
 ERRORS = {
     "400": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED",
     "401": "UNAUTHENTICATED",
-    "403": "FORBIDDEN (also missing X-Requested-With on non-GET)",
+    "403": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)",
     "404": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)",
     "409": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED",
     "503": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE",

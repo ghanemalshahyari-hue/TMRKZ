@@ -10,6 +10,7 @@
 __pycache__/
 *.py[cod]
 node_modules/
+.vite/
 .venv/
 venv/
 .DS_Store
@@ -23,6 +24,7 @@ uploads/
 # Production application build output, backups and offline bundles
 backend/target/
 frontend/dist/
+prototypes/*/dist/
 backups/
 offline-bundle/
 .idea/

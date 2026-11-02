@@ -38,8 +38,11 @@ public class SiteService {
     private final Clock clock;
     private final AuditService audit;
     private final ReservationService reservations;
+    private final SiteOverlapRule overlapRule;
 
-    public SiteService(JdbcClient jdbc, Json json, Clock clock, AuditService audit, ReservationService reservations) {
+    public SiteService(JdbcClient jdbc, Json json, Clock clock, AuditService audit, ReservationService reservations,
+                       SiteOverlapRule overlapRule) {
+        this.overlapRule = overlapRule;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -356,6 +359,15 @@ public class SiteService {
             }
             throw e;
         }
+        UUID newParent = in.parentId() == null ? null : UUID.fromString(in.parentId());
+        if (!java.util.Objects.equals(newParent, current.parentId())) {
+            // the overlap exemption follows the tree: a move may neither gain one nor leave an overlap behind (ADR-027)
+            SiteOverlapRule.serialise(jdbc);
+            List<String> problems = overlapRule.afterMove(ctx, id);
+            if (!problems.isEmpty()) {
+                throw ApiException.validation("لا يمكن نقل الموقع في شجرة المواقع: " + String.join(" ", problems));
+            }
+        }
         UUID newOrg = UUID.fromString(in.responsibleOrgId());
         if (!newOrg.equals(current.orgId())) {
             setResponsibility(id, newOrg, now);
@@ -547,7 +559,8 @@ public class SiteService {
                 || in.kind() == null || in.kind().isBlank() || in.responsibleOrgId() == null) {
             throw ApiException.validation("أكمل رمز الموقع واسمه وتصنيفه والجهة المسؤولة.");
         }
-        if (in.location() != null && (Math.abs(in.location().lat()) > 90 || Math.abs(in.location().lng()) > 180)) {
+        if (in.location() != null && (!Double.isFinite(in.location().lat()) || !Double.isFinite(in.location().lng())
+                || Math.abs(in.location().lat()) > 90 || Math.abs(in.location().lng()) > 180)) {
             throw ApiException.validation("إحداثيات غير صالحة.");
         }
     }

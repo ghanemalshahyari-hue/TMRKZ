@@ -1,0 +1,58 @@
+:root {
+  --ink: #16324f; --line: #d8e0e3; --bg: #f4f7f8; --card: #fff; --muted: #637079;
+  --green: #1f9d55; --blue: #2f6db0; --red: #c0392b; --accent: #0d5d4e;
+  font-family: "Segoe UI", Tahoma, system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--ink); direction: rtl; }
+#app { display: flex; flex-direction: column; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 16px; background: #10283c; color: #eaf1f5; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.brand .logo { font-size: 20px; color: #7fd3b5; }
+.brand .sub { color: #9db4c4; font-size: 12px; margin-inline-start: 6px; }
+.controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.seg { display: inline-flex; background: #163049; border: 1px solid #294a63; border-radius: 9px; overflow: hidden; }
+.seg a { padding: 6px 12px; color: #bcd0de; text-decoration: none; font-size: 13px; border-inline-start: 1px solid #294a63; }
+.seg a:first-child { border-inline-start: 0; }
+.seg a.on { background: #2b9b78; color: #fff; }
+
+.body { flex: 1; display: flex; min-height: 0; }
+.mapwrap { position: relative; flex: 1; min-width: 0; }
+/* id selector so it beats MapLibre's `.maplibregl-map { position: relative }` (imported later) — otherwise the
+   container collapses to 0 height and the WebGL canvas + markers vanish/are clipped. */
+#map { position: absolute; inset: 0; background: #eef2f3; }
+.leaflet-container, .maplibregl-map { font: inherit; }
+
+.hud { position: absolute; top: 12px; inset-inline-start: 12px; z-index: 500; width: 232px; background: rgba(255,255,255,.95);
+  border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 12.5px; box-shadow: 0 6px 20px rgba(16,40,60,.14); }
+.hud hr { border: 0; border-top: 1px solid var(--line); margin: 8px 0; }
+.hud-row { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.hud-row span { color: var(--muted); }
+.hud-row b { font-variant-numeric: tabular-nums; }
+.hud-title { font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.hud .ok { color: var(--green); } .hud .bad { color: var(--red); } .hud .warn { color: #c77b1b; }
+
+.panel { width: 320px; border-inline-start: 1px solid var(--line); background: var(--card); padding: 18px; overflow: auto; }
+.panel h2 { margin: 0 0 6px; font-size: 16px; }
+.panel .muted { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
+.panel .small { font-size: 11.5px; margin-top: 16px; line-height: 1.6; }
+#commit { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; margin: 0 0 14px; font-size: 13.5px; }
+#commit dt { color: var(--muted); } #commit dd { margin: 0; font-weight: 600; text-align: start; }
+#commit .ok { color: var(--green); } #commit .bad { color: var(--red); }
+.btn { font: inherit; font-size: 13.5px; padding: 9px 14px; border-radius: 9px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); width: 100%; }
+.btn.primary:disabled { background: #a9c3bb; border-color: #a9c3bb; cursor: not-allowed; }
+.btn.ghost { background: #163049; color: #cfe0ec; border-color: #294a63; }
+.toast { background: #e8f5ee; border: 1px solid #b9e2cd; color: #1b6b45; border-radius: 9px; padding: 8px 10px; font-size: 12.5px; margin-top: 10px; }
+
+/* markers (container origin sits on the geo point for both engines) */
+.pA-prop, .pA-cur, .pB-prop, .pB-cur { position: relative; width: 0; height: 0; }
+.pin { position: absolute; transform: translate(-50%, -50%); font-size: 22px; line-height: 1; text-shadow: 0 1px 2px rgba(0,0,0,.35); cursor: grab; }
+.pin.green { color: var(--green); } .pin.blue { color: var(--blue); }
+.pin.ok { color: var(--green); } .pin.bad { color: var(--red); }
+.chip { position: absolute; transform: translate(-50%, 10px); white-space: nowrap; background: #fff; border: 1px solid var(--line);
+  border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 700; color: var(--ink); box-shadow: 0 2px 8px rgba(16,40,60,.18); font-variant-numeric: tabular-nums; }
+.lbl { position: absolute; transform: translate(-50%, 12px); white-space: nowrap; background: var(--blue); color: #fff; border-radius: 6px; padding: 1px 8px; font-size: 11.5px; }
+.maplibregl-marker { will-change: transform; }

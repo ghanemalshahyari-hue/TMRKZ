@@ -112,6 +112,10 @@ so withdrawn access stops updates immediately without channel re-evaluation logi
 
 ## ADR-013 Independent actions, configuration separate from content, requester decisions — Accepted (2026-10-29)
 
+*Superseded in part on 2026-11-02 by ADR-027: the requester-decision clause below no longer applies — nobody decides a
+request they made, directly or through a delegation, another role, organisation or person record. Kept for history;
+decisions recorded before ADR-027 keep their `by_requester` flag and «(مقدم الطلب)» label.*
+
 Owner decisions in `docs/ADMIN_PRODUCTION_IMPLEMENTATION_PROMPT_AR.md` §2 and §7. The action set is
 `VIEW, VIEW_SUMMARY, CREATE, EDIT, REVIEW, APPROVE, EXPORT, EXECUTE, MANAGE_FACILITIES, MANAGE_ACCESS, CONFIGURE, AUDIT,
 VIEW_SOURCE_IDENTIFIERS`; none implies another.
@@ -229,6 +233,11 @@ Owner decisions after the review of `c96cb4b`.
 ## ADR-017 Administrative map workspace on PostGIS; registered boundaries only — Accepted (2026-10-29)
 
 Owner's completion brief `docs/MAP_WORKSPACE_COMPLETION_AR.md` (MAP-01 … MAP-18). Supersedes ADR-008 and amends ADR-009.
+
+*Amended 2026-11-02 (ADR-029): the page `MapPage` («الخريطة والمرافق», `#map`) is retired; its functions run in
+«مساحة التمركز» (`#stationing`) with the same components and server rules, and `#map` redirects there.* *Further amended
+the same day: the merge into «مساحة التمركز» was removed by the owner; the page stays retired and `#map` still opens
+`#stationing`, but its functions have no screen until the rebuild (components, APIs and data unchanged).*
 
 - **Database.** Image `postgis/postgis:17-3.5-alpine` (PostgreSQL 17.11, PostGIS 3.5.7, GEOS 3.14.1, PROJ 9.8.1 with
   network access disabled). Same PostgreSQL release as the earlier `postgres:17.11-alpine`, so an existing volume is
@@ -459,6 +468,11 @@ Owner brief of 30 Oct 2026 (map-centred administrative workspace, review and dec
 
 Owner request of 30 Oct 2026 (two options around the site; draw the new location; then move).
 
+*Amended 2026-11-02 (ADR-029): «نقل المقر» in the ring now opens the stationing panel of ADR-025 (footprint copy dragged
+as one object, or a drawn polygon); the point/rectangle `RelocationPanel` of this ADR is removed. Request kind, type,
+storage, workflow and effects are unchanged.* *Further amended the same day: with the merge removed, the ring is not
+shown on any screen; a relocation is proposed from the stationing popup «طلب تمركز / إعادة تمركز» (ADR-025).*
+
 - **Ring.** On the desktop map a click on a site shows two options as a ring around it: «طلب استخدام» (opens the card
   with the published use types) and «نقل المقر». Phones keep the bottom sheet; tree and list rows keep the card.
 - **Request.** Request kind `RELOCATION` (V14), type `ORG_RELOCATION` «نقل مقر جهة» seeded by the bootstrap with its
@@ -503,6 +517,14 @@ interface, not an excluded capability.
 
 ## ADR-025 Map-first stationing workspace: drag a proposed location with configurable distance rules and occupancy — Accepted (2026-10-30)
 
+*Amended 2026-11-02 (owner: rebuild the stationing interaction to the approved polygon prototype). The proposal is a
+footprint, not a point: a copy of the registered polygon and the organisation symbol is dragged as one rigid object
+(geodesic distance/bearing per vertex, `frontend/src/lib/footprint.ts`, `components/stationing/FootprintEditor.ts`), or a
+new polygon is drawn by vertex count (≥ 3) on the map or by per-vertex coordinates, with numbered vertices, edge lengths,
+area, vertex editing, undo/redo/reset and a compare view. The registered polygon and symbol stay visible and unchanged;
+the map step comes first and a compact details step follows. Server validation, save/submit and approval are unchanged;
+activation of an approved relocation is not built. Organisation symbols are on by default in this workspace.*
+
 Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation and its premises, choose «تمركز /
 إعادة تمركز», drag the proposed marker, see the distance, the allowed range and occupied sites, confirm or cancel).
 
@@ -535,3 +557,218 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   forces, no tactical graphics, unit symbols stay informational and are not dragged.
 - **Verified.** `PlacementIT` on real PostgreSQL/PostGIS with OpenFGA; the browser journey in Chrome against the
   acceptance environment with fictional data (`ops/test-env/stationing-demo.sql`).
+- *Amended 2026-11-02 (owner acceptance of the optimised drag, working tree): the proposed marker follows the pointer
+  without being clamped back into the range; outside the range or over an occupied area it turns red and «متابعة» stays
+  disabled. The chip/bubble are updated in place once per animation frame and React state is committed only on drop.
+  The server checks at save, submission and approval are unchanged. A hidden site is never named in any answer (ADR-026).*
+
+## ADR-026 Security and integrity remediation after the enterprise acceptance audit — Accepted (2026-11-02)
+
+- **Context.** The enterprise acceptance audit (`docs/audit/enterprise-launch/REPORT_AR.md`) reproduced, against the
+  running application, four security defects (P0) and four integrity defects (P1). The owner approved P0/P1 remediation
+  (2 Nov 2026) with test-first fixes and evidence, without weakening authorization, before any scale testing.
+- **Decision (P0).**
+  1. *Position seats are grants.* `POST /position-seats` and its withdrawal apply the same authority as
+     `POST /memberships` (`GrantAdminService.requireAuthorityForRole`: grantable roles, ALL scope and system actions only
+     for a global access manager). A seat for an HR position the actor holds is refused (indirect self-grant).
+  2. *No self-grant.* Nobody grants a role to themselves, and the identity created by `ops/bootstrap-admin.sh`
+     (`person.bootstrap`) receives no grant beyond its 72-hour one; the lasting administrator is the person's HR record.
+  3. *Hidden sites stay hidden everywhere.* `PlacementService.evaluate` fails closed (no access context = no names); a
+     masked conflict carries no availability date and no shared-limit distinction, and masked shared use is not reported;
+     the re-check at submission and approval runs with the actor's context; `includedOrgIds` are validated at the
+     interactive check as at save; a hidden registered site cannot be chosen as the target (404).
+  4. *(Revised by ADR-027: the cross-organisation name search below was withdrawn; bridges replace it.)*
+     *Directory and delegations follow authority — search, don't list.* `GET /people` and `GET /delegations` list
+     everyone only for a global access manager. For a scoped one, browsing and terms shorter than 3 characters return
+     only people affiliated with, or granted in, organisations inside their MANAGE_ACCESS subtrees (with employee number,
+     account and status); a search of 3 or more characters also finds active people outside by name, or by an *exact*
+     employee number or account, returned as name and organisation only. This keeps cross-organisation grants on a
+     shared site possible (access studio STUDIO-06) without exposing the directory; the grant itself is still refused
+     when the role, organisation or site is outside the manager's authority. Delegations: those on grants inside the
+     subtrees, plus the manager's own. *Residual:* a scoped manager can confirm that a named person exists elsewhere.
+- **Decision (P1).**
+  1. *Material relocation changes need full re-approval.* The relocation snapshot (geometry, organisation, level,
+     duration, covered units, target) joined the structural keys of the change-impact policy (D-06); a returned request
+     whose proposal moved goes through every stage again. Unchanged resubmissions still carry earlier approvals.
+  2. *Import previews are bound to the structure they were made against.* A preview stores a fingerprint of every unit's
+     code/name/parent/status and is valid for 30 minutes; commit refuses a changed structure or an expired preview and
+     re-validates without recording another run (a commit no longer leaves a committable PREVIEWED run behind).
+  3. *Typed coordinates are taken as a pair.* `lib/coords.parseCoordinates` never fills a missing or invalid axis with 0;
+     the site editor keeps the typed text visible, shows the error and cannot save while the pair is invalid.
+  4. *Registered boundaries do not overlap except along the site tree.* Every boundary registration (drawing,
+     coordinates, import publication — all through `BoundaryService.publishVersion`) and the validation preview refuse an
+     overlap above 1 m² with an active site that is neither an ancestor nor a descendant; a shared edge is allowed; a site
+     the editor may not see is not named.
+  5. *Refusal messages state the real reason.* Submission/approval errors use `PlacementService.Check.refusal()` (range
+     problem, else the first blocking conflict) instead of the first informational message.
+- **Consequences.** No schema change and no data migration (Flyway untouched). Grants/seats created before the fix are not
+  removed automatically — the review queries in the audit report list them. Previews created before the fix carry no
+  fingerprint and must be previewed again. Existing overlapping boundaries are not re-checked; only new registrations.
+- **Not done (open).** Separation of duties for approvals (owner decision of 2 Nov 2026 prohibits self-approval by
+  default, including through delegation or multiple roles) is decided but **not yet enforced** — ADR-013's requester
+  decision remains in the code until it is implemented. Resolving an identity issue (`IdentityService.resolveIssue`) does
+  not compare the target person's existing grants with the resolver's authority (code-level risk, not reproduced). The
+  `/identity-issues` list is not scoped (its rows carry no organisation). Site-level authorised sharing does not exist,
+  so no overlap exception is made for it. Local provisioning of people and controlled unit creation (owner decision 1)
+  are planned, not built.
+- **Verified.** `SecurityRemediationIT`, `PlacementIT.hiddenSiteNeverDisclosed/materialChangeReapproval/refusalStatesTheRealReason`,
+  `AdministrationAcceptanceIT.staleImportPreview`, `BoundaryOverlapIT`, `frontend/src/lib/coords.test.ts`; each was run
+  red before its fix. Full backend suite 116/116 on PostgreSQL + PostGIS with OpenFGA. Exploit re-runs against the
+  rebuilt acceptance and disposable environments: `docs/audit/enterprise-launch/evidence/P0-verify.json`, `P1-verify.json`.
+  Browser suites on the rebuilt offline environment: map 22/22, journey passed, access studio 5/6 (STUDIO-03 is a
+  stale count from before this change; STUDIO-06 — a cross-organisation grant — passes under the search rule above).
+
+## ADR-027 Separation of duties, identity and directory scope, containment-only boundary overlap — Accepted (2026-11-02)
+
+- **Context.** Owner decision of 2 Nov 2026: self-approval is prohibited by default, including indirectly, and enforced
+  in the server; cross-organisation work only through explicit, scoped permissions; the load tool must use the current
+  sign-in; the fixes are verified independently before any scale test. Builds on ADR-026; ADR-013's requester-decision
+  clause is withdrawn.
+- **Decision — separation of duties (`access/SeparationOfDuties`, `access/PersonKeys`).**
+  1. Nobody decides (approve, refer, return, reject — any stage) a request they made. *They* is the human: the creator's
+     person record and every record sharing one of its sign-in keys — employee number, account, the HR domain account of
+     the published snapshot, or the key claimed by a sign-in an administrator linked to the record (case-insensitive).
+  2. A grant received through a delegation acts for its delegator: the requester's authority delegated to a deputy does
+     not decide the request; the requester as deputy of someone else does not either. A deputy with an approval grant of
+     their own still decides through it.
+  3. Enforced in the server at every path: task list, request detail actions, approval document, certificate signing and
+     the decision (checked before the assignment, so a task assigned to the requester still refuses them), with error
+     code `SEPARATION_OF_DUTIES` (403). There is no switch; relaxing the rule needs an owner decision and a code change.
+  4. *No independent holder.* When a new review task could be taken only by the requester (`TaskSync` →
+     `TaskRealignment.separate`), or its last independent holder leaves (`realign`), the task waits for the access
+     managers of its organisation (`task_reassignment`, reason `SEPARATION_OF_DUTIES`), who are notified — the requester
+     excluded. The requester never sees or resolves the routing of their own request, is never a candidate and cannot be
+     assigned; a sole remaining holder is assigned only if independent. The access managers grant the role to an
+     independent person and assign the task on the new screen «مهام بانتظار الإسناد» (`components/TaskRoutings.tsx`).
+- **Decision — identity and directory scope (`access/DirectoryScope`).**
+  1. A scoped access manager reaches *members* (affiliated with, or holding a current grant homed in, an organisation of
+     their MANAGE_ACCESS authority) and *bridges* (a current grant on a site that authority administers — the explicit,
+     scoped form of cross-organisation work, set up by a manager whose authority covers the person). Members are shown
+     with identifiers, bridges by name and organisation only. The ≥3-character outside search of ADR-026 is withdrawn: an
+     outsider is found neither by name nor by an exact identifier. Global access managers reach everyone.
+  2. The same reach bounds `GET /people`, `POST /memberships` (grantee), `GET /access/explain` (an ended grant no longer
+     relates someone), the employee numbers shown among task candidates, and the unlinked sign-ins.
+  3. *Unlinked sign-ins.* A scoped manager sees only those whose claimed key belongs to one of their members; key-less or
+     unmatched sign-ins are for global managers. Linking hands the sign-in the person's roles, so it requires authority
+     over every current and future grant of that person, never targets the linker or the bootstrap identity, and never
+     links a sign-in to anyone but the person whose key it claims.
+  4. Ending a grant (`POST /memberships/{id}/end`) requires the authority to give it, as for a position seat.
+- **Decision — boundary overlap (`facilities/SiteOverlapRule`).** The register has no site-level sharing (organisations
+  share one site through a SHARED resource, which needs no overlapping boundaries). The only exemption is the site tree,
+  and only as containment: where a site meets an ancestor's boundary it lies inside it, and where it meets a descendant's
+  boundary it contains it; a site straddling its ancestor's boundary is refused. Moving a site in the tree re-checks it
+  and its descendants, so the exemption can neither be gained nor left behind by a move.
+- **Decision — load tool.** `ops/load/load-test.mjs` signs in through `POST /auth/directory/login` only, refuses the
+  acceptance environment and needs an explicit target; `ops/load/up-load-env.sh` starts the disposable project
+  `tmrkz-load` (port 8099) with synthetic directory accounts and HR records (`ops/load/synthetic-identities.sql`, shared
+  password generated under `ops/test-env/.generated/`). `SMOKE=1` takes one request through every stage, each decided by
+  a different synthetic person. No sign-in endpoint was restored and no bypass added.
+- **Migration.** `V16__separation_of_duties.sql`: indexes only (case-insensitive employee number and account, linked
+  claimed keys). No table, column or data change.
+- **Consequences.** A requester holding an approval role now waits for another holder; organisations where one person is
+  the only holder of a stage's role see that stage routed to their access managers. A scoped access manager can no longer
+  find people of other organisations unless a site grant relates them; the first cross-organisation grant is made by a
+  manager whose authority covers the person. A child site boundary drawn across its parent's boundary is refused.
+- **Independent review (same day).** A separate read-only review of every control found further paths; fixed here:
+  the organisation detail roster (employee numbers, grant sites) is shown only for an organisation inside the reader's
+  own VIEW or MANAGE_ACCESS scope, never for an ancestor shown as context, and a grant's site only when visible; a
+  relocation's origin/target site is unnamed for a reader who may not see it; the access explanation covers members only
+  and names a target only when visible; a bridge is found by name only (not by identifier fragments); every self check
+  (grant, link, position seat, delegation) compares humans through `PersonKeys`, which also ties a bootstrap identity to
+  the HR record that replaces it (`bootstrap_admin.login`); a delegation is never to the bootstrap identity and never of
+  MANAGE_ACCESS, CONFIGURE or VIEW_SOURCE_IDENTIFIERS (administration is granted by an access manager, not delegated —
+  an owner may revisit this); a stage a requester decided before this ADR is never carried into a resubmission; site
+  coordinates must be finite numbers (NaN passed the range check); boundary registrations and tree moves are serialised
+  by a transaction-level advisory lock. Concurrent final approvals over overlapping resource trees now row-lock the trees
+  in id order before inserting scope locks (`ReservationService.lockTrees`), so the later one gets the reservation
+  conflict instead of a database deadlock (a latent race the added checks made visible in MAP-13).
+- **Not changed (recorded as open).** Execution tasks and closing are not covered by separation of duties (the receipt
+  task belongs to the requester by design; owner decision needed for handover and closing). `/requests/{id}/boundaries`
+  and the approval document's site codes at summary level; availability probing by window, and occupant guessing through
+  one's own ancestor organisations in `/placement/check`; the audit log is not scoped by organisation; a manager limited
+  to sites can list their home organisation's grants; revoking someone else's delegation needs only organisation scope;
+  task candidates match on employee numbers; import commit has no lock against a concurrent HR sync; numeric strings
+  such as "007" and "7" compare equal in the change policy; `infoOrgIds` is not a material key.
+- **Verified.** `SeparationOfDutiesIT` (8), `IdentityScopeIT` (8), `BoundaryOverlapIT` (3), revised `AccessAcceptanceIT`
+  (AT-24) and `SecurityRemediationIT`; the phase-1/2 tests were run red first (15 failing assertions,
+  `docs/audit/enterprise-launch/evidence/phase2-red.log`); the review-finding tests were written with their fixes. Full
+  backend suite 133/133; browser: SoD and assignment screen 12/12, journey passed, map 21/22 (MAP-19 order-dependent),
+  access studio 5/6 (stale STUDIO-03); P0 exploit re-runs all FIXED; load tool smoke workflow passed.
+
+## ADR-028 Execution integrity: handover, receipt, acknowledgement and closing — Proposed, written but not tested (2026-11-02)
+
+- **Context.** Owner decisions of 2 Nov 2026 on the steps after approval, completing ADR-027 ("Not changed": execution
+  tasks and closing were outside separation of duties).
+- **Decision.**
+  1. Separation of duties covers every approval decision; an approval stage whose role nobody holds goes to the access
+     managers (`NO_HOLDER`) instead of being skipped (`TaskRealignment.separate`).
+  2. The requester *acknowledges* completing their own work (`ACKNOWLEDGEMENT`, audited as `EXECUTION_ACKNOWLEDGED`,
+     "not an approval").
+  3. A handover is never performed by the requester, directly or through a delegation; the *receipt* confirms a
+     completed handover and is never done by the human who handed over (`SeparationOfDuties.step`,
+     `ExecutionService.doComplete`).
+  4. The receipt belongs to the authorised receiving party: the step's role, organisation and order after the handover,
+     checked against the human, not the record.
+  5. Closing needs an independent holder of the right; the requester cannot close their own request
+     (`SEPARATION_OF_DUTIES`) and does not see the action (`ExecutionService.doClose`, `RequestViews`). The controlled
+     automatic transition the owner listed as an alternative is **not built**.
+  6. No silent bypass: an execution step without an independent party, or without anyone, goes to the access managers
+     (`TaskRealignment.separateExecution`, `DecisionService.finalizeApproval`).
+  - Storage: migration `V17__execution_purpose.sql` adds `execution_task.purpose` (`HANDOVER`, `RECEIPT`,
+    `ACKNOWLEDGEMENT`, `TASK`) and fills existing steps from their keys; workflow definitions accept an optional `purpose`.
+- **Status — not verified.** The code compiles (main and tests, 2 Nov 2026) but `ExecutionIntegrityIT` (EX-1…EX-5) and
+  the backend suite have **not run**: the owner stopped the run, and later briefs forbade migrations. Until they pass,
+  do not deploy this revision to data you keep (V17 would be applied) and do not rebuild the acceptance environment's
+  backend from it.
+
+## ADR-029 One GIS workspace: «مساحة التمركز» replaces «الخريطة والمرافق» — Accepted (2026-11-02)
+
+- **Context.** Owner decision of 2 Nov 2026, after the polygon stationing interaction (ADR-025 amendment) was accepted:
+  «مساحة التمركز» is the official and only main GIS workspace and «الخريطة والمرافق» is retired once its functions are
+  inventoried and the required ones preserved. The two map pages each had a site menu and a request entry. The full
+  inventory is in `docs/GIS_WORKSPACE_RETIREMENT_AR.md`.
+- **Decision.**
+  1. `#stationing` (`StationingPage`) carries every function of the retired page with the same components and server
+     rules: context bar with period tools and colour mode, background and layer panels, names, legend, coverage note,
+     neutral state on a failed refresh, aborted and sequenced viewport requests, viewport summary and the per-person
+     saved context (same key, cleared at sign-out); a collapsible directory with organisations (the stationing tree with
+     levels and linked sites, plus an optional map filter with or without branches) and sites (`SiteTree` with row menus
+     and the selection's path revealed); site details with resources, occupants, boundary version, use requests and
+     changes to an existing use; and facility tools as the server allows (add a site at a marker, move a marker, edit a
+     boundary, import boundaries, map packages, export).
+  2. One on-site menu: the server-decided `SiteActionMenu` (ring on the desktop map, card from a tree row, bottom sheet on
+     phones). «طلب استخدام» opens the request drawer docked beside the map; «نقل المقر» opens the stationing panel with
+     the chosen published relocation type (`StationingPanel.typeCode`). The stationing page's own popup — a duplicate
+     entry decided on the client — is removed; its items moved to the details panel and the context bar.
+  3. The organisation of a stationing request is the one chosen from the tree, the search or its symbol when it is
+     linked to the site; otherwise the site's responsible organisation. A click on the map never re-fits the map; only an
+     organisation chosen from the tree or the search fits the map to its sites.
+  4. Routes: `#map`, `#map/…` and unknown routes open `#stationing` (address replaced); `#stationing/<requestId>` still
+     reopens a draft; the brand link, the no-access card and «على الخريطة» on the organisation page lead to
+     `#stationing`; «طلب جديد» opens the drawer there. The map keeps a full working height; the heading and context bar
+     scroll away above it.
+  5. Removed: `pages/MapPage.tsx`, `components/map/RelocationPanel.tsx` (the point/rectangle proposal of ADR-023,
+     superseded by the footprint panel), the navigation entry, the `map` view and the page-only CSS. Kept: every shared
+     component (including `OrgTree`, used by the permission pickers), API, table, permission and geographic data.
+- **Not changed.** Backend, database, OpenAPI, permissions and workflows. Activation of an approved relocation and
+  site-sharing agreements remain not built (ADR-025); nothing was invented for them.
+- **Verified** (Edge, offline `tmrkz-test`, only the web container rebuilt): `gis-workspace.mjs` 8/8 (navigation, legacy
+  route, no errors, sites and resources against the server, symbols, organisation-page link, facility tools against
+  `/map/context` and `canManage` for three roles, «نقل المقر» against `/request-actions` for two roles);
+  `stationing-footprint.mjs` 11/11 with the same measurements as the accepted run; `map-workspace.mjs` 22/22 ported to
+  `#stationing`; `admin-journey.mjs` 12/12 (J12 now on the footprint panel; it rejects its own open-ended relocation so
+  later runs find free windows); `resources.mjs` 3/3; `journey.mjs` passed; access studio 5/6 (stale STUDIO-03, as
+  before); frontend 30/30, type check and build. The backend suite was not re-run: no backend code changed, and a run
+  would build and migrate the untested ADR-028 work (V17).
+- *Amended 2026-11-02 (owner: the merge made the stationing workspace significantly worse; remove it). Decision items 1–3
+  and the layout part of 4 are withdrawn: `StationingPage`, `stationing.css`, `map.css` and `StationingPanel` are back to
+  their state before this ADR (the 11-step polygon acceptance), and the map, admin-journey and resources suites are back to
+  their committed versions. Kept from this ADR: the retirement of «الخريطة والمرافق» (no page, no navigation entry),
+  `#map`/unknown routes opening `#stationing`, the brand, no-access and organisation-page links pointing there, and the
+  removal of `MapPage.tsx` and `RelocationPanel.tsx`. One pre-merge item is not restored: «عرض التفاصيل» in the stationing
+  popup, which opened the retired page. Consequence: the facility functions of the retired page (site details and
+  resources, use requests started from the map, period and colour mode, layers, boundary and marker editing, imports, map
+  packages, export) have no screen until the owner's rebuild; their components, APIs and data are unchanged. Verified:
+  `stationing-footprint.mjs` 11/11 with the accepted measurements; merge-removal check `stationing-layout.mjs` 5/5
+  (`docs/evidence/stationing-unmerge/`); frontend 30/30, type check, build. Report: `docs/GIS_MERGE_REMOVAL_AR.md`.*
+

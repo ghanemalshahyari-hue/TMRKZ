@@ -184,6 +184,9 @@ class AuthorizationIT extends IntegrationTest {
         UUID target = UUID.randomUUID();
         jdbc.sql("insert into person(id, employee_no, display_name, username) values (:id, :e, 'شخص هدف', :u)")
                 .param("id", target).param("e", "T-target-" + sfx).param("u", "target-" + sfx).update();
+        // the target works in A1, inside the manager's authority (ADR-027: a scoped manager grants only to people there)
+        jdbc.sql("insert into affiliation(id, person_id, organization_id, valid_from) values (:id, :p, :o, '2026-01-01T00:00:00Z')")
+                .param("id", UUID.randomUUID()).param("p", target).param("o", orgA1).update();
         Map<String, Object> base = new LinkedHashMap<>();
         base.put("personId", target.toString());
         base.put("organizationId", orgA1.toString());

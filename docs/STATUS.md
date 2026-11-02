@@ -120,6 +120,62 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   organisation↔site record after approval, automatic end-of-term return and reminders, a rule editor screen, workflow
   studio changes (phases D–E of the brief).
 
+- **Security and integrity remediation (2 Nov 2026, ADR-026):** after the enterprise acceptance audit
+  (`docs/audit/enterprise-launch/REPORT_AR.md` — the report, its evidence and the exploit re-run scripts in
+  `tests/acceptance/audit/` are kept outside this public repository because they describe exploit paths; references
+  to them below point to the owner's local copy), the four reproduced P0 defects are fixed — escalation through HR
+  position seats, self-grants and a permanent bootstrap administrator, hidden-site names/dates in check, submission and
+  target answers, unscoped people and delegation lists (scoped managers now search outside their authority by name or
+  exact identifier only, and see name + organisation) — and the four P1 defects: earlier approvals carried after the
+  relocation proposal moved, stale import previews, an invalid latitude saved as 0, overlapping registered boundaries.
+  Backend suite 116/116, frontend 26/26; each regression test was red before its fix; exploit re-runs against the
+  rebuilt environments in `docs/audit/enterprise-launch/evidence/`; browser suites offline: map 22/22, journey passed,
+  access studio 5/6 (STUDIO-03 stale count of actions since `CLOSE`, 30 Oct). **Not yet:** separation of duties for approvals
+  (decided by the owner, not enforced), identity-issue resolution bounded by the target's grants, local provisioning of
+  people and controlled unit creation (planned), activation/return of approved stationing.
+
+- **Separation of duties and directory scope (2 Nov 2026, ADR-027):** nobody decides a request they made — directly,
+  through a delegation either way, another role, organisation or HR seat, or another person record of the same human;
+  a task with no independent holder waits for the access managers on «مهام بانتظار الإسناد». Scoped access managers see,
+  search, link, grant, explain and list rosters only for people inside their authority (site-grant bridges by name);
+  unlinked sign-ins are scoped and linking is bounded by authority over the person's grants. Boundary overlap along the
+  site tree is containment only and re-checked when a site moves. Load tool repaired (directory sign-in, synthetic
+  accounts, disposable environment). **Not yet:** separation of duties for execution tasks and closing (owner decision),
+  the open items listed in ADR-027, local provisioning and controlled unit creation, scale measurements.
+
+- **Stationing footprint interaction (2 Nov 2026, ADR-025 amendment):** «مساحة التمركز» now proposes a footprint, not a
+  point — the registered polygon and organisation symbol are copied and dragged as one rigid object (area kept), or a new
+  polygon is drawn by vertex count or typed coordinates; vertex editing, undo/redo/reset, compare, cancel, save and reopen.
+  Browser walkthrough 11/11 (`tests/acceptance/stationing-footprint.mjs`). Activation of an approved relocation is not
+  built; the owner's hands-on acceptance is pending.
+
+- **One GIS workspace (2 Nov 2026, ADR-029):** «الخريطة والمرافق» is retired; «مساحة التمركز» (`#stationing`) carries all
+  of its functions — period and colour mode, backgrounds and layers, site and organisation trees, site details and use
+  requests, the on-site menu, boundary and marker editing, imports, map packages and export — and `#map` redirects to
+  it. «نقل المقر» opens the polygon stationing panel; the point/rectangle relocation panel and the duplicate stationing
+  popup are removed. Inventory and results: `docs/GIS_WORKSPACE_RETIREMENT_AR.md`. Browser: retirement checks 8/8,
+  stationing 11/11, map 22/22, admin journey 12/12, resources 3/3, journey passed. **Not yet:** activation of approved
+  stationing, site-sharing agreements, touch dragging of the footprint (untested); owner review pending.
+  **Superseded the same day (owner decision):** the merge was removed and «مساحة التمركز» is back to its pre-merge
+  stationing layout (walkthrough 11/11, merge-removal check 5/5, `docs/GIS_MERGE_REMOVAL_AR.md`). The old page stays
+  retired (no navigation entry; `#map` opens `#stationing`), so its facility functions — site details, use requests from
+  the map, period and colour mode, layers, boundary and marker editing, imports, map packages, export — have **no screen**
+  until the planned rebuild; their components, APIs and data are unchanged. The map, admin-journey (map steps) and
+  resources browser suites target the retired page and cannot run until then.
+
+- **Execution integrity (2 Nov 2026, ADR-028) — written, NOT tested:** handover, receipt, acknowledgement and closing
+  under separation of duties, migration V17. Compiles; `ExecutionIntegrityIT` and the backend suite have not run.
+  **Do not deploy this revision to data you keep, or rebuild the test environment's backend from it, until they pass.**
+
+- **Stationing defect fixes and UX prototype (2 Nov 2026, stationing UX brief):** seven defects of the visual audit are
+  fixed in «مساحة التمركز» — touch dragging of the footprint, proposal/validation colours, RTL offsets of vertices and
+  edge lengths, overlapping site markers, the organisation page's «على الخريطة» link, organisations without a symbol, and
+  keyboard focus/Escape in the site menu (regression 7/7, the 11 polygon scenarios 11/11; `docs/TRACEABILITY.md`). A
+  redesigned workspace exists only as an isolated prototype with fictional data (`prototypes/stationing-ux/`), compared
+  with the current page in Edge at four sizes (`docs/audit/stationing-ux/redesign/COMPARISON_AR.md`). **Not integrated:**
+  the real page keeps its current layout until the owner approves the design; its phone layout still hides the editing
+  controls (V-01).
+
 ## Known limitations
 
 | Area | Limitation | Planned handling |
@@ -169,3 +225,9 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
 The system passes its automated acceptance suite and a measured restore, but **operational readiness for production
 is not claimed**: it still needs the open decisions above, a production hardening review (TLS termination,
 database roles, secrets management, host egress controls), capacity targets (D-03) and a load test against them.
+
+The enterprise acceptance audit of 2 Nov 2026 stopped before scale testing. Its P0/P1 findings are fixed (ADR-026);
+separation of duties, identity/directory scope and containment-only boundary overlap followed (ADR-027), with an
+independent review whose fixable findings were fixed and whose remaining items are listed in ADR-027. The load tool now
+signs in through the directory flow against the disposable `tmrkz-load` environment and has completed a smoke workflow;
+no measurement exists yet at 1,000 or 7,000 units. Scale phases wait for the owner's explicit approval.

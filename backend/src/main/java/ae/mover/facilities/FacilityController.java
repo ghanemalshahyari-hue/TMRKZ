@@ -134,7 +134,7 @@ public class FacilityController {
         var ctx = access.context(actor);
         ctx.require(Permission.MANAGE_FACILITIES);
         sites.detail(ctx, id);
-        return boundaries.check(in == null || in.geometry() == null ? null : json.tree((Object) in.geometry()), in == null ? null : in.crs());
+        return boundaries.checkFor(ctx, id, in == null || in.geometry() == null ? null : json.tree((Object) in.geometry()), in == null ? null : in.crs());
     }
 
     @PostMapping("/sites/{id}/geometry")

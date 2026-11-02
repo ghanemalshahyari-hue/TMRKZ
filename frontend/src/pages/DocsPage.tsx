@@ -27,7 +27,7 @@ export function DocsPage() {
       <Heading en="DOCUMENTATION / OPERATIONS" title="التوثيق والتشغيل" description="الوثائق محفوظة محلياً داخل البيئة المعزولة، دون اعتماد على خدمات خارجية." />
       <section className="handoff-hero">
         <div>
-          <span className="eyebrow">MOVER / ADMINISTRATIVE FACILITIES</span>
+          <span className="eyebrow">TMRKZ / ADMINISTRATIVE FACILITIES</span>
           <h2>نظام مؤسسي، بتوثيق قابل للتحقق.</h2>
           <p>
             يخص النظام إدارة المرافق والحجوزات والموافقات الإدارية. تجد هنا عقد الواجهات المنفذ، وحزمة المتطلبات الأصلية، وأدلة التركيب المعزول والنسخ

@@ -11,7 +11,6 @@ import { CalendarPage } from './pages/CalendarPage';
 import { DocsPage } from './pages/DocsPage';
 import { FormStudio } from './pages/FormStudio';
 import { LoginPage } from './pages/LoginPage';
-import { MapPage } from './pages/MapPage';
 import { OrgPage } from './pages/OrgPage';
 import { PermissionsPage } from './pages/PermissionsPage';
 import { RequestsPage } from './pages/RequestsPage';
@@ -22,9 +21,12 @@ import { WorkflowStudio } from './pages/WorkflowStudio';
 
 const POLL_MS = 30_000;
 
+/** The retired «الخريطة والمرافق» route and any unknown one open «مساحة التمركز»; the address shows the real route. */
 function viewFromHash(): View {
-  const next = location.hash.replace('#', '').split('/')[0] || 'map';
-  return (NAV.some(([id]) => id === next) ? next : 'map') as View;
+  const next = location.hash.replace('#', '').split('/')[0];
+  if (NAV.some(([id]) => id === next)) return next as View;
+  if (next) history.replaceState(null, '', '#stationing');
+  return 'stationing';
 }
 
 /** Server-enforced permissions decide what each screen shows; this mirrors them for navigation only. */
@@ -33,7 +35,7 @@ function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: b
   if (['workflow', 'forms', 'settings'].includes(view)) return !can('CONFIGURE');
   if (view === 'permissions') return !can('MANAGE_ACCESS');
   if (view === 'org') return !(can('VIEW') || can('MANAGE_ACCESS') || can('MANAGE_FACILITIES') || can('CONFIGURE'));
-  if (['map', 'stationing', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
+  if (['stationing', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
   if (summaryOnly) return true;
   if (view === 'review') return !can('REVIEW');
   if (view === 'audit') return !can('AUDIT');
@@ -176,7 +178,6 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
   };
 
   const pages: Record<View, () => ReactNode> = {
-    map: () => <MapPage />,
     stationing: () => <StationingPage />,
     requests: () => <RequestsPage />,
     review: () => <ReviewPage />,
@@ -201,13 +202,13 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
         <a href="/docs/handoff/START_HERE.md">حزمة التسليم الأصلية ↓</a>
       </div>
       <aside id="sidebar" className="sidebar">
-        <a className="brand" href="#map">
+        <a className="brand" href="#stationing">
           <span className="brand-logo">
             <Icon name="map" />
           </span>
           <span>
             <strong>
-              MOVER<span>.</span>
+              TMRKZ<span>.</span>
             </strong>
             <small>المواقع · المرافق · الإجراءات</small>
           </span>
@@ -222,9 +223,9 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
         </div>
         <span className="nav-section">مساحة العمل</span>
         <nav id="navigation" aria-label="القائمة الرئيسية">
-          {NAV.map(([id, ico, label], i) => (
+          {NAV.map(([id, ico, label]) => (
             <Fragment key={id}>
-              {i === 6 && <div className="nav-divider" />}
+              {id === 'workflow' && <div className="nav-divider" />}
               <a className={'nav-item ' + (view === id ? 'active' : '')} href={'#' + id}>
                 <Icon name={ico} />
                 <span>{label}</span>
@@ -260,7 +261,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
             <a className="text-link handoff-link" href="#docs">
               دليل التشغيل
             </a>
-            <button className="button primary compact" onClick={() => ctx.openWizard({ origin: 'LIST', layout: view === 'map' ? 'drawer' : 'dialog' })} disabled={!can('CREATE')}>
+            <button className="button primary compact" onClick={() => ctx.openWizard({ origin: 'LIST', layout: 'dialog' })} disabled={!can('CREATE')}>
               <span>＋</span>طلب جديد
             </button>
             <IdentitySwitch me={me} setMe={setMe} onSwitched={bump} toast={toast} />
@@ -273,7 +274,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
           <ScreenBoundary resetKey={view}>{restriction(view, can, me.summaryOnly) ? <NoAccess /> : pages[view]()}</ScreenBoundary>
         </main>
         <footer className="app-footer">
-          <span>MOVER / FACILITIES WORKSPACE</span>
+          <span>TMRKZ / FACILITIES WORKSPACE</span>
           <span>إدارة مرافق وموافقات إدارية · خادم وقاعدة بيانات وسجل تدقيق داخل الشبكة</span>
         </footer>
       </div>

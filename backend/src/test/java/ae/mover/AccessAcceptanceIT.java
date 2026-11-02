@@ -171,18 +171,21 @@ class AccessAcceptanceIT extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("AT-24 (revised 2026-10-29): a requester holding APPROVE over the stage may approve their own request, recorded as such; one without it may not")
+    @DisplayName("AT-24 (revised 2026-11-02, ADR-027): a requester holding APPROVE over the stage does not decide their own request; an independent approver does")
     void requesterDecision() {
         UUID both = person("both", "REQUESTER", orgA);
         membership(both, "APPROVER", root, null);
         Api api = login("both");
         UUID id = api.submitted(finalType, orgA, List.of(resA), day("2028-08-01"), day("2028-08-02"));
-        String task = api.taskFor(id);
-        assertThat(task).isNotNull();
-        assertThat(api.approve(task, 1).status()).isEqualTo(200);
+        String task = jdbc.sql("select id::text from task_assignment where request_id = :r").param("r", id).query(String.class).single();
+        assertThat(api.taskFor(id)).isNull();
+        Res self = api.approve(task, 1);
+        assertThat(self.status()).isEqualTo(403);
+        assertThat(self.code()).isEqualTo("SEPARATION_OF_DUTIES");
+        assertThat(activeReservations(resA)).isZero();
+        assertThat(login("apr").approve(task, 1).status()).isEqualTo(200);
         assertThat(activeReservations(resA)).isEqualTo(1);
-        assertThat(jdbc.sql("select by_requester from decision where request_id = :r").param("r", id).query(Boolean.class).single()).isTrue();
-        assertThat(api.get("/requests/" + id).body().path("history").toString()).contains("(مقدم الطلب)");
+        assertThat(jdbc.sql("select by_requester from decision where request_id = :r").param("r", id).query(Boolean.class).single()).isFalse();
 
         // REVIEW without APPROVE (organisation manager) does not reach the final stage, for one's own request or any other.
         UUID reviewer = person("selfrev", "REQUESTER", orgA);

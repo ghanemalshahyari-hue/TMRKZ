@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 
 import ae.mover.access.AccessContext;
 import ae.mover.access.AccessService;
+import ae.mover.access.DirectoryScope;
 import ae.mover.access.Grant;
 import ae.mover.access.GrantSource;
 import ae.mover.access.Permission;
@@ -72,8 +73,11 @@ public class AccessPolicyService {
     private final Authorization authorization;
     private final GrantAdminService grants;
 
+    private final DirectoryScope directory;
+
     public AccessPolicyService(JdbcClient jdbc, Json json, Clock clock, AuditService audit, AccessService access,
-                               AuthzSync sync, Authorization authorization, GrantAdminService grants) {
+                               AuthzSync sync, Authorization authorization, GrantAdminService grants, DirectoryScope directory) {
+        this.directory = directory;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -450,14 +454,10 @@ public class AccessPolicyService {
         ctx.require(Permission.MANAGE_ACCESS);
         Map<String, Object> person = jdbc.sql("select id, display_name, employee_no, status from person where id = :id")
                 .param("id", personId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
-        if (!ctx.canEverywhere(Permission.MANAGE_ACCESS)) {
-            List<UUID> orgs = jdbc.sql("""
-                    select organization_id from membership where person_id = :p
-                    union select organization_id from affiliation where person_id = :p and valid_to is null""")
-                    .param("p", personId).query(UUID.class).list();
-            if (orgs.stream().noneMatch(o -> ctx.canFor(Permission.MANAGE_ACCESS, o))) {
-                throw ApiException.notFound();
-            }
+        // only members of the manager's directory: not outsiders (an ended grant no longer relates someone) and not
+        // bridges, whose identifiers and grants elsewhere the manager does not administer (ADR-027)
+        if (!directory.members(ctx, List.of(personId)).contains(personId)) {
+            throw ApiException.notFound();
         }
         Instant now = clock.instant();
         UUID site = siteId;
@@ -513,9 +513,12 @@ public class AccessPolicyService {
         out.put("person", Map.of("id", personId.toString(), "displayName", person.get("display_name"),
                 "employeeNo", person.get("employee_no"), "status", person.get("status")));
         Map<String, Object> target = new LinkedHashMap<>();
-        target.put("organization", orgId == null ? null : Ref.of(orgId, name("organization", orgId)));
-        target.put("site", site == null ? null : Ref.of(site, name("site", site)));
-        target.put("resource", resourceId == null ? null : Ref.of(resourceId, name("resource", resourceId)));
+        // a target is named only when the manager may see it; otherwise the identifier they passed is echoed back
+        boolean siteVisible = site != null && ctx.siteView(site, Set.of(), responsible) != ae.mover.access.ViewLevel.NONE;
+        boolean orgVisible = orgId != null && (ctx.canFor(Permission.MANAGE_ACCESS, orgId) || ctx.canFor(Permission.VIEW, orgId));
+        target.put("organization", orgId == null ? null : Ref.of(orgId, orgVisible ? name("organization", orgId) : null));
+        target.put("site", site == null ? null : Ref.of(site, siteVisible ? name("site", site) : null));
+        target.put("resource", resourceId == null ? null : Ref.of(resourceId, siteVisible ? name("resource", resourceId) : null));
         target.put("meaning", resourceId != null || siteId != null
                 ? "طلب يخص هذا الموقع أو المورد" + (orgId != null ? " مقدم من الجهة المختارة" : "")
                 : orgId != null ? "العمل باسم الجهة المختارة" : "في أي نطاق");

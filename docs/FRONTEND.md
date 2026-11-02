@@ -31,13 +31,17 @@ attribution anchor links (not fetched) and React error-doc URLs. nginx sends a C
 - Counts and notifications use 30 s short polling through scoped endpoints, so revoked access stops updates immediately.
 - Times are stored/sent as UTC and displayed in `Asia/Dubai`; period ends are exclusive.
 
-## Map workspace (ADR-017)
+## GIS workspace «مساحة التمركز» (ADR-017, ADR-025, ADR-029)
 
-- `pages/MapPage.tsx` composes the workspace: context bar (organisation, site, period, background; tools collapsible),
-  browse panel (`map/BrowseTrees.tsx`: organisation and site trees loaded per level, search across the permitted scope),
-  the map (`map/MapCanvas.tsx`), and the details panel (`map/SiteDetailPanel.tsx`) or, for an authorised manager, the
-  boundary editor (`map/BoundaryEditor.tsx`). Imports and map packages: `map/MapAdmin.tsx`; backgrounds, layers,
-  legend and coverage: `map/MapPanels.tsx`; review and calendar maps: `map/StaticMap.tsx`.
+- `pages/StationingPage.tsx` (`#stationing`) is the only GIS screen: the organisation tree
+  (`stationing/StationOrgTree.tsx`), the map (`map/MapCanvas.tsx`, `map/OrgSymbolLayer.tsx`) with the stationing layer
+  chips, and the stationing panel (`stationing/StationingPanel.tsx`, `FootprintEditor.ts`). The retired «الخريطة
+  والمرافق» (`#map`, former `pages/MapPage.tsx`) has no navigation entry and its route opens `#stationing`. Its merge
+  into this page (ADR-029) was removed by owner decision on 2 Nov 2026; the facility components below are kept for the
+  planned rebuild but are not on any screen now: `map/SiteDetailPanel.tsx`, `map/SiteActionMenu.tsx`,
+  `map/BoundaryEditor.tsx`, `map/SiteMarkerEditor.tsx`, `map/MapAdmin.tsx` (imports, map packages), `map/MapPanels.tsx`
+  (layers, legend, coverage; `BackgroundPanel` is used), `map/BrowseTrees.tsx` (`OrgTree` is used by the permission
+  pickers). Review and calendar maps: `map/StaticMap.tsx`.
 - `MapCanvas` draws only what the server returned: registered Polygon/MultiPolygon boundaries and markers. A site
   without a boundary keeps a dashed marker and «حدود غير مسجلة». Sites and zones (sub-sites) have their own panes,
   visibility, opacity and order. The view changes only on the user's own pan/zoom or an explicit fit (selection,

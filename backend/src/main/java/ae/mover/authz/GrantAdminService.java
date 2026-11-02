@@ -18,10 +18,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ae.mover.access.AccessContext;
 import ae.mover.access.AccessService;
+import ae.mover.access.DirectoryScope;
 import ae.mover.access.Grant;
 import ae.mover.access.GrantSource;
 import ae.mover.access.GrantTarget;
 import ae.mover.access.Permission;
+import ae.mover.access.PersonKeys;
 import ae.mover.access.RawGrant;
 import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
@@ -63,13 +65,18 @@ public class GrantAdminService {
     private final AccessService access;
     private final AuditService audit;
     private final GrantSource source;
+    private final DirectoryScope directory;
+    private final PersonKeys keys;
 
-    public GrantAdminService(JdbcClient jdbc, Clock clock, AccessService access, AuditService audit, GrantSource source) {
+    public GrantAdminService(JdbcClient jdbc, Clock clock, AccessService access, AuditService audit, GrantSource source,
+                             DirectoryScope directory, PersonKeys keys) {
+        this.keys = keys;
         this.jdbc = jdbc;
         this.clock = clock;
         this.access = access;
         this.audit = audit;
         this.source = source;
+        this.directory = directory;
     }
 
     // ---- create -------------------------------------------------------------------------------------------------
@@ -82,6 +89,7 @@ public class GrantAdminService {
         }
         UUID person = uuid(in.personId(), "الشخص");
         UUID home = uuid(in.organizationId(), "الجهة");
+        requireGrantee(ctx, person);
         Map<String, Object> role = jdbc.sql("select code, name, permissions, scope from role_def where code = :c")
                 .param("c", in.roleCode()).query().listOfRows().stream().findFirst()
                 .orElseThrow(() -> ApiException.validation("الدور غير موجود في السياسة المنشورة."));
@@ -151,12 +159,48 @@ public class GrantAdminService {
     }
 
     /**
+     * Separation of duties (owner decision of 2 Nov 2026; audit P0-2): nobody grants a role to themselves, and the
+     * time-boxed identity created by ops/bootstrap-admin.sh never receives a grant beyond its own 72-hour one — the
+     * lasting administrator is the person's HR record, granted by an administrator. A scoped manager grants only to
+     * people inside their directory (ADR-027): a person of another organisation is first related to the manager's
+     * authority by someone whose authority covers that person (a global manager, or a grant on a shared site).
+     */
+    void requireGrantee(AccessContext ctx, UUID person) {
+        // another record of the same human (a duplicate HR record, a linked sign-in) is oneself too
+        if (keys.same(ctx.personId(), person)) {
+            throw ApiException.forbidden("لا يجوز منح دور لنفسك؛ يمنحه لك مدير صلاحيات آخر.");
+        }
+        boolean bootstrap = jdbc.sql("select coalesce(bootstrap, false) from person where id = :p").param("p", person)
+                .query(Boolean.class).optional().orElse(false);
+        if (bootstrap) {
+            throw ApiException.forbidden("هوية التهيئة الأولى مؤقتة ولا تُمنح أدواراً إضافية؛ امنح الدور لسجل الشخص في الموارد البشرية.");
+        }
+        if (!directory.covers(ctx, person)) {
+            throw ApiException.forbidden("الشخص خارج نطاق إدارتك للصلاحيات؛ يمنحه مدير صلاحيات يشمل نطاقه جهة الشخص.");
+        }
+    }
+
+    /**
+     * The same authority bound for a role handed out through an HR position seat (audit P0-1): a seat gives the role
+     * to whoever holds the position, so it is a grant and is limited exactly like one.
+     */
+    public void requireAuthorityForRole(AccessContext ctx, UUID orgId, String roleCode, UUID siteScope) {
+        Map<String, Object> role = jdbc.sql("select code, name, permissions, scope from role_def where code = :c")
+                .param("c", roleCode).query().listOfRows().stream().findFirst()
+                .orElseThrow(() -> ApiException.validation("الدور غير موجود في السياسة المنشورة."));
+        RawGrant proposed = new RawGrant(null, null, null, null, null, roleCode, (String) role.get("name"),
+                permissions(role.get("permissions")), (String) role.get("scope"), false, orgId, null, siteScope, null, "ROLE", true,
+                false, clock.instant(), null, List.of());
+        requireAuthority(ctx, proposed);
+    }
+
+    /**
      * The granter's authority bounds the grant (owner brief §7): one of the granter's own MANAGE_ACCESS grants must
      * list the role as grantable and reach the grant's organisation and every target. The explicit ALL scope and
      * system actions are reserved to global access managers. A role from one grant and a scope from another are never
      * combined to widen what may be handed out.
      */
-    void requireAuthority(AccessContext ctx, RawGrant proposed) {
+    public void requireAuthority(AccessContext ctx, RawGrant proposed) {
         if (ctx.canEverywhere(Permission.MANAGE_ACCESS)) {
             return;
         }
@@ -234,11 +278,20 @@ public class GrantAdminService {
         if (reason == null || reason.isBlank()) {
             throw ApiException.validation("اذكر سبب إنهاء العضوية.");
         }
-        Map<String, Object> m = jdbc.sql("select person_id, organization_id, role_code, valid_from, valid_to from membership where id = :id for update")
+        Map<String, Object> m = jdbc.sql("""
+                select m.person_id, m.organization_id, m.role_code, m.valid_from, m.valid_to, m.site_scope_id, m.scope_mode,
+                       m.scope_combine, m.scope_all, r.name as role_name, r.permissions, r.scope as role_scope
+                from membership m join role_def r on r.code = m.role_code where m.id = :id for update of m""")
                 .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         if (!ctx.canFor(Permission.MANAGE_ACCESS, (UUID) m.get("organization_id"))) {
             throw ApiException.notFound();
         }
+        // ending a grant needs the authority to give it (ADR-027), as for a position seat (audit P0-1)
+        requireAuthority(ctx, new RawGrant(id, (UUID) m.get("person_id"), id, null, null, (String) m.get("role_code"),
+                (String) m.get("role_name"), permissions(m.get("permissions")), (String) m.get("role_scope"), false,
+                (UUID) m.get("organization_id"), null, (UUID) m.get("site_scope_id"), null, (String) m.get("scope_mode"),
+                "AND".equals(m.get("scope_combine")), (Boolean) m.get("scope_all"), Db.toInstant(m.get("valid_from")),
+                Db.toInstant(m.get("valid_to")), source.targets(List.of(id)).getOrDefault(id, List.of())));
         Instant end = endAt == null ? clock.instant() : Times.parse(endAt, "endAt");
         Instant from = Db.toInstant(m.get("valid_from"));
         if (!end.isAfter(from)) {

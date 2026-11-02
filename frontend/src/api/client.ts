@@ -1,4 +1,6 @@
 import type {
+  TaskCandidate,
+  TaskRouting,
   AccessExplain,
   ApprovalVerification,
   SigningJob,
@@ -234,6 +236,10 @@ export const api = {
   people: (q: string) => get<Page<Person>>('/people' + query({ q, size: 50 })),
   identityIssues: () => get<IdentityIssue[]>('/identity-issues'),
   resolveIdentityIssue: (id: string, personId: string | null, reason: string) => post<void>(`/identity-issues/${id}/resolve`, { personId, reason }),
+  taskRoutings: () => get<TaskRouting[]>('/task-reassignments'),
+  taskRoutingCandidates: (id: string, q: string, page = 0) =>
+    get<{ items: TaskCandidate[]; page: number; hasMore: boolean }>(`/task-reassignments/${id}/candidates` + query({ q, page })),
+  assignRoutedTask: (id: string, personId: string, reason: string) => post<void>(`/task-reassignments/${id}/assign`, { personId, reason }),
   createMembership: (body: { personId: string; organizationId: string; roleCode: string; positionTitle?: string; siteScopeId?: string | null; validFrom: string; validTo?: string | null }) =>
     post<unknown>('/memberships', body),
   endMembership: (id: string, reason: string, endAt?: string) => post<unknown>(`/memberships/${id}/end`, { reason, endAt }),

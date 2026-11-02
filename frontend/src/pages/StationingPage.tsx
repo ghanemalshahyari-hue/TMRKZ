@@ -8,14 +8,17 @@ import { OrgSymbolLayer } from '../components/map/OrgSymbolLayer';
 import { StationOrgTree } from '../components/stationing/StationOrgTree';
 import { StationingPanel, type StationLayers } from '../components/stationing/StationingPanel';
 import { OrgSymbol } from '../components/UnitSymbol';
+import { Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { formatKm, distanceM } from '../lib/geo';
 import { DEFAULT_LAYERS } from '../lib/mapState';
+import { parseStationingHash } from '../lib/stationingLink';
 import '../styles/stationing.css';
 
 type Org = { id: string; name: string };
 const LAYER_KEY = 'tmrkz.stationing.layers.';
-const DEFAULT_STATION_LAYERS: StationLayers = { range: true, occupied: true, symbols: false, sites: true };
+// organisation symbols are on: an organisation is chosen from its own symbol on the map as well as from the tree
+const DEFAULT_STATION_LAYERS: StationLayers = { range: true, occupied: true, symbols: true, sites: true };
 /** Stable objects: the map redraws its markers whenever these change identity. */
 const CANVAS_LAYERS = { ...DEFAULT_LAYERS, sites: { visible: true, opacity: 0.25 } };
 const NO_FEATURES: MapFeature[] = [];
@@ -30,9 +33,11 @@ function loadLayers(personId: string): StationLayers {
 
 /** Second hash segment: a saved stationing draft to reopen (#stationing/<requestId>). */
 function draftFromHash(): string | null {
-  const parts = location.hash.replace('#', '').split('/');
-  return parts[0] === 'stationing' && parts[1] ? parts[1] : null;
+  return parseStationingHash(location.hash).draft ?? null;
 }
+
+/** Markers closer than this on screen are one click target; a click there asks which site is meant (V-06). */
+const STACK_PX = 24;
 
 /**
  * Map-first stationing workspace (owner brief of 30 Oct 2026, ADR-025): the organisation tree on the right, the map in
@@ -70,6 +75,14 @@ export function StationingPage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<{ orgs: OrgBranch[]; sites: SiteNode[] } | null>(null);
+  /** Several sites drawn at one point: the menu first asks which one (V-06). */
+  const [stack, setStack] = useState<MapFeature[] | null>(null);
+  const [revealOrg, setRevealOrg] = useState<{ ids: string[]; key: number } | null>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  /** An organisation chosen with its site (a link): the map stays on the site instead of fitting all its sites. */
+  const skipOrgFit = useRef(false);
+  const stationingRef = useRef(stationing);
+  stationingRef.current = stationing;
   const seq = useRef(0);
 
   useEffect(() => {
@@ -127,7 +140,9 @@ export function StationingPage() {
       .mapFeatures({ orgId: org.id, includeSubOrgs: false, from: pq.from, to: pq.to, open: pq.open }, ctl.signal)
       .then((d) => {
         setOrgSites(d.features);
-        if (!stationing) {
+        const keepView = skipOrgFit.current;
+        skipOrgFit.current = false;
+        if (!stationing && !keepView) {
           const all = d.features.map((f) => featureBounds(f)).filter(Boolean) as L.LatLngBounds[];
           if (all.length) {
             const b = all.reduce((acc, x) => acc.extend(x), all[0].pad(0));
@@ -166,6 +181,62 @@ export function StationingPage() {
       })
       .catch((e: Error) => setNotice(e.message));
   }, []);
+
+  // a site opened from another screen (#stationing/site/<id>/org/<id>, V-09): select the organisation and the site, show
+  // the organisation in the tree and open the site's menu; the address returns to #stationing once applied
+  useEffect(() => {
+    const apply = () => {
+      const link = parseStationingHash(location.hash);
+      if (!link.site || stationingRef.current) return;
+      history.replaceState(null, '', '#stationing');
+      api
+        .mapFeatures({ siteIds: link.site, time: new Date().toISOString() })
+        .then(async (d) => {
+          const f = d.features[0];
+          if (!f) return setNotice('الموقع المطلوب غير ظاهر لك على الخريطة.');
+          const linked = [f.responsibleOrg, ...(f.occupants ?? [])].find((o) => o && o.id === link.org);
+          let o: Org | null = linked ? { id: linked.id, name: linked.name } : null;
+          if (!o && link.org) o = await api.org(link.org).then((x) => ({ id: x.org.id, name: x.org.name })).catch(() => null);
+          if (!o && f.responsibleOrg) o = { id: f.responsibleOrg.id, name: f.responsibleOrg.name };
+          if (o) {
+            skipOrgFit.current = true;
+            setOrg(o);
+            setRevealOrg({ ids: ancestorsOf(o.id), key: Date.now() });
+          }
+          setStack(null);
+          setSite(f);
+          setPopup(true);
+          const b = featureBounds(f);
+          if (b) setFit({ bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]], key: Date.now(), maxZoom: 16 });
+        })
+        .catch((e: Error) => setNotice(e.message));
+    };
+    apply();
+    window.addEventListener('hashchange', apply);
+    return () => window.removeEventListener('hashchange', apply);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // the site menu takes the keyboard focus when it opens; Escape closes it and returns to the site's marker (V-16)
+  useEffect(() => {
+    if (!popup || !popupPos) return;
+    const el = popupRef.current;
+    if (!el || el.contains(document.activeElement)) return;
+    (el.querySelector<HTMLElement>('button:not(:disabled):not(.stw-x)') ?? el).focus({ preventScroll: true });
+  }, [popup, !!popupPos, stack, site?.siteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!popup) return;
+    const id = site?.siteId;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      setPopup(false);
+      setStack(null);
+      if (id) window.setTimeout(() => document.querySelector<HTMLElement>(`.pin-icon:has(.pin-wrap[data-site="${id}"])`)?.focus({ preventScroll: true }), 0);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [popup, site?.siteId]);
 
   // scale bar
   useEffect(() => {
@@ -246,16 +317,59 @@ export function StationingPage() {
     if (stationing) return;
     setSite(f);
     setPopup(openMenu);
-    if (!org && f.responsibleOrg) setOrg({ id: f.responsibleOrg.id, name: f.responsibleOrg.name });
+    // a symbol click has just chosen its organisation (several may share the site): keep it; else the responsible one
+    const responsible = f.responsibleOrg;
+    if (responsible) setOrg((cur) => cur ?? { id: responsible.id, name: responsible.name });
     const b = featureBounds(f);
     if (b) setFit({ bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]], key: Date.now(), maxZoom: Math.max(map?.getZoom() ?? 13, 13) });
   };
 
-  const onSiteHit = (id: string, _hit: SiteHit) => {
+  const onSiteHit = (id: string, hit: SiteHit) => {
     if (measuring) return;
     if (stationing) return setPicked({ siteId: id, key: Date.now() });
     const f = features.find((x) => x.siteId === id) ?? orgSites.find((x) => x.siteId === id);
-    if (f) chooseSite(f);
+    if (!f) return;
+    // a pointer click on a marker that hides others (a main site and its sub-site at one point): ask which site (V-06);
+    // the keyboard reaches each marker on its own, and a symbol or a boundary names its site, so they choose directly
+    const at = featureAnchor(f);
+    if (map && at && !hit.keyboard && hit.element?.classList.contains('pin-icon')) {
+      const p = map.latLngToContainerPoint(at);
+      const drawn = hit.element.querySelector('.pin-wrap')?.getBoundingClientRect();
+      const near = features.filter((x) => {
+        if (x.siteId === f.siteId) return true;
+        const a = featureAnchor(x);
+        if (!a) return false;
+        if (map.latLngToContainerPoint(a).distanceTo(p) <= STACK_PX) return true;
+        // another marker whose head lies under the clicked marker as drawn (its pin and name) cannot be clicked
+        const h = document.querySelector(`.pin-wrap[data-site="${x.siteId}"] .pin-head`)?.getBoundingClientRect();
+        if (!h || !drawn) return false;
+        const cx = h.left + h.width / 2;
+        const cy = h.top + h.height / 2;
+        return cx >= drawn.left - 4 && cx <= drawn.right + 4 && cy >= drawn.top - 4 && cy <= drawn.bottom + 4;
+      });
+      if (near.length > 1) {
+        setSite(f);
+        setStack(near);
+        setPopup(true);
+        return;
+      }
+    }
+    setStack(null);
+    chooseSite(f);
+  };
+
+  /** The ancestors of an organisation, top first (the organisation structure the application already holds). */
+  const orgsRef = useRef(app.orgs);
+  orgsRef.current = app.orgs;
+  const ancestorsOf = (id: string): string[] => {
+    const byId = new Map(orgsRef.current.map((o) => [o.id, o]));
+    const out: string[] = [];
+    let cur = byId.get(id)?.parentId ?? null;
+    while (cur && out.length < 40) {
+      out.unshift(cur);
+      cur = byId.get(cur)?.parentId ?? null;
+    }
+    return out;
   };
 
   const startStationing = () => {
@@ -281,67 +395,41 @@ export function StationingPage() {
   };
 
   const shown = layers.sites ? features : NO_FEATURES;
-  const role = me.primaryRole?.name ?? 'مستخدم';
-  const nav: [string, string][] = [
-    ['map', 'الخريطة'],
-    ['org', 'الجهات'],
-    ['calendar', 'المواقع والإشغال'],
-    ['stationing', 'التمركز'],
-    ['requests', 'الطلبات'],
-    ['audit', 'التقارير'],
-  ];
-
   return (
     <div className="stw" dir="rtl">
-      <header className="stw-top">
-        <a className="stw-brand" href="#map" aria-label="TMRKZ — العودة إلى الخريطة">
-          <span className="stw-logo" aria-hidden="true">⌖</span>
-          <b>TMRKZ</b>
-        </a>
-        <nav className="stw-nav" aria-label="التنقل">
-          {nav.map(([id, label]) => (
-            <a key={id} href={'#' + id} className={id === 'stationing' ? 'active' : ''} aria-current={id === 'stationing' ? 'page' : undefined}>
-              {label}
-            </a>
-          ))}
-        </nav>
+      <Heading
+        en="STATIONING / MAP WORKSPACE"
+        title="مساحة التمركز"
+        description="اختر الجهة ومقرها من الشجرة أو الخريطة، ثم اقترح موقعاً جديداً ضمن النطاق المسموح؛ لا يتغير الموقع الفعلي قبل الاعتماد."
+        actions={
         <div className="stw-top-search">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="البحث عن جهة أو موقع …" aria-label="البحث عن جهة أو موقع" />
-          {hits && (
-            <div className="stw-search-pop" role="listbox">
-              {hits.orgs.length + hits.sites.length === 0 && <p className="stw-note">لا نتائج ضمن ما يحق لك رؤيته.</p>}
-              {hits.orgs.map((o) => (
-                <button key={'o' + o.id} onClick={() => (chooseOrg({ id: o.id, name: o.name }), setQ(''))}>
-                  <small>جهة</small>
-                  <b>{o.name}</b>
-                </button>
-              ))}
-              {hits.sites.map((s) => (
-                <button
-                  key={'s' + s.id}
-                  onClick={() => {
-                    setQ('');
-                    api.mapFeatures({ siteIds: s.id, time: new Date().toISOString() }).then((d) => d.features[0] && chooseSite(d.features[0]));
-                  }}
-                >
-                  <small>موقع</small>
-                  <b>{s.name}</b>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <a className="stw-bell" href="#review" aria-label={'مهام المراجعة: ' + app.counts.tasks}>
-          🔔{app.counts.tasks > 0 && <i>{app.counts.tasks}</i>}
-        </a>
-        <span className="stw-user">
-          <span className="stw-avatar">{me.initials}</span>
-          <span>
-            <b>{me.username}</b>
-            <small>{role}</small>
-          </span>
-        </span>
-      </header>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="البحث عن جهة أو موقع …" aria-label="البحث عن جهة أو موقع" />
+            {hits && (
+              <div className="stw-search-pop" role="listbox">
+                {hits.orgs.length + hits.sites.length === 0 && <p className="stw-note">لا نتائج ضمن ما يحق لك رؤيته.</p>}
+                {hits.orgs.map((o) => (
+                  <button key={'o' + o.id} onClick={() => (chooseOrg({ id: o.id, name: o.name }), setQ(''))}>
+                    <small>جهة</small>
+                    <b>{o.name}</b>
+                  </button>
+                ))}
+                {hits.sites.map((s) => (
+                  <button
+                    key={'s' + s.id}
+                    onClick={() => {
+                      setQ('');
+                      api.mapFeatures({ siteIds: s.id, time: new Date().toISOString() }).then((d) => d.features[0] && chooseSite(d.features[0]));
+                    }}
+                  >
+                    <small>موقع</small>
+                    <b>{s.name}</b>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        }
+      />
 
       {notice && (
         <div className="stw-notice" role="status">
@@ -359,9 +447,10 @@ export function StationingPage() {
           selectedSiteId={site?.siteId ?? null}
           onSite={(f) => chooseSite(f)}
           revision={revision}
+          revealPath={revealOrg}
         />
 
-        <main className="stw-mapwrap">
+        <section className="stw-mapwrap" aria-label="خريطة التمركز">
           {ctxError ? (
             <p className="stw-note red">{ctxError}</p>
           ) : ctx ? (
@@ -440,8 +529,29 @@ export function StationingPage() {
             <p className="stw-note">جارٍ تحميل سياق الخريطة…</p>
           )}
 
-          {popup && site && popupPos && !stationing && (
-            <div className="stw-popup" style={{ left: popupPos.x, top: popupPos.y }} role="dialog" aria-label={'إجراءات ' + site.name}>
+          {popup && site && popupPos && !stationing && stack && (
+            <div ref={popupRef} tabIndex={-1} className="stw-popup" style={{ left: popupPos.x, top: popupPos.y }} role="dialog" aria-label="عدة مواقع في هذا الموضع">
+              <button className="stw-x" onClick={() => (setPopup(false), setStack(null))} aria-label="إغلاق">✕</button>
+              <div className="stw-popup-head">
+                <span>
+                  <b>عدة مواقع في هذا الموضع</b>
+                  <small>اختر الموقع المقصود</small>
+                </span>
+              </div>
+              <ul className="stw-stack">
+                {stack.map((x) => (
+                  <li key={x.siteId}>
+                    <button className="stw-menu-item" onClick={() => (setStack(null), chooseSite(x))}>
+                      <b>{x.name}</b>
+                      <small>{x.parentId ? 'موقع فرعي' : 'موقع رئيسي'}{x.code ? ' · ' + x.code : ''}</small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {popup && site && popupPos && !stationing && !stack && (
+            <div ref={popupRef} tabIndex={-1} className="stw-popup" style={{ left: popupPos.x, top: popupPos.y }} role="dialog" aria-label={'إجراءات ' + site.name}>
               <button className="stw-x" onClick={() => setPopup(false)} aria-label="إغلاق">✕</button>
               <div className="stw-popup-head">
                 <OrgSymbol orgId={org?.id ?? site.responsibleOrg?.id} size={18} />
@@ -451,9 +561,6 @@ export function StationingPage() {
                   <small className="stw-mono">{featureAnchor(site) ? featureAnchor(site)!.lat.toFixed(4) + ' , ' + featureAnchor(site)!.lng.toFixed(4) : ''}</small>
                 </span>
               </div>
-              <button className="stw-menu-item" onClick={() => (app.setSelectedSiteId(site.siteId), (location.hash = 'map'))}>
-                ▤ عرض التفاصيل
-              </button>
               <button
                 className="stw-menu-item primary"
                 onClick={startStationing}
@@ -468,7 +575,7 @@ export function StationingPage() {
               </button>
             </div>
           )}
-        </main>
+        </section>
 
         {stationing && site && org ? (
           <StationingPanel

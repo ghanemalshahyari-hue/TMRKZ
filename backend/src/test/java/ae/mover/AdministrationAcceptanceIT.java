@@ -237,6 +237,46 @@ class AdministrationAcceptanceIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("P1-2: an import preview made before a later change cannot be committed, expires, and committing leaves no new run")
+    void staleImportPreview() {
+        Api admin = login("admin");
+        String p = "STL" + sfx;
+        String base = admin.post("/integrations/org-structure/preview", Map.of("rows", List.of(
+                Map.of("code", p + "-R", "name", "جذر", "parentCode", ""),
+                Map.of("code", p + "-A", "name", "أ", "parentCode", p + "-R"),
+                Map.of("code", p + "-B", "name", "ب", "parentCode", p + "-R"),
+                Map.of("code", p + "-X", "name", "س", "parentCode", p + "-A")))).body().path("runId").asText();
+        assertThat(admin.post("/integrations/org-structure/runs/" + base + "/commit", Map.of()).status()).isEqualTo(200);
+
+        String runs = "select count(*) from integration_run where connector = 'ORG_STRUCTURE'";
+        // F1 (X under R) is previewed but not committed; F2 (X under B) is previewed and committed afterwards
+        String f1 = admin.post("/integrations/org-structure/preview", Map.of("rows", List.of(
+                Map.of("code", p + "-X", "name", "س", "parentCode", p + "-R")))).body().path("runId").asText();
+        String f2 = admin.post("/integrations/org-structure/preview", Map.of("rows", List.of(
+                Map.of("code", p + "-X", "name", "س", "parentCode", p + "-B")))).body().path("runId").asText();
+        long before = jdbc.sql(runs).query(Long.class).single();
+        assertThat(admin.post("/integrations/org-structure/runs/" + f2 + "/commit", Map.of()).status()).isEqualTo(200);
+        assertThat(jdbc.sql(runs).query(Long.class).single()).as("committing does not create another run").isEqualTo(before);
+
+        Res late = admin.post("/integrations/org-structure/runs/" + f1 + "/commit", Map.of());
+        assertThat(late.status()).as("stale preview: " + late).isIn(400, 409);
+        assertThat(late.toString()).contains("أعد المعاينة");
+        assertThat(jdbc.sql("select p.code from organization o join organization p on p.id = o.parent_id where o.code = :c")
+                .param("c", p + "-X").query(String.class).single()).as("the newer change stays").isEqualTo(p + "-B");
+
+        // an old preview expires even when nothing changed
+        String old = admin.post("/integrations/org-structure/preview", Map.of("rows", List.of(
+                Map.of("code", p + "-Y", "name", "ص", "parentCode", p + "-R")))).body().path("runId").asText();
+        jdbc.sql("update integration_run set started_at = now() - interval '2 hours' where id = cast(:id as uuid)").param("id", old).update();
+        assertThat(admin.post("/integrations/org-structure/runs/" + old + "/commit", Map.of()).status()).as("expired preview").isIn(400, 409);
+
+        // authorised: a fresh preview of the same change commits
+        String fresh = admin.post("/integrations/org-structure/preview", Map.of("rows", List.of(
+                Map.of("code", p + "-Y", "name", "ص", "parentCode", p + "-R")))).body().path("runId").asText();
+        assertThat(admin.post("/integrations/org-structure/runs/" + fresh + "/commit", Map.of()).status()).isEqualTo(200);
+    }
+
+    @Test
     @DisplayName("R-01: the site tree rejects cycles and sites cannot be destructively deleted")
     void siteTree() {
         Api admin = login("admin");

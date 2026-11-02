@@ -135,6 +135,15 @@ public class IntegrationService {
     public record PreviewResult(String runId, boolean valid, List<Map<String, Object>> errors, Map<String, Integer> summary) {
     }
 
+    /** A preview is valid for this long, and only while the organisation structure is unchanged (audit P1-2). */
+    static final java.time.Duration PREVIEW_TTL = java.time.Duration.ofMinutes(30);
+
+    private record Analysis(List<Map<String, Object>> errors, Map<String, Integer> summary) {
+        boolean valid() {
+            return errors.isEmpty();
+        }
+    }
+
     @Transactional
     public PreviewResult preview(AccessContext ctx, List<OrgRow> rows) {
         ctx.require(Permission.CONFIGURE);
@@ -144,6 +153,34 @@ public class IntegrationService {
         if (rows.size() > 20000) {
             throw ApiException.validation("الحد الأقصى 20,000 صف في دفعة واحدة.");
         }
+        Analysis a = analyse(rows);
+        UUID runId = UUID.randomUUID();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("errors", a.errors());
+        result.put("summary", a.summary());
+        // the structure this preview was made against; commit refuses if it has changed since
+        result.put("fingerprint", structureFingerprint());
+        jdbc.sql("""
+                insert into integration_run(id, connector, status, payload, result, started_by, started_at, finished_at)
+                values (:id, 'ORG_STRUCTURE', :st, cast(:p as jsonb), cast(:r as jsonb), :by, :now, :now)""")
+                .param("id", runId).param("st", a.valid() ? "PREVIEWED" : "INVALID").param("p", json.write(rows))
+                .param("r", json.write(result)).param("by", ctx.personId())
+                .param("now", Db.ts(clock.instant())).update();
+        audit.recordAs(ctx.actor(), "ORG_IMPORT_PREVIEWED", "INTEGRATION", runId.toString(), "ORG_STRUCTURE",
+                Map.of("valid", a.valid(), "errors", a.errors().size(), "summary", a.summary()), null);
+        return new PreviewResult(runId.toString(), a.valid(), a.errors(), a.summary());
+    }
+
+    /** Every unit's code, name, parent and status, hashed: any change to the structure changes it. */
+    private String structureFingerprint() {
+        return jdbc.sql("""
+                select md5(coalesce(string_agg(o.code || '|' || o.name || '|' || coalesce(p.code, '') || '|' || o.status, chr(10)
+                                               order by o.code), ''))
+                from organization o left join organization p on p.id = o.parent_id""").query(String.class).single();
+    }
+
+    /** Validation of the rows against the current structure, with no side effect. */
+    private Analysis analyse(List<OrgRow> rows) {
         List<Map<String, Object>> errors = new ArrayList<>();
         Map<String, Map<String, Object>> existing = new HashMap<>();
         jdbc.sql("select o.code, o.name, p.code as parent_code from organization o left join organization p on p.id = o.parent_id")
@@ -205,18 +242,7 @@ public class IntegrationService {
                 cur = parentOf.get(cur);
             }
         }
-        Map<String, Integer> summary = Map.of("create", create, "update", update, "unchanged", unchanged);
-        UUID runId = UUID.randomUUID();
-        boolean valid = errors.isEmpty();
-        jdbc.sql("""
-                insert into integration_run(id, connector, status, payload, result, started_by, started_at, finished_at)
-                values (:id, 'ORG_STRUCTURE', :st, cast(:p as jsonb), cast(:r as jsonb), :by, :now, :now)""")
-                .param("id", runId).param("st", valid ? "PREVIEWED" : "INVALID").param("p", json.write(rows))
-                .param("r", json.write(Map.of("errors", errors, "summary", summary))).param("by", ctx.personId())
-                .param("now", Db.ts(clock.instant())).update();
-        audit.recordAs(ctx.actor(), "ORG_IMPORT_PREVIEWED", "INTEGRATION", runId.toString(), "ORG_STRUCTURE",
-                Map.of("valid", valid, "errors", errors.size(), "summary", summary), null);
-        return new PreviewResult(runId.toString(), valid, errors, summary);
+        return new Analysis(errors, Map.of("create", create, "update", update, "unchanged", unchanged));
     }
 
     private static Map<String, Object> error(int row, String code, String message) {
@@ -230,15 +256,26 @@ public class IntegrationService {
     @Transactional
     public Map<String, Object> commit(AccessContext ctx, UUID runId) {
         ctx.require(Permission.CONFIGURE);
-        Map<String, Object> run = jdbc.sql("select status, payload::text as payload from integration_run where id = :id and connector = 'ORG_STRUCTURE' for update")
+        Map<String, Object> run = jdbc.sql("""
+                select status, payload::text as payload, result->>'fingerprint' as fingerprint, started_at
+                from integration_run where id = :id and connector = 'ORG_STRUCTURE' for update""")
                 .param("id", runId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         if (!"PREVIEWED".equals(run.get("status"))) {
             throw ApiException.validation("لا يمكن اعتماد دفعة غير صالحة أو معتمدة سابقاً.");
         }
+        // a preview is a decision on the structure as it was then (audit P1-2): it expires, and any change to the
+        // structure since — another import, the HR sync — makes it stale instead of silently undoing that change
+        if (Db.toInstant(run.get("started_at")).plus(PREVIEW_TTL).isBefore(clock.instant())) {
+            throw ApiException.validation("انتهت صلاحية المعاينة (" + PREVIEW_TTL.toMinutes() + " دقيقة). أعد المعاينة.");
+        }
+        if (!java.util.Objects.equals(run.get("fingerprint"), structureFingerprint())) {
+            throw ApiException.validation("تغير الهيكل التنظيمي منذ المعاينة؛ لن تُطبق الدفعة حتى لا تُلغي التغيير الأحدث. أعد المعاينة.");
+        }
         List<OrgRow> rows = json.convert(json.tree((String) run.get("payload")),
                 new com.fasterxml.jackson.core.type.TypeReference<List<OrgRow>>() {
                 });
-        PreviewResult recheck = preview(ctx, rows);
+        // re-validated without recording another run (a commit must not leave a new PREVIEWED run behind)
+        Analysis recheck = analyse(rows);
         if (!recheck.valid()) {
             throw ApiException.validation("تغيرت البيانات منذ المعاينة وأصبحت الدفعة غير صالحة. أعد المعاينة.");
         }

@@ -1,0 +1,1257 @@
+{
+  "run": "2026-11-02T11:03:48.535Z",
+  "current": "http://localhost:8088/#stationing (t.requester)",
+  "prototype": "http://127.0.0.1:5194/",
+  "browser": "Microsoft Edge (playwright-core), headless",
+  "draftReopened": "0ccbd484-7b18-4171-ab25-8c23052ebf66",
+  "results": [
+    {
+      "size": "1920",
+      "side": "current",
+      "scenario": "initial",
+      "attempted": "فتح «مساحة التمركز» دون اختيار",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/current/1920-01-initial.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "951×791",
+        "mapShareOfScreen": "36%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1920",
+      "side": "current",
+      "scenario": "organisation",
+      "attempted": "اختيار «الخدمات المشتركة» من الشجرة",
+      "worked": true,
+      "note": "4 مواقع تحت الجهة",
+      "file": "screenshots/current/1920-02-organisation.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "951×791",
+        "mapShareOfScreen": "36%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1920",
+      "side": "current",
+      "scenario": "shared-site",
+      "attempted": "فتح «مركز الخدمات» (جهتان) من البحث",
+      "worked": true,
+      "note": "رموز الجهات للموقع: 2",
+      "file": "screenshots/current/1920-03-shared-site.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "951×791",
+        "mapShareOfScreen": "36%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1920",
+      "side": "current",
+      "scenario": "relocation-start",
+      "attempted": "«طلب تمركز / إعادة تمركز»",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/current/1920-04-relocation-start.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "951×791",
+        "mapShareOfScreen": "36%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 2,
+        "overlapping": [
+          "مقترح ⟷ المسافة",
+          "المسافة ⟷ مركز الخدمات · الموقع المعتمد"
+        ],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1920",
+      "side": "current",
+      "scenario": "polygon-drag",
+      "attempted": "سحب النسخة بالفأرة",
+      "worked": true,
+      "note": "المسافة 15 م ← 1.51 كم",
+      "file": "screenshots/current/1920-05-polygon-drag.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "951×791",
+        "mapShareOfScreen": "36%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1920",
+      "side": "current",
+      "scenario": "vertex-edit",
+      "attempted": "تعديل الرؤوس ثم سحب رأس",
+      "worked": true,
+      "note": "المساحة المقترحة: 30,665 م² ← 30,375 م²",
+      "file": "screenshots/current/1920-06-vertex-edit.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "951×791",
+        "mapShareOfScreen": "36%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1920",
+      "side": "current",
+      "scenario": "new-polygon",
+      "attempted": "رسم حدود جديدة بخمسة رؤوس",
+      "worked": true,
+      "note": "5 رؤوس",
+      "file": "screenshots/current/1920-07-new-polygon.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "951×791",
+        "mapShareOfScreen": "36%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1920",
+      "side": "current",
+      "scenario": "draft-reopen",
+      "attempted": "فتح مسودة قائمة من رابطها (دون حفظ)",
+      "worked": true,
+      "note": "المسودة مفتوحة بمضلعها",
+      "file": "screenshots/current/1920-08-draft-reopen.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "951×791",
+        "mapShareOfScreen": "36%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 1,
+        "overlapping": [
+          "المسافة ⟷ مركز الخدمات · الموقع المعتمد"
+        ],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "current",
+      "scenario": "initial",
+      "attempted": "فتح «مساحة التمركز» دون اختيار",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/current/1366-01-initial.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "435×517",
+        "mapShareOfScreen": "21%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1366",
+      "side": "current",
+      "scenario": "organisation",
+      "attempted": "اختيار «الخدمات المشتركة» من الشجرة",
+      "worked": true,
+      "note": "4 مواقع تحت الجهة",
+      "file": "screenshots/current/1366-02-organisation.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "435×517",
+        "mapShareOfScreen": "21%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1366",
+      "side": "current",
+      "scenario": "shared-site",
+      "attempted": "فتح «مركز الخدمات» (جهتان) من البحث",
+      "worked": true,
+      "note": "رموز الجهات للموقع: 2",
+      "file": "screenshots/current/1366-03-shared-site.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "435×517",
+        "mapShareOfScreen": "21%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1366",
+      "side": "current",
+      "scenario": "relocation-start",
+      "attempted": "«طلب تمركز / إعادة تمركز»",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/current/1366-04-relocation-start.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "435×517",
+        "mapShareOfScreen": "21%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 2,
+        "overlapping": [
+          "مقترح ⟷ المسافة",
+          "المسافة ⟷ مركز الخدمات · الموقع المعتمد"
+        ],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "current",
+      "scenario": "polygon-drag",
+      "attempted": "سحب النسخة بالفأرة",
+      "worked": true,
+      "note": "المسافة 15 م ← 1.51 كم",
+      "file": "screenshots/current/1366-05-polygon-drag.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "435×517",
+        "mapShareOfScreen": "21%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "current",
+      "scenario": "vertex-edit",
+      "attempted": "تعديل الرؤوس ثم سحب رأس",
+      "worked": true,
+      "note": "المساحة المقترحة: 30,665 م² ← 30,375 م²",
+      "file": "screenshots/current/1366-06-vertex-edit.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "435×517",
+        "mapShareOfScreen": "21%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "1366",
+      "side": "current",
+      "scenario": "new-polygon",
+      "attempted": "رسم حدود جديدة بخمسة رؤوس",
+      "worked": true,
+      "note": "5 رؤوس",
+      "file": "screenshots/current/1366-07-new-polygon.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "435×517",
+        "mapShareOfScreen": "21%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "current",
+      "scenario": "draft-reopen",
+      "attempted": "فتح مسودة قائمة من رابطها (دون حفظ)",
+      "worked": true,
+      "note": "المسودة مفتوحة بمضلعها",
+      "file": "screenshots/current/1366-08-draft-reopen.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "435×517",
+        "mapShareOfScreen": "21%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 1,
+        "overlapping": [
+          "المسافة ⟷ مركز الخدمات · الموقع المعتمد"
+        ],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "768",
+      "side": "current",
+      "scenario": "initial",
+      "attempted": "فتح «مساحة التمركز» دون اختيار",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/current/768-01-initial.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "549×420",
+        "mapShareOfScreen": "29%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "768",
+      "side": "current",
+      "scenario": "organisation",
+      "attempted": "اختيار «الخدمات المشتركة» من الشجرة",
+      "worked": true,
+      "note": "4 مواقع تحت الجهة",
+      "file": "screenshots/current/768-02-organisation.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "549×420",
+        "mapShareOfScreen": "29%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "768",
+      "side": "current",
+      "scenario": "shared-site",
+      "attempted": "فتح «مركز الخدمات» (جهتان) من البحث",
+      "worked": true,
+      "note": "رموز الجهات للموقع: 2",
+      "file": "screenshots/current/768-03-shared-site.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "549×420",
+        "mapShareOfScreen": "29%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "768",
+      "side": "current",
+      "scenario": "relocation-start",
+      "attempted": "«طلب تمركز / إعادة تمركز»",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/current/768-04-relocation-start.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "549×420",
+        "mapShareOfScreen": "29%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 2,
+        "overlapping": [
+          "مقترح ⟷ المسافة",
+          "المسافة ⟷ مركز الخدمات · الموقع المعتمد"
+        ],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "768",
+      "side": "current",
+      "scenario": "polygon-drag",
+      "attempted": "سحب النسخة باللمس",
+      "worked": true,
+      "note": "المسافة 15 م ← 1.32 كم",
+      "file": "screenshots/current/768-05-polygon-drag.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "549×420",
+        "mapShareOfScreen": "29%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "768",
+      "side": "current",
+      "scenario": "vertex-edit",
+      "attempted": "تعديل الرؤوس ثم سحب رأس",
+      "worked": true,
+      "note": "المساحة المقترحة: 30,665 م² ← 30,375 م²",
+      "file": "screenshots/current/768-06-vertex-edit.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "549×420",
+        "mapShareOfScreen": "29%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "768",
+      "side": "current",
+      "scenario": "new-polygon",
+      "attempted": "رسم حدود جديدة بخمسة رؤوس",
+      "worked": true,
+      "note": "5 رؤوس",
+      "file": "screenshots/current/768-07-new-polygon.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "549×420",
+        "mapShareOfScreen": "29%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "768",
+      "side": "current",
+      "scenario": "draft-reopen",
+      "attempted": "فتح مسودة قائمة من رابطها (دون حفظ)",
+      "worked": true,
+      "note": "المسودة مفتوحة بمضلعها",
+      "file": "screenshots/current/768-08-draft-reopen.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "549×420",
+        "mapShareOfScreen": "29%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 1,
+        "overlapping": [
+          "المسافة ⟷ مركز الخدمات · الموقع المعتمد"
+        ],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "390",
+      "side": "current",
+      "scenario": "initial",
+      "attempted": "فتح «مساحة التمركز» دون اختيار",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/current/390-01-initial.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "364×430",
+        "mapShareOfScreen": "48%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "390",
+      "side": "current",
+      "scenario": "organisation",
+      "attempted": "اختيار «الخدمات المشتركة» من الشجرة",
+      "worked": true,
+      "note": "4 مواقع تحت الجهة",
+      "file": "screenshots/current/390-02-organisation.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "364×430",
+        "mapShareOfScreen": "48%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "390",
+      "side": "current",
+      "scenario": "shared-site",
+      "attempted": "فتح «مركز الخدمات» (جهتان) من البحث",
+      "worked": true,
+      "note": "رموز الجهات للموقع: 2",
+      "file": "screenshots/current/390-03-shared-site.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "364×430",
+        "mapShareOfScreen": "48%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "390",
+      "side": "current",
+      "scenario": "relocation-start",
+      "attempted": "«طلب تمركز / إعادة تمركز»",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/current/390-04-relocation-start.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "364×430",
+        "mapShareOfScreen": "48%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 2,
+        "overlapping": [
+          "مقترح ⟷ المسافة",
+          "المسافة ⟷ مركز الخدمات · الموقع المعتمد"
+        ],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "390",
+      "side": "current",
+      "scenario": "polygon-drag",
+      "attempted": "سحب النسخة باللمس",
+      "worked": true,
+      "note": "المسافة 15 م ← 1.32 كم",
+      "file": "screenshots/current/390-05-polygon-drag.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "364×430",
+        "mapShareOfScreen": "48%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "390",
+      "side": "current",
+      "scenario": "vertex-edit",
+      "attempted": "تعديل الرؤوس ثم سحب رأس",
+      "worked": false,
+      "note": "locator.click: Timeout 30000ms exceeded.",
+      "file": "screenshots/current/390-06-vertex-edit.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "364×430",
+        "mapShareOfScreen": "48%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "390",
+      "side": "current",
+      "scenario": "new-polygon",
+      "attempted": "رسم حدود جديدة بخمسة رؤوس",
+      "worked": false,
+      "note": "locator.click: Timeout 30000ms exceeded.",
+      "file": "screenshots/current/390-07-new-polygon.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "364×430",
+        "mapShareOfScreen": "48%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "390",
+      "side": "current",
+      "scenario": "draft-reopen",
+      "attempted": "فتح مسودة قائمة من رابطها (دون حفظ)",
+      "worked": true,
+      "note": "المسودة مفتوحة بمضلعها",
+      "file": "screenshots/current/390-08-draft-reopen.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "364×430",
+        "mapShareOfScreen": "48%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 1,
+        "overlapping": [
+          "المسافة ⟷ مركز الخدمات · الموقع المعتمد"
+        ],
+        "editorReadoutVisible": false
+      }
+    },
+    {
+      "size": "1920",
+      "side": "prototype",
+      "scenario": "initial",
+      "attempted": "فتح النموذج دون اختيار",
+      "worked": true,
+      "note": "8 مجموعات و9 مواقع منفردة",
+      "file": "screenshots/prototype/1920-01-initial.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "1647×952",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 0,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1920",
+      "side": "prototype",
+      "scenario": "organisation",
+      "attempted": "اختيار «الخدمات المشتركة» من الهيكل",
+      "worked": true,
+      "note": "8 مواقع مبرزة منفردة و11 في 3 مجموعات مبرزة",
+      "file": "screenshots/prototype/1920-02-organisation.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "1647×952",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 8,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1920",
+      "side": "prototype",
+      "scenario": "shared-site",
+      "attempted": "فتح «المبنى المشترك» (أربع جهات) من البحث",
+      "worked": true,
+      "note": "4 جهات قابلة للاختيار",
+      "file": "screenshots/prototype/1920-03-shared-site.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "1647×952",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 6,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1920",
+      "side": "prototype",
+      "scenario": "relocation-start",
+      "attempted": "«طلب تمركز / إعادة تمركز»",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/prototype/1920-04-relocation-start.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "1647×952",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1920",
+      "side": "prototype",
+      "scenario": "polygon-drag",
+      "attempted": "سحب النسخة بالفأرة",
+      "worked": true,
+      "note": "المسافة — ← 1.56 كم",
+      "file": "screenshots/prototype/1920-05-polygon-drag.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "1647×952",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1920",
+      "side": "prototype",
+      "scenario": "vertex-edit",
+      "attempted": "تعديل الزوايا ثم سحب رأس",
+      "worked": true,
+      "note": "22,187 م² · مطابقة للمعتمد ← 24,152 م² · +9٪ عن المعتمد",
+      "file": "screenshots/prototype/1920-06-vertex-edit.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "1647×952",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1920",
+      "side": "prototype",
+      "scenario": "new-polygon",
+      "attempted": "رسم حدود جديدة بخمسة رؤوس",
+      "worked": true,
+      "note": "5 رؤوس",
+      "file": "screenshots/prototype/1920-07-new-polygon.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "1647×952",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1920",
+      "side": "prototype",
+      "scenario": "draft-reopen",
+      "attempted": "حفظ مسودة ثم فتحها من رابطها بعد إعادة التحميل",
+      "worked": true,
+      "note": "المسودة #draft/u200vqnj أعيد فتحها بمضلعها",
+      "file": "screenshots/prototype/1920-08-draft-reopen.png",
+      "facts": {
+        "viewport": "1920×1080",
+        "map": "1647×952",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "prototype",
+      "scenario": "initial",
+      "attempted": "فتح النموذج دون اختيار",
+      "worked": true,
+      "note": "6 مجموعات و5 مواقع منفردة",
+      "file": "screenshots/prototype/1366-01-initial.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "1113×640",
+        "mapShareOfScreen": "68%",
+        "horizontalScroll": false,
+        "visibleNames": 0,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1366",
+      "side": "prototype",
+      "scenario": "organisation",
+      "attempted": "اختيار «الخدمات المشتركة» من الهيكل",
+      "worked": true,
+      "note": "5 مواقع مبرزة منفردة و14 في 3 مجموعات مبرزة",
+      "file": "screenshots/prototype/1366-02-organisation.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "1113×640",
+        "mapShareOfScreen": "68%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1366",
+      "side": "prototype",
+      "scenario": "shared-site",
+      "attempted": "فتح «المبنى المشترك» (أربع جهات) من البحث",
+      "worked": true,
+      "note": "4 جهات قابلة للاختيار",
+      "file": "screenshots/prototype/1366-03-shared-site.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "1113×640",
+        "mapShareOfScreen": "68%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "1366",
+      "side": "prototype",
+      "scenario": "relocation-start",
+      "attempted": "«طلب تمركز / إعادة تمركز»",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/prototype/1366-04-relocation-start.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "1113×640",
+        "mapShareOfScreen": "68%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "prototype",
+      "scenario": "polygon-drag",
+      "attempted": "سحب النسخة بالفأرة",
+      "worked": true,
+      "note": "المسافة — ← 1.56 كم",
+      "file": "screenshots/prototype/1366-05-polygon-drag.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "1113×640",
+        "mapShareOfScreen": "68%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "prototype",
+      "scenario": "vertex-edit",
+      "attempted": "تعديل الزوايا ثم سحب رأس",
+      "worked": true,
+      "note": "22,187 م² · مطابقة للمعتمد ← 24,152 م² · +9٪ عن المعتمد",
+      "file": "screenshots/prototype/1366-06-vertex-edit.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "1113×640",
+        "mapShareOfScreen": "68%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "prototype",
+      "scenario": "new-polygon",
+      "attempted": "رسم حدود جديدة بخمسة رؤوس",
+      "worked": true,
+      "note": "5 رؤوس",
+      "file": "screenshots/prototype/1366-07-new-polygon.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "1113×640",
+        "mapShareOfScreen": "68%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "prototype",
+      "scenario": "draft-reopen",
+      "attempted": "حفظ مسودة ثم فتحها من رابطها بعد إعادة التحميل",
+      "worked": true,
+      "note": "المسودة #draft/at5u3966 أعيد فتحها بمضلعها",
+      "file": "screenshots/prototype/1366-08-draft-reopen.png",
+      "facts": {
+        "viewport": "1366×768",
+        "map": "1113×640",
+        "mapShareOfScreen": "68%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "768",
+      "side": "prototype",
+      "scenario": "initial",
+      "attempted": "فتح النموذج دون اختيار",
+      "worked": true,
+      "note": "6 مجموعات و5 مواقع منفردة",
+      "file": "screenshots/prototype/768-01-initial.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "668×896",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 0,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "768",
+      "side": "prototype",
+      "scenario": "organisation",
+      "attempted": "اختيار «الخدمات المشتركة» من الهيكل",
+      "worked": true,
+      "note": "3 مواقع مبرزة منفردة و16 في 4 مجموعات مبرزة",
+      "file": "screenshots/prototype/768-02-organisation.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "668×896",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 1,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "768",
+      "side": "prototype",
+      "scenario": "shared-site",
+      "attempted": "فتح «المبنى المشترك» (أربع جهات) من البحث",
+      "worked": true,
+      "note": "4 جهات قابلة للاختيار",
+      "file": "screenshots/prototype/768-03-shared-site.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "668×896",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 1,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "768",
+      "side": "prototype",
+      "scenario": "relocation-start",
+      "attempted": "«طلب تمركز / إعادة تمركز»",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/prototype/768-04-relocation-start.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "668×896",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "768",
+      "side": "prototype",
+      "scenario": "polygon-drag",
+      "attempted": "سحب النسخة باللمس",
+      "worked": true,
+      "note": "المسافة — ← 1.32 كم",
+      "file": "screenshots/prototype/768-05-polygon-drag.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "668×896",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "768",
+      "side": "prototype",
+      "scenario": "vertex-edit",
+      "attempted": "تعديل الزوايا ثم سحب رأس",
+      "worked": true,
+      "note": "22,187 م² · مطابقة للمعتمد ← 24,152 م² · +9٪ عن المعتمد",
+      "file": "screenshots/prototype/768-06-vertex-edit.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "668×896",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "768",
+      "side": "prototype",
+      "scenario": "new-polygon",
+      "attempted": "رسم حدود جديدة بخمسة رؤوس",
+      "worked": true,
+      "note": "5 رؤوس",
+      "file": "screenshots/prototype/768-07-new-polygon.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "668×896",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "768",
+      "side": "prototype",
+      "scenario": "draft-reopen",
+      "attempted": "حفظ مسودة ثم فتحها من رابطها بعد إعادة التحميل",
+      "worked": true,
+      "note": "المسودة #draft/ik8frzm3 أعيد فتحها بمضلعها",
+      "file": "screenshots/prototype/768-08-draft-reopen.png",
+      "facts": {
+        "viewport": "768×1024",
+        "map": "668×896",
+        "mapShareOfScreen": "76%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "390",
+      "side": "prototype",
+      "scenario": "initial",
+      "attempted": "فتح النموذج دون اختيار",
+      "worked": true,
+      "note": "7 مجموعات و2 مواقع منفردة",
+      "file": "screenshots/prototype/390-01-initial.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "374×728",
+        "mapShareOfScreen": "83%",
+        "horizontalScroll": false,
+        "visibleNames": 0,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "390",
+      "side": "prototype",
+      "scenario": "organisation",
+      "attempted": "اختيار «الخدمات المشتركة» من الهيكل",
+      "worked": true,
+      "note": "3 مواقع مبرزة منفردة و16 في 4 مجموعات مبرزة",
+      "file": "screenshots/prototype/390-02-organisation.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "374×728",
+        "mapShareOfScreen": "83%",
+        "horizontalScroll": false,
+        "visibleNames": 0,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "390",
+      "side": "prototype",
+      "scenario": "shared-site",
+      "attempted": "فتح «المبنى المشترك» (أربع جهات) من البحث",
+      "worked": true,
+      "note": "4 جهات قابلة للاختيار",
+      "file": "screenshots/prototype/390-03-shared-site.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "374×728",
+        "mapShareOfScreen": "83%",
+        "horizontalScroll": false,
+        "visibleNames": 1,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": null
+      }
+    },
+    {
+      "size": "390",
+      "side": "prototype",
+      "scenario": "relocation-start",
+      "attempted": "«طلب تمركز / إعادة تمركز»",
+      "worked": true,
+      "note": "",
+      "file": "screenshots/prototype/390-04-relocation-start.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "374×728",
+        "mapShareOfScreen": "83%",
+        "horizontalScroll": false,
+        "visibleNames": 3,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "390",
+      "side": "prototype",
+      "scenario": "polygon-drag",
+      "attempted": "سحب النسخة باللمس",
+      "worked": true,
+      "note": "المسافة — ← 1.32 كم",
+      "file": "screenshots/prototype/390-05-polygon-drag.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "374×728",
+        "mapShareOfScreen": "83%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "390",
+      "side": "prototype",
+      "scenario": "vertex-edit",
+      "attempted": "تعديل الزوايا ثم سحب رأس",
+      "worked": true,
+      "note": "22,187 م² · مطابقة للمعتمد ← 24,152 م² · +9٪ عن المعتمد",
+      "file": "screenshots/prototype/390-06-vertex-edit.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "374×728",
+        "mapShareOfScreen": "83%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "390",
+      "side": "prototype",
+      "scenario": "new-polygon",
+      "attempted": "رسم حدود جديدة بخمسة رؤوس",
+      "worked": true,
+      "note": "5 رؤوس",
+      "file": "screenshots/prototype/390-07-new-polygon.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "374×728",
+        "mapShareOfScreen": "83%",
+        "horizontalScroll": false,
+        "visibleNames": 4,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "390",
+      "side": "prototype",
+      "scenario": "draft-reopen",
+      "attempted": "حفظ مسودة ثم فتحها من رابطها بعد إعادة التحميل",
+      "worked": true,
+      "note": "المسودة #draft/okwrpcd9 أعيد فتحها بمضلعها",
+      "file": "screenshots/prototype/390-08-draft-reopen.png",
+      "facts": {
+        "viewport": "390×844",
+        "map": "374×728",
+        "mapShareOfScreen": "83%",
+        "horizontalScroll": false,
+        "visibleNames": 5,
+        "overlappingNames": 0,
+        "overlapping": [],
+        "editorReadoutVisible": true
+      }
+    },
+    {
+      "size": "1366",
+      "side": "prototype",
+      "scenario": "keyboard",
+      "attempted": "التركيز على علامة، Enter، ثم Escape",
+      "worked": true,
+      "note": "التركيز في البطاقة: true · Escape يغلق: true · يعود للعلامة: true",
+      "file": "screenshots/prototype/1366-keyboard-card.png"
+    }
+  ],
+  "consoleErrors": [],
+  "externalRequests": [],
+  "rerun_prototype": "2026-11-02T11:09:11.287Z"
+}

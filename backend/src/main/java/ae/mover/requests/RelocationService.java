@@ -83,7 +83,30 @@ public class RelocationService {
             throw ApiException.forbidden("تفاصيل النقل جزء من محتوى الطلب الكامل.");
         }
         ctx.confirmView(scope, ViewLevel.FULL);
-        return find(requestId);
+        return masked(ctx, find(requestId));
+    }
+
+    /**
+     * The proposal as this reader may see it: a reviewer who reads the request may still not see its origin or target
+     * site (ADR-027, independent review); such a site keeps its identifier but not its name.
+     */
+    View masked(AccessContext ctx, View v) {
+        if (v == null) {
+            return null;
+        }
+        return new View(v.organization(), v.includeDescendants(), maskSite(ctx, v.fromSite()), v.proposedName(), v.geometry(),
+                v.areaM2(), v.centroid(), v.completedAt(), v.action(), v.stationLevel(), v.temporary(), v.temporaryEnd(),
+                maskSite(ctx, v.targetSite()), v.includedOrgs(), v.distanceM(), v.checkStatus(), v.ruleName());
+    }
+
+    private Ref maskSite(AccessContext ctx, Ref site) {
+        if (site == null) {
+            return null;
+        }
+        UUID id = UUID.fromString(site.id());
+        UUID responsible = jdbc.sql("select organization_id from site_responsibility where site_id = :s and valid_to is null")
+                .param("s", id).query(UUID.class).optional().orElse(null);
+        return ctx.siteView(id, java.util.Set.of(), responsible) == ViewLevel.NONE ? new Ref(site.id(), "موقع غير ظاهر لك", null) : site;
     }
 
     View find(UUID requestId) {
@@ -187,6 +210,10 @@ public class RelocationService {
             throw ApiException.validation("حدد نهاية المدة المؤقتة بعد تاريخ البداية.");
         }
         UUID target = in.targetSiteId() == null || in.targetSiteId().isBlank() ? null : uuid(in.targetSiteId(), "الموقع المسجل");
+        if (target != null) {
+            // a registered site the person may not see is neither chosen nor named back (audit P0-3)
+            placement.requireVisibleSite(ctx, target);
+        }
         Set<UUID> branch = orgs.requireVisibleBranch(ctx, org, true);
         List<UUID> included = new ArrayList<>();
         if (in.includedOrgIds() != null) {
@@ -228,14 +255,15 @@ public class RelocationService {
         detail.put("distanceM", result.distanceM());
         detail.put("check", result.status());
         audit.recordAs(ctx.actor(), "RELOCATION_PROPOSAL_SAVED", "REQUEST", requestId.toString(), name, detail, null);
-        return find(requestId);
+        return masked(ctx, find(requestId));
     }
 
     /**
      * Server re-check before submission and approval: the saved proposal against the rule and the occupancy in force
-     * now, for the request period. Null when the request has no proposal.
+     * now, for the request period, seen as the acting person sees it (a site hidden from them stays unnamed in the
+     * answer — audit P0-3). Null when the request has no proposal.
      */
-    public PlacementService.Check recheck(UUID requestId, Instant start) {
+    public PlacementService.Check recheck(AccessContext ctx, UUID requestId, Instant start) {
         Map<String, Object> r = jdbc.sql("""
                 select organization_id, from_site_id, action, station_level, temporary_end, target_site_id,
                        array_to_string(included_org_ids, ',') as inc, proposed_geojson::text as gj
@@ -251,7 +279,7 @@ public class RelocationService {
                 included.add(UUID.fromString(v));
             }
         }
-        return placement.evaluate(null, (String) r.get("action"), (UUID) r.get("organization_id"), included,
+        return placement.evaluate(ctx, (String) r.get("action"), (UUID) r.get("organization_id"), included,
                 (UUID) r.get("from_site_id"), (String) r.get("station_level"), (String) r.get("gj"), (UUID) r.get("target_site_id"),
                 start == null ? clock.instant() : start, Db.toInstant(r.get("temporary_end")), requestId);
     }
