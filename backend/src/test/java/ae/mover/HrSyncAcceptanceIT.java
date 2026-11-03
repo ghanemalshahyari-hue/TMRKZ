@@ -495,7 +495,8 @@ class HrSyncAcceptanceIT extends IntegrationTest {
             }
         }
         assertThat(routedId).isNotNull();
-        JsonNode candidates = admin.get("/task-reassignments/" + routedId + "/candidates?q=cc").body();
+        // by C's employee number prefix: a bare "cc" also matched D whenever the random suffix contained "cc"
+        JsonNode candidates = admin.get("/task-reassignments/" + routedId + "/candidates?q=T-cc-").body();
         assertThat(candidates.path("items").toString()).contains(c.toString()).doesNotContain(d.toString());
         assertThat(admin.post("/task-reassignments/" + routedId + "/assign", Map.of("personId", c.toString(), "reason", "أُسندت للمكلف الجديد"))
                 .status()).isEqualTo(204);

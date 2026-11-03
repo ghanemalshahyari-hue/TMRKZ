@@ -13,8 +13,9 @@ docker network create "$NET" >/dev/null 2>&1 || true
 docker rm -f "$PG" "$FGA" >/dev/null 2>&1 || true
 docker run -d --name "$FGA" --network "$NET" openfga/openfga:v1.8.16 run --datastore-engine memory \
   --authn-method preshared --authn-preshared-keys "$FGA_KEY" --playground-enabled=false --log-level warn >/dev/null
+# every cached Spring test context keeps its own connection pool; V17MigrationIT also opens a probe database
 docker run -d --name "$PG" --network "$NET" -e POSTGRES_DB=mover_test -e POSTGRES_USER=mover -e POSTGRES_PASSWORD=devpass \
-  postgis/postgis:17-3.5-alpine >/dev/null
+  postgis/postgis:17-3.5-alpine -c max_connections=200 >/dev/null
 until docker exec "$PG" pg_isready -U mover -d mover_test >/dev/null 2>&1; do sleep 1; done
 sleep 2
 status=0

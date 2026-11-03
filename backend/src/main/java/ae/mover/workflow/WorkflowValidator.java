@@ -18,7 +18,7 @@ public final class WorkflowValidator {
     private static final Pattern KEY = Pattern.compile("^[a-z][a-z0-9_]{1,39}$");
     private static final Set<String> TOP_KEYS = Set.of("name", "stages", "execution");
     private static final Set<String> STAGE_KEYS = Set.of("key", "name", "mode", "slaDays", "assignees", "condition", "final", "requiresSignature");
-    private static final Set<String> EXEC_KEYS = Set.of("key", "name", "role", "orgFrom", "dueDays", "evidenceRequired");
+    private static final Set<String> EXEC_KEYS = Set.of("key", "name", "role", "orgFrom", "dueDays", "evidenceRequired", "purpose");
     private static final Set<String> ORG_FROM = Set.of("REQUEST_ORG", "RESOURCE_ORG", "ANY");
 
     private WorkflowValidator() {
@@ -139,6 +139,11 @@ public final class WorkflowValidator {
                 int due = e.path("dueDays").asInt(-1);
                 if (due < 0 || due > 365) {
                     out.add(new Problem(p + ".dueDays", "مهلة التنفيذ بين 0 و365 يوماً."));
+                }
+                // ADR-028: an unknown purpose would silently fall back to the key's, dropping the step's independence rule
+                JsonNode purpose = e.get("purpose");
+                if (purpose != null && !purpose.isNull() && !WorkflowDefinition.ExecTemplate.PURPOSES.contains(purpose.asText(""))) {
+                    out.add(new Problem(p + ".purpose", "معنى مهمة التنفيذ يجب أن يكون HANDOVER أو RECEIPT أو ACKNOWLEDGEMENT أو TASK."));
                 }
             }
         }

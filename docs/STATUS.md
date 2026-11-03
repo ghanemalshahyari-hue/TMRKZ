@@ -163,9 +163,20 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   until the planned rebuild; their components, APIs and data are unchanged. The map, admin-journey (map steps) and
   resources browser suites target the retired page and cannot run until then.
 
-- **Execution integrity (2 Nov 2026, ADR-028) — written, NOT tested:** handover, receipt, acknowledgement and closing
-  under separation of duties, migration V17. Compiles; `ExecutionIntegrityIT` and the backend suite have not run.
-  **Do not deploy this revision to data you keep, or rebuild the test environment's backend from it, until they pass.**
+- **Execution integrity (ADR-028): tested on a disposable database on 3 Nov 2026, NOT deployed.** It covers handover,
+  receipt, acknowledgement and closing under separation of duties, with migration V17.
+  - **Fixed** (committed 3 Nov 2026, not deployed): the workflow-publication bug, where `purpose` was rejected.
+  - **Tested:** the backend suite passed 144/144 on a sealed throw-away database, including in-progress and scope
+    cases (`ExecutionInFlightIT`) and V17 on older data (`V17MigrationIT`).
+  - **Open:**
+    - requests approved before ADR-028 can get stuck — a handover assigned to its requester has no recovery in the
+      application;
+    - closing is never routed;
+    - approval stages held only outside their scope are not routed.
+  - A recovery workflow is proposed but not built: `docs/audit/main-risk/ADR-028_TEST_RESULTS_AR.md`, with a read-only
+    candidate query in `stuck-candidates.sql`.
+  - **Do not deploy this revision to data you keep, or rebuild the test environment's backend from it, until the owner
+    approves.** Either would apply V17.
 
 - **Stationing defect fixes and UX prototype (2 Nov 2026, stationing UX brief):** seven defects of the visual audit are
   fixed in «مساحة التمركز» — touch dragging of the footprint, proposal/validation colours, RTL offsets of vertices and

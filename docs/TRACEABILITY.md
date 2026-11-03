@@ -362,3 +362,19 @@ Defect numbers are those of `docs/audit/stationing-ux/VISUAL_AUDIT_AR.md`. Regre
 Results (2 Nov 2026): F-02…F-16 7/7, the 11 accepted polygon scenarios `stationing-footprint.mjs` 11/11, layout check
 `stationing-layout.mjs` 5/5, frontend type check and 33/33 unit tests. Backend, API and database unchanged.
 
+## Execution integrity (2026-11-03, ADR-028; `docs/audit/main-risk/ADR-028_TEST_RESULTS_AR.md`)
+
+Run on a sealed disposable database (owner approval of 3 Nov 2026). The backend suite passed 144/144.
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| Handover never by the requester; receipt after it, by the receiving party, not by the one who handed over | `SeparationOfDuties.step`, `ExecutionService.doComplete` | EX-1 | Pass |
+| Requester's own work is an acknowledgement, not an approval | `ExecutionService.doComplete` | EX-2 | Pass |
+| Closing needs an independent holder of CLOSE | `ExecutionService.doClose`, `RequestViews` | EX-3, IF-3 | Pass (no routing for closing: gap) |
+| A step only the requester holds, or nobody holds, goes to the access managers; never assigned to the requester | `TaskRealignment.separateExecution`, `assign` | EX-4 | Pass (failed before the `WorkflowValidator` fix) |
+| An approval stage nobody holds is routed at submission | `TaskRealignment.separate` | EX-5 | Pass |
+| Workflow definitions accept a valid `purpose` and refuse others | `WorkflowValidator` | EX-4 (publication) | Pass |
+| Requests approved before ADR-028 | — | IF-1 (recovered by an audited grant), IF-2 (assigned to the requester: stuck) | Pass; gap recorded |
+| Role and organisational scope of execution steps | `executionGrant`, `separateExecution` | IF-4 | Pass |
+| Approval stage held only outside its scope | `TaskRealignment.roleHeld` (scope-blind) | IF-5 | Pass; gap recorded |
+| V17 on existing steps: key-based purpose; later inserts get TASK; CHECK enforced | `V17__execution_purpose.sql` | V17-1 | Pass |

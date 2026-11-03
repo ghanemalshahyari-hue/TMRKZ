@@ -695,7 +695,7 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   backend suite 133/133; browser: SoD and assignment screen 12/12, journey passed, map 21/22 (MAP-19 order-dependent),
   access studio 5/6 (stale STUDIO-03); P0 exploit re-runs all FIXED; load tool smoke workflow passed.
 
-## ADR-028 Execution integrity: handover, receipt, acknowledgement and closing — Proposed, written but not tested (2026-11-02)
+## ADR-028 Execution integrity: handover, receipt, acknowledgement and closing — Proposed; tested on a disposable database, not deployed (2026-11-03)
 
 - **Context.** Owner decisions of 2 Nov 2026 on the steps after approval, completing ADR-027 ("Not changed": execution
   tasks and closing were outside separation of duties).
@@ -720,6 +720,24 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   the backend suite have **not run**: the owner stopped the run, and later briefs forbade migrations. Until they pass,
   do not deploy this revision to data you keep (V17 would be applied) and do not rebuild the acceptance environment's
   backend from it.
+- *Amended 2026-11-03 (owner approval: fix the publication bug, test on a disposable database).*
+  - **Fix.** `WorkflowValidator` rejected `purpose` on execution steps, so a definition using it could not be
+    published and EX-4 failed. It now accepts `purpose` and refuses a value outside the four purposes instead of
+    letting it fall back to the key's purpose.
+  - **Run.** The backend suite ran on a sealed disposable database: its own container names, an `--internal`
+    network, PostgreSQL on tmpfs, OpenFGA in memory, Maven offline. Probes showed the retained databases, the host
+    and the internet unreachable. Result: **144/144**, including EX-1…EX-5.
+  - **New tests.** `ExecutionInFlightIT` (IF-1…IF-5) covers requests approved before ADR-028 and role and
+    organisational scope. `V17MigrationIT` migrates a separate probe database to V16, adds steps as older code wrote
+    them, migrates to V17 and drops it.
+  - **Gaps the tests record** (`docs/audit/main-risk/ADR-028_TEST_RESULTS_AR.md`):
+    - a handover assigned to its requester before ADR-028 cannot be completed by anyone;
+    - closing is never routed;
+    - an approval stage whose role is held only outside the request's scope is not routed.
+  - **Recovery.** An application-level workflow is proposed (read-only scan → audited routing → authorised
+    assignment; a CLOSING routing kind needs a migration), **not built**.
+  - **Still not deployed.** V17 has been applied to no retained database. Committed and pushed on 3 Nov 2026 at the
+    owner's request.
 
 ## ADR-029 One GIS workspace: «مساحة التمركز» replaces «الخريطة والمرافق» — Accepted (2026-11-02)
 
@@ -771,4 +789,3 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   packages, export) have no screen until the owner's rebuild; their components, APIs and data are unchanged. Verified:
   `stationing-footprint.mjs` 11/11 with the accepted measurements; merge-removal check `stationing-layout.mjs` 5/5
   (`docs/evidence/stationing-unmerge/`); frontend 30/30, type check, build. Report: `docs/GIS_MERGE_REMOVAL_AR.md`.*
-
