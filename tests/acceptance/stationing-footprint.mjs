@@ -5,14 +5,22 @@
 // without changing authoritative data, save and reopen the draft. Evidence: docs/evidence/stationing/.
 // Usage: node tests/acceptance/stationing-footprint.mjs   (HEADED=1 SLOWMO=300 to watch)
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BASE, apiSession, consoleErrors, external, launch, newContext, signInManual, watch } from './lib/browser.mjs';
 
-const evidence = new URL('../../docs/evidence/stationing/', import.meta.url);
+// EVIDENCE_DIR=<folder> keeps a regression run's evidence apart from the accepted run's
+const evidence = process.env.EVIDENCE_DIR ? pathToFileURL(process.env.EVIDENCE_DIR.replace(/[\/]?$/, '/')) : new URL('../../docs/evidence/stationing/', import.meta.url);
 mkdirSync(evidence, { recursive: true });
 const shot = (page, name) => page.screenshot({ path: fileURLToPath(new URL(name + '.png', evidence)) });
 const results = [];
+// SKIP=S11 leaves out a step (S11 saves a draft: skipped when the environment's data must stay unchanged)
+const SKIP = (process.env.SKIP ?? '').split(',').filter(Boolean);
 async function step(id, title, fn) {
+  if (SKIP.includes(id)) {
+    results.push({ id, title, result: 'SKIPPED' });
+    console.log('SKIP', id, title);
+    return;
+  }
   try {
     const detail = await fn();
     results.push({ id, title, result: 'PASS', detail });

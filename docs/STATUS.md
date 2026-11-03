@@ -199,6 +199,22 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   - **Not done:** no backend, migration (V18+ waits for ADR-028/V17) or real-page change. The two approved frontend
     fixes of the same day (basemap tiles, overlap predicate) are ADR-030, not part of this model.
 
+- **Basemap tiles and overlap predicate (3 Nov 2026, ADR-030): two owner-approved frontend fixes, built and tested in
+  the acceptance environment; committed 3 Nov 2026.**
+  - **Basemap:** the installed SVG basemap is drawn as vector tiles instead of one image the browser rasterised again
+    on every zoom step (`lib/svgTiles.ts`, `components/map/svgTileLayer.ts`, `MapCanvas`). Packages in another
+    structure and raster packages keep the image overlay. Measured in Edge at four sizes and four zoom levels: worst
+    frame 67–734 ms before, 14–31 ms after, no frame over 33 ms; boundaries and markers at the same pixels; basemap
+    aligned with an independent rendering of the same file. Offline unchanged.
+  - **Overlap predicate:** `ringsIntersect` no longer misses identical or coincident rings; its rule (shared area;
+    touching is not an overlap) is unchanged and documented with the server rules it differs from.
+  - **Environment:** only the `tmrkz-test` web container was rebuilt and recreated (rollback image
+    `mover/web:before-basemap-tiles`); backends and databases untouched (V16, no V17). The rebuilt image leaves out
+    `docs/audit/enterprise-launch/`, which the previous one served on port 8088.
+  - **Open:** owner decision on touching boundaries in the live feedback (the server placement check counts any
+    contact); `map-workspace.mjs` updated for the new renderer but not runnable while the facility page has no screen.
+    Evidence: `docs/evidence/map-basemap/`.
+
 - **Stationing defect fixes and UX prototype (2 Nov 2026, stationing UX brief):** seven defects of the visual audit are
   fixed in «مساحة التمركز» — touch dragging of the footprint, proposal/validation colours, RTL offsets of vertices and
   edge lengths, overlapping site markers, the organisation page's «على الخريطة» link, organisations without a symbol, and

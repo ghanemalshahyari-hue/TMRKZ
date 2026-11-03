@@ -378,3 +378,18 @@ Run on a sealed disposable database (owner approval of 3 Nov 2026). The backend 
 | Role and organisational scope of execution steps | `executionGrant`, `separateExecution` | IF-4 | Pass |
 | Approval stage held only outside its scope | `TaskRealignment.roleHeld` (scope-blind) | IF-5 | Pass; gap recorded |
 | V17 on existing steps: key-based purpose; later inserts get TASK; CHECK enforced | `V17__execution_purpose.sql` | V17-1 | Pass |
+
+## Basemap tiles and overlap predicate (2026-11-03, ADR-030; owner approval of two frontend fixes)
+
+Evidence: `docs/evidence/map-basemap/` (before = previous web image, after = rebuilt one; `compare.json`, side-by-side
+pictures). Browser script `tests/acceptance/map-basemap.mjs` (Edge, headless, test environment, read-only).
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| Basemap does not lag while panning and zooming (1920×1080, 1366×768, 768×1024, 390×844) | `lib/svgTiles.ts`, `components/map/svgTileLayer.ts`, `MapCanvas` background effect | `map-basemap.mjs` B3 (frames at four zoom levels) | Pass: after, worst frame 14–31 ms, 0 frames over 50 ms at 16/16 levels (before: up to 734 ms, 88 frames) |
+| Basemap content and meaning unchanged; packages not in the plain structure keep the image overlay | `parseSvgTiles` (strict), fallback in `MapCanvas` | `svgTiles.test.ts` (real package read in full; 19 rejected structures incl. the acceptance plan); `map-basemap.mjs` B1 | Pass: 23/23 unit; B1 16/16 (same colour as the independent rendering) |
+| GIS alignment of the basemap | `tileWindow` (same linear mapping as `L.imageOverlay`), viewBox clip | `svgTiles.test.ts` (tile placement = overlay mapping); `map-basemap.mjs` B2 (best offset against an independent Web-Mercator rendering of the same file) | Pass: 15/16 at (0,0) or ±1 px in both builds; 390×844 zoom 18 stale reported centre in both builds, (0,0) after one pan |
+| Boundary and marker positions unchanged | overlay code untouched | `compare.json` (before/after positions at the same views) | Pass: 16/16 views, largest difference 0 px |
+| Offline; no external requests | same local package URL | `map-basemap.mjs` B4 | Pass: 0 external requests, 0 console errors |
+| Overlap predicate: conflict semantics documented, identical and coincident geometry not missed, touching unchanged | `lib/footprint.ringsIntersect` | `footprint.test.ts` (24 cases × both argument orders: disjoint, crossing, contained, identical ×5, partly coincident ×2, vertex touch ×2, boundary touch ×3, near miss ×2, 1 cm overlap, concave ×2, degenerate ×2) | Pass |
+| Polygon editor, permissions, data behaviour, stationing redesign | not changed (no backend, API, database or editor change; Stationing V2 not integrated) | `stationing-fixes.mjs`, `stationing-layout.mjs`, `stationing-footprint.mjs` (S1–S10) | Pass: 7/7, 5/5, S1–S10 10/10 (S11 saves a draft: skipped) |

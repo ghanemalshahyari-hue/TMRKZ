@@ -789,3 +789,60 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   packages, export) have no screen until the owner's rebuild; their components, APIs and data are unchanged. Verified:
   `stationing-footprint.mjs` 11/11 with the accepted measurements; merge-removal check `stationing-layout.mjs` 5/5
   (`docs/evidence/stationing-unmerge/`); frontend 30/30, type check, build. Report: `docs/GIS_MERGE_REMOVAL_AR.md`.*
+
+## ADR-030 Basemap drawn as vector tiles; overlap predicate that does not miss coincident geometry — Accepted (2026-11-03)
+
+- **Context.** Owner approval of 3 Nov 2026 of two narrowly scoped fixes in the real frontend, after the Stationing V2
+  prototype showed both: (A) the map lagged while zooming — `MapCanvas` drew the installed SVG basemap package as one
+  `L.imageOverlay`, an image tens of thousands of pixels wide at the zoom of site and polygon editing that the browser
+  rasterises again after every zoom step; (B) `ringsIntersect` (`lib/footprint.ts`) missed identical and coincident
+  rings — no strict edge crossing, and the single vertex it tested lies on the other ring's boundary. Nothing else of
+  Stationing V2 is integrated; no backend, API, database, permission, workflow or polygon-editor change.
+- **Decision — basemap.** `lib/svgTiles.ts` reads an SVG_OVERLAY package once into its drawing layers (background, the
+  filled `<g>` groups, the stroked road classes), each shape with its bounding box; `components/map/svgTileLayer.ts`
+  draws it as a Leaflet grid layer of 256-px canvas tiles in the same `background` pane, each tile in its own task and
+  only with the shapes that touch it, in the file's colours, widths, fill rules and order, clipped to the viewBox, under
+  the same linear mapping between the projected coverage corners that `L.imageOverlay` uses. Only the plain structure of
+  the regional package is accepted (absolute M/L/Z data, `preserveAspectRatio="none"`, no text, transforms, curves,
+  styles, images or nested groups); any other SVG — such as the acceptance campus plan — and every RASTER_IMAGE package
+  stay an image overlay, so no package looks different. The file is fetched from the same local URL as before
+  (`/api/v1/map/packages/{id}/content`); nothing else is requested; offline unchanged. The shown layer carries
+  `data-background="<package id>"` for tests whatever the renderer.
+- **Decision — overlap predicate (conflict semantics documented first).**
+  - Documented rules before the change: `ringsIntersect` — "whether two rings share any area"; the boundary register
+    (`SiteOverlapRule`, ADR-026) refuses an overlap above 1 m² and allows a shared edge; the stationing occupancy check
+    (`POST /placement/check`, ADR-025) uses `ST_Intersects`, so any contact — also a shared edge or vertex — is a hit,
+    and it is the authoritative check after every drop, at save, submission and approval.
+  - The predicate keeps its rule (interiors overlap): crossing edges, containment (also with shared edges), partly
+    coincident edges on the same side and identical rings (any start vertex, orientation or extra collinear vertex) are
+    an overlap; a shared edge, a shared stretch of edge from opposite sides, a shared vertex and a near miss are not.
+  - Method, no special case for equal coordinates: both rings in one local metric plane; (1) a proper crossing of two
+    edges, else (2) each boundary cut at the other ring's vertices that lie on it, every piece classified by its
+    midpoint — inside the other polygon is an overlap — else (3) boundaries that coincide entirely. Coincidence
+    tolerance 1 mm (`ON_EDGE_M`), a geometric tolerance, not a business one; bounding boxes reject far rings first.
+  - Not changed: the server rules, `pointInRing`, `kinks`, the editor. The pre-existing difference stays and is an
+    open owner decision: the live feedback does not mark a proposal that only touches an occupied boundary, the server
+    check does.
+- **Verified.** Edge headless against `tmrkz-test` with only the web container rebuilt (database V16, backend
+  untouched); evidence `docs/evidence/map-basemap/` (README, `compare.json`, side-by-side pictures).
+  - Frames (`tests/acceptance/map-basemap.mjs`, 1920×1080, 1366×768, 768×1024, 390×844, four zoom levels each up to
+    the zoom of polygon editing, mouse pans and wheel zooms): before, the worst frames were 67–734 ms with up to 88
+    frames over 50 ms at close zoom (p95 up to 173 ms); after, the worst frame is 14–31 ms, no frame over 33 ms, p95
+    13.4–13.5 ms at every size and zoom (16/16 within the budget).
+  - Alignment: the same 16 views in both builds, every boundary and marker at the same pixel (0 px); basemap pictures
+    before vs after within ±1 px; against an independent Web-Mercator rendering of the same file 15/16 views at (0,0)
+    or ±1 px in both builds — the 16th (390×844, zoom 18) differs identically in both because the map's reported centre
+    was stale there, and matches at (0,0) after one keyboard pan. No external request, no console error.
+  - Unit tests: `svgTiles.test.ts` 23 (the installed package read in full; 18 structures and the acceptance plan
+    refused; tile placement equal to the overlay mapping; culling), `footprint.test.ts` 24 overlap cases in both
+    argument orders; frontend 80/80 (78 + 2 skipped in the image build, which has no repository files), type check
+    and build; prototype 28/28 and type check with the new predicate.
+  - Browser regressions on the rebuilt app (read-only, evidence in `docs/evidence/map-basemap/regression/`):
+    `stationing-fixes.mjs` 7/7, `stationing-layout.mjs` 5/5, `stationing-footprint.mjs` S1–S10 10/10 (S11, which saves a draft, skipped so the
+    environment's data stays unchanged; S10 confirms no request was created).
+- **Not done.** `map-workspace.mjs` now checks the shown background through `data-background` instead of the overlay
+  `<img>`; it cannot run while «الخريطة والمرافق» has no screen (ADR-029), so that change is not executed. The web
+  image is built from a context without `docs/audit/enterprise-launch/` (the previous image served that report under
+  `/docs/` on port 8088); a `Dockerfile.dockerignore` entry would make this permanent — not changed, outside this
+  approval. The live feedback/placement difference for touching boundaries is left to the owner. The isolated
+  prototype keeps its own `svgBasemap.ts`.

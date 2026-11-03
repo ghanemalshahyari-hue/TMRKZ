@@ -193,10 +193,11 @@ await step('MAP-07a', 'مدير الخرائط: رفع حزمة مخطط مرف�
   await row.waitFor({ timeout: 15000 });
   check((await row.innerText()).includes('قيد المراجعة'), 'uploaded package not pending review');
   await row.getByRole('button', { name: 'معاينة على الخريطة' }).click();
-  await pageA.waitForSelector('.leaflet-image-layer');
+  // the shown package, whether drawn as an image overlay or as vector tiles (ADR-030)
+  await pageA.waitForSelector('[data-background]');
   const pkgs = (await admin.get('/map/packages?all=true')).body;
   planId = pkgs.find((p) => p.version === `2026.10-test-${run}` && p.role === 'overlay').id;
-  check((await pageA.getAttribute('.leaflet-image-layer', 'src')).includes(planId), 'preview did not show the uploaded package');
+  check((await pageA.getAttribute('[data-background]', 'data-background')) === planId, 'preview did not show the uploaded package');
   await shot(pageA, 'map-07-preview-pending-package');
   await pageA.getByRole('button', { name: 'مدير الخرائط' }).click();
   await pageA.getByPlaceholder('مثال: روجع الترخيص والتغطية').fill('روجع المصدر والترخيص والتغطية');
@@ -338,10 +339,10 @@ await step('MAP-06', 'رسم ثم إلغاء، تعديل رؤوس ثم حفظ،
 await step('MAP-07', 'التبديل بين خلفيتين مثبتتين، وإظهار/إخفاء المناطق والأسماء باستقلال، ونقص الصور الجوية معلن', pageA, async () => {
   const pick = (name) => pickBackground(pageA, name);
   await pick('مخطط المرفق — بيئة القبول');
-  await pageA.waitForFunction((id) => document.querySelector('.leaflet-image-layer')?.getAttribute('src')?.includes(id), planId);
+  await pageA.waitForFunction((id) => document.querySelector('[data-background]')?.getAttribute('data-background') === id, planId);
   await pick('خلفية إقليمية توضيحية');
-  await pageA.waitForFunction((id) => !document.querySelector('.leaflet-image-layer')?.getAttribute('src')?.includes(id), planId);
-  check((await pageA.locator('.leaflet-image-layer').count()) === 1, 'more than one background drawn');
+  await pageA.waitForFunction((id) => !!document.querySelector('[data-background]') && document.querySelector('[data-background]').getAttribute('data-background') !== id, planId);
+  check((await pageA.locator('[data-background]').count()) === 1, 'more than one background drawn');
   await pageA.getByRole('button', { name: 'الخلفية', exact: true }).click();
   const panel = await pageA.locator('.map-popover').innerText();
   check(panel.includes('لم تثبت حزمة صور جوية'), 'missing aerial imagery not stated');
@@ -386,7 +387,7 @@ await step('MAP-08', 'خارج التغطية وتغطية جزئية: تنبي�
   await pageA.waitForSelector('.map-caption.coverage[data-coverage="NONE"]', { timeout: 10000 });
   const none = await pageA.locator('.map-caption.coverage').innerText();
   check(none.includes('مخطط المرفق') && none.includes('خارج تغطية'), 'none message: ' + none);
-  check((await pageA.locator('.leaflet-image-layer').count()) === 1, 'a substitute background appeared');
+  check((await pageA.locator('[data-background]').count()) === 1, 'a substitute background appeared');
   await pickBackground(pageA, 'خلفية إقليمية توضيحية');
   await pageA.waitForSelector('.map-caption.coverage[data-coverage="FULL"]', { timeout: 10000 });
   return 'جزئي: «' + partial.slice(0, 70) + '…» · خارج: «' + none.slice(0, 60) + '…» · الخلفية الإقليمية: كاملة';

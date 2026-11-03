@@ -6,7 +6,8 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as lib from './lib/browser.mjs';
 
-const OUT = fileURLToPath(new URL('../../docs/evidence/stationing-unmerge/', import.meta.url));
+// EVIDENCE_DIR=<folder> keeps a regression run's evidence apart from the accepted run's
+const OUT = process.env.EVIDENCE_DIR ? process.env.EVIDENCE_DIR.replace(/[\/]?$/, '/') : fileURLToPath(new URL('../../docs/evidence/stationing-unmerge/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 const results = [];
 const check = async (id, title, fn) => {

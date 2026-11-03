@@ -3,6 +3,7 @@ import L from '../../lib/leaflet';
 import { urls } from '../../api/client';
 import type { MapFeature, MapPackage } from '../../api/types';
 import { DEFAULT_LAYERS, featureStyle, MAP_COLORS, type LayerSettings, type MapMode } from '../../lib/mapState';
+import { loadSvgTiles, svgTileLayer } from './svgTileLayer';
 
 export type Viewport = { bbox: string; zoom: number; center: [number, number] };
 export type FitTarget = { bounds: L.LatLngBoundsExpression; key: number; maxZoom?: number };
@@ -76,8 +77,10 @@ export function MapCanvas({
   const siteLayer = useRef<L.LayerGroup | null>(null);
   const zoneLayer = useRef<L.LayerGroup | null>(null);
   const markerLayer = useRef<L.LayerGroup | null>(null);
-  const bgLayer = useRef<L.ImageOverlay | null>(null);
+  const bgLayer = useRef<L.ImageOverlay | L.GridLayer | null>(null);
   const bgAttribution = useRef<string | null>(null);
+  const bgOpacity = useRef(layers.backgroundOpacity);
+  bgOpacity.current = layers.backgroundOpacity;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const onBackgroundRef = useRef(onBackgroundClick);
@@ -140,7 +143,9 @@ export function MapCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // background: only an installed package; nothing is drawn in place of a missing one
+  // background: only an installed package; nothing is drawn in place of a missing one. An SVG package in the plain
+  // structure of the regional basemap is drawn as vector tiles (svgTileLayer: one huge image re-rasterised on every zoom
+  // step made the map lag); any other package, or an SVG that is not in that structure, stays an image overlay.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -149,15 +154,24 @@ export function MapCanvas({
     if (bgAttribution.current) map.attributionControl.removeAttribution(bgAttribution.current);
     bgAttribution.current = null;
     if (!background) return;
-    const b: L.LatLngBoundsExpression = [
-      [background.coverage.minLat, background.coverage.minLng],
-      [background.coverage.maxLat, background.coverage.maxLng],
-    ];
-    const overlay = L.imageOverlay(urls.mapContent(background), b, { pane: 'background', interactive: false, opacity: layers.backgroundOpacity, alt: background.name });
-    overlay.addTo(map);
-    bgLayer.current = overlay;
+    const b = L.latLngBounds([background.coverage.minLat, background.coverage.minLng], [background.coverage.maxLat, background.coverage.maxLng]);
+    let current = true;
+    const show = (layer: L.ImageOverlay | L.GridLayer) => {
+      if (!current) return;
+      layer.addTo(map);
+      // the package shown, for acceptance tests whatever the renderer
+      (layer instanceof L.ImageOverlay ? layer.getElement() : layer.getContainer())?.setAttribute('data-background', background.id);
+      bgLayer.current = layer;
+    };
+    const overlay = () => L.imageOverlay(urls.mapContent(background), b, { pane: 'background', interactive: false, opacity: bgOpacity.current, alt: background.name });
+    if (background.format === 'SVG_OVERLAY')
+      void loadSvgTiles(urls.mapContent(background)).then((svg) => show(svg ? svgTileLayer(svg, b, { pane: 'background', opacity: bgOpacity.current }) : overlay()));
+    else show(overlay());
     bgAttribution.current = background.attributionHtml || background.source;
     map.attributionControl.addAttribution(bgAttribution.current);
+    return () => {
+      current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [background?.id]);
 

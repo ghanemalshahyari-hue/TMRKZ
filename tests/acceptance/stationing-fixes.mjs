@@ -4,10 +4,11 @@
 // Real application, fictional tmrkz-test data, Microsoft Edge. Nothing is written (no proposal is saved).
 // Usage: node tests/acceptance/stationing-fixes.mjs   Evidence: docs/evidence/stationing-fixes/
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { BASE, apiSession, consoleErrors, external, launch, newContext, signInManual, watch } from './lib/browser.mjs';
 
-const evidence = new URL('../../docs/evidence/stationing-fixes/', import.meta.url);
+// EVIDENCE_DIR=<folder> keeps a regression run's evidence apart from the accepted run's
+const evidence = process.env.EVIDENCE_DIR ? pathToFileURL(process.env.EVIDENCE_DIR.replace(/[\/]?$/, '/')) : new URL('../../docs/evidence/stationing-fixes/', import.meta.url);
 mkdirSync(evidence, { recursive: true });
 const shot = (page, name) => page.screenshot({ path: fileURLToPath(new URL(name + '.png', evidence)) });
 const results = [];

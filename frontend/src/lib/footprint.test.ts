@@ -33,6 +33,43 @@ describe('footprint geometry', () => {
     expect(ringsIntersect(rect, moveRigid(rect, { lat: 25.21, lng: 55.32 }))).toBe(false);
   });
 
+  // ringsIntersect: "share any area" (owner approval of 3 Nov 2026: identical and coincident geometry must not be missed;
+  // touching keeps the documented rule). Shapes in metres east/north of a fictional point near Dubai.
+  const m = (x: number, y: number) => ({ lat: 25.2 + y / 111195, lng: 55.3 + x / (111195 * Math.cos((25.2 * Math.PI) / 180)) });
+  const sq = (x: number, y: number, w: number, h = w): Ring => [m(x, y), m(x + w, y), m(x + w, y + h), m(x, y + h)];
+  const A = sq(0, 0, 100);
+  // a U open to the north: arms 0–30 and 70–100, notch 30–70 above y = 40
+  const U: Ring = [m(0, 0), m(100, 0), m(100, 100), m(70, 100), m(70, 40), m(30, 40), m(30, 100), m(0, 100)];
+  it.each<[string, Ring, Ring, boolean]>([
+    ['1 clearly disjoint', A, sq(300, 0, 100), false],
+    ['2 crossing (corner over corner)', A, sq(50, 50, 100), true],
+    ['2 crossing (a plus sign: no vertex inside the other)', sq(-100, -10, 200, 20), sq(-10, -100, 20, 200), true],
+    ['3 contained', sq(-100, -100, 300), sq(20, 20, 40), true],
+    ['3 contained, sharing two edges and a corner', A, sq(0, 0, 40), true],
+    ['4 identical', A, A.map((p) => ({ ...p })), true],
+    ['4 identical, other start vertex', A, [A[2], A[3], A[0], A[1]], true],
+    ['4 identical, opposite orientation', A, [...A].reverse(), true],
+    ['4 identical, extra collinear vertex', A, [A[0], m(50, 0), A[1], A[2], A[3]], true],
+    ['4 identical concave ring', U, [...U], true],
+    ['5 partly coincident edges, same side', A, sq(50, 0, 100), true],
+    ['5 partly coincident edges, opposite sides', A, sq(100, 50, 100), false],
+    ['6 vertex-only touch (corner to corner)', A, sq(100, 100, 100), false],
+    ['6 vertex-only touch (apex on an edge)', A, [m(50, 100), m(100, 200), m(0, 200)], false],
+    ['7 boundary-only touch (full shared edge)', A, sq(100, 0, 100), false],
+    ['7 boundary-only touch, extra vertex on the shared edge', A, [m(100, 0), m(200, 0), m(200, 100), m(100, 100), m(100, 50)], false],
+    ['7 boundary-only touch inside a concave notch', U, sq(30, 40, 40, 60), false],
+    ['8 near but not touching (0.5 m)', A, sq(100.5, 0, 100), false],
+    ['8 near but not touching (5 cm, diagonal)', A, sq(100.05, 100.05, 100), false],
+    ['true overlap of 1 cm is not missed', A, sq(99.99, 0, 100), true],
+    ['overlap with one arm of a concave ring', U, sq(20, 50, 40), true],
+    ['inside the notch, touching nothing', U, sq(40, 60, 20), false],
+    ['degenerate: two vertices', A, [m(10, 10), m(20, 20)], false],
+    ['degenerate: all vertices on one line', A, [m(10, 10), m(20, 20), m(30, 30)], false],
+  ])('ringsIntersect: %s', (_, a, b, shared) => {
+    expect(ringsIntersect(a, b)).toBe(shared);
+    expect(ringsIntersect(b, a)).toBe(shared);
+  });
+
   it('reads the main ring of a registered boundary and writes a closed GeoJSON polygon', () => {
     const g = toPolygon(rect);
     expect((g.coordinates as number[][][])[0]).toHaveLength(5);
