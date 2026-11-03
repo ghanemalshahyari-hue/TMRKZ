@@ -40,6 +40,23 @@ The headed side-by-side comparison with the current page is `docs/audit/stationi
 - `src/layout.ts` (+ `layout.test.ts`) — pure screen-space clustering and label placement.
 - `src/data.ts` — the fictional data set; `src/symbols.tsx` — offline unit symbols (milsymbol, as in the application).
 
+## Stationing domain model V2 page (3 Nov 2026)
+
+`model.html` (`src/model/`) is a second, separate page: the owner-approved stationing domain model V2
+(`docs/STATIONING_DOMAIN_MODEL_V2_AR.md`) as a simulated state machine — current/temporary stationing, associated areas,
+primary and alternative relocation candidates, activation, cancellation, extension, early return — with simulated
+people, permissions and time. Open `http://127.0.0.1:5194/model.html#s=1` … `#s=18` for the owner's eighteen scenarios.
+Unit tests: `src/model/domain.test.ts` (run with the vitest command above). Browser evidence and report:
+`docs/audit/stationing-ux/model-v2/`. It adds no dependency and is not integrated. Scenarios 19–22 (3 Nov, second pass)
+add cancellation before start and the reservation / covered-scope / exception flows; sensitive actions open their own
+reason dialogs (`src/model/dialog.tsx`); phones get a three-height bottom sheet. `window.__stationingModel` is a
+prototype-only test hook for the browser evidence.
+
+**Basemap tiles (`src/svgBasemap.ts`, both pages):** the regional SVG basemap is drawn as vector tiles — parsed once,
+each tile drawing only the shapes that touch it — instead of one `L.imageOverlay` the browser re-rasterised on every
+zoom step (measured up to 160–200 ms frames; now ≤ 14 ms). Same picture and georeferencing. The application's
+`MapCanvas` received the same fix, with a strict reader of the package structure, on 3 Nov 2026 (ADR-030).
+
 ## Removing it
 
 Delete `prototypes/stationing-ux/` and `docs/audit/stationing-ux/redesign/`. Nothing else references them.

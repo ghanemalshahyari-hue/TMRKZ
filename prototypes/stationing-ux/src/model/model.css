@@ -1,0 +1,181 @@
+/* Stationing domain model V2 prototype. Built on the prototype's tokens and classes; five layer colours, each with its own
+   line pattern so the meaning never depends on colour alone. Map tags are placed from their point with left/top 0. */
+.md{--c-perm:#2f6db0;--c-temp:#0e8f8f;--c-area-p:#7b4fb3;--c-area-a:#a46fd6;--c-cand-p:#1f9d55;--c-cand-a:#c46d12;--c-off:#7b8b8f}
+
+/* the card: start side (right in Arabic), full height; a bottom sheet on narrow screens */
+.md-dock{position:absolute;top:12px;bottom:12px;inset-inline-start:12px;width:min(452px,calc(100% - 24px));display:flex}
+.md-card{display:flex;flex-direction:column;gap:2px}
+.md-head h2{font-size:16px}
+.md-intro .md-row{grid-template-columns:1fr}
+/* narrow screens: a bottom sheet with three heights (B4); only the card scrolls, and never in the collapsed state */
+.ux.phone .md-dock{top:auto;inset-inline:8px;bottom:8px;width:auto;flex-direction:column;background:#fff;border-radius:14px;box-shadow:0 -6px 24px #19363826}
+.ux.phone .md-dock.sheet-collapsed{height:auto;max-height:178px}
+.ux.phone .md-dock.sheet-medium{height:46%}
+.ux.phone .md-dock.sheet-expanded{height:calc(100% - 60px)}
+.ux.phone .md-dock .md-card{border-radius:0 0 14px 14px;box-shadow:none;min-height:0;padding-top:4px}
+.ux.phone .md-dock.sheet-collapsed .md-card{overflow:hidden}
+.md-handle{display:block;width:100%;height:24px;border:0;background:#fff;border-radius:14px 14px 0 0;cursor:pointer;flex:none;padding:0}
+.md-handle span{display:block;width:48px;height:5px;border-radius:3px;background:#a9b6b9;margin:0 auto}
+.md-handle:focus-visible{outline:3px solid #54ae96;outline-offset:-3px}
+/* the map's zoom and scale follow the sheet: always just above it, never over it */
+.ux.md.phone .leaflet-bottom{bottom:calc(var(--sheet,0px) + 14px)}
+/* compact drawing status at the top of the sheet: readable and reachable in the collapsed state */
+.md-compact{position:sticky;top:-4px;z-index:2;background:#fff;padding:2px 0 8px;border-bottom:1px solid var(--line);display:grid;gap:6px}
+.md-compact-row{display:grid;gap:2px;font-size:12px;line-height:1.55}
+.md-compact-row .good{color:#16743f;font-weight:600}
+.md-compact-row .bad{color:#9c2f2f;font-weight:600}
+.md-compact-actions{display:flex;gap:8px}
+.md-compact-actions .ux-btn{min-height:40px;flex:1;font-size:12.5px}
+
+/* simulation strip above the map (nothing simulated sits on the map), clearly marked */
+.ux.md{height:calc(100dvh - 128px - 76px);min-height:420px}
+.md-sim{margin:0 0 8px;background:#fffdf5;border:1.5px dashed #c9a227;border-radius:12px;padding:5px 10px;font-size:12px}
+.md-sim-row{display:flex;gap:6px 10px;align-items:center;overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+.md-sim label{display:flex;align-items:center;gap:6px;font-weight:600;color:var(--muted)}
+.md-sim select{height:32px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);font:inherit;max-width:240px}
+.md-sim .ux-chip{height:32px;padding:0 10px;font-size:12px;box-shadow:none;flex:none}
+.md-sim-tag{background:#a8841a;color:#fff;border-radius:6px;padding:1px 8px;font-weight:700}
+.md-time{font-weight:700}
+.md-sim-hint{margin:3px 0 0;font-size:11.5px;color:#5d4a10;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:760px){
+  .ux.md{height:calc(100dvh - 116px - 64px)}
+  .md-sim{padding:4px 8px}
+  .md-sim select{max-width:150px}
+  .md-sim-hint{display:none}
+}
+.md-legend{position:absolute;top:12px;inset-inline-end:12px;width:300px}
+.md-legend ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:12.5px}
+.md-legend li{display:flex;align-items:center;gap:8px}
+.md-notice{position:absolute;top:12px;inset-inline-end:12px;max-width:min(460px,calc(100% - 490px));display:flex;gap:8px;align-items:center;background:#fdf1f1;border:1.5px solid #e4a1a1;color:#8c2b2b;border-radius:10px;padding:8px 10px;font-size:12.5px;font-weight:600}
+.ux.phone .md-notice{inset-inline:8px;max-width:none;top:8px}
+
+/* map tags */
+.md-tag-icon{background:none;border:0}
+.md-tag{position:absolute;left:0;top:0;transform:translate(-50%,-125%);white-space:nowrap;font-size:11.5px;font-weight:700;padding:2px 9px;border-radius:8px;background:#fff;border:1.5px solid var(--line);box-shadow:0 2px 6px #0002;display:inline-flex;align-items:center;gap:6px;color:var(--ink);direction:rtl}
+.md-tag .ux-sym{height:18px}
+.md-tag.perm{border-color:var(--c-perm);color:var(--c-perm)}
+.md-tag.small{font-size:11px;padding:1px 7px}
+.md-tag.temp{border-color:var(--c-temp);color:var(--c-temp);border-style:dashed}
+.md-tag.area-p,.md-tag.area-a{transform:translate(-50%,25%);border-color:var(--c-area-p);color:var(--c-area-p);border-style:dotted}
+.md-tag.area-a{border-color:var(--c-area-a);color:#7d4fa8}
+.md-tag.cand-p{border-color:var(--c-cand-p);color:#16743f}
+.md-tag.cand-a{transform:translate(-50%,25%);border-color:var(--c-cand-a);color:var(--c-cand-a);border-style:dashed}
+.md-tag.off{border-color:var(--c-off);color:var(--c-off);text-decoration:line-through}
+.md-tag.chip{transform:translate(-50%,-50%);background:#16324f;border-color:#16324f;color:#fff;font-weight:600}
+.md-tag.group{transform:translate(-50%,40%);background:var(--c-temp);border-color:var(--c-temp);color:#fff;cursor:pointer}
+.md-tag.hidden{visibility:hidden}
+/* narrow screens: long names wrap instead of running off the map */
+.ux.phone .md-tag{white-space:normal;width:max-content;max-width:min(200px,54vw);text-align:center;line-height:1.45}
+.md-tag.up{transform:translate(-50%,-125%)}
+.md-tag.down{transform:translate(-50%,25%)}
+.md-tag.side{transform:translate(12px,-50%)}
+.md-tag.side-w{transform:translate(calc(-100% - 12px),-50%)}
+.leaflet-marker-icon:focus-visible .md-tag{outline:3px solid #54ae96;outline-offset:2px}
+
+/* swatches: colour and line pattern */
+.md-swatch{display:inline-block;width:18px;height:11px;border-radius:3px;border:2.5px solid;vertical-align:middle;flex:none}
+.md-swatch.perm{border-color:var(--c-perm);background:#2f6db022}
+.md-swatch.temp{border-color:var(--c-temp);border-style:dashed;background:#0e8f8f22}
+.md-swatch.area-p{border-color:var(--c-area-p);border-style:dotted;background:#7b4fb31a}
+.md-swatch.area-a{border-color:var(--c-area-a);border-style:dotted}
+.md-swatch.cand-p{border-color:var(--c-cand-p);background:#1f9d5522}
+.md-swatch.cand-a{border-color:var(--c-cand-a);border-style:dashed}
+.md-swatch.off{border-color:var(--c-off);border-style:dashed}
+
+/* card contents */
+.md-block{border-top:1px solid var(--line);padding:10px 0 4px;display:grid;gap:4px}
+.md-block.perm,.md-block.temp{border:1.5px solid var(--c-perm);border-radius:10px;padding:8px 10px;margin:4px 0}
+.md-block.temp{border-color:var(--c-temp);border-style:dashed;background:#0e8f8f0a}
+.md-block small{font-size:11.5px;color:var(--muted);line-height:1.6}
+.md-k{font-size:12.5px;color:var(--ink)}
+details.md-block>summary{cursor:pointer}
+.md-v{margin:0;font-size:13px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.md-v.small{font-size:12px;color:var(--muted)}
+.md-chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0 6px}
+.md-tagline{font-size:11.5px;font-weight:700;border:1px solid var(--line);border-radius:7px;padding:1px 8px;background:var(--canvas)}
+.md-state{font-size:11.5px;font-weight:700;border-radius:7px;padding:1px 9px;color:#fff;background:#5c686c;white-space:nowrap}
+.md-state.ok{background:#1f8a54}.md-state.warn{background:#b7791f}.md-state.bad{background:#b83a3a}.md-state.info{background:#2f6db0}
+.md-alert{border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.6;margin:4px 0}
+.md-alert.warn{background:#fff7e6;border:1.5px solid #e9c46a;color:#7a5410}
+.md-alert.info{background:#eef5fc;border:1.5px solid #a9c8ea;color:#1f4f80}
+.md-list{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.md-list li{display:flex;gap:8px;align-items:center;font-size:12.5px}
+.md-list li b{display:block;font-size:12.5px}
+.md-list.units li{padding:3px 0}
+.md-list.units li.away b{color:var(--c-temp)}
+.md-badge{margin-inline-start:auto;font-size:11px;font-weight:700;border-radius:6px;padding:0 7px;border:1.5px solid var(--c-perm);color:var(--c-perm)}
+.md-badge.temp{border-color:var(--c-temp);color:var(--c-temp);border-style:dashed}
+.md-row{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;width:100%;border:0;background:none;text-align:start;padding:6px 8px;border-radius:9px;cursor:pointer;min-height:44px;color:var(--ink);font:inherit;font-size:12.5px}
+.md-row:hover,.md-row:focus-visible{background:var(--canvas)}
+.md-toggle{height:38px;font-size:12.5px;justify-self:start}
+.md-act{display:grid;gap:2px;flex:1 1 180px;min-width:0}
+.md-act .ux-btn{width:100%;min-height:40px;font-size:12.5px}
+.md-why{color:#9c2f2f;font-size:11px;line-height:1.5}
+.md-reason{display:grid;gap:4px;font-size:11.5px;color:var(--muted)}
+.md-reason input{height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;color:var(--ink)}
+.md-stages{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:4px}
+.md-stages li{display:flex;gap:8px;align-items:flex-start;font-size:12.5px}
+.md-stages li b{display:block}
+.md-mark{width:20px;text-align:center;font-weight:700;color:var(--muted)}
+.md-stages .approved .md-mark{color:#1f8a54}
+.md-stages .carried .md-mark{color:#2f6db0}
+.md-stages .invalidated .md-mark{color:#b7791f}
+.md-stages .current{background:var(--soft);border-radius:8px}
+.md-stages .current .md-mark{color:var(--accent)}
+.md-events{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:5px}
+.md-events li{display:grid;font-size:11.5px}
+.md-events .ux-mono{font-size:10.5px;color:#1f4f80}
+
+/* comparison table */
+.md-compare{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed;margin:4px 0}
+.md-compare th,.md-compare td{border-bottom:1px solid var(--line);padding:5px 4px;text-align:start;vertical-align:top;line-height:1.5;word-break:break-word}
+.md-compare th{font-size:11.5px}
+.md-compare tbody td:first-child{color:var(--muted);font-weight:600;width:72px}
+.md-compare thead th:first-child{width:72px}
+.md-compare td.good{color:#16743f;font-weight:600}
+.md-compare td.bad{color:#9c2f2f;font-weight:600}
+.md-compare caption{caption-side:bottom;font-size:10.5px;color:var(--muted);text-align:start;padding-top:4px}
+.md-active{display:table;font-style:normal;font-size:10px;background:var(--accent);color:#fff;border-radius:5px;padding:0 5px;margin-top:3px}
+
+/* request editor */
+.md-steps{flex-wrap:wrap;margin:2px 0 6px}
+.md-steps button{border:0;padding:3px 9px;border-radius:99px;background:var(--canvas);color:var(--muted);font:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
+.md-steps button.on{background:var(--accent);color:#fff}
+.md-steps button.done{background:var(--soft);color:var(--accent)}
+.md-dates{display:flex;gap:10px;flex-wrap:wrap}
+.md-dates label{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.md-dates input{height:38px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;color:var(--ink)}
+.md-check{display:flex;gap:8px;align-items:center;min-height:36px;font-size:12.5px;cursor:pointer}
+.md-check input{width:18px;height:18px;accent-color:var(--accent)}
+.md-dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:12.5px}
+.md-dl dt{color:var(--muted)}
+.md-dl dd{margin:0}
+.md-dl dd.good{color:#16743f;font-weight:600}
+.md-dl dd.bad{color:#9c2f2f;font-weight:600}
+.md-editor .ux-actions.sticky{bottom:-14px}
+
+/* sensitive actions: their own block, their own look, their own reason dialog (B3) */
+.md-binding{border:1.5px solid #16324f40;background:#f3f6f9;border-radius:10px;padding:8px 10px;margin-top:8px;display:grid;gap:4px}
+.ux-btn.md-auth{background:#16324f;border-color:#16324f;color:#fff}
+.ux-btn.md-destr{background:#fff;border:2px solid #b83a3a;color:#9c2f2f}
+.md-modal{position:fixed;inset:0;background:#0f1f2a73;display:grid;place-items:center;z-index:5000;padding:16px}
+.md-dialog{background:#fff;border-radius:14px;max-width:540px;width:100%;max-height:calc(100dvh - 32px);overflow:auto;padding:14px 18px 16px;box-shadow:0 20px 50px #0005;border-top:6px solid var(--accent);color:var(--ink)}
+.md-dialog.auth{border-top-color:#16324f}
+.md-dialog.destructive{border-top-color:#b83a3a}
+.md-dialog h3{margin:4px 0 10px;font-size:17px}
+.md-dialog-kind{font-size:11.5px;font-weight:700;color:var(--muted)}
+.md-dialog.destructive .md-dialog-kind{color:#9c2f2f}
+.md-field{display:grid;gap:4px;font-size:12px;color:var(--muted);margin-top:10px}
+.md-field textarea,.md-field input{border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;color:var(--ink)}
+.md-dialog-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.md-dialog-actions .ux-btn{flex:0 0 auto;min-width:110px}
+.md-sim-mark{font-style:normal;font-size:10.5px;background:#a8841a;color:#fff;border-radius:5px;padding:0 6px}
+.md-data{display:flex;flex-wrap:wrap;gap:1px 10px;font-size:10.5px;color:#1f4f80}
+.md-note-a3{color:#0e6f6f;font-weight:600}
+
+/* availability check of a reservation */
+.md-tag.res.bad{border-color:#c0392b;color:#c0392b}
+.md-tag.res.good{border-color:#1f9d55;color:#16743f}
+.md-verdict{font-weight:700;font-size:12.5px;margin:6px 0 0}
+.md-verdict.bad,.md-list .bad{color:#9c2f2f}
+.md-verdict.good,.md-list .good{color:#16743f}

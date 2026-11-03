@@ -178,6 +178,27 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   - **Do not deploy this revision to data you keep, or rebuild the test environment's backend from it, until the owner
     approves.** Either would apply V17.
 
+- **Stationing domain model V2 (3 Nov 2026): owner-approved design baseline, NOT implemented.**
+  - **Design:** `docs/STATIONING_DOMAIN_MODEL_V2_AR.md` (5th revision), with owner decisions D1–D18, the
+    conditional-approval corrections A1–A5, the held-start correction A6 and a consistency review. After A6 the owner
+    accepted the document and the isolated prototype as the design baseline: no further redesign cycle unless real
+    implementation exposes a contradiction. It covers authoritative stationing separate from facility responsibility,
+    associated areas with an explicit covered organisation scope, primary and alternative relocation candidates,
+    independent activation, cancellation before activation, cancellation of an activated temporary before it starts
+    (a pending cancellation holds the scheduled start; rejected late, the temporary takes effect from the decision time;
+    its window can expire without a start), temporary overlay, extension (lapses if not activated) and early return.
+  - **Prototype (reference and evidence):** isolated, with simulated rules and fictional data:
+    `prototypes/stationing-ux/model.html`. Each sensitive action has its own mandatory-reason dialog. Phones get a
+    three-height bottom sheet.
+  - **Evidence:** 28 unit tests; 25 scenarios plus a measured polygon-drag test (mouse, and touch at 768/390) × 4 sizes
+    = 104/104 browser steps with 526 checks and 48 confirmed dialogs, 0 layout issues;
+    `docs/audit/stationing-ux/model-v2/PROTOTYPE_REPORT_AR.md`, review set of 17 images in `model-v2/review/`.
+  - **For owner review:** two rules derived from A6 (§15 items ز and ح of the model document): an approved extension
+    cannot be activated while a cancellation before start is pending or the start is held; an extension activated
+    before the hold carries the window to its end.
+  - **Not done:** no backend, migration (V18+ waits for ADR-028/V17) or real-page change. The two approved frontend
+    fixes of the same day (basemap tiles, overlap predicate) are ADR-030, not part of this model.
+
 - **Stationing defect fixes and UX prototype (2 Nov 2026, stationing UX brief):** seven defects of the visual audit are
   fixed in «مساحة التمركز» — touch dragging of the footprint, proposal/validation colours, RTL offsets of vertices and
   edge lengths, overlapping site markers, the organisation page's «على الخريطة» link, organisations without a symbol, and

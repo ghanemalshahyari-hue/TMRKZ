@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import L from '../../../frontend/src/lib/leaflet';
 import { areaM2, centroid, formatArea } from '../../../frontend/src/lib/footprint';
 import basemapUrl from '../../../map-packages/regional-basemap-2026.10/basemap.svg?url';
+import { svgBasemap } from './svgBasemap';
 import {
   BASEMAP_BOUNDS,
   ORGS,
@@ -73,7 +74,7 @@ export function Workspace() {
   const [q, setQ] = useState('');
   const [toast, setToast] = useState<string | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  const layers = useRef<{ sites: L.LayerGroup; shapes: L.LayerGroup; bg: L.ImageOverlay } | null>(null);
+  const layers = useRef<{ sites: L.LayerGroup; shapes: L.LayerGroup; bg: L.GridLayer } | null>(null);
 
   /** Height the bottom sheet covers on tablets and phones (the map keeps selections above it). */
   const sheetPx = useCallback(() => (narrow ? Math.min(window.innerHeight * 0.46, 460) : 0), [narrow]);
@@ -90,7 +91,8 @@ export function Workspace() {
     if (!mapEl.current) return;
     const m = L.map(mapEl.current, { zoomControl: false, minZoom: 10, maxZoom: 18, attributionControl: true, zoomSnap: 0.5 });
     m.attributionControl.setPrefix('Leaflet');
-    const bg = L.imageOverlay(basemapUrl, BASEMAP_BOUNDS, { attribution: 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap', interactive: false }).addTo(m);
+    // tiled, drawn once per tile: a single SVG overlay was re-rasterised on every zoom step (map lag)
+    const bg = svgBasemap(basemapUrl, BASEMAP_BOUNDS, 'OpenFreeMap © OpenMapTiles Data from OpenStreetMap').addTo(m);
     L.control.scale({ position: 'bottomright', imperial: false, maxWidth: 120 }).addTo(m);
     const shapes = L.layerGroup().addTo(m);
     const sites = L.layerGroup().addTo(m);
