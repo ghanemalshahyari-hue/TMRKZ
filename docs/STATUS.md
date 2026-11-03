@@ -178,6 +178,72 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   - **Do not deploy this revision to data you keep, or rebuild the test environment's backend from it, until the owner
     approves.** Either would apply V17.
 
+- **Stationing V3 production phases P0–P3 (3 Nov 2026): stop gate reached, NOT active.**
+  - **Report:** `docs/audit/stationing-v3-production/STOP_GATE_REPORT.md`.
+  - **P0 finding:** the acceptance test database `tmrkz-test` is at **V17**. It was migrated at 13:01:50 UTC when this
+    session rebuilt the test environment after pulling `964edb2`. V16 adds indexes only; V17 added a column to 0
+    rows. No backup from before the change exists. ADR-028 is amended. No production TMRKZ database exists on this
+    machine.
+  - **Code added:** pure domain logic and read-only adapters in `backend/src/main/java/ae/mover/stationing/` — policy,
+    hierarchy and snapshot, drift, routing, terrain, deployment, occupancy, PostGIS geometry, outbound event contract
+    and sender, read-access filter. Also an inactive frontend helper, `frontend/src/lib/stationingV3.ts` (the flag is
+    off). No schema, no route, no user-visible change.
+  - **Tests:** backend 174/174 on a disposable database (30 new, 11 ADR-028); frontend 84/84; build OK.
+  - **Open:**
+    - V17 approval, and a decision on the acceptance database.
+    - **A new owner question:** the terrain classification method for elevation data.
+    - Terrain data permission or import approval.
+    - Non-production Oracle access.
+    - The map renderer ADR.
+    - A real touch device.
+
+- **Stationing model V3, revision 2 — FINAL OWNER MODEL, all owner decisions closed (3 Nov 2026): design and isolated prototype for owner review,
+  NOT implemented.**
+  - **Design:** `docs/STATIONING_MODEL_V3_AR.md` records the owner's decisions:
+    - O-02: a site link is separate from stationing, and stationing is separate from facility responsibility.
+    - O-03: including a unit from another branch is configurable, with one or more approvals.
+    - O-05: the terrain class is the one covering the largest area.
+    - O-06: the terrain allowance raises the maximum only.
+    - O-07: the route starts from the requesting unit and goes up the Oracle hierarchy.
+    - O-08: an occupied deployment area is a hard block.
+    - O-09: the first approver is the requesting unit's own, and this is configurable.
+    - O-10: a hierarchy change pauses the request and returns it for reconfirmation; the route is then rebuilt from
+      the same unit, with history kept.
+
+    It also contains the Oracle, site-contract, workflow, Studio-properties, terrain-source and street-source designs
+    and the offline map-package plan.
+  - **Prototype:** `prototypes/stationing-ux/restationing.html`, scenarios A–X.
+    - The street mode shows Arabic road names drawn offline. They are OpenStreetMap names (ODbL, non-authoritative),
+      extracted from MOVER's local PMTiles by `tools/extract_road_names.py`.
+    - The terrain relief is still generated and marked "not for production".
+  - **Evidence:** `docs/audit/stationing-ux/model-v3/REPORT_AR.md`.
+  - **Answered by the owner after the visual comparison (3 Nov 2026):**
+    - O-04: deployment distance is measured centre to centre, for both relations.
+    - O-13: the second area is labelled «منطقة الانتشار البديلة».
+    - O-10b: after a hierarchy change, every stage is decided again.
+    - O-14: activation leaves site links untouched.
+  - **Closed by the owner the same day:**
+    - O-03b: one existing stage may satisfy several conditions and records which; independence is configurable (a
+      separate stage and a different human).
+    - O-15: a site link is not occupancy; only authoritative records count.
+    - O-16: a hierarchy change before activation blocks activation, pauses the request, and the route and approvals
+      are rebuilt.
+    - O-01: inbound from Oracle; outbound through a read API and an asynchronous outbox/event feed; no write to the
+      Oracle hierarchy.
+    - O-11: FGIC only with written permission, otherwise Copernicus GLO-30 (a surface model) with owner approval.
+    - O-12: local PMTiles with OSM names, offline glyphs and ODbL attribution; official layers only once licensed.
+  - **O-05b closed (option C):** a tie for the largest terrain share is decided by the administrator-configured
+    `terrain_class_priority`; tied classes without a valid priority block submission. The decision and the policy
+    version are written to the audit record (scenario T2).
+  - **Owner decisions: none open.**
+  - **Evidence:** 101/101 unit tests; 108/108 browser scenario loads (27 × 4 sizes); 44/44 interactions; 3/3 journeys;
+    0 external requests; 0 errors.
+  - **Ready for the production implementation phase, waiting for the owner's go-ahead.** Plan: §12 of the design
+    document. Still not done: no backend, migration, real page, Oracle write or map package.
+    - Licences for official terrain and road-name data: FGIC needs written permission; ADSDI road names are for Abu
+      Dhabi government entities only; MOVER's NRN/FGIC road copies have no published licence.
+  - **Not done:** no backend, migration, real-page, Oracle or map-package change.
+
 - **Stationing domain model V2 (3 Nov 2026): owner-approved design baseline, NOT implemented.**
   - **Design:** `docs/STATIONING_DOMAIN_MODEL_V2_AR.md` (5th revision), with owner decisions D1–D18, the
     conditional-approval corrections A1–A5, the held-start correction A6 and a consistency review. After A6 the owner

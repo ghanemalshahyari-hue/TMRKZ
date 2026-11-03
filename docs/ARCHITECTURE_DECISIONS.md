@@ -738,6 +738,18 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
     assignment; a CLOSING routing kind needs a migration), **not built**.
   - **Still not deployed.** V17 has been applied to no retained database. Committed and pushed on 3 Nov 2026 at the
     owner's request.
+- *Amended 2026-11-03 (P0 audit for Stationing V3, recorded as found):* the statement above is no longer true for the
+  **acceptance test environment** (`tmrkz-test`, fictional data).
+  - **What happened:** at 13:00:46 UTC a working session fast-forwarded `main` to `964edb2` and ran
+    `sh ops/test-env/up.sh`. That rebuilt the backend image, and the backend recreated at 13:01:42 UTC migrated
+    `tmrkz-test_db-data` from V15 to V17 at 13:01:50 UTC (Flyway log: "Successfully applied 2 migrations … now at
+    version v17").
+  - **Effect:** V16 adds indexes only. V17 added `execution_task.purpose` to a database with 0 execution tasks, so no
+    rows changed. No backup from before the change exists.
+  - **Still true:** no production or owner-retained TMRKZ database exists on this machine (no `tmrkz-mover` volumes),
+    and no other database was touched.
+  - **Not decided:** keeping the acceptance database at V17, or restoring it to V15 by rebuilding the fictional
+    environment, is the owner's decision.
 
 ## ADR-029 One GIS workspace: «مساحة التمركز» replaces «الخريطة والمرافق» — Accepted (2026-11-02)
 

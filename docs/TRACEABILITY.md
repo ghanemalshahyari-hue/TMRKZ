@@ -393,3 +393,55 @@ pictures). Browser script `tests/acceptance/map-basemap.mjs` (Edge, headless, te
 | Offline; no external requests | same local package URL | `map-basemap.mjs` B4 | Pass: 0 external requests, 0 console errors |
 | Overlap predicate: conflict semantics documented, identical and coincident geometry not missed, touching unchanged | `lib/footprint.ringsIntersect` | `footprint.test.ts` (24 cases × both argument orders: disjoint, crossing, contained, identical ×5, partly coincident ×2, vertex touch ×2, boundary touch ×3, near miss ×2, 1 cm overlap, concave ×2, degenerate ×2) | Pass |
 | Polygon editor, permissions, data behaviour, stationing redesign | not changed (no backend, API, database or editor change; Stationing V2 not integrated) | `stationing-fixes.mjs`, `stationing-layout.mjs`, `stationing-footprint.mjs` (S1–S10) | Pass: 7/7, 5/5, S1–S10 10/10 (S11 saves a draft: skipped) |
+
+## Stationing model V3 rev. 2 — final owner model (2026-11-03; prototype only, not integrated)
+
+- **Design:** `docs/STATIONING_MODEL_V3_AR.md`.
+- **Evidence:** `docs/audit/stationing-ux/model-v3/REPORT_AR.md`.
+  - Unit tests: `prototypes/stationing-ux/src/v3/domain.test.ts`.
+  - Browser: `v3-run.mjs`, run in Edge at four sizes.
+- **Status meaning:** "Pass" means the simulated prototype. In production every row is **Not implemented**.
+
+| Final brief § | Requirement | Prototype code | Test | Status |
+|---|---|---|---|---|
+| 1, 3 | Oracle hierarchy, levels from Oracle; hierarchy ≠ location | `fixtures.ts` extract, `ancestors`, `pathOf` | A, B | Pass |
+| 2, 4, 39 | Sites not from Oracle; four separate concepts (hierarchy, `SiteLink`, `Stationing`, `Responsibility`); external site source; Oracle change rewrites no link | `domain.ts` types, `LINK_SITE`/`UNLINK_SITE`, `CORRECT_STATIONING`, `SET_RESPONSIBILITY`, `ORACLE_SYNC` | C, X, "stationing is corrected only by its own action" | Pass (O-14, O-15 owner: a link is not occupancy) |
+| 5 | One map object per site; contextual card with stationed and linked units and their relations | `App` pins, `SiteCard` | C; pins = site records in all scenarios | Pass |
+| 6–9, 11–12 | One site; selectable scope; co-located move with one drag; consolidation; exclusion; drag-first | `presetScope`, `ScopeStep`, `FootprintEditor` (unchanged) | D–G; drag ×4 sizes; journey | Pass |
+| 10 (O-03) | Other-branch unit never moved automatically; inclusion configurable with one or more authorities; explicit and audited | `crossBranch`, `deriveRoute` CROSS_BRANCH stages | D, H | Pass (O-03b owner: shared stage with `satisfies`, or independent stage and human) |
+| 13–15 | No re-stationing distance rule; red occupied geography; configurable maximum area, blocks | `validate`, `conflictRings` | "no distance rule", conflict drop ×4 sizes, maximum-area test | Pass |
+| 16–17 | Permanent and temporary lifecycles, expiry return, extension | `activate`, `tick`, extensions | I, J, K, L | Pass |
+| 18–22 | Two deployment areas in the same request; REQUIRED/OPTIONAL; guidance bands; place, drag and resize | `validate`, `legCheck`, `bandOutline`, `DeployStep` | P, Q; place/drag/resize ×4 sizes | Pass (label O-13 owner: «البديلة») |
+| 24 (O-05) | Largest-area terrain class with shares shown | `terrainShares`, `terrainClassOf` | S | Pass (O-05b: tie decided by `terrain_class_priority`; no valid priority → blocked) |
+| 25–26 (O-06) | Allowance extends the maximum only; configurable, versioned, reasoned, referenced | `legCheck`, `PolicyVersion.reference` | T, policy lock and effective date | Pass |
+| 27, 48 (O-04) | Distance method: owner chose centre → centre after the visual comparison | `measure.ts` (`CENTROID_TO_CENTROID` policy default), `compare.ts`, `CompareCard` | W, method tests | Pass (owner decision 2026-11-03) |
+| 28–29 (O-07, O-09) | Route from the requesting unit upward; first approver configurable | `requestingUnit`, `deriveRoute` | N, "the route belongs to the requesting unit" | Pass |
+| 30 (O-10) | Hierarchy change → pause, return for reconfirmation, rebuild, history kept | `ORACLE_SYNC`, `PAUSED_HIERARCHY_CHANGED`, `routeHistory` | O, "elsewhere does not pause" | Pass (O-10b restart all; O-16 activation blocked and paused) |
+| 31 (O-08) | Occupied deployment area is a HARD block | `validate.deployConflicts`, engine `busy` | R; blocked-area interaction | Pass |
+| 33 | Returned request reuses the same request; selective invalidation | `reconcile`, revisions | M | Pass |
+| 23, 35, 37–38 | Official terrain first (not synthetic in production); street names from approved data, never fabricated | `basemap.ts` labels, `data/road-names.json` (OSM, labelled non-authoritative) | U, V; street names at z16 ×4 sizes | Prototype: OSM names labelled non-official; O-11/O-12 owner: FGIC only with permission, Copernicus with approval; offline glyph pipeline designed, not built |
+| 36 | Mode switch keeps request, selection, geometry and camera | `basemap.setMode` | layer switch ×4 sizes (`proposalUnchanged`) | Pass |
+| O-15 | A site link is not occupancy; authoritative occupancy (stationing, approved use, reservation) blocks geography | `Occupancy`, `occupancyAt`, `conflictRings` | "O-15 — a linked-only site does not occupy…" (J vs K) | Pass |
+| O-16 | Hierarchy drift before activation: activation blocked, request paused, rebuilt and re-approved | `ORACLE_SYNC`, `check(ACTIVATE)` drift guard | Y; "activation is refused on drift…" | Pass |
+| O-01 | Outbound contract: outbox/event feed with stable IDs, effective time, source/version, audit ref; no Oracle write | `OutboxEvent`, `emit`, `LinksCard` outbox table | "O-01 — the outbox carries…" | Pass (delivery and read API designed, not built) |
+| O-03b | One stage satisfies several conditions (`satisfies`), or an independent stage decided by a different human | `deriveRoute`, `crossBranch.independent` | Z; "when the policy requires independence…" | Pass |
+| O-05b | Tie for the largest share: highest tied class in the administrator's `terrain_class_priority`; tied classes without a priority block submission; decision and policy version audited | `terrainClassOf`, `PolicyValues.terrainPriority`, `terrainAudit`, policy-panel priority editor | T2; "O-05b — a tie … decided by …", "… BLOCK submission", "… written to the audit record" | Pass |
+
+## Stationing V3 production preparation (2026-11-03, P1–P3; no schema, not active)
+
+Report: `docs/audit/stationing-v3-production/STOP_GATE_REPORT.md`. Run with
+`sh ops/test-backend.sh StationingRulesTest,StationingAdaptersIT`.
+
+| Owner decision | Production code | Test | Status |
+|---|---|---|---|
+| O-07, O-09 route from the requesting unit; levels configured | `stationing/RouteDerivation` | `StationingRulesTest` routing (4) | Pass (unit) |
+| O-03, O-03b cross-branch, shared `satisfies`, independent human | `RouteDerivation.derive` / `mayDecide` | cross-branch (4) | Pass (unit) |
+| O-10, O-16 drift: pause, activation refused | `HierarchyDrift`, `HierarchySnapshot`, `OrganizationHierarchy` | drift (4); `StationingAdaptersIT` (HR-shaped fixture, not real Oracle) | Pass |
+| O-05, O-05b, O-06 terrain and ties, maximum only | `TerrainRule`, `DeploymentRules.leg` | terrain (4) | Pass (unit) |
+| O-04 centre to centre; pair rule; maximum footprint | `PostgisGeoMeasure`, `DeploymentRules` | deployment (4); `StationingAdaptersIT` PostGIS | Pass |
+| O-08, O-15 authoritative occupancy only | `OccupancyRule` | occupancy (1) | Pass (unit) |
+| O-01 outbound contract and sender | `StationingEvent`, `StationingEventSender` | outbound (5) | Pass (unit; no destination connected, no persistence) |
+| Read API scope | `StationingReadAccess` (existing `Grant.covers`) | read scope (1) | Pass (unit; endpoint not built) |
+| Policy validation | `StationingPolicy.problems` | policy (2) | Pass |
+| UI inactive | `frontend/src/lib/stationingV3.ts` | `stationingV3.test.ts` (4) | Pass (flag off; not routed) |
+

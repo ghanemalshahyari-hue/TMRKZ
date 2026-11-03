@@ -57,6 +57,25 @@ each tile drawing only the shapes that touch it — instead of one `L.imageOverl
 zoom step (measured up to 160–200 ms frames; now ≤ 14 ms). Same picture and georeferencing. The application's
 `MapCanvas` received the same fix, with a strict reader of the package structure, on 3 Nov 2026 (ADR-030).
 
+## Stationing model V3 page (3 Nov 2026; revision 2 = the owner's FINAL model, supersedes the V2 relocation candidates)
+
+`restationing.html` (`src/v3/`) is a third, separate page for the owner brief «COMPLETE STATIONING / RE-STATIONING /
+DEPLOYMENT REDESIGN» (`docs/STATIONING_MODEL_V3_AR.md`): ONE re-stationing site per request, the two DEPLOYMENT areas
+(primary + alternative) of a stationing context with radial guidance bands, a fictional Oracle TEST extract (L6–L10)
+projected by parent links, TMRKZ sites (one from a fictional external site system) separate from the hierarchy,
+selectable scope (co-located, distributed, excluded child, unrelated occupants), permanent/temporary lifecycles,
+return-for-edit with fact-based invalidation, hierarchy-derived routing, a versioned administrator policy with the
+owner's open decisions O-01…O-12 as visible switches, and two offline map modes drawn from the local GeoJSON package
+(«الشوارع» road hierarchy; «طبيعة الأرض» land cover with hillshade and contours of a GENERATED illustrative elevation
+field — the repository has no terrain data; not for production). Revision 2 adds site links separate from stationing, configurable cross-branch approvals, routing from the requesting unit, pause on hierarchy change, hard-blocked occupied deployment areas, largest-area terrain class, and offline Arabic road names (OpenStreetMap, non-authoritative; `src/v3/data/README.md`). Scenarios: `http://127.0.0.1:5194/restationing.html#s=A` … `#s=X` (W = the owner's open distance-method question).
+
+- `src/v3/domain.ts` — the pure state machine and guards; `fixtures.ts` — fictional world; `scenarios.ts` — A–S as
+  action lists; `measure.ts` — the three distance methods and band outlines; `basemap.ts` — the two map modes;
+  `App.tsx`, `cards.tsx`, `v3.css` — the page. The real polygon engine (`FootprintEditor`) is used unchanged, one
+  instance at a time (site, primary or alternative).
+- Unit tests: `src/v3/domain.test.ts` (vitest command above). Browser evidence: `docs/audit/stationing-ux/model-v3/`
+  (`v3-run.mjs`, `REPORT_AR.md`, `screenshots/`). `window.__v3` is a prototype-only test hook.
+
 ## Removing it
 
-Delete `prototypes/stationing-ux/` and `docs/audit/stationing-ux/redesign/`. Nothing else references them.
+Delete `prototypes/stationing-ux/` and `docs/audit/stationing-ux/redesign/` (and `model-v2/`, `model-v3/`). Nothing else references them.
