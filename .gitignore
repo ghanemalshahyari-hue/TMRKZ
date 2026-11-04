@@ -33,3 +33,5 @@ offline-bundle/
 ops/test-env/.generated/
 # Large terrain/map data (raw DEM, derived rasters, PMTiles): packaged with checksums, never in git
 map-data/
+# Installed offline map root of a production checkout (TMRKZ_MAP_ROOT default)
+map-runtime/

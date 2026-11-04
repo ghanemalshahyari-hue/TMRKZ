@@ -1406,3 +1406,59 @@ D12, D16, A4, A5, A6). Plan: `docs/audit/stationing-v3-production/LIFECYCLE_PLAN
 - **Evidence:** `docs/evidence/acceptance-journeys/stationing-v3/geometry/tmrkz-test/SUMMARY.md`.
 - **Still open:** real touch; production map packaging; the final production-readiness audit. Geometry editing is
   accepted on `tmrkz-test`; Stationing V3 is not production-ready.
+
+## ADR-036 Production offline map package: one verified package, a staged install, served read-only — Proposed (2026-11-05)
+
+**Context.** Owner gate «PRODUCTION MAP PACKAGING PHASE — GO»: the accepted Stationing V3 map ran from the git-ignored
+working folder `map-data/`, mounted raw into the acceptance web container. It must become one deterministic, documented
+offline package, installed and verified without internet access. The gate also requires:
+- MOVER's proven data pattern reused (PMTiles, MapLibre, local fonts, provenance and checksum manifests);
+- OpenStreetMap road names kept as unofficial labels;
+- GLO-30 kept as a DSM with its licence notices;
+- business analysis kept apart from visualization;
+- no migration, no change of Stationing behaviour.
+
+**Decision.**
+- **Format `tmrkz-offline-map-package` v1 (`ops/map-package/`).** Modelled on MOVER's `mover-offline-map-package`
+  (file list with path, sha256, size, component and required flag):
+  - one directory named after the package id, with fixed paths per component;
+  - `manifest.json` (provenance, licences, coverage, compatibility, style checksum, every file) and `SHA256SUMS`;
+  - the roles are kept apart: BUSINESS_ANALYSIS (slope), MAP_VISUALIZATION (basemap, font, style, hillshade),
+    PROVENANCE, LEGAL;
+  - the 776 MB of source tiles are an optional archival component, listed with their checksums in every package.
+- **Untrusted until verified (`package_format.py`, standard library only).** A package is refused unless:
+  - it holds only regular files at layout paths, with nothing extra, missing, linked or escaping;
+  - its sizes and manifest structure are within limits;
+  - every sha256 matches;
+  - every component's content checks out: readable PMTiles, a TrueType font, a style with local URLs only, terrain
+    matching its provenance, complete coverage, the required attribution.
+- **Deterministic build (`build_package.py`):**
+  - every input is checked against its recorded checksum first;
+  - the style is exported from the application's own `offlineStyle.ts`;
+  - the build report is copied without run timings;
+  - the archive is a sorted USTAR with a fixed owner, mode and time (`SOURCE_DATE_EPOCH`).
+- **Staged install with recovery (`install_package.py`):**
+  - plan by default; `--confirm` with the same root carries it out;
+  - verify in full, copy to staging, verify again, then rename `current` → `previous` and staging → `current`;
+  - `previous/` and `history/` (log and manifests) allow `restore-previous` without any download;
+  - dangerous or foreign roots are refused.
+- **Serving:**
+  - the map root is mounted read-only at `/srv/tmrkz-map` (`TMRKZ_MAP_ROOT`; acceptance `map-data/runtime`);
+  - nginx serves only `current/` under `/map-data/`, with ranges, GET only and links not followed;
+  - the slope analysis and source tiles are not served;
+  - the application's paths are fixed (`mapPackage.ts`), so a new package needs no new build;
+  - the map font now comes from the package.
+- **Readiness (`readiness.py`):**
+  - the package checks;
+  - the database: the dataset is loaded with the same slope product, and the policy in force names that version;
+  - the served package: the same manifest bytes, ranges, font, analysis hidden;
+  - one failure is NOT READY; an unasked section is INCOMPLETE.
+- **Air-gap bundle:** carries the tools and, with `MAP_PACKAGE`, the archive; `install.sh` installs the map before
+  starting the stack.
+- **Map display polish (same gate):** one label per logical site (MAP-2, `c6d63ad`).
+
+**Not changed.**
+- MapLibre 6.15.0, no right-to-left plugin, the map-only bracket fix;
+- the terrain classes and thresholds;
+- the database load path (`ops/terrain/load-slope.sh`, now pointed at the installed package);
+- the schema (V20).

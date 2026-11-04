@@ -18,4 +18,5 @@ export {
   type OfflineStyleOptions,
 } from './offlineStyle';
 export { ensureOfflineMapSetup } from './setup';
+export { BASEMAP_URL, HILLSHADE, MAP_DATA, MAP_FONT_URL, MAP_MANIFEST_URL } from './mapPackage';
 export { drawGlyphsLeftToRight } from './glyphDirection';

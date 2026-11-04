@@ -9,7 +9,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
 const fe = path.join(repo, 'frontend');
-const data = path.join(repo, 'map-data');
+// the installed map package (ADR-036: map-data/runtime/current, or TMRKZ_MAP_ROOT/current) when there is one, else map-data/
+const installed = path.join(process.env.TMRKZ_MAP_ROOT ? path.resolve(process.env.TMRKZ_MAP_ROOT) : path.join(repo, 'map-data', 'runtime'), 'current');
+const data = existsSync(path.join(installed, 'manifest.json')) ? installed : path.join(repo, 'map-data');
 const nm = (p) => path.join(fe, 'node_modules', p);
 const { default: react } = await import(pathToFileURL(nm('@vitejs/plugin-react/dist/index.js')).href);
 

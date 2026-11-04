@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 # Swaps the ACCEPTANCE environment's web entry point to another web image, and (for the Stationing V3 page) mounts the
-# git-ignored offline map packages under /map-data/ (ops/test-env/compose.v3-maps.yml). Only the web container changes;
+# installed offline map root map-data/runtime, whose current/ package it serves under /map-data/ (ops/test-env/
+# compose.v3-maps.yml, ADR-036). Only the web container changes;
 # the database and the backend are untouched. The previous image is kept for recovery:
 #   sh ops/test-env/upgrade-web.sh <web-image> <label>                 # e.g. mover/web:rel-<sha>-v3
 #   MAPS=0 sh ops/test-env/upgrade-web.sh mover/web:1.0.0 <label>      # recovery: the earlier image, no map mount
@@ -40,3 +41,5 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' "$P-web-1" 2>/dev/null)"
 done
 log "web healthy on $IMAGE; mounts: $(docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' "$P-web-1")"
 log "health $(curl -s -o /dev/null -w '%{http_code}' "${TMRKZ_PUBLIC_URL:-http://localhost:8088}/healthz"), map package $(curl -s -o /dev/null -w '%{http_code}' -H 'Range: bytes=0-15' "${TMRKZ_PUBLIC_URL:-http://localhost:8088}/map-data/basemap/uae.pmtiles")"
+# the installed map package the entry point now serves (ADR-036; ops/map-package/readiness.py checks it in full)
+log "served map package: $(curl -s "${TMRKZ_PUBLIC_URL:-http://localhost:8088}/map-data/manifest.json" | grep -m1 -o '"packageId": "[^"]*"' || echo 'none')"

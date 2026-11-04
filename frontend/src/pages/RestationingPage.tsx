@@ -3,7 +3,7 @@ import type { GeoJSONSource, Map as MlMap } from 'maplibre-gl';
 import { api } from '../api/client';
 import type { Ref, RestationingChecks, RestationingListItem, RestationingRequest, RestationingState } from '../api/types';
 import { Heading, Icon } from '../components/ui';
-import { OfflineMapLibre, addOverlayLayer } from '../components/map/maplibre';
+import { BASEMAP_URL, HILLSHADE, OfflineMapLibre, addOverlayLayer } from '../components/map/maplibre';
 import { LABEL_FONT, type BasemapMode } from '../components/map/maplibre/offlineStyle';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
@@ -57,8 +57,6 @@ const LEG_STATUS: Record<string, string> = {
   TERRAIN_TIE_UNRESOLVED: 'تعادل فئات أرض دون أولوية',
 };
 
-const BASEMAP = '/map-data/basemap/uae.pmtiles';
-const HILLSHADE = { url: '/map-data/terrain/glo30/visualization/hillshade.pmtiles', kind: 'raster' as const };
 const km = (m: number | null | undefined) => (m == null ? '—' : (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 2 }) + ' كم');
 
 /** The proposed site as an approver reads it: type, part count, area and, once submitted, the submission holding it. */
@@ -564,7 +562,7 @@ export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZ
   return (
     <div style={{ height }}>
       <OfflineMapLibre
-        basemapUrl={BASEMAP}
+        basemapUrl={BASEMAP_URL}
         hillshade={HILLSHADE}
         mode={mode}
         center={initial}

@@ -186,6 +186,9 @@ services:
         condition: service_started
     ports:
       - "${MOVER_HTTP_PORT:-8088}:80"
+    # The offline map root (ops/map-package/install_package.py): only its current/ package is served under /map-data/.
+    volumes:
+      - ${TMRKZ_MAP_ROOT:-./map-runtime}:/srv/tmrkz-map:ro
     networks: [internal]
 
 volumes:

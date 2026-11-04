@@ -3,7 +3,9 @@
 # compose file, scripts, map packages and documentation, with a SHA-256 manifest. Nothing in the bundle fetches
 # from the internet when installed (no npm/Maven/registry access needed in the isolated environment).
 #
-# Usage: ops/airgap-bundle.sh [output-dir]
+# Usage: [MAP_PACKAGE=map-data/packages/tmrkz-map-<v>.tar] ops/airgap-bundle.sh [output-dir]
+# MAP_PACKAGE adds the offline map package archive (ops/map-package/build_package.py --archive) and its .sha256; the
+# bundle's install.sh installs it into TMRKZ_MAP_ROOT before the stack starts (ADR-036).
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
@@ -24,6 +26,13 @@ done
 
 cp docker-compose.yml .env.example "$OUT/"
 mkdir -p "$OUT/ops/keycloak" && cp -r ops/*.sh ops/sql ops/db "$OUT/ops/" && cp -r ops/keycloak/truststores "$OUT/ops/keycloak/"
+# map package tools (standard-library Python) and the terrain loader
+cp -r ops/map-package ops/terrain "$OUT/ops/" && find "$OUT/ops" -name __pycache__ -prune -exec rm -rf {} +
+if [ -n "${MAP_PACKAGE:-}" ]; then
+  [ -f "$MAP_PACKAGE" ] && [ -f "$MAP_PACKAGE.sha256" ] || { echo "MAP_PACKAGE needs the archive and its .sha256" >&2; exit 1; }
+  (cd "$(dirname "$MAP_PACKAGE")" && sha256sum -c "$(basename "$MAP_PACKAGE").sha256")
+  mkdir -p "$OUT/map-package" && cp "$MAP_PACKAGE" "$MAP_PACKAGE.sha256" "$OUT/map-package/"
+fi
 cp -r map-packages docs handoff README.md CLAUDE.md FONT-LICENSE.txt "$OUT/"
 cat > "$OUT/install.sh" <<'EOF'
 #!/usr/bin/env sh
@@ -34,6 +43,13 @@ sha256sum -c SHA256SUMS
 for t in images/*.tar; do docker load -i "$t"; done
 sh ops/init-env.sh
 grep -q "^LDAP_URL=." .env || { echo "Fill in the directory settings (LDAP_*) in .env and the CA in ops/keycloak/truststores, then rerun."; exit 1; }
+# the offline map package, when the bundle carries one: verified in full, staged, then swapped in (ADR-036)
+for t in map-package/tmrkz-map-*.tar; do
+  [ -f "$t" ] || continue
+  root="$(grep '^TMRKZ_MAP_ROOT=' .env | cut -d= -f2-)"; root="${root:-./map-runtime}"
+  case "$root" in /*) ;; *) root="$PWD/${root#./}";; esac
+  python3 ops/map-package/install_package.py install --package "$t" --root "$root"     --expect-sha256 "$(cut -d' ' -f1 "$t.sha256")" --confirm "$root"
+done
 docker compose up -d --no-build
 echo "MOVER started — check: curl -s http://localhost:\${MOVER_HTTP_PORT:-8088}/api/v1/system/health"
 EOF

@@ -1,0 +1,44 @@
+{
+  "comment": "Inputs of the TMRKZ offline map package (ops/map-package/build_package.py). Paths are relative to the repository root; the large files are git-ignored under map-data/. Every input is checked against the checksum recorded here or in the terrain manifest before anything is packaged.",
+  "packageVersion": "2026.11.1",
+  "coverage": {
+    "name": "United Arab Emirates (mainland and islands)",
+    "bbox": [51.5, 22.6, 56.4, 26.1],
+    "basis": "approximate extent of UAE territory, where Stationing sites and deployment areas lie; the basemap and the terrain grid must both cover it"
+  },
+  "basemap": {
+    "path": "map-data/basemap/uae.pmtiles",
+    "sha256": "17de2d52a6fca1b633fbe2bbfa7265a9287980c59391274fd97427506b73028f",
+    "version": "4.14.9",
+    "obtainedFrom": "byte-identical copy of MOVER's app/NavMap/data/uae.pmtiles (MOVER docs/OFFLINE_MAP_DATA_SOURCE_OF_TRUTH.md: PMTiles v3, Protomaps schema, OSM only)",
+    "data": "OpenStreetMap and Natural Earth"
+  },
+  "fonts": [
+    {
+      "path": "frontend/public/fonts/NotoSansArabic.ttf",
+      "sha256": "146b2193f4aee343a8da5e2295255b04db547d74339a12be51763b3a0081868d",
+      "styleName": "Noto Sans Arabic Regular",
+      "covers": "Arabic and its presentation forms, Latin, Arabic-Indic and European digits, brackets and guillemets",
+      "licence": "SIL Open Font License 1.1",
+      "licenceFile": "FONT-LICENSE.txt"
+    }
+  ],
+  "terrain": {
+    "derived": "map-data/terrain/glo30",
+    "source": "map-data/terrain/glo30/source",
+    "manifest": "map-packages/terrain-glo30-2026.11/manifest.json",
+    "notice": "map-packages/terrain-glo30-2026.11/LICENSE-NOTICE.txt",
+    "datasetCode": "copernicus-glo30",
+    "grid": { "lat": [22, 26], "lon": [51, 56] }
+  },
+  "licences": {
+    "odbl": "ops/map-package/licences/ODbL-1.0-NOTICE.txt"
+  },
+  "compatibility": {
+    "application": "TMRKZ Stationing V3 offline map (RestationingPage)",
+    "servedAt": "/map-data/",
+    "mapLibre": "6.15.0",
+    "pmtiles": "4.5.0",
+    "terrainSchema": "Flyway V18 or later (terrain_dataset, terrain_slope); loaded by ops/terrain/load-slope.sh"
+  }
+}

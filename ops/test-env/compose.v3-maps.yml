@@ -1,6 +1,7 @@
-# Acceptance environment only: the git-ignored offline map packages (basemap and terrain hillshade PMTiles) served by
-# the web entry point under /map-data/ for the Stationing V3 map (ADR-033). Read-only; never a production layout.
+# Acceptance environment: the map root that ops/map-package/install_package.py fills (git-ignored map-data/runtime),
+# mounted read-only like production (docker-compose.yml, TMRKZ_MAP_ROOT). The web entry point serves only its
+# current/ package under /map-data/ (ADR-036). This file only points the mount at the acceptance root.
 services:
   web:
     volumes:
-      - ./map-data:/usr/share/nginx/map-data:ro
+      - ./map-data/runtime:/srv/tmrkz-map:ro

@@ -14,6 +14,7 @@ import {
   type LabelLanguage,
 } from './offlineStyle';
 import { ensureOfflineMapSetup } from './setup';
+import { MAP_FONT_URL } from './mapPackage';
 import { drawGlyphsLeftToRight } from './glyphDirection';
 
 /**
@@ -24,7 +25,7 @@ import { drawGlyphsLeftToRight } from './glyphDirection';
  */
 export function OfflineMapLibre({
   basemapUrl,
-  fontUrl = '/fonts/NotoSansArabic.ttf',
+  fontUrl = MAP_FONT_URL,
   hillshade = null,
   mode,
   labels = 'ar',

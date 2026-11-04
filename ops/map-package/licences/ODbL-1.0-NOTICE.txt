@@ -1,0 +1,15 @@
+OpenStreetMap data — Open Database License (ODbL) 1.0
+
+The street basemap of this package (basemap/uae.pmtiles, Protomaps Basemap 4.14.9) contains information from
+OpenStreetMap, © OpenStreetMap contributors, made available under the Open Database License (ODbL) 1.0:
+https://opendatacommons.org/licenses/odbl/1-0/
+Copyright and licence details: https://www.openstreetmap.org/copyright
+
+The vector tiles were produced by the Protomaps Basemap build (planetiler) from OpenStreetMap and Natural Earth
+(public domain, https://www.naturalearthdata.com/). Protomaps: https://protomaps.com
+
+Road and place names in this basemap come from OpenStreetMap. TMRKZ shows them as unofficial map labels: they are not
+UAE-government authoritative road names, and this package contains no official road-name layer.
+
+On the map the attribution reads «© OpenStreetMap contributors (ODbL) · Protomaps», with the note
+«أسماء الطرق من OpenStreetMap وليست أسماء رسمية».

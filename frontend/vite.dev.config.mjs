@@ -1,19 +1,25 @@
-// DEVELOPMENT SERVER ONLY (never a build): the production configuration plus the repository's git-ignored map-data/
-// (offline basemap and terrain PMTiles) served with HTTP range requests, as the production web server will once the
-// map package is released. Usage (Stationing V3 development environment, ops/test-env/README.md):
+// DEVELOPMENT SERVER ONLY (never a build): the production configuration plus the installed offline map package served
+// under /map-data/ with HTTP range requests, as the production web server does (ADR-036): TMRKZ_MAP_ROOT/current, by
+// default the git-ignored map-data/runtime/current that ops/map-package/install_package.py fills. Without an installed
+// package it falls back to map-data/ itself (sources: the basemap and terrain, no map font). Usage (Stationing V3
+// development environment, ops/test-env/README.md):
 //   MOVER_API=http://localhost:8097 VITE_STATIONING_V3=true npx vite --config vite.dev.config.mjs --host 127.0.0.1
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import base from './vite.config.ts';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'map-data');
+const data = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'map-data');
+const installed = path.join(process.env.TMRKZ_MAP_ROOT ? path.resolve(process.env.TMRKZ_MAP_ROOT) : path.join(data, 'runtime'), 'current');
+// looked up on every request: a package installed while the server runs is served at once
+const mapRoot = () => (existsSync(path.join(installed, 'manifest.json')) ? installed : data);
 
 function mapData() {
   return {
     name: 'tmrkz-dev-map-data',
     configureServer(server) {
       server.middlewares.use('/map-data', (req, res, next) => {
+        const root = mapRoot();
         const file = path.join(root, decodeURIComponent((req.url ?? '/').split('?')[0]));
         if (!file.startsWith(root + path.sep) || !existsSync(file) || !statSync(file).isFile()) return next();
         const size = statSync(file).size;
