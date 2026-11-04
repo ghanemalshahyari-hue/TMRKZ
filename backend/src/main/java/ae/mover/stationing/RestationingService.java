@@ -192,7 +192,9 @@ public class RestationingService {
                     .param("c", json.write(c.stored())).param("kind", c.kind()).param("start", Db.ts(c.start() == null ? now : c.start()))
                     .param("end", c.end() == null ? null : Db.ts(c.end())).param("reason", c.reason()).param("now", Db.ts(now))
                     .param("id", id).update();
-            audit.recordAs(ctx.actor(), "RESTATIONING_EDITED", "RESTATIONING_REQUEST", id.toString(), r.number(), c.summary(), null);
+            Map<String, Object> edited = new LinkedHashMap<>(c.summary());
+            edited.put("site", siteFacts(c));
+            audit.recordAs(ctx.actor(), "RESTATIONING_EDITED", "RESTATIONING_REQUEST", id.toString(), r.number(), edited, null);
         });
     }
 
@@ -284,6 +286,7 @@ public class RestationingService {
             detail.put("invalidated", invalidated.size());
             detail.put("carried", carried.size());
             detail.put("terrain", view.get("terrain"));
+            detail.put("site", siteFacts(r.content()));
             if (res.needsDistanceException()) {
                 // O-17: the written reason of every distance exception, with the submission it belongs to
                 detail.put("distanceExceptions", r.content().exceptions());
@@ -704,6 +707,32 @@ public class RestationingService {
         audit.recordAs(ctx.actor(), "RESTATIONING_EDITED", "RESTATIONING_REQUEST", r.id().toString(), r.number(), next.summary(), null);
     }
 
+    /**
+     * What an audit entry needs to name a site geometry without copying it: its type, number of parts, area (when valid)
+     * and a SHA-256 of its GeoJSON. The geometry itself is in the content and in every submitted revision.
+     */
+    private Map<String, Object> siteFacts(RestationingContent c) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        if (c.site() == null || c.site().geometry() == null) {
+            m.put("type", null);
+            return m;
+        }
+        Map<String, Object> g = c.site().geometry();
+        String geo = json.write(g);
+        m.put("type", g.get("type"));
+        m.put("parts", "MultiPolygon".equals(g.get("type")) && g.get("coordinates") instanceof List<?> l ? l.size() : 1);
+        m.put("shape", c.site().shape());
+        m.put("areaM2", checks.siteProblem(geo) == null ? (Object) Math.round(jdbc.sql("select ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)::geography)")
+                .param("g", geo).query(Double.class).single()) : null);
+        try {
+            m.put("sha256", java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(geo.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+        return m;
+    }
+
     /** The temporary request and its activated extensions, whose records together make the stationing. */
     List<UUID> chain(UUID request) {
         List<UUID> out = new ArrayList<>(List.of(request));
@@ -756,9 +785,10 @@ public class RestationingService {
         jdbc.sql("""
                 insert into site_geometry_version(id, site_id, version, geojson, crs, source, valid_from, geom, geometry_type, original_format,
                                                   reason, created_by)
-                values (:id, :s, 1, cast(:g as jsonb), 'EPSG:4326', :src, :now, ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326), 'Polygon',
+                values (:id, :s, 1, cast(:g as jsonb), 'EPSG:4326', :src, :now, ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326), :type,
                         'RESTATIONING', :why, :by)""")
-                .param("id", UUID.randomUUID()).param("s", site).param("g", geo).param("src", "طلب إعادة تمركز " + r.number())
+                .param("id", UUID.randomUUID()).param("s", site).param("g", geo).param("type", String.valueOf(r.content().site().geometry().get("type")))
+                .param("src", "طلب إعادة تمركز " + r.number())
                 .param("now", Db.ts(now)).param("why", r.content().reason().trim()).param("by", ctx.personId()).update();
         return site;
     }

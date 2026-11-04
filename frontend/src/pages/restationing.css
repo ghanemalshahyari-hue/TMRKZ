@@ -86,3 +86,9 @@
 /* lifecycle (ADR-034) */
 .rs-lifecycle { display: flex; flex-direction: column; gap: 8px; }
 .rs-lifecycle .link { background: none; border: 0; padding: 0; color: var(--green); font: inherit; text-decoration: underline; cursor: pointer; }
+/* proposed site editing (owner, 4 Nov 2026) */
+.rs-site-controls { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.rs-banner.blue { border-color: var(--accent); }
+.rs-parts .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.rs-site-readout { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.92em; }
+.rs-ok { color: var(--green); }

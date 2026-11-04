@@ -345,6 +345,81 @@ class RestationingWorkflowIT extends RestationingTestBase {
         assertThat(created.status()).as(created.toString()).isEqualTo(200);
     }
 
+    // ---- the proposed site geometry (owner, 4 Nov 2026) -----------------------------------------------------
+
+    @Autowired
+    RestationingChecks checks;
+
+    @Test
+    @DisplayName("Site geometry parity: PostGIS gives the client's verdict on every shared case (siteGeometryCases.json)")
+    void siteGeometryParity() throws Exception {
+        JsonNode cases = JSON.readTree(java.nio.file.Files.readString(java.nio.file.Path.of("..", "frontend", "src", "lib", "siteGeometryCases.json")))
+                .path("cases");
+        assertThat(cases.size()).isGreaterThanOrEqualTo(10);
+        for (JsonNode c : cases) {
+            String problem = checks.siteProblem(JSON.writeValueAsString(c.path("geometry")));
+            assertThat(problem == null).as(c.path("name").asText() + ": " + problem).isEqualTo(c.path("valid").asBoolean());
+            if (c.has("serverAreaM2")) {
+                double area = jdbc.sql("select ST_Area(ST_SetSRID(ST_GeomFromGeoJSON(:g), 4326)::geography)").param("g", JSON.writeValueAsString(c.path("geometry")))
+                        .query(Double.class).single();
+                assertThat(area).as("the area the client is held to: " + c.path("name").asText()).isCloseTo(c.path("serverAreaM2").asDouble(), org.assertj.core.data.Offset.offset(0.01));
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("A site of several parts: submitted, approved and activated as the same MultiPolygon; audited with its parts and area")
+    void multiPolygonSite() throws Exception {
+        Map<String, Object> c = permanent(List.of(team));
+        double lat = lat0 - 0.01;
+        c.put("site", Map.of("geometry", multi(lat, lng0), "shape", "COPY"));
+        String id = create("req", c);
+        Res sub = login("req").post("/restationing-requests/" + id + "/submit", Map.of());
+        assertThat(sub.status()).as(sub.toString()).isEqualTo(200);
+        assertThat(sub.body().path("content").path("site").path("geometry").path("coordinates").size()).isEqualTo(3);
+        decide("apSec", id, "APPROVE");
+        decide("apDept", id, "APPROVE");
+        decide("apTop", id, "APPROVE");
+        Res act = login("activator").post("/restationing-requests/" + id + "/activate", Map.of());
+        assertThat(act.status()).as(act.toString()).isEqualTo(200);
+        Map<String, Object> g = jdbc.sql("""
+                select v.geometry_type, ST_NumGeometries(v.geom) as parts, ST_Area(v.geom::geography) as area
+                  from restationing_request r join site_geometry_version v on v.site_id = r.site_id where r.id = cast(:id as uuid)""")
+                .param("id", id).query().singleRow();
+        assertThat(g.get("geometry_type")).as("the activated site is the submitted geometry, not a regenerated one").isEqualTo("MultiPolygon");
+        assertThat(((Number) g.get("parts")).intValue()).isEqualTo(3);
+        JsonNode submitted = JSON.readTree(jdbc.sql("select detail::text from audit_event where entity_id = :id and action = 'RESTATIONING_SUBMITTED'")
+                .param("id", id).query(String.class).single()).path("site");
+        assertThat(submitted.path("type").asText()).isEqualTo("MultiPolygon");
+        assertThat(submitted.path("parts").asInt()).isEqualTo(3);
+        assertThat(submitted.path("sha256").asText()).hasSize(64);
+        assertThat(Math.abs(submitted.path("areaM2").asDouble() - ((Number) g.get("area")).doubleValue())).isLessThan(2.0);
+        assertThat(jdbc.sql("select content -> 'site' -> 'geometry' ->> 'type' from restationing_revision where request_id = cast(:id as uuid)")
+                .param("id", id).query(String.class).single()).as("the submitted revision keeps the geometry").isEqualTo("MultiPolygon");
+    }
+
+    @Test
+    @DisplayName("An invalid site of several parts (two overlapping parts) is refused by the checks and at submission")
+    void invalidMultiPolygonSite() {
+        Map<String, Object> c = permanent(List.of(team));
+        double lat = lat0 - 0.01;
+        c.put("site", Map.of("geometry", Map.of("type", "MultiPolygon", "coordinates", List.of(
+                List.of(ring(lat, lng0, 0.0008)), List.of(ring(lat + 0.0004, lng0 + 0.0004, 0.0008)))), "shape", "EDITED"));
+        String id = create("req", c);
+        assertThat(problems(id)).anyMatch(x -> x.startsWith("حدود الموقع المقترح"));
+        assertThat(login("req").post("/restationing-requests/" + id + "/submit", Map.of()).status()).isEqualTo(400);
+    }
+
+    /** Three square parts around (lat, lng), far enough apart to be one valid MultiPolygon. */
+    static Map<String, Object> multi(double lat, double lng) {
+        return Map.of("type", "MultiPolygon", "coordinates", List.of(List.of(ring(lat, lng, 0.0006)), List.of(ring(lat, lng + 0.003, 0.0004)),
+                List.of(ring(lat + 0.003, lng, 0.0004))));
+    }
+
+    static List<List<Double>> ring(double lat, double lng, double h) {
+        return List.of(List.of(lng - h, lat - h), List.of(lng + h, lat - h), List.of(lng + h, lat + h), List.of(lng - h, lat + h), List.of(lng - h, lat - h));
+    }
+
     @Test
     @DisplayName("Visibility: the requester, viewers of the units and the deciders see a request; others get 404")
     void visibility() {

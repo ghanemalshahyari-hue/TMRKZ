@@ -27,19 +27,20 @@ describe('Stationing V3 preparation', () => {
     expect(Math.abs(areaM2(ring) - Math.PI * 600 * 600) / (Math.PI * 600 * 600)).toBeLessThan(0.01);
   });
 
-  it('copies only a Polygon; a MultiPolygon and a Point fall back to drawing, saying why, never reduced or synthesised', () => {
-    const at = (type: string, name: string) => ({ site: { id: name, name }, geometry: { type, coordinates: [] } });
-    const multi = at('MultiPolygon', 'الموقع 05');
+  it('copies a Polygon, and a MultiPolygon whole; a Point falls back to drawing, saying why, never synthesised', () => {
+    const at = (type: string, name: string, coordinates: unknown = []) => ({ site: { id: name, name }, geometry: { type, coordinates } });
+    const multi = at('MultiPolygon', 'الموقع 05', [[[]], [[]]]);
     const point = at('Point', 'الموقع 06');
     const poly = at('Polygon', 'الموقع 02');
-    expect(copyableBoundary([multi, poly]).copy).toBe(poly);
+    expect(copyableBoundary([poly, multi]).copy).toBe(poly);
     const m = copyableBoundary([multi]);
-    expect(m.copy).toBeNull();
-    expect(m.message).toContain('متعددة الأجزاء');
-    expect(m.message).toContain(DRAW_NEW_BOUNDARY);
+    expect(m.copy).toBe(multi);
+    expect(m.message).toContain('كاملة (2 أجزاء)');
+    expect(m.message).toContain('كل أجزاء الموقع ستنتقل معاً');
     const p = copyableBoundary([point]);
     expect(p.copy).toBeNull();
     expect(p.message).toContain('نقطةً بلا حدود');
+    expect(p.message).toContain(DRAW_NEW_BOUNDARY);
     expect(copyableBoundary([]).message).toContain('لا حدود مسجلة');
     expect(DRAW_NEW_BOUNDARY).toBe('رسم حدود جديدة');
   });

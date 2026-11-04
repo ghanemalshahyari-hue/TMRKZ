@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as MlMap } from 'maplibre-gl';
 import { api } from '../api/client';
-import type { GeoPolygon, Ref, RestationingChecks, RestationingListItem, RestationingRequest, RestationingState } from '../api/types';
+import type { GeoPolygon, Ref, RestationingChecks, RestationingListItem, RestationingRequest, RestationingState, SiteGeometry } from '../api/types';
 import { Heading, Icon } from '../components/ui';
 import { OfflineMapLibre, addOverlayLayer } from '../components/map/maplibre';
 import { LABEL_FONT, type BasemapMode } from '../components/map/maplibre/offlineStyle';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
 import { circle } from '../lib/geo';
+import { anchorOf, partsOf } from '../lib/siteGeometry';
 import { HIERARCHY_CHANGED } from '../lib/stationingV3';
 import { RestationingEditor } from './RestationingEditor';
 import './restationing.css';
@@ -519,15 +520,14 @@ function Lifecycle({ r, busy, act, onOpen }: { r: RestationingRequest; busy: boo
   );
 }
 
-const centre = (p: GeoPolygon) => {
-  const ring = p.coordinates[0].slice(0, -1);
-  return { lng: ring.reduce((a, q) => a + q[0], 0) / ring.length, lat: ring.reduce((a, q) => a + q[1], 0) / ring.length };
-};
+/** The centre a site or an area is measured from: the shared anchor of every part (a MultiPolygon included). */
+const centre = (g: SiteGeometry) => anchorOf(partsOf(g));
 
 /** The request on the offline map: current sites, the proposed site, the deployment areas and their guidance bands. */
-export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZoom = 15 }: { request: RestationingRequest; checks: RestationingChecks | null; mode: BasemapMode; height?: number; onMap?: (m: MlMap) => void; fitMaxZoom?: number }) {
+export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZoom = 15, hideSite = false, fit = true }: { request: RestationingRequest; checks: RestationingChecks | null; mode: BasemapMode; height?: number; onMap?: (m: MlMap) => void; fitMaxZoom?: number; hideSite?: boolean; fit?: boolean }) {
   const [map, setMap] = useState<MlMap | null>(null);
-  const data = useMemo(() => features(request, checks), [request, checks]);
+  // the editor draws the proposed site itself while it is being edited (hideSite); the bands still follow it
+  const data = useMemo(() => features(request, checks, hideSite), [request, checks, hideSite]);
   const initial = useMemo(() => {
     const c = request.content.site?.geometry ? centre(request.content.site.geometry) : { lng: 55.3, lat: 25.2 };
     return [c.lng, c.lat] as [number, number];
@@ -541,7 +541,7 @@ export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZ
       f.geometry.type === 'Polygon' ? (f.geometry.coordinates[0] as [number, number][]) : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates.flatMap((part) => part[0] as [number, number][]) : [],
     );
     // the camera follows a newly opened request once; editing it never moves the camera under the user's hand
-    if (pts.length && fitted.current !== request.id) {
+    if (fit && pts.length && fitted.current !== request.id) {
       fitted.current = request.id;
       const xs = pts.map((p) => p[0]);
       const ys = pts.map((p) => p[1]);
@@ -616,7 +616,7 @@ export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZ
 }
 
 type F = GeoJSON.Feature<GeoJSON.Geometry, { role: string; label?: string }>;
-function features(r: RestationingRequest, checks: RestationingChecks | null): GeoJSON.FeatureCollection<GeoJSON.Geometry, { role: string; label?: string }> {
+function features(r: RestationingRequest, checks: RestationingChecks | null, hideSite = false): GeoJSON.FeatureCollection<GeoJSON.Geometry, { role: string; label?: string }> {
   const out: F[] = [];
   const poly = (g: GeoPolygon, role: string, label?: string) => out.push({ type: 'Feature', geometry: g as GeoJSON.Polygon, properties: { role, label } });
   for (const s of r.currentSites) {
@@ -626,11 +626,12 @@ function features(r: RestationingRequest, checks: RestationingChecks | null): Ge
     }
   }
   const c = r.content;
-  if (c.site?.geometry) poly(c.site.geometry, 'SITE', 'الموقع المقترح');
+  // the proposed site as submitted: one Polygon or one MultiPolygon with every part
+  if (c.site?.geometry && !hideSite) out.push({ type: 'Feature', geometry: c.site.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: { role: 'SITE', label: 'الموقع المقترح' } });
   if (c.primary) poly(c.primary, 'PRIMARY', 'منطقة الانتشار الرئيسية');
   if (c.alternative) poly(c.alternative, 'ALTERNATIVE', 'منطقة الانتشار البديلة');
   // guidance bands: the allowed centre-to-centre distance around the reference centre — guidance only (O-04)
-  const band = (from: GeoPolygon | null | undefined, leg: 'primary' | 'alternative') => {
+  const band = (from: SiteGeometry | null | undefined, leg: 'primary' | 'alternative') => {
     const l = checks?.legs?.find((x) => x.leg === leg);
     if (!from || !l) return;
     const ctr = centre(from);

@@ -118,7 +118,7 @@ public class RestationingChecks {
             problems.add("لم يُحدد موقع إعادة التمركز.");
         } else {
             siteGeo = json.write(c.site().geometry());
-            String shapeProblem = polygonProblem(siteGeo);
+            String shapeProblem = siteProblem(siteGeo);
             if (shapeProblem != null) {
                 problems.add("حدود الموقع المقترح: " + shapeProblem);
                 siteGeo = null;
@@ -238,6 +238,37 @@ public class RestationingChecks {
     }
 
     /** A problem with a submitted polygon, or null when it is one valid polygon. */
+    /**
+     * A problem with the proposed site, or null when it is one valid Polygon or one valid MultiPolygon (a copied site of
+     * several parts stays several parts, owner decision of 4 Nov 2026). PostGIS decides validity (self-intersection, ring
+     * and component topology, too few points); a part without area is refused. Nothing is repaired.
+     */
+    public String siteProblem(String geoJson) {
+        try {
+            Map<String, Object> r = jdbc.sql("""
+                    select GeometryType(g) as t, ST_IsEmpty(g) as empty, ST_IsValid(g) as valid, ST_IsValidReason(g) as why,
+                           (select min(ST_Area((d).geom::geography)) from ST_Dump(g) d) as smallest
+                    """ + " from (select " + GEOM.formatted(":g") + " as g) x")
+                    .param("g", geoJson).query().singleRow();
+            if (!"POLYGON".equals(r.get("t")) && !"MULTIPOLYGON".equals(r.get("t"))) {
+                return "يجب أن تكون مضلعاً أو مضلعاً متعدد الأجزاء.";
+            }
+            if (Boolean.TRUE.equals(r.get("empty"))) {
+                return "هندسة فارغة.";
+            }
+            if (!Boolean.TRUE.equals(r.get("valid"))) {
+                return "متقاطعة أو غير صالحة (" + r.get("why") + ").";
+            }
+            Object smallest = r.get("smallest");
+            if (smallest == null || ((Number) smallest).doubleValue() < 1.0) {
+                return "أحد الأجزاء بلا مساحة (حلقة متدهورة).";
+            }
+            return null;
+        } catch (RuntimeException e) {
+            return "هندسة غير مقروءة.";
+        }
+    }
+
     public String polygonProblem(String geoJson) {
         try {
             Map<String, Object> r = jdbc.sql("select GeometryType(g) as t, ST_IsValid(g) as valid, ST_IsValidReason(g) as why from (select "

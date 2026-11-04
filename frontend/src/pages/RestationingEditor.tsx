@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { MapMouseEvent } from 'maplibre-gl';
+import type { Map as MlMap, MapMouseEvent } from 'maplibre-gl';
 import { api } from '../api/client';
-import type { GeoPolygon, RestationingChecks, RestationingContent, RestationingRequest, RestationingUnit } from '../api/types';
+import type { GeoPolygon, RestationingChecks, RestationingContent, RestationingRequest, RestationingUnit, SiteGeometry } from '../api/types';
+import { SiteEditor, type SiteLive } from '../components/map/maplibre';
 import { useApp } from '../lib/app';
+import { formatArea } from '../lib/footprint';
 import { DRAW_NEW_BOUNDARY, copyableBoundary } from '../lib/stationingV3';
 import { RequestMap } from './RestationingPage';
 
@@ -20,7 +22,7 @@ const centreOf = (p: GeoPolygon) => {
   const ring = p.coordinates[0].slice(0, -1);
   return { lng: ring.reduce((a, q) => a + q[0], 0) / ring.length, lat: ring.reduce((a, q) => a + q[1], 0) / ring.length };
 };
-/** The same polygon moved so its centre sits at (lng, lat): «السحب أولاً» — a copied boundary keeps its shape. */
+/** A deployment area moved so its centre sits at (lng, lat), keeping its shape (the site itself is dragged in SiteEditor). */
 const moveTo = (p: GeoPolygon, lng: number, lat: number): GeoPolygon => {
   const c = centreOf(p);
   return { type: 'Polygon', coordinates: [p.coordinates[0].map(([x, y]) => [x + lng - c.lng, y + lat - c.lat])] };
@@ -45,6 +47,15 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
   const placingRef = useRef<Placing>(null);
   placingRef.current = placing;
   const clickRef = useRef<(e: MapMouseEvent) => void>(() => undefined);
+  // the proposed site is edited on the map by SiteEditor: one grouped move, or (advanced) one vertex of one part
+  const editorRef = useRef<SiteEditor | null>(null);
+  const liveListeners = useRef(new Set<(l: SiteLive) => void>());
+  const [siteMode, setSiteMode] = useState<'move' | 'vertices'>('move');
+  const [siteOk, setSiteOk] = useState(true);
+  const contentRef = useRef(content);
+  contentRef.current = content;
+  const checksRef = useRef(checks);
+  checksRef.current = checks;
   // only the units where the actor may request (the server's own list): no general view of the organisation needed
   const [units, setUnits] = useState<RestationingUnit[]>([]);
   useEffect(() => {
@@ -57,6 +68,8 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
       setLoaded(r);
       setUnit(r.requestingUnit.id);
       setContent({ ...r.content, exceptions: r.content.exceptions ?? {}, occupants: r.content.occupants ?? {} });
+      // a reopened draft is a new editing session from the saved geometry
+      editorRef.current?.load(r.content.site?.geometry ?? null);
     });
     api.restationingChecks(requestId).then(setChecks);
   }, [requestId]);
@@ -70,6 +83,39 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
   }, [units, unit]);
 
   const set = (patch: Partial<RestationingContent>) => setContent((c) => ({ ...c, ...patch }));
+
+  /** A new site editing session: the copy, a drawn shape, or nothing (redraw chosen). Undo/redo/reset start here. */
+  const loadSite = (geometry: SiteGeometry | null, copiedFrom: string | null, shape: 'COPY' | 'DRAWN') => {
+    setContent((c) => ({ ...c, site: geometry ? { geometry, copiedFrom, shape } : null }));
+    setSiteMode('move');
+    editorRef.current?.setMode('move');
+    editorRef.current?.load(geometry);
+  };
+
+  /** A committed change on the map (drop of a drag, undo, redo, reset): the content follows; a moved copy stays COPY. */
+  const onSite = (live: SiteLive, final: boolean) => {
+    liveListeners.current.forEach((l) => l(live));
+    if (!final) return;
+    setSiteOk(live.geometry == null || live.ok);
+    setContent((c) => {
+      if (!live.geometry) return c.site ? { ...c, site: null } : c;
+      const shape = c.site?.shape === 'COPY' && live.vertexEdited ? 'EDITED' : (c.site?.shape ?? 'DRAWN');
+      return { ...c, site: { geometry: live.geometry, copiedFrom: c.site?.copiedFrom ?? null, shape } };
+    });
+  };
+
+  const onMap = (m: MlMap) => {
+    m.on('click', (e) => clickRef.current(e));
+    editorRef.current = new SiteEditor(m, { onChange: (l, f) => onSiteRef.current(l, f), maxAreaM2: () => checksRef.current?.maxFootprintAreaM2 ?? null });
+    editorRef.current.load(contentRef.current.site?.geometry ?? null);
+  };
+  const onSiteRef = useRef(onSite);
+  onSiteRef.current = onSite;
+  useEffect(() => () => editorRef.current?.destroy(), []);
+  // the server's maximum footprint arrives with the checks: validate the site against it
+  useEffect(() => {
+    editorRef.current?.refresh();
+  }, [checks?.maxFootprintAreaM2]);
   const toggle = (org: string) => set({ scope: content.scope.includes(org) ? content.scope.filter((x) => x !== org) : [...content.scope, org] });
 
   const save = async (): Promise<string | null> => {
@@ -111,11 +157,14 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
     const p = placingRef.current;
     if (!p) return;
     const { lng, lat } = e.lngLat;
+    if (p === 'site') {
+      // «رسم حدود جديدة»: a new shape where the requester clicks, then dragged or edited like a copy
+      loadSite(square(lng, lat, 150), null, 'DRAWN');
+      setPlacing(null);
+      app.toast('رُسمت حدود جديدة — اسحبها لنقلها أو عدّل رؤوسها من «تعديل الحدود»');
+      return;
+    }
     setContent((c) => {
-      if (p === 'site') {
-        const g = c.site?.geometry ? moveTo(c.site.geometry, lng, lat) : square(lng, lat, 150);
-        return { ...c, site: { geometry: g, copiedFrom: c.site?.copiedFrom ?? null, shape: c.site?.shape ?? 'DRAWN' } };
-      }
       const g = c[p] ? moveTo(c[p]!, lng, lat) : square(lng, lat, 280);
       return { ...c, [p]: g };
     });
@@ -135,9 +184,17 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
     }
     const { copy: cur, message } = copyableBoundary(r.currentSites);
     if (!cur) return app.toast(message);
-    set({ site: { geometry: cur.geometry as GeoPolygon, copiedFrom: cur.site.id, shape: 'COPY' } });
-    setPlacing('site');
+    loadSite(cur.geometry as SiteGeometry, cur.site.id, 'COPY');
+    setPlacing(null);
     app.toast(message);
+  };
+
+  /** The requester's explicit choice to draw instead of the copy: never taken silently. */
+  const redraw = () => {
+    if (content.site && !window.confirm('ستُستبدل حدود الموقع المقترح الحالية برسم جديد. متابعة؟')) return;
+    if (content.site) loadSite(null, null, 'DRAWN');
+    setPlacing('site');
+    app.toast(content.site ? 'أُلغيت الحدود السابقة بطلبك — انقر على الخريطة لرسم الحدود الجديدة' : 'انقر على الخريطة لرسم الحدود الجديدة');
   };
 
   const preview: RestationingRequest = {
@@ -187,8 +244,8 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
           <legend>الموقع المقترح (موقع واحد) ومنطقتا الانتشار</legend>
           <div className="rs-tools">
             <button className="button" onClick={copyCurrent}>نسخ حدود الموقع الحالي</button>
-            <button className={'button' + (placing === 'site' ? ' primary' : '')} onClick={() => setPlacing(placing === 'site' ? null : 'site')}>
-              {content.site ? 'نقل الموقع المقترح' : DRAW_NEW_BOUNDARY}
+            <button className={'button' + (placing === 'site' ? ' primary' : '')} onClick={redraw}>
+              {DRAW_NEW_BOUNDARY}
             </button>
             <button className={'button' + (placing === 'primary' ? ' primary' : '')} onClick={() => setPlacing(placing === 'primary' ? null : 'primary')}>
               منطقة الانتشار الرئيسية
@@ -198,8 +255,20 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
             </button>
           </div>
           <small className="muted">
-            {placing ? 'انقر على الخريطة لوضع «' + { site: 'الموقع المقترح', primary: 'منطقة الانتشار الرئيسية', alternative: 'منطقة الانتشار البديلة' }[placing] + '»؛ النقر مجدداً ينقلها بشكلها.' : 'اختر ما تضعه ثم انقر على الخريطة. المسافة إلى الموقع الحالي للعلم فقط.'}
+            {placing ? 'انقر على الخريطة لوضع «' + { site: 'الموقع المقترح', primary: 'منطقة الانتشار الرئيسية', alternative: 'منطقة الانتشار البديلة' }[placing] + '»؛ النقر مجدداً ينقلها بشكلها.' : 'الموقع المقترح يُسحب على الخريطة؛ منطقتا الانتشار توضعان بالنقر. المسافة إلى الموقع الحالي للعلم فقط.'}
           </small>
+          {content.site && (
+            <SiteControls
+              editor={editorRef}
+              listeners={liveListeners}
+              mode={siteMode}
+              setMode={(m) => {
+                setSiteMode(m);
+                editorRef.current?.setMode(m);
+              }}
+              maxAreaM2={checks?.maxFootprintAreaM2 ?? null}
+            />
+          )}
           {(['primary', 'alternative'] as const).map((k) =>
             leg(k)?.status === 'NEEDS_EXCEPTION' ? (
               <label key={k}>
@@ -215,7 +284,7 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
         </label>
         <div className="rs-tools">
           <button className="button" disabled={busy} onClick={save}>حفظ المسودة والفحص</button>
-          <button className="button primary" disabled={busy || (checks != null && !checks.ok)} onClick={submit}>إرسال للاعتماد</button>
+          <button className="button primary" disabled={busy || !siteOk || (checks != null && !checks.ok)} onClick={submit}>إرسال للاعتماد</button>
           <button className="button" onClick={() => onClose(id ?? undefined)}>إغلاق</button>
         </div>
         {checks && (
@@ -234,8 +303,71 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
       </div>
       <div className="card rs-map-card">
         <div className={placing ? 'rs-placing' : ''}>
-          <RequestMap request={preview} checks={checks} mode="street" height={640} fitMaxZoom={11.5} onMap={(m) => m.on('click', (e) => clickRef.current(e))} />
+          <RequestMap request={preview} checks={checks} mode="street" height={640} fitMaxZoom={11.5} hideSite fit={false} onMap={onMap} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The proposed site's controls and live readout: grouped move or (advanced) «تعديل الحدود», undo/redo/reset, the parts,
+ * the active vertex, the area against the configured maximum and the validity — updated on every frame of a drag from
+ * the editor, without re-rendering the map or the form.
+ */
+function SiteControls({ editor, listeners, mode, setMode, maxAreaM2 }: {
+  editor: React.RefObject<SiteEditor | null>;
+  listeners: React.RefObject<Set<(l: SiteLive) => void>>;
+  mode: 'move' | 'vertices';
+  setMode: (m: 'move' | 'vertices') => void;
+  maxAreaM2: number | null;
+}) {
+  const [live, setLive] = useState<SiteLive | null>(null);
+  useEffect(() => {
+    const set = listeners.current;
+    set.add(setLive);
+    editor.current?.refresh();
+    return () => {
+      set.delete(setLive);
+    };
+  }, [editor, listeners]);
+  if (!live?.geometry) return null;
+  const many = live.parts > 1;
+  return (
+    <div className="rs-site-controls">
+      {many && mode === 'move' && <div className="rs-banner blue">كل أجزاء الموقع ستنتقل معاً — اسحب أي جزء ({live.parts} أجزاء)</div>}
+      {mode === 'vertices' && (
+        <div className="rs-banner orange">
+          {many ? 'اختر جزءاً ثم اسحب رأساً من رؤوسه؛ الأجزاء الأخرى لا تتغير.' : 'اسحب رأساً من رؤوس الحدود.'} لا تُضاف رؤوس ولا تُحذف.
+        </div>
+      )}
+      <div className="rs-tools">
+        <button className={'button' + (mode === 'vertices' ? ' primary' : '')} onClick={() => setMode(mode === 'vertices' ? 'move' : 'vertices')}>
+          {mode === 'vertices' ? 'إنهاء تعديل الحدود' : 'تعديل الحدود'}
+        </button>
+        <button className="button" disabled={!live.canUndo} onClick={() => editor.current?.undo()}>تراجع</button>
+        <button className="button" disabled={!live.canRedo} onClick={() => editor.current?.redo()}>إعادة</button>
+        <button className="button" onClick={() => editor.current?.reset()}>استعادة البداية</button>
+      </div>
+      {many && mode === 'vertices' && (
+        <div className="rs-tools rs-parts">
+          {live.partAreas.map((a, i) => (
+            <button key={i} className={'chip' + (i === live.activePart ? ' active' : '')} onClick={() => editor.current?.selectPart(i)}>
+              الجزء {i + 1} · {formatArea(a)}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="rs-site-readout" data-testid="site-readout">
+        <span>المساحة: {formatArea(live.areaM2)}{maxAreaM2 != null && <> من حد {formatArea(maxAreaM2)}</>}</span>
+        <span>الأجزاء: {live.parts}</span>
+        {mode === 'vertices' && live.activePart != null && (
+          <span>
+            الجزء النشط: {live.activePart + 1}
+            {live.activeVertex != null && <> · الرأس {live.activeVertex + 1}</>}
+          </span>
+        )}
+        <span className={live.ok ? 'rs-ok' : 'rs-bad'} data-testid="site-validity">{live.ok ? 'الحدود صالحة' : 'الحدود غير صالحة: ' + live.problems.join('، ')}</span>
       </div>
     </div>
   );

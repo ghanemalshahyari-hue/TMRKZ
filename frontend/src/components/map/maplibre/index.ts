@@ -1,5 +1,6 @@
 // Offline MapLibre background for the Stationing V3 map. Not imported by any page yet (owner decision 5, 4 Nov 2026).
 export { OfflineMapLibre, addOverlayLayer } from './OfflineMapLibre';
+export { SiteEditor, type SiteLive } from './SiteEditor';
 export {
   LABEL_FONT,
   MODE_NOTICE,

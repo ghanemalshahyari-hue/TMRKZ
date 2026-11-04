@@ -972,6 +972,9 @@ export type AuthzStatus = {
 // ---- Stationing V3 re-stationing requests (ADR-033) ----------------------------------------------------------------
 
 export type GeoPolygon = { type: 'Polygon'; coordinates: number[][][] };
+export type GeoMultiPolygon = { type: 'MultiPolygon'; coordinates: number[][][][] };
+/** The proposed site: one Polygon, or one MultiPolygon when a site of several parts is copied whole (owner, 4 Nov 2026). */
+export type SiteGeometry = GeoPolygon | GeoMultiPolygon;
 export type RestationingState =
   | 'DRAFT'
   | 'UNDER_REVIEW'
@@ -1011,7 +1014,7 @@ export type RestationingContent = {
   end?: string | null;
   scope: string[];
   occupants?: Record<string, 'EXCLUDED' | 'INCLUDED' | 'SEPARATE'>;
-  site: { geometry: GeoPolygon; copiedFrom?: string | null; shape?: 'COPY' | 'EDITED' | 'DRAWN' | null } | null;
+  site: { geometry: SiteGeometry; copiedFrom?: string | null; shape?: 'COPY' | 'EDITED' | 'DRAWN' | null } | null;
   primary: GeoPolygon | null;
   alternative: GeoPolygon | null;
   exceptions?: Record<string, string>;
