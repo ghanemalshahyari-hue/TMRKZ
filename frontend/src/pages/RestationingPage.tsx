@@ -7,8 +7,9 @@ import { OfflineMapLibre, addOverlayLayer } from '../components/map/maplibre';
 import { LABEL_FONT, type BasemapMode } from '../components/map/maplibre/offlineStyle';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
+import { formatArea } from '../lib/footprint';
 import { circle } from '../lib/geo';
-import { anchorOf, partsOf } from '../lib/siteGeometry';
+import { anchorOf, partsOf, siteArea } from '../lib/siteGeometry';
 import { HIERARCHY_CHANGED } from '../lib/stationingV3';
 import { RestationingEditor } from './RestationingEditor';
 import './restationing.css';
@@ -59,6 +60,16 @@ const LEG_STATUS: Record<string, string> = {
 const BASEMAP = '/map-data/basemap/uae.pmtiles';
 const HILLSHADE = { url: '/map-data/terrain/glo30/visualization/hillshade.pmtiles', kind: 'raster' as const };
 const km = (m: number | null | undefined) => (m == null ? '—' : (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 2 }) + ' كم');
+
+/** The proposed site as an approver reads it: type, part count, area and, once submitted, the submission holding it. */
+function proposedSite(r: RestationingRequest): string {
+  const g = r.content.site?.geometry;
+  if (!g) return '—';
+  const parts = partsOf(g);
+  const held = r.state !== 'DRAFT' && r.state !== 'RETURNED_FOR_CHANGES' ? r.revisions.at(-1)?.n : undefined;
+  return [g.type === 'MultiPolygon' ? 'مضلع متعدد' : 'مضلع', parts.length === 1 ? 'جزء واحد' : `${parts.length} أجزاء`,
+    formatArea(siteArea(parts)), ...(held ? [`الإرسال #${held}`] : [])].join(' · ');
+}
 
 export function StatePill({ state }: { state: RestationingState }) {
   const [label, tone] = RS_STATE[state] ?? [state, ''];
@@ -213,6 +224,10 @@ function RequestDetail({ id, onChanged, onEdit, onOpen }: { id: string; onChange
           <div>
             <dt>من</dt>
             <dd>{r.currentSites.map((s) => s.site.name).join('، ') || '—'}</dd>
+          </div>
+          <div>
+            <dt>الموقع المقترح</dt>
+            <dd data-testid="proposed-site">{proposedSite(r)}</dd>
           </div>
           <div>
             <dt>{c.kind === 'TEMPORARY' ? 'المدة' : 'النفاذ'}</dt>
