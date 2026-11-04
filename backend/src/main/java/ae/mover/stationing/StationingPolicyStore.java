@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import ae.mover.access.AccessContext;
+import ae.mover.access.Grant;
 import ae.mover.access.Permission;
 import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
@@ -130,8 +131,16 @@ public class StationingPolicyStore {
             m.put("new", c.current());
             return m;
         }).toList());
-        audit.recordAs(ctx.actor(), "STATIONING_POLICY_PUBLISHED", "STATIONING_POLICY", id.toString(), "النسخة " + version,
-                detail, saved.reason());
+        // who published, in which capacity: the stable person and the whole-organisation CONFIGURE grant that allowed it
+        Map<String, Object> actor = new LinkedHashMap<>();
+        actor.put("personId", ctx.personId().toString());
+        actor.put("employeeNo", jdbc.sql("select employee_no from person where id = :id").param("id", ctx.personId())
+                .query(String.class).optional().orElse(null));
+        actor.put("username", ctx.actor().username());
+        detail.put("actor", actor);
+        Grant by = ctx.grants().stream().filter(g -> g.has(Permission.CONFIGURE) && g.isAll()).findFirst().orElse(null);
+        audit.record(ctx.actor(), by == null ? AuditService.Capacity.NONE : new AuditService.Capacity(by.roleName(), by.orgName(), by.delegationId()),
+                "STATIONING_POLICY_PUBLISHED", "STATIONING_POLICY", id.toString(), "النسخة " + version, detail, saved.reason(), null);
         return saved;
     }
 

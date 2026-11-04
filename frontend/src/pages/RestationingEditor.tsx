@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MapMouseEvent } from 'maplibre-gl';
 import { api } from '../api/client';
-import type { GeoPolygon, RestationingChecks, RestationingContent, RestationingRequest } from '../api/types';
-import { useApp, type FlatOrg } from '../lib/app';
+import type { GeoPolygon, RestationingChecks, RestationingContent, RestationingRequest, RestationingUnit } from '../api/types';
+import { useApp } from '../lib/app';
 import { DRAW_NEW_BOUNDARY, copyableBoundary } from '../lib/stationingV3';
 import { RequestMap } from './RestationingPage';
 
@@ -45,6 +45,11 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
   const placingRef = useRef<Placing>(null);
   placingRef.current = placing;
   const clickRef = useRef<(e: MapMouseEvent) => void>(() => undefined);
+  // only the units where the actor may request (the server's own list): no general view of the organisation needed
+  const [units, setUnits] = useState<RestationingUnit[]>([]);
+  useEffect(() => {
+    api.restationingUnits().then(setUnits).catch(() => setUnits([]));
+  }, []);
 
   useEffect(() => {
     if (!requestId) return;
@@ -57,12 +62,12 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
   }, [requestId]);
 
   const branch = useMemo(() => {
-    const i = app.orgs.findIndex((o) => o.id === unit);
-    if (i < 0) return [] as FlatOrg[];
-    const out = [app.orgs[i]];
-    for (let j = i + 1; j < app.orgs.length && app.orgs[j].depth > app.orgs[i].depth; j++) out.push(app.orgs[j]);
+    const i = units.findIndex((o) => o.id === unit);
+    if (i < 0) return [] as RestationingUnit[];
+    const out = [units[i]];
+    for (let j = i + 1; j < units.length && units[j].depth > units[i].depth; j++) out.push(units[j]);
     return out;
-  }, [app.orgs, unit]);
+  }, [units, unit]);
 
   const set = (patch: Partial<RestationingContent>) => setContent((c) => ({ ...c, ...patch }));
   const toggle = (org: string) => set({ scope: content.scope.includes(org) ? content.scope.filter((x) => x !== org) : [...content.scope, org] });
@@ -153,7 +158,7 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
           الوحدة الطالبة (المسار يبدأ منها)
           <select value={unit} disabled={!!loaded && loaded.state !== 'DRAFT'} onChange={(e) => { setUnit(e.target.value); set({ scope: [] }); }}>
             <option value="">— اختر —</option>
-            {app.orgs.map((o) => (
+            {units.map((o) => (
               <option key={o.id} value={o.id}>{'  '.repeat(o.depth) + o.name}</option>
             ))}
           </select>

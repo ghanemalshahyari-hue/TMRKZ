@@ -1004,6 +1004,8 @@ export type RestationingStage = {
   decidedBy: Ref | null;
   decidedAt: string | null;
 };
+/** A unit the actor may request a re-stationing for (`GET /restationing-requests/units`), depth-ordered. */
+export type RestationingUnit = { id: string; code: string; name: string; parentId: string | null; depth: number };
 export type RestationingListItem = {
   id: string;
   number: string;
@@ -1014,6 +1016,7 @@ export type RestationingListItem = {
   units: number;
   updatedAt: string;
   currentStage?: string;
+  currentStageUnit?: string | null;
   mine: boolean;
 };
 export type RestationingRevision = {

@@ -367,6 +367,22 @@ class RestationingWorkflowIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("Requestable units: exactly where «طلب إعادة التمركز» acts, depth-ordered; enough to create without a view right")
+    void requestableUnits() {
+        person("reqOnly", role("RSONLY", "ORGANIZATION", "CREATE_RESTATIONING"), sec);
+        JsonNode units = login("reqOnly").get("/restationing-requests/units").body();
+        assertThat(units.size()).isEqualTo(2);
+        assertThat(units.get(0).path("id").asText()).isEqualTo(sec.toString());
+        assertThat(units.get(0).path("depth").asInt()).isZero();
+        assertThat(units.get(1).path("id").asText()).isEqualTo(team.toString());
+        assertThat(units.get(1).path("depth").asInt()).isEqualTo(1);
+        assertThat(login("apSec").get("/restationing-requests/units").body().size()).as("a seat alone requests nothing").isZero();
+        assertThat(login("reqOnly").get("/organizations/tree").status()).as("the general tree stays a view right").isEqualTo(403);
+        Res created = login("reqOnly").post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "content", permanent(List.of(team))));
+        assertThat(created.status()).as(created.toString()).isEqualTo(200);
+    }
+
+    @Test
     @DisplayName("Visibility: the requester, viewers of the units and the deciders see a request; others get 404")
     void visibility() {
         String id = create("req", permanent(List.of(sec)));

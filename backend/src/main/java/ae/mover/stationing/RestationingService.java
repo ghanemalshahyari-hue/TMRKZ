@@ -690,6 +690,49 @@ public class RestationingService {
 
     // ---- reads ----------------------------------------------------------------------------------------------
 
+    /**
+     * The units the actor may request a re-stationing for — the editor's choices — as a depth-ordered tree: exactly
+     * where «طلب إعادة التمركز» acts (subtrees of the actor's grants, confirmed like every other check). Nothing else of
+     * the organisation is disclosed, so a requester needs no general view right; without the right the list is empty.
+     */
+    public List<Map<String, Object>> requestableUnits(AccessContext ctx) {
+        Set<UUID> ids = new HashSet<>();
+        for (Grant g : ctx.grants()) {
+            if (!g.has(Permission.CREATE_RESTATIONING)) {
+                continue;
+            }
+            if (g.isAll()) {
+                ids.addAll(jdbc.sql("select id from organization").query(UUID.class).list());
+            } else if (!g.orgSubtree().isEmpty()) {
+                ids.addAll(g.orgSubtree());
+            } else if (g.orgId() != null) {
+                ids.add(g.orgId());
+            }
+        }
+        ids.removeIf(u -> !ctx.canFor(Permission.CREATE_RESTATIONING, u));
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.sql("""
+                with recursive t(id, code, name, parent_id, depth, path) as (
+                  select o.id, o.code, o.name, o.parent_id, 0, array[o.name::text] from organization o
+                   where o.id = any(string_to_array(:ids, ',')::uuid[])
+                     and (o.parent_id is null or not o.parent_id = any(string_to_array(:ids, ',')::uuid[]))
+                  union all
+                  select o.id, o.code, o.name, o.parent_id, t.depth + 1, t.path || o.name::text from organization o join t on o.parent_id = t.id
+                   where o.id = any(string_to_array(:ids, ',')::uuid[]))
+                select id, code, name, parent_id, depth from t order by path""")
+                .param("ids", Db.ids(ids)).query((rs, n) -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", rs.getString("id"));
+                    m.put("code", rs.getString("code"));
+                    m.put("name", rs.getString("name"));
+                    m.put("parentId", rs.getString("parent_id"));
+                    m.put("depth", rs.getInt("depth"));
+                    return m;
+                }).list();
+    }
+
     public List<Map<String, Object>> list(AccessContext ctx, String state) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (UUID id : jdbc.sql("select id from restationing_request where (cast(:st as text) is null or state = cast(:st as text)) order by created_at desc limit 500")
@@ -708,7 +751,10 @@ public class RestationingService {
             m.put("units", r.content().scope().size());
             m.put("updatedAt", r.updatedAt().toString());
             List<StageRow> route = stages(id, r.routeNo());
-            route.stream().filter(x -> !x.marked()).findFirst().ifPresent(x -> m.put("currentStage", x.label()));
+            route.stream().filter(x -> !x.marked()).findFirst().ifPresent(x -> {
+                m.put("currentStage", x.label());
+                m.put("currentStageUnit", x.unit() == null ? null : ref(x.unit()).get("name"));
+            });
             m.put("mine", r.requester().equals(ctx.personId()));
             out.add(m);
         }

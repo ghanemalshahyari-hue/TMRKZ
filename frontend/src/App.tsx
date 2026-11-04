@@ -119,10 +119,15 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
   }, [navOpen]);
 
   // reference data shared by screens; reloaded after mutations and identity changes
+  // each list is asked for only with a right its endpoint accepts (a user holding one single action asks for none)
   useEffect(() => {
-    api.sites().then(setSites).catch(() => setSites([]));
-    api.requestTypes().then(setRequestTypes).catch(() => setRequestTypes([]));
-    api.orgTree().then(setOrgTree).catch(() => setOrgTree([]));
+    const any = (...p: Permission[]) => p.some((x) => me.permissions.includes(x));
+    if (any('VIEW', 'VIEW_SUMMARY', 'MANAGE_FACILITIES')) api.sites().then(setSites).catch(() => setSites([]));
+    else setSites([]);
+    if (any('VIEW', 'VIEW_SUMMARY', 'CREATE', 'CONFIGURE')) api.requestTypes().then(setRequestTypes).catch(() => setRequestTypes([]));
+    else setRequestTypes([]);
+    if (any('VIEW', 'VIEW_SUMMARY', 'MANAGE_ACCESS', 'MANAGE_FACILITIES', 'CONFIGURE')) api.orgTree().then(setOrgTree).catch(() => setOrgTree([]));
+    else setOrgTree([]);
     api
       .policy()
       .then((p) => setSettings(p.settings))

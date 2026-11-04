@@ -9,6 +9,7 @@ import type {
   RestationingContent,
   RestationingListItem,
   RestationingRequest,
+  RestationingUnit,
   TaskCandidate,
   TaskRouting,
   AccessExplain,
@@ -478,6 +479,7 @@ export const api = {
   // Stationing V3 re-stationing requests (ADR-033)
   restationingRequests: (state?: string) => get<RestationingListItem[]>('/restationing-requests' + query({ state })),
   restationingRequest: (id: string) => get<RestationingRequest>(`/restationing-requests/${id}`),
+  restationingUnits: () => get<RestationingUnit[]>('/restationing-requests/units'),
   createRestationing: (requestingUnitId: string, content: RestationingContent) =>
     post<RestationingRequest>('/restationing-requests', { requestingUnitId, content }),
   editRestationing: (id: string, content: RestationingContent) => put<RestationingRequest>(`/restationing-requests/${id}/content`, content),

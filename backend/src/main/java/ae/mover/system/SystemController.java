@@ -130,8 +130,12 @@ public class SystemController {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("id", rs.getLong("id"));
                     m.put("at", Db.iso(rs, "occurred_at"));
-                    m.put("actor", rs.getString("actor_name") == null ? null : mapOf("name", rs.getString("actor_name"),
-                            "role", rs.getString("actor_role"), "org", rs.getString("actor_org")));
+                    Map<String, Object> who = rs.getString("actor_name") == null ? null : mapOf("name", rs.getString("actor_name"),
+                            "role", rs.getString("actor_role"), "org", rs.getString("actor_org"));
+                    if (who != null) {
+                        who.put("personId", rs.getString("actor_person_id"));
+                    }
+                    m.put("actor", who);
                     m.put("action", rs.getString("action"));
                     m.put("actionLabel", AuditService.LABELS.getOrDefault(rs.getString("action"), rs.getString("action")));
                     m.put("entityType", rs.getString("entity_type"));

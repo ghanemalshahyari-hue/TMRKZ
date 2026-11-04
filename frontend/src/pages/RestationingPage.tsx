@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as MlMap } from 'maplibre-gl';
 import { api } from '../api/client';
-import type { GeoPolygon, RestationingChecks, RestationingListItem, RestationingRequest, RestationingState } from '../api/types';
+import type { GeoPolygon, Ref, RestationingChecks, RestationingListItem, RestationingRequest, RestationingState } from '../api/types';
 import { Heading, Icon } from '../components/ui';
 import { OfflineMapLibre, addOverlayLayer } from '../components/map/maplibre';
 import { LABEL_FONT, type BasemapMode } from '../components/map/maplibre/offlineStyle';
@@ -50,6 +50,12 @@ export function StatePill({ state }: { state: RestationingState }) {
 }
 
 /** «إعادة التمركز»: the re-stationing requests the server lets this person see, one at a time on the offline map. */
+/** The unit of a stage, shown apart from the stage's fixed label (owner, 4 Nov 2026); the exception stage acts for the requesting unit. */
+function StageUnit({ unit, kind }: { unit: Ref | null; kind: string }) {
+  if (unit) return <small className="rs-stage-unit">الجهة: {unit.name}</small>;
+  return kind === 'EXCEPTION' ? <small className="rs-stage-unit">يقررها صاحب «اعتماد استثناء مسافة الانتشار»</small> : null;
+}
+
 export function RestationingPage() {
   const app = useApp();
   const [items, setItems] = useState<RestationingListItem[] | null>(null);
@@ -105,7 +111,7 @@ export function RestationingPage() {
                   <StatePill state={r.state} />
                 </span>
                 <span>{r.requestingUnit.name} · {r.kind === 'TEMPORARY' ? 'مؤقت' : 'دائم'} · {r.units} وحدة</span>
-                {r.currentStage && <small>المرحلة الحالية: {r.currentStage}</small>}
+                {r.currentStage && <small>المرحلة الحالية: {r.currentStage}{r.currentStageUnit ? ' · ' + r.currentStageUnit : ''}</small>}
                 <small>
                   {r.requester.name}
                   {r.mine ? ' (أنت)' : ''} · {fullDate(r.updatedAt)}
@@ -232,6 +238,7 @@ function RequestDetail({ id, onChanged, onEdit }: { id: string; onChanged: () =>
                 {checks.route.map((s) => (
                   <li key={s.key}>
                     <b>{s.label}</b>
+                    <StageUnit unit={s.unit} kind={s.kind} />
                     <small>يستوفي: {s.satisfies.join('، ')}</small>
                   </li>
                 ))}
@@ -242,6 +249,7 @@ function RequestDetail({ id, onChanged, onEdit }: { id: string; onChanged: () =>
             {r.route.map((s) => (
               <li key={s.key} className={s.mark ? 'done' : s.current ? 'current' : ''}>
                 <b>{s.label}</b>
+                <StageUnit unit={s.unit} kind={s.kind} />
                 <small>يستوفي: {s.satisfies.join('، ')}</small>
                 {s.mark && (
                   <small>
@@ -260,6 +268,7 @@ function RequestDetail({ id, onChanged, onEdit }: { id: string; onChanged: () =>
                   {p.stages.map((s) => (
                     <li key={s.key} className={s.mark ? 'done' : ''}>
                       <b>{s.label}</b>
+                      <StageUnit unit={s.unit} kind={s.kind} />
                       {s.mark && <small>اعتمدها {s.decidedBy?.name}</small>}
                     </li>
                   ))}
@@ -390,7 +399,9 @@ export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZ
   useEffect(() => {
     if (!map) return;
     (map.getSource('rs') as GeoJSONSource | undefined)?.setData(data);
-    const pts = data.features.flatMap((f) => (f.geometry.type === 'Polygon' ? (f.geometry.coordinates[0] as [number, number][]) : []));
+    const pts = data.features.flatMap((f) =>
+      f.geometry.type === 'Polygon' ? (f.geometry.coordinates[0] as [number, number][]) : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates.flatMap((part) => part[0] as [number, number][]) : [],
+    );
     // the camera follows a newly opened request once; editing it never moves the camera under the user's hand
     if (pts.length && fitted.current !== request.id) {
       fitted.current = request.id;
@@ -439,7 +450,19 @@ export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZ
               type: 'symbol',
               source: 'rs',
               filter: ['has', 'label'],
-              layout: { 'text-field': ['get', 'label'], 'text-font': [LABEL_FONT], 'text-size': 13, 'text-allow-overlap': true },
+              // labels never overlap (owner, 4 Nov 2026): each may move around its polygon; when none fits at this zoom the
+              // least important waits for a closer zoom (proposed site first, then the primary, alternative, current site)
+              layout: {
+                'text-field': ['get', 'label'],
+                'text-font': [LABEL_FONT],
+                'text-size': 13,
+                'text-allow-overlap': false,
+                'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
+                'text-radial-offset': 0.9,
+                'text-justify': 'auto',
+                'text-padding': 4,
+                'symbol-sort-key': ['match', ['get', 'role'], 'SITE', 0, 'PRIMARY', 1, 'ALTERNATIVE', 2, 'CURRENT', 3, 4],
+              },
               paint: { 'text-color': '#1d2733', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
             },
             'top',
@@ -457,7 +480,10 @@ function features(r: RestationingRequest, checks: RestationingChecks | null): Ge
   const out: F[] = [];
   const poly = (g: GeoPolygon, role: string, label?: string) => out.push({ type: 'Feature', geometry: g as GeoJSON.Polygon, properties: { role, label } });
   for (const s of r.currentSites) {
-    if (s.geometry?.type === 'Polygon') poly(s.geometry as GeoPolygon, 'CURRENT', s.site.name + ' (الحالي)');
+    // a MultiPolygon current site is drawn with every part (owner, 4 Nov 2026); a Point has no footprint to draw
+    if (s.geometry?.type === 'Polygon' || s.geometry?.type === 'MultiPolygon') {
+      out.push({ type: 'Feature', geometry: s.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: { role: 'CURRENT', label: s.site.name + ' (الحالي)' } });
+    }
   }
   const c = r.content;
   if (c.site?.geometry) poly(c.site.geometry, 'SITE', 'الموقع المقترح');

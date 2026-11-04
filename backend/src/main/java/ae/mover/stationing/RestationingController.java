@@ -48,6 +48,11 @@ public class RestationingController {
         return service.view(ctx, id, clock.instant());
     }
 
+    @GetMapping("/units")
+    public List<Map<String, Object>> units(Actor actor) {
+        return service.requestableUnits(access.context(actor));
+    }
+
     @GetMapping("/{id}")
     public Map<String, Object> get(Actor actor, @PathVariable UUID id) {
         return service.view(access.context(actor), id, clock.instant());

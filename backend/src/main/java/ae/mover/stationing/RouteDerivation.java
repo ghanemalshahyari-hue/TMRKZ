@@ -66,7 +66,7 @@ public final class RouteDerivation {
             RoutingLevel cfg = u.level() == null ? null
                     : routing.levels().stream().filter(l -> l.level() == u.level()).findFirst().orElse(null);
             if (cfg != null && cfg.approves()) {
-                stages.add(new RouteStage("H:" + u.id(), u.id(), Kind.HIERARCHY, cfg.label() + " — " + u.name(),
+                stages.add(new RouteStage("H:" + u.id(), u.id(), Kind.HIERARCHY, cfg.label(),
                         new ArrayList<>(List.of(new Requirement("HIERARCHY", "اعتماد هرمي"))), cfg.finalStage(),
                         cfg.finalStage() ? EnumSet.allOf(Fact.class) : copy(cfg.dependsOn()), null));
             }

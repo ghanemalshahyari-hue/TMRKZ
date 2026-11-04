@@ -140,6 +140,20 @@ class StationingFoundationIT extends IntegrationTest {
         assertThat(change.path("previous").asDouble()).isEqualTo(200_000);
         assertThat(change.path("new").asDouble()).isEqualTo(150_000);
         assertThat(audit.path("detail").path("effectiveFrom").asText()).startsWith(later.toString().substring(0, 16));
+        // the owner's audit fields (4 Nov 2026): stable identity, role, organisation, time, version and reference
+        Map<String, Object> row = jdbc.sql("""
+                select actor_person_id, actor_role, actor_org, occurred_at from audit_event
+                 where entity_type = 'STATIONING_POLICY' and action = 'STATIONING_POLICY_PUBLISHED' order by id desc limit 1""")
+                .query().singleRow();
+        UUID publisher = jdbc.sql("select id from person where username = :u").param("u", "sysadmin-" + sfx).query(UUID.class).single();
+        assertThat(row.get("actor_person_id")).isEqualTo(publisher);
+        assertThat((String) row.get("actor_role")).isNotBlank();
+        assertThat((String) row.get("actor_org")).isNotBlank();
+        assertThat(row.get("occurred_at")).isNotNull();
+        assertThat(audit.path("detail").path("actor").path("personId").asText()).isEqualTo(publisher.toString());
+        assertThat(audit.path("detail").path("actor").path("employeeNo").asText()).isEqualTo("T-sysadmin-" + sfx);
+        assertThat(audit.path("detail").path("version").asInt()).isEqualTo(first + 1);
+        assertThat(audit.path("detail").path("reference").asText()).isEqualTo("قرار اختبار 1");
     }
 
     // ---- terrain -------------------------------------------------------------------------------------
