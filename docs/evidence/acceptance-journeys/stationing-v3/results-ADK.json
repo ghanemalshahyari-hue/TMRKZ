@@ -1,0 +1,223 @@
+{
+  "ranAt": "2026-11-04T08:16:19.262Z",
+  "base": "http://localhost:8088",
+  "only": [
+    "A",
+    "D",
+    "K"
+  ],
+  "policy": {
+    "version": 1,
+    "reference": "ACCEPTANCE-V3-POLICY-1"
+  },
+  "results": [
+    {
+      "id": "A1",
+      "label": "permanent draft passes the server checks, no exception needed",
+      "result": "PASS",
+      "extra": "منطقة الانتشار الرئيسية: 6004 m, OK, allowed 5000–8000 (exception to 10000), FLAT +0 | منطقة الانتشار البديلة: 3995 m, OK, allowed 3000–5000 (exception to 7000), FLAT +0"
+    },
+    {
+      "id": "A2",
+      "label": "submitted on the page; policy version locked",
+      "result": "PASS",
+      "extra": "UNDER_REVIEW, policy 1, 2 stages: اعتماد المستوى L7 — الخدمات المشتركة ← اعتماد المستوى L6 — المؤسسة"
+    },
+    {
+      "id": "A3",
+      "label": "ancestry route from the L7 requesting unit: its own approver, then L6 final (no unrelated unit)",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "MAP1",
+      "label": "the map draws (basemap, current site, proposed site, both deployment areas, guidance rings) and the legend names them",
+      "result": "PASS",
+      "extra": "1342 colours in the middle of the map; legend: الموقع الحالي الموقع المقترح الانتشار الرئيسية الانتشار البديلة النطاق المسموح (إرشاد)"
+    },
+    {
+      "id": "MAP2",
+      "label": "terrain mode draws (GLO-30 notice) and back to street mode keeps the request selected",
+      "result": "PASS",
+      "extra": "1142 colours; طبيعة الأرض: Copernicus GLO-30 — نموذج سطح DSM وليس تضاريس رسمية (للعرض فقط)"
+    },
+    {
+      "id": "A4",
+      "label": "each stage approved on the page by its own seat holder",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED; اعتماد المستوى L7 — الخدمات المشتركة [APPROVED] ← اعتماد المستوى L6 — المؤسسة [APPROVED]; final approver صاحب الاعتماد التجريبي"
+    },
+    {
+      "id": "A5",
+      "label": "activated on the page by an independent activator",
+      "result": "PASS",
+      "extra": "ACTIVATED_PERMANENT, by مراجع المرافق التجريبي, site موقع RS-2026-0012"
+    },
+    {
+      "id": "A6",
+      "label": "new authoritative stationing in the read contract",
+      "result": "PASS",
+      "extra": "موقع RS-2026-0012 PERMANENT REQUEST"
+    },
+    {
+      "id": "A7",
+      "label": "site links unchanged by the activation (O-14)",
+      "result": "PASS",
+      "extra": "0 links before and after"
+    },
+    {
+      "id": "D1",
+      "label": "flat ground: FLAT adds nothing to the range",
+      "result": "PASS",
+      "extra": "8 km south: FLAT +0 m, range 5000–8000, shares FLAT 100.0%; copernicus-glo30 2026.11 DSM"
+    },
+    {
+      "id": "D2",
+      "label": "non-zero allowance: beyond the base maximum, inside base + allowance, accepted (maximum only, O-06)",
+      "result": "PASS",
+      "extra": "MOUNTAINOUS «جبلي / شديد التضرس» +2000 m: 9205 m within 5000–10000 (base 5000–8000); shares UNDULATING 5.9%, ROLLING 9.2%, HILLY 17.4%, MOUNTAINOUS 67.4%"
+    },
+    {
+      "id": "D3",
+      "label": "submitted with the terrain decision and the policy version recorded",
+      "result": "PASS",
+      "extra": "policy 1; منطقة الانتشار الرئيسية: 9205 m, OK, allowed 5000–10000 (exception to 12000), MOUNTAINOUS +2000 | منطقة الانتشار البديلة: 3496 m, OK, allowed 3000–5500 (exception to 7500), UNDULATING +500"
+    },
+    {
+      "id": "D4",
+      "label": "approved through its route (not activated)",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED"
+    },
+    {
+      "id": "D5",
+      "label": "terrain tie on real data",
+      "result": "NOTE",
+      "extra": "an exact area tie on real GLO-30 cells is not practical to construct; the tie, the priority and the block are proven on a synthetic raster (StationingFoundationIT, StationingRulesTest)"
+    },
+    {
+      "id": "K-Polygon",
+      "label": "«نسخ حدود الموقع الحالي» on a Polygon current site (moving unit الخدمات المشتركة)",
+      "result": "PASS",
+      "extra": "نُسخت حدود «موقع RS-2026-0012» — انقر على الخريطة حيث تريد نقلها; draw button «نقل الموقع المقترح»; draft RS-2026-0014"
+    },
+    {
+      "id": "K-MultiPolygon",
+      "label": "«نسخ حدود الموقع الحالي» on a MultiPolygon current site (moving unit قسم الخدمات العامة)",
+      "result": "PASS",
+      "extra": "حدود «مركز التدريب الإداري» متعددة الأجزاء؛ نسخها مجموعةً واحدة لم يُنفَّذ بعد — استخدم «رسم حدود جديدة»; draw button «رسم حدود جديدة»; draft RS-2026-0015"
+    },
+    {
+      "id": "K-Point",
+      "label": "«نسخ حدود الموقع الحالي» on a Point current site (moving unit إدارة التقنية)",
+      "result": "PASS",
+      "extra": "«مكتب التقنية» مسجل نقطةً بلا حدود، فلا شيء يُنسخ — استخدم «رسم حدود جديدة»; draw button «رسم حدود جديدة»; draft RS-2026-0016"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the real page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors on the real page",
+      "result": "PASS",
+      "extra": ""
+    }
+  ],
+  "requests": [
+    {
+      "journey": "A",
+      "id": "f22ea612-c8d0-4c8d-98ba-f064874fad6f",
+      "number": "RS-2026-0012",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "D",
+      "id": "41891940-7e73-45db-b2bb-571af8b0ad5e",
+      "number": "RS-2026-0013",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "K-Polygon: ACCEPTANCE-TEST DRAFT (boundary copy), not a business request",
+      "id": "36bdf7c4-c3c7-4881-aecb-775ee371b3d8",
+      "number": "RS-2026-0014",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "K-MultiPolygon: ACCEPTANCE-TEST DRAFT (boundary copy), not a business request",
+      "id": "78d37e4a-f740-4c82-ae58-e2e32b7e361f",
+      "number": "RS-2026-0015",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "K-Point: ACCEPTANCE-TEST DRAFT (boundary copy), not a business request",
+      "id": "17174597-8344-4888-855f-b22aad485f59",
+      "number": "RS-2026-0016",
+      "requester": "t.requester2"
+    }
+  ],
+  "routes": [
+    {
+      "journey": "A",
+      "number": "RS-2026-0012",
+      "requestingUnit": "HR-T-SS",
+      "stages": 2,
+      "route": [
+        {
+          "key": "H:3af418c5-fb73-869c-da16-7411f739b156",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — الخدمات المشتركة",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    },
+    {
+      "journey": "D",
+      "number": "RS-2026-0013",
+      "requestingUnit": "HR-T-SS",
+      "stages": 2,
+      "route": [
+        {
+          "key": "H:3af418c5-fb73-869c-da16-7411f739b156",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — الخدمات المشتركة",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    }
+  ]
+}

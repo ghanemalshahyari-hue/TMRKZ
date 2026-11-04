@@ -1,0 +1,608 @@
+{
+  "ranAt": "2026-11-04T08:10:05.191Z",
+  "base": "http://localhost:8088",
+  "only": null,
+  "policy": {
+    "version": 1,
+    "reference": "ACCEPTANCE-V3-POLICY-1"
+  },
+  "results": [
+    {
+      "id": "A1",
+      "label": "permanent draft passes the server checks, no exception needed",
+      "result": "PASS",
+      "extra": "منطقة الانتشار الرئيسية: 6004 m, OK, allowed 5000–8500 (exception to 10500), UNDULATING +500 | منطقة الانتشار البديلة: 3996 m, OK, allowed 3000–5000 (exception to 7000), FLAT +0"
+    },
+    {
+      "id": "A2",
+      "label": "submitted on the page; policy version locked",
+      "result": "PASS",
+      "extra": "UNDER_REVIEW, policy 1, 2 stages: اعتماد المستوى L7 — الخدمات المشتركة ← اعتماد المستوى L6 — المؤسسة"
+    },
+    {
+      "id": "A3",
+      "label": "ancestry route from the L7 requesting unit: its own approver, then L6 final (no unrelated unit)",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "MAP1",
+      "label": "current site, proposed site, both deployment areas and the guidance rings drawn and labelled",
+      "result": "PASS",
+      "extra": "الموقع الحالي الموقع المقترح الانتشار الرئيسية الانتشار البديلة النطاق المسموح (إرشاد)"
+    },
+    {
+      "id": "MAP2",
+      "label": "terrain mode (GLO-30 notice) and back to street mode keep the request selected",
+      "result": "PASS",
+      "extra": "طبيعة الأرض: Copernicus GLO-30 — نموذج سطح DSM وليس تضاريس رسمية (للعرض فقط)"
+    },
+    {
+      "id": "A4",
+      "label": "each stage approved on the page by its own seat holder",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED; اعتماد المستوى L7 — الخدمات المشتركة [APPROVED] ← اعتماد المستوى L6 — المؤسسة [APPROVED]; final approver صاحب الاعتماد التجريبي"
+    },
+    {
+      "id": "A5",
+      "label": "activated on the page by an independent activator",
+      "result": "PASS",
+      "extra": "ACTIVATED_PERMANENT, by مراجع المرافق التجريبي, site موقع RS-2026-0001"
+    },
+    {
+      "id": "A6",
+      "label": "new authoritative stationing in the read contract",
+      "result": "PASS",
+      "extra": "موقع RS-2026-0001 PERMANENT REQUEST"
+    },
+    {
+      "id": "A7",
+      "label": "site links unchanged by the activation (O-14)",
+      "result": "PASS",
+      "extra": "0 links before and after"
+    },
+    {
+      "id": "X1",
+      "label": "normal: inside the effective range, no exception stage",
+      "result": "PASS",
+      "extra": "منطقة الانتشار الرئيسية: 6004 m, OK, allowed 5000–8000 (exception to 10000), FLAT +0 | منطقة الانتشار البديلة: 3995 m, OK, allowed 3000–5000 (exception to 7000), FLAT +0"
+    },
+    {
+      "id": "X2",
+      "label": "within maxExtra: an exception is required, with a written reason",
+      "result": "PASS",
+      "extra": "منطقة الانتشار الرئيسية: 9005 m, NEEDS_EXCEPTION, allowed 5000–8000 (exception to 10000), FLAT +0 | منطقة الانتشار البديلة: 3995 m, OK, allowed 3000–5000 (exception to 7000), FLAT +0"
+    },
+    {
+      "id": "X3",
+      "label": "with the reason: a separate exception stage just before the final stage",
+      "result": "PASS",
+      "extra": "اعتماد المستوى L7 — الخدمات المشتركة ← اعتماد استثناء مسافة الانتشار ← اعتماد المستوى L6 — المؤسسة"
+    },
+    {
+      "id": "X4",
+      "label": "submitted; the reason is part of the submitted content",
+      "result": "PASS",
+      "extra": "UNDER_REVIEW, 3 stages: اعتماد المستوى L7 — الخدمات المشتركة ← اعتماد استثناء مسافة الانتشار ← اعتماد المستوى L6 — المؤسسة"
+    },
+    {
+      "id": "X5",
+      "label": "the written reason is in the audit history of the submission",
+      "result": "PASS",
+      "extra": "audit «RESTATIONING_SUBMITTED» RS-2026-0002"
+    },
+    {
+      "id": "X6",
+      "label": "a seat holder without «اعتماد استثناء مسافة الانتشار» cannot decide the exception stage",
+      "result": "PASS",
+      "extra": "403 ليس صاحب قرار المرحلة الحالية («اعتماد استثناء مسافة الانتشار»)."
+    },
+    {
+      "id": "X7",
+      "label": "the holder of «اعتماد استثناء مسافة الانتشار» decides it",
+      "result": "PASS",
+      "extra": "200 "
+    },
+    {
+      "id": "X8",
+      "label": "then the final stage: approved, not activated",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED; اعتماد المستوى L7 — الخدمات المشتركة [APPROVED] ← اعتماد استثناء مسافة الانتشار [APPROVED] ← اعتماد المستوى L6 — المؤسسة [APPROVED]"
+    },
+    {
+      "id": "X9",
+      "label": "too far: beyond effective maximum + maxExtra is a hard refusal, no exception stage",
+      "result": "PASS",
+      "extra": "منطقة الانتشار الرئيسية: 10606 m, OUT_OF_RANGE, allowed 5000–8000 (exception to 10000), FLAT +0 | منطقة الانتشار البديلة: 3995 m, OK, allowed 3000–5500 (exception to 7500), UNDULATING +500; submit 400 منطقة الانتشار الرئيسية خارج النطاق المسموح (10606 م، المسموح 5000–8000 م)."
+    },
+    {
+      "id": "C1",
+      "label": "a deployment area over occupied ground is refused by the checks",
+      "result": "PASS",
+      "extra": "منطقة الانتشار الرئيسية تتداخل مع أرض مشغولة: المقر الإداري — يجب نقلها إلى أرض خالية."
+    },
+    {
+      "id": "C2",
+      "label": "and the submission is refused (hard block, O-08)",
+      "result": "PASS",
+      "extra": "400 منطقة الانتشار الرئيسية تتداخل مع أرض مشغولة: المقر الإداري — يجب نقلها إلى أرض خالية."
+    },
+    {
+      "id": "D1",
+      "label": "flat ground near the acceptance sites: FLAT, no allowance",
+      "result": "FAIL",
+      "extra": "UNDULATING +500 m, copernicus-glo30 2026.11 DSM"
+    },
+    {
+      "id": "D2",
+      "label": "non-zero allowance: beyond the base maximum, inside base + allowance, accepted (maximum only, O-06)",
+      "result": "PASS",
+      "extra": "MOUNTAINOUS «جبلي / شديد التضرس» +2000 m: 9205 m within 5000–10000 (base 5000–8000); shares UNDULATING 5.9%, ROLLING 9.2%, HILLY 17.4%, MOUNTAINOUS 67.4%"
+    },
+    {
+      "id": "D3",
+      "label": "submitted with the terrain decision and the policy version recorded",
+      "result": "PASS",
+      "extra": "policy 1; منطقة الانتشار الرئيسية: 9205 m, OK, allowed 5000–10000 (exception to 12000), MOUNTAINOUS +2000 | منطقة الانتشار البديلة: 3496 m, OK, allowed 3000–5500 (exception to 7500), UNDULATING +500"
+    },
+    {
+      "id": "D4",
+      "label": "approved through its route (not activated)",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED"
+    },
+    {
+      "id": "D5",
+      "label": "terrain tie on real data",
+      "result": "NOTE",
+      "extra": "an exact area tie on real GLO-30 cells is not practical to construct; the tie, the priority and the block are proven on a synthetic raster (StationingFoundationIT, StationingRulesTest)"
+    },
+    {
+      "id": "E1",
+      "label": "a unit of another branch is never moved implicitly",
+      "result": "PASS",
+      "extra": "وحدات خارج فرع الوحدة الطالبة: إدارة المشاريع"
+    },
+    {
+      "id": "E2",
+      "label": "explicit inclusion: one stage of the other unit satisfies OTHER_UNIT and SITE_RESPONSIBLE (not independent)",
+      "result": "PASS",
+      "extra": "موافقة الوحدة من الفرع الآخر — يستوفي: موافقة الوحدة من الفرع الآخر (ضم إدارة المشاريع)، موافقة المسؤول عن موقعها (ضم إدارة المشاريع)"
+    },
+    {
+      "id": "E3",
+      "label": "submitted",
+      "result": "PASS",
+      "extra": "3 stages: اعتماد المستوى L7 — الخدمات المشتركة ← موافقة الوحدة من الفرع الآخر ← اعتماد المستوى L6 — المؤسسة"
+    },
+    {
+      "id": "F1",
+      "label": "returned for changes at the final stage",
+      "result": "PASS",
+      "extra": "اعتماد المستوى L7 — الخدمات المشتركة [APPROVED] ← موافقة الوحدة من الفرع الآخر [APPROVED] ← اعتماد المستوى L6 — المؤسسة"
+    },
+    {
+      "id": "F2",
+      "label": "resubmitted: only the deployment changed",
+      "result": "PASS",
+      "extra": "changed DEPLOYMENT"
+    },
+    {
+      "id": "F3",
+      "label": "only the decisions resting on the deployment are taken again; the cross-branch decision is carried (D18)",
+      "result": "PASS",
+      "extra": "invalidated اعتماد المستوى L7 — الخدمات المشتركة; carried موافقة الوحدة من الفرع الآخر; اعتماد المستوى L7 — الخدمات المشتركة ← موافقة الوحدة من الفرع الآخر [CARRIED] ← اعتماد المستوى L6 — المؤسسة"
+    },
+    {
+      "id": "F4",
+      "label": "the re-taken stages are decided again; the request completes",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED; اعتماد المستوى L7 — الخدمات المشتركة [APPROVED] ← موافقة الوحدة من الفرع الآخر [CARRIED] ← اعتماد المستوى L6 — المؤسسة [APPROVED]"
+    },
+    {
+      "id": "S1",
+      "label": "the requester cannot approve their own request",
+      "result": "PASS",
+      "extra": "403 SEPARATION_OF_DUTIES مقدم الطلب لا يقرر مراحل طلبه."
+    },
+    {
+      "id": "S2",
+      "label": "a seat delegated to the requester does not let them approve their own request",
+      "result": "PASS",
+      "extra": "403 SEPARATION_OF_DUTIES مقدم الطلب لا يقرر مراحل طلبه."
+    },
+    {
+      "id": "S2r",
+      "label": "delegation revoked after the check",
+      "result": "NOTE",
+      "extra": "204"
+    },
+    {
+      "id": "S3",
+      "label": "a user of another branch cannot see the request",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "S4",
+      "label": "nor act on it",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "S5",
+      "label": "another unit's approver cannot decide this stage",
+      "result": "PASS",
+      "extra": "404 العنصر المطلوب غير موجود أو خارج نطاق صلاحياتك."
+    },
+    {
+      "id": "S6",
+      "label": "the final approver cannot decide before the current stage",
+      "result": "PASS",
+      "extra": "403 ليس صاحب قرار المرحلة الحالية («اعتماد المستوى L7 — الخدمات المشتركة»)."
+    },
+    {
+      "id": "S7",
+      "label": "activation before final approval is refused",
+      "result": "PASS",
+      "extra": "400 التفعيل بعد الاعتماد النهائي فقط"
+    },
+    {
+      "id": "S8",
+      "label": "the security request is closed by rejection",
+      "result": "PASS",
+      "extra": "200 REJECTED"
+    },
+    {
+      "id": "S9",
+      "label": "second account of the same human",
+      "result": "NOTE",
+      "extra": "accepted by the owner as backend/OpenFGA evidence (RestationingWorkflowIT.permanentJourney); the acceptance directory holds no linked second account"
+    },
+    {
+      "id": "K-Polygon",
+      "label": "«نسخ حدود الموقع الحالي» on a Polygon current site (moving unit الخدمات المشتركة)",
+      "result": "PASS",
+      "extra": "نُسخت حدود «موقع RS-2026-0001» — انقر على الخريطة حيث تريد نقلها; draw button «نقل الموقع المقترح»; draft RS-2026-0008"
+    },
+    {
+      "id": "K-MultiPolygon",
+      "label": "«نسخ حدود الموقع الحالي» on a MultiPolygon current site (moving unit قسم الخدمات العامة)",
+      "result": "FAIL",
+      "extra": "; draw button «رسم موقع جديد»; draft RS-2026-0009"
+    },
+    {
+      "id": "K-Point",
+      "label": "«نسخ حدود الموقع الحالي» on a Point current site (moving unit إدارة التقنية)",
+      "result": "FAIL",
+      "extra": "; draw button «رسم موقع جديد»; draft RS-2026-0010"
+    },
+    {
+      "id": "G",
+      "label": "hierarchy change through HR synchronisation",
+      "result": "NOTE",
+      "extra": "NOT RUN on this environment: HR source «مصدر الموارد البشرية — بيئة الاختبار» enabled=false, no connection settings; its HR mirror was loaded by ops/test-env/seed.sql. The synchronisation reads Oracle only (JDBC thin) and the owner forbids direct SQL as equivalent evidence. Proven through HrSyncService with the Oracle-compatible test source: RestationingHrSyncIT."
+    },
+    {
+      "id": "B1",
+      "label": "temporary approved and activated: scheduled for its start",
+      "result": "PASS",
+      "extra": "TEMPORARY_SCHEDULED; 2 stages; start 2026-11-04T08:06:17.888Z, end 2026-11-04T08:09:17.888Z; original مكتب التقنية PERMANENT"
+    },
+    {
+      "id": "B2",
+      "label": "the real scheduler started it at its start; the authoritative stationing is the temporary site",
+      "result": "PASS",
+      "extra": "2026-11-04T08:07:04.292Z: مكتب التقنية PERMANENT, موقع RS-2026-0011 TEMPORARY until 2026-11-04T08:09:17.888Z"
+    },
+    {
+      "id": "B3",
+      "label": "returned automatically at its end; the preserved original stationing is the authoritative one again",
+      "result": "PASS",
+      "extra": "TEMPORARY_RETURNED; temporary 2026-11-04T08:06:17.888Z → 2026-11-04T08:09:17.888Z (RETURNED); now مكتب التقنية PERMANENT"
+    },
+    {
+      "id": "B4",
+      "label": "extension, early return, cancellation before start",
+      "result": "NOTE",
+      "extra": "not built yet — remaining implementation work, not accepted here"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the real page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors on the real page",
+      "result": "FAIL",
+      "extra": "t.requester: Error: Worker failed to load. Check that the worker URL is correct.\n    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.requester: Error: Worker failed to load. Check that the worker URL is correct.\n    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.manager: Error: Worker failed to load. Check that the worker URL is correct.\n    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.manager: Error: Worker failed to load. Check that the worker URL is correct.\n    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.approver: Error: Worker failed to load. Check that the worker URL is correct.\n    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.approver: Error: Worker failed to load. Check that the worker URL is correct.\n    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.facilities: Error: Worker failed to load. Check that the worker URL is correct.\n    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.facilities: Error: Worker failed to load. Check that the worker URL is correct.\n    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214)"
+    }
+  ],
+  "requests": [
+    {
+      "journey": "A",
+      "id": "2e4b947e-508f-442b-8322-2651b8754510",
+      "number": "RS-2026-0001",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "X",
+      "id": "689a7564-c15e-4db1-a352-2bc6e354df01",
+      "number": "RS-2026-0002",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "X-too-far",
+      "id": "9d0e095c-22db-4c88-99cc-b727506dfae7",
+      "number": "RS-2026-0003",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "C",
+      "id": "2417cc62-cfa6-4259-92fc-3b8356679cf0",
+      "number": "RS-2026-0004",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "D",
+      "id": "48e605da-e29c-49cb-8338-65b102517eec",
+      "number": "RS-2026-0005",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "E/F",
+      "id": "09a6fb5d-82cc-4160-b63b-1cb4f4e37d2b",
+      "number": "RS-2026-0006",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "S",
+      "id": "c52b58df-fce2-4c38-a31d-fccadf222629",
+      "number": "RS-2026-0007",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "K-Polygon: ACCEPTANCE-TEST DRAFT (boundary copy), not a business request",
+      "id": "a8c06e2d-ef8f-4ebd-bd12-30a34fe1b34a",
+      "number": "RS-2026-0008",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "K-MultiPolygon: ACCEPTANCE-TEST DRAFT (boundary copy), not a business request",
+      "id": "27934ab5-eef2-4327-9c96-c5cad7d37dd4",
+      "number": "RS-2026-0009",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "K-Point: ACCEPTANCE-TEST DRAFT (boundary copy), not a business request",
+      "id": "ce496c2b-17ff-4938-87c7-f922ca537811",
+      "number": "RS-2026-0010",
+      "requester": "t.requester2"
+    },
+    {
+      "journey": "B",
+      "id": "e6061412-3d03-4c48-a7d3-6635def5b524",
+      "number": "RS-2026-0011",
+      "requester": "t.requester2"
+    }
+  ],
+  "routes": [
+    {
+      "journey": "A",
+      "number": "RS-2026-0001",
+      "requestingUnit": "HR-T-SS",
+      "stages": 2,
+      "route": [
+        {
+          "key": "H:3af418c5-fb73-869c-da16-7411f739b156",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — الخدمات المشتركة",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    },
+    {
+      "journey": "X",
+      "number": "RS-2026-0002",
+      "requestingUnit": "HR-T-SS",
+      "stages": 3,
+      "route": [
+        {
+          "key": "H:3af418c5-fb73-869c-da16-7411f739b156",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — الخدمات المشتركة",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "X:distance",
+          "kind": "EXCEPTION",
+          "label": "اعتماد استثناء مسافة الانتشار",
+          "final": false,
+          "satisfies": [
+            "استثناء المسافة"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    },
+    {
+      "journey": "D",
+      "number": "RS-2026-0005",
+      "requestingUnit": "HR-T-SS",
+      "stages": 2,
+      "route": [
+        {
+          "key": "H:3af418c5-fb73-869c-da16-7411f739b156",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — الخدمات المشتركة",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    },
+    {
+      "journey": "E",
+      "number": "RS-2026-0006",
+      "requestingUnit": "HR-T-SS",
+      "stages": 3,
+      "route": [
+        {
+          "key": "H:3af418c5-fb73-869c-da16-7411f739b156",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — الخدمات المشتركة",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "C:OTHER_UNIT:373032ba-3812-3f3c-a4cf-1517dbc0fcea:373032ba-3812-3f3c-a4cf-1517dbc0fcea",
+          "kind": "CROSS_BRANCH",
+          "label": "موافقة الوحدة من الفرع الآخر",
+          "final": false,
+          "satisfies": [
+            "موافقة الوحدة من الفرع الآخر (ضم إدارة المشاريع)",
+            "موافقة المسؤول عن موقعها (ضم إدارة المشاريع)"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    },
+    {
+      "journey": "F (after resubmission)",
+      "number": "RS-2026-0006",
+      "requestingUnit": "HR-T-SS",
+      "stages": 3,
+      "route": [
+        {
+          "key": "H:3af418c5-fb73-869c-da16-7411f739b156",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — الخدمات المشتركة",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": "APPROVED",
+          "decidedBy": "مدير الخدمات المشتركة"
+        },
+        {
+          "key": "C:OTHER_UNIT:373032ba-3812-3f3c-a4cf-1517dbc0fcea:373032ba-3812-3f3c-a4cf-1517dbc0fcea",
+          "kind": "CROSS_BRANCH",
+          "label": "موافقة الوحدة من الفرع الآخر",
+          "final": false,
+          "satisfies": [
+            "موافقة الوحدة من الفرع الآخر (ضم إدارة المشاريع)",
+            "موافقة المسؤول عن موقعها (ضم إدارة المشاريع)"
+          ],
+          "mark": "CARRIED",
+          "decidedBy": "مدير الإدارة العامة"
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": "APPROVED",
+          "decidedBy": "صاحب الاعتماد التجريبي"
+        }
+      ]
+    },
+    {
+      "journey": "B",
+      "number": "RS-2026-0011",
+      "requestingUnit": "HR-T-IT",
+      "stages": 2,
+      "route": [
+        {
+          "key": "H:eb32f24f-78da-d5f2-0655-4a94ace028e0",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — إدارة التقنية",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    }
+  ]
+}

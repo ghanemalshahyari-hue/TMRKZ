@@ -1,0 +1,7 @@
+worker asset after the swap (4 Nov 2026):
+HTTP/1.1 200 OK
+Content-Type: text/javascript
+Cache-Control: max-age=31536000
+Cache-Control: public, immutable
+X-Content-Type-Options: nosniff
+before the fix (mover/web:rel-b8f62e8-v3): Content-Type: application/octet-stream, X-Content-Type-Options: nosniff → «Worker failed to load» (run1-all-journeys.txt)

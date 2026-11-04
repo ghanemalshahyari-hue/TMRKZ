@@ -1,0 +1,13 @@
+Stationing V3 page and policy studio on tmrkz-test, 4 Nov 2026 (headless Edge, directory sign-in as t.admin)
+web image   mover/web:rel-b8f62e8-v3  sha256:a0e97aa9e4c229f645cc3f48f6a84d82a031740240a6d32fb191ed11df4556be
+            OCI revision b8f62e8136158f52b0b49d1c702c082dc586bb3e, label tmrkz.stationing-v3=true
+previous    mover/web:1.0.0  sha256:0a01bc2163be263f54aacd2b8f4c5cfe2c54eefd31949f79c45d5e2ebb576f55 (kept for recovery)
+backend     mover/backend:rel-99c7ede  sha256:a3f93b3a60ecfc63e4ff3e5baecaf075032f11afa777f66b79c5bd23293d41e2 (no migration;
+            evidence ../tmrkz-test-c4-backend/, 6,667 rows unchanged, schema identical apart from pg_dump's random \restrict key)
+map files   /map-data/ read-only mount (compose.v3-maps.yml): basemap range request 206
+#stationingPolicy  «لا توجد سياسة تمركز نافذة»; 5 routing rows from the published HR levels: L6 (1 unit), L7 (4), L8 (1),
+                   L9 (1), L10 (1); every row starts with approves = false (nothing assumed)
+#restationing      list shown, 0 requests
+console errors     0
+external requests  0
+policy versions    0 (the owner publishes the acceptance policy in the studio)

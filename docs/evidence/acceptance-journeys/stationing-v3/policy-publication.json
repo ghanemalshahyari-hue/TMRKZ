@@ -1,0 +1,114 @@
+{
+  "ranAt": "2026-11-04T07:54:39.752Z",
+  "base": "http://localhost:8088",
+  "results": [
+    {
+      "id": "P1",
+      "label": "signed in through Keycloak",
+      "result": "PASS",
+      "extra": "مدير النظام التجريبي, PROVIDER, identity provider http://localhost:8088"
+    },
+    {
+      "id": "V1",
+      "label": "first published version, the only one",
+      "result": "PASS",
+      "extra": "version 1, 1 version(s)"
+    },
+    {
+      "id": "V2",
+      "label": "in force now, open-ended",
+      "result": "PASS",
+      "extra": "effective from 2026-11-04T07:54:23.920829Z"
+    },
+    {
+      "id": "V3",
+      "label": "L6–L10 approve; the first stage is the requesting unit's own approver",
+      "result": "PASS",
+      "extra": "L6:approves L7:approves L8:approves L9:approves L10:approves"
+    },
+    {
+      "id": "V4",
+      "label": "final level L6, only L6",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "V5",
+      "label": "hierarchy stages rest on scope, classification, duration, site and deployment (owner model V2 §4.5)",
+      "result": "PASS",
+      "extra": "L7: DURATION,SCOPE,DEPLOYMENT,SITE,CLASSIFICATION | L8: DURATION,SCOPE,DEPLOYMENT,SITE,CLASSIFICATION | L9: DURATION,SCOPE,DEPLOYMENT,SITE,CLASSIFICATION | L10: DURATION,SCOPE,DEPLOYMENT,SITE,CLASSIFICATION"
+    },
+    {
+      "id": "V6",
+      "label": "deployment areas REQUIRED",
+      "result": "PASS",
+      "extra": "REQUIRED"
+    },
+    {
+      "id": "V7",
+      "label": "base ranges 5–8 km and 3–5 km, terrain applies",
+      "result": "PASS",
+      "extra": "{\"primary\":{\"minM\":5000,\"maxM\":8000,\"terrainApplies\":true},\"alternative\":{\"minM\":3000,\"maxM\":5000,\"terrainApplies\":true}}"
+    },
+    {
+      "id": "V8",
+      "label": "allowances 0 / 0.5 / 1 / 1.5 / 2 km on the maximum only",
+      "result": "PASS",
+      "extra": "{\"FLAT\":0,\"HILLY\":1500,\"ROLLING\":1000,\"UNDULATING\":500,\"MOUNTAINOUS\":2000}"
+    },
+    {
+      "id": "V9",
+      "label": "tie priority MOUNTAINOUS > HILLY > ROLLING > UNDULATING > FLAT",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "V10",
+      "label": "footprint maximum 0.5 km²",
+      "result": "PASS",
+      "extra": "500000"
+    },
+    {
+      "id": "V11",
+      "label": "cross-branch OTHER_UNIT + SITE_RESPONSIBLE, independent approvals OFF",
+      "result": "PASS",
+      "extra": "{\"allowed\":true,\"authorities\":[\"OTHER_UNIT\",\"SITE_RESPONSIBLE\"],\"independent\":false}"
+    },
+    {
+      "id": "V12",
+      "label": "distance exception enabled, maxExtra 2 km",
+      "result": "PASS",
+      "extra": "{\"allowed\":true,\"maxExtraM\":2000}"
+    },
+    {
+      "id": "V13",
+      "label": "dataset copernicus-glo30 2026.11 and the approved FAO classes (ROLLING «تضاريس متدرجة»)",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "V14",
+      "label": "author, reason and reference recorded",
+      "result": "PASS",
+      "extra": "مدير النظام التجريبي · ACCEPTANCE-V3-POLICY-1 · سياسة اختبار قبول Stationing V3 — بيانات وهمية، ليست إعدادات إنتاج (ACCEPTANCE TEST POLICY — NOT A PRODUCTION DEFAULT; exception.maxExtra 2 km = ACCEPTANCE TEST VALUE)"
+    },
+    {
+      "id": "V15",
+      "label": "no development value or extra field in the published values",
+      "result": "PASS",
+      "extra": "maxFootprintAreaM2,deploymentRequirement,primary,alternative,terrainSlopeClassification,terrainAllowancesM,terrainClassPriority,terrainAppliesTo,exception,crossBranch,routing"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the studio (the identity provider is local)",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors",
+      "result": "PASS",
+      "extra": ""
+    }
+  ]
+}

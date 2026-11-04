@@ -1,0 +1,13 @@
+First run of tests/acceptance/publish-acceptance-policy.mjs, 4 Nov 2026 (headless Edge, Keycloak sign-in as t.admin) — the
+publishing run. The comparison V8 failed only because the script compared the allowances as text and the server returns
+them with another key order (jsonb); the values were correct. The script was corrected (order-insensitive comparison,
+verification only when a version is in force) and the verification rerun passed 18/18 (policy-publication.json).
+PASS  P1  signed in through Keycloak  — مدير النظام التجريبي, PROVIDER, identity provider http://localhost:8088
+PASS  P2  no policy in force before publication  — لا توجد سياسة تمركز نافذة — الطلبات لا تُرسل حتى تُنشر نسخة.
+PASS  P3  routing rows for every HR level L6–L10 on the page  — L6 L7 L8 L9 L10
+PASS  P4  «فحص على الخادم»: the server validation passes  — القيم صالحة للنشر
+PASS  P5  «نشر نسخة جديدة»: a version is in force  — النسخة السارية: 1 منذ 4 نوفمبر 2026 · مدير النظام التجريبي · ACCEPTANCE-V3-POLICY-1
+PASS  V1–V7, V9–V15 (see policy-publication.json for the same checks on the rerun)
+FAIL  V8  allowances — {"FLAT":0,"HILLY":1500,"ROLLING":1000,"UNDULATING":500,"MOUNTAINOUS":2000}  (key order only)
+PASS  NET  zero external requests from the studio
+PASS  CONSOLE  no console or page errors

@@ -195,8 +195,8 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     submit, and a first editor. Shown only with `VITE_STATIONING_V3=true`.
   - **Development environment:** `tmrkz-v3dev` on :8097 (`ops/test-env/dev-v3.sh`), fictional data and illustrative
     development values only.
-  - **Tests:** `RestationingWorkflowIT` 10/10; full backend suite 195/195; `restationing-journey.mjs` 15/15 through the
-    real sign-in; frontend 93/93, build OK.
+  - **Tests:** `RestationingWorkflowIT` 11/11, `RestationingHrSyncIT` 1/1; full backend suite 197/197 (4 Nov, after
+    `cea09c7`); `restationing-journey.mjs` 15/15 through the real sign-in; frontend 94/94, build OK.
   - **Owner decision O-17 (4 Nov, option B):** a distance exception is allowed only when enabled in the policy, up to
     `exception.maxExtra`, with a written reason and a separate stage decided by its permission holder, audited.
   - **V19 on `tmrkz-test` (owner D1/D2, 4 Nov): `ACCEPTANCE / V19`.**
@@ -221,9 +221,52 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
       - exception disabled (no `maxExtraM`).
 
       The owner sets the routing levels and the deployment requirement in the new «سياسة التمركز» studio.
-    - **The page stays hidden** on `tmrkz-test` (D3). Evidence: `docs/evidence/acceptance-data/tmrkz-test-v3/`.
-  - **Not yet:** extensions, early return, cancellation before start, vertex editing, production packaging of the page
-    and map data, V19 on `tmrkz-test` (owner approval).
+    - Evidence: `docs/evidence/acceptance-data/tmrkz-test-v3/`.
+  - **Page and policy studio enabled on `tmrkz-test` (owner gate, 4 Nov; the earlier D3 «hidden» is superseded):**
+    - local commits `f7856fe` (C3, V19 evidence and acceptance provisioning), `99c7ede` (C4, policy studio, template,
+      web build flag, map mount) and `b8f62e8` (C4a, the flag reaches only the bundle build, not the unit tests);
+    - backend `mover/backend:rel-99c7ede` without migration (6,667 rows unchanged, schema identical); web
+      `mover/web:rel-b8f62e8-v3` with the map packages read-only under `/map-data/`; earlier images kept for recovery;
+    - headless check: studio without a policy, 5 routing rows from the HR levels, 0 console errors, 0 external
+      requests. Evidence: `docs/evidence/acceptance-upgrade/tmrkz-test-c4-backend/`, `tmrkz-test-web-v3/`.
+  - **Real-application acceptance on `tmrkz-test` (owner gate «ACCEPTANCE POLICY FINAL SETTINGS», 4 Nov): run.**
+    Evidence and every measured value: `docs/evidence/acceptance-journeys/stationing-v3/SUMMARY.md`.
+    - **Policy version 1 published through the «سياسة التمركز» studio**
+      (`tests/acceptance/publish-acceptance-policy.mjs`): Keycloak sign-in as `t.admin`, JSON import, the owner's
+      settings in the page, «فحص على الخادم» passed, «نشر نسخة جديدة»; no SQL. The settings:
+      - L6–L10 approve, final L6, ancestry routing from the requesting unit;
+      - deployment areas REQUIRED; 5–8 / 3–5 km; allowances 0 / 0.5 / 1 / 1.5 / 2 km on the maximum;
+        MOUNTAINOUS-first priority; footprint 0.5 km²;
+      - cross-branch OTHER_UNIT + SITE_RESPONSIBLE, not independent;
+      - distance exception enabled at 2 km (ACCEPTANCE TEST VALUE).
+
+      The hierarchy stages rest on scope, classification, duration, site and deployment (owner model V2 §4.5). Read-back
+      15/15.
+    - **Journeys** (`tests/acceptance/restationing-acceptance.mjs`, real sign-in, real page, real GLO-30): A, X
+      (exception: normal, within 2 km, too far), B (real scheduler start and return), C, D, E, F and S pass.
+      - Run 1: 43 pass, 4 fail, 5 notes. Run 2 (the failed A, D and K after the fix): 18/18.
+      - 0 external requests in both runs; 0 console errors in run 2.
+    - **G (hierarchy change) is not run on `tmrkz-test`:** no HR source is attached there (seeded HR mirror; the sync
+      reads Oracle only). It passes through the application's HR sync path in `RestationingHrSyncIT` (the
+      Oracle-compatible test source, `POST /hr/sync`, publication, pause, reconfirmation, rebuilt route, approvals
+      again, restore by sync).
+    - **Defects found and fixed in local commit `cea09c7`** (functional, separate):
+      - the web image served MapLibre's `.mjs` worker as `application/octet-stream` under nosniff, so the V3 map was
+        blank;
+      - the boundary-copy fallback said «لا حدود مسجلة» for a MultiPolygon.
+
+      Web `mover/web:rel-cea09c7-v3` is now on `tmrkz-test`; recovery images `rel-b8f62e8-v3` and `1.0.0` are kept.
+    - **Boundaries:**
+      - a Polygon is copied;
+      - a MultiPolygon falls back to «رسم حدود جديدة». The owner-approved target is copying the whole MultiPolygon and
+        moving it as one rigid group, NOT BUILT;
+      - a Point falls back to drawing.
+
+      Six acceptance-test drafts are recorded: RS-2026-0008/0009/0010 and 0014/0015/0016.
+    - **Not exercised on `tmrkz-test`:** routes from L8–L10 (no fictional requesters or seats below L7); a terrain tie
+      on real cells; a second account of the same human (backend evidence accepted by the owner).
+  - **Not yet:** extensions, early return, cancellation before start, vertex editing, grouped MultiPolygon copy and
+    move, production packaging of the page and map data, real non-production Oracle, real touch.
 
 - **Stationing V3 after the stop gate (4 Nov 2026, owner decisions 1–6): foundation built and tested, NOT active —
   no page uses it.** Report `docs/audit/stationing-v3-production/CONTINUATION_REPORT.md`; ADR-031, ADR-032, ADR-028

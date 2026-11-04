@@ -1,0 +1,496 @@
+{
+  "readAt": "2026-11-04T07:54:39.751Z",
+  "inForce": {
+    "id": "b433a5ba-1cd4-4984-bbfb-d4b88a6bb167",
+    "version": 1,
+    "previousVersion": null,
+    "values": {
+      "maxFootprintAreaM2": 500000,
+      "deploymentRequirement": "REQUIRED",
+      "primary": {
+        "minM": 5000,
+        "maxM": 8000,
+        "terrainApplies": true
+      },
+      "alternative": {
+        "minM": 3000,
+        "maxM": 5000,
+        "terrainApplies": true
+      },
+      "terrainSlopeClassification": {
+        "datasetCode": "copernicus-glo30",
+        "datasetVersion": "2026.11",
+        "classes": [
+          {
+            "code": "FLAT",
+            "label": "مستوٍ / شبه مستوٍ",
+            "fromPct": 0,
+            "toPct": 2
+          },
+          {
+            "code": "UNDULATING",
+            "label": "متموّج",
+            "fromPct": 2,
+            "toPct": 10
+          },
+          {
+            "code": "ROLLING",
+            "label": "تضاريس متدرجة",
+            "fromPct": 10,
+            "toPct": 15
+          },
+          {
+            "code": "HILLY",
+            "label": "تلال",
+            "fromPct": 15,
+            "toPct": 30
+          },
+          {
+            "code": "MOUNTAINOUS",
+            "label": "جبلي / شديد التضرس",
+            "fromPct": 30,
+            "toPct": null
+          }
+        ]
+      },
+      "terrainAllowancesM": {
+        "FLAT": 0,
+        "HILLY": 1500,
+        "ROLLING": 1000,
+        "UNDULATING": 500,
+        "MOUNTAINOUS": 2000
+      },
+      "terrainClassPriority": [
+        "MOUNTAINOUS",
+        "HILLY",
+        "ROLLING",
+        "UNDULATING",
+        "FLAT"
+      ],
+      "terrainAppliesTo": "MAX_ONLY",
+      "exception": {
+        "allowed": true,
+        "maxExtraM": 2000
+      },
+      "crossBranch": {
+        "allowed": true,
+        "authorities": [
+          "OTHER_UNIT",
+          "SITE_RESPONSIBLE"
+        ],
+        "independent": false
+      },
+      "routing": {
+        "startAt": "SELF",
+        "levels": [
+          {
+            "level": 6,
+            "approves": true,
+            "label": "اعتماد المستوى L6",
+            "finalStage": true,
+            "dependsOn": []
+          },
+          {
+            "level": 7,
+            "approves": true,
+            "label": "اعتماد المستوى L7",
+            "finalStage": false,
+            "dependsOn": [
+              "DURATION",
+              "SCOPE",
+              "DEPLOYMENT",
+              "SITE",
+              "CLASSIFICATION"
+            ]
+          },
+          {
+            "level": 8,
+            "approves": true,
+            "label": "اعتماد المستوى L8",
+            "finalStage": false,
+            "dependsOn": [
+              "DURATION",
+              "SCOPE",
+              "DEPLOYMENT",
+              "SITE",
+              "CLASSIFICATION"
+            ]
+          },
+          {
+            "level": 9,
+            "approves": true,
+            "label": "اعتماد المستوى L9",
+            "finalStage": false,
+            "dependsOn": [
+              "DURATION",
+              "SCOPE",
+              "DEPLOYMENT",
+              "SITE",
+              "CLASSIFICATION"
+            ]
+          },
+          {
+            "level": 10,
+            "approves": true,
+            "label": "اعتماد المستوى L10",
+            "finalStage": false,
+            "dependsOn": [
+              "DURATION",
+              "SCOPE",
+              "DEPLOYMENT",
+              "SITE",
+              "CLASSIFICATION"
+            ]
+          }
+        ]
+      }
+    },
+    "effectiveFrom": "2026-11-04T07:54:23.920829Z",
+    "reason": "سياسة اختبار قبول Stationing V3 — بيانات وهمية، ليست إعدادات إنتاج (ACCEPTANCE TEST POLICY — NOT A PRODUCTION DEFAULT; exception.maxExtra 2 km = ACCEPTANCE TEST VALUE)",
+    "reference": "ACCEPTANCE-V3-POLICY-1",
+    "createdBy": "e157c135-8b42-6ca6-562b-3218b487f0eb",
+    "createdByName": "مدير النظام التجريبي",
+    "createdAt": "2026-11-04T07:54:23.920829Z"
+  },
+  "versions": [
+    {
+      "version": {
+        "id": "b433a5ba-1cd4-4984-bbfb-d4b88a6bb167",
+        "version": 1,
+        "previousVersion": null,
+        "values": {
+          "maxFootprintAreaM2": 500000,
+          "deploymentRequirement": "REQUIRED",
+          "primary": {
+            "minM": 5000,
+            "maxM": 8000,
+            "terrainApplies": true
+          },
+          "alternative": {
+            "minM": 3000,
+            "maxM": 5000,
+            "terrainApplies": true
+          },
+          "terrainSlopeClassification": {
+            "datasetCode": "copernicus-glo30",
+            "datasetVersion": "2026.11",
+            "classes": [
+              {
+                "code": "FLAT",
+                "label": "مستوٍ / شبه مستوٍ",
+                "fromPct": 0,
+                "toPct": 2
+              },
+              {
+                "code": "UNDULATING",
+                "label": "متموّج",
+                "fromPct": 2,
+                "toPct": 10
+              },
+              {
+                "code": "ROLLING",
+                "label": "تضاريس متدرجة",
+                "fromPct": 10,
+                "toPct": 15
+              },
+              {
+                "code": "HILLY",
+                "label": "تلال",
+                "fromPct": 15,
+                "toPct": 30
+              },
+              {
+                "code": "MOUNTAINOUS",
+                "label": "جبلي / شديد التضرس",
+                "fromPct": 30,
+                "toPct": null
+              }
+            ]
+          },
+          "terrainAllowancesM": {
+            "FLAT": 0,
+            "HILLY": 1500,
+            "ROLLING": 1000,
+            "UNDULATING": 500,
+            "MOUNTAINOUS": 2000
+          },
+          "terrainClassPriority": [
+            "MOUNTAINOUS",
+            "HILLY",
+            "ROLLING",
+            "UNDULATING",
+            "FLAT"
+          ],
+          "terrainAppliesTo": "MAX_ONLY",
+          "exception": {
+            "allowed": true,
+            "maxExtraM": 2000
+          },
+          "crossBranch": {
+            "allowed": true,
+            "authorities": [
+              "OTHER_UNIT",
+              "SITE_RESPONSIBLE"
+            ],
+            "independent": false
+          },
+          "routing": {
+            "startAt": "SELF",
+            "levels": [
+              {
+                "level": 6,
+                "approves": true,
+                "label": "اعتماد المستوى L6",
+                "finalStage": true,
+                "dependsOn": []
+              },
+              {
+                "level": 7,
+                "approves": true,
+                "label": "اعتماد المستوى L7",
+                "finalStage": false,
+                "dependsOn": [
+                  "DURATION",
+                  "SCOPE",
+                  "DEPLOYMENT",
+                  "SITE",
+                  "CLASSIFICATION"
+                ]
+              },
+              {
+                "level": 8,
+                "approves": true,
+                "label": "اعتماد المستوى L8",
+                "finalStage": false,
+                "dependsOn": [
+                  "DURATION",
+                  "SCOPE",
+                  "DEPLOYMENT",
+                  "SITE",
+                  "CLASSIFICATION"
+                ]
+              },
+              {
+                "level": 9,
+                "approves": true,
+                "label": "اعتماد المستوى L9",
+                "finalStage": false,
+                "dependsOn": [
+                  "DURATION",
+                  "SCOPE",
+                  "DEPLOYMENT",
+                  "SITE",
+                  "CLASSIFICATION"
+                ]
+              },
+              {
+                "level": 10,
+                "approves": true,
+                "label": "اعتماد المستوى L10",
+                "finalStage": false,
+                "dependsOn": [
+                  "DURATION",
+                  "SCOPE",
+                  "DEPLOYMENT",
+                  "SITE",
+                  "CLASSIFICATION"
+                ]
+              }
+            ]
+          }
+        },
+        "effectiveFrom": "2026-11-04T07:54:23.920829Z",
+        "reason": "سياسة اختبار قبول Stationing V3 — بيانات وهمية، ليست إعدادات إنتاج (ACCEPTANCE TEST POLICY — NOT A PRODUCTION DEFAULT; exception.maxExtra 2 km = ACCEPTANCE TEST VALUE)",
+        "reference": "ACCEPTANCE-V3-POLICY-1",
+        "createdBy": "e157c135-8b42-6ca6-562b-3218b487f0eb",
+        "createdByName": "مدير النظام التجريبي",
+        "createdAt": "2026-11-04T07:54:23.920829Z"
+      },
+      "changes": [
+        {
+          "key": "maxFootprintAreaM2",
+          "previous": null,
+          "current": 500000
+        },
+        {
+          "key": "deploymentRequirement",
+          "previous": null,
+          "current": "REQUIRED"
+        },
+        {
+          "key": "primary",
+          "previous": null,
+          "current": {
+            "minM": 5000,
+            "maxM": 8000,
+            "terrainApplies": true
+          }
+        },
+        {
+          "key": "alternative",
+          "previous": null,
+          "current": {
+            "minM": 3000,
+            "maxM": 5000,
+            "terrainApplies": true
+          }
+        },
+        {
+          "key": "terrainSlopeClassification",
+          "previous": null,
+          "current": {
+            "datasetCode": "copernicus-glo30",
+            "datasetVersion": "2026.11",
+            "classes": [
+              {
+                "code": "FLAT",
+                "label": "مستوٍ / شبه مستوٍ",
+                "fromPct": 0,
+                "toPct": 2
+              },
+              {
+                "code": "UNDULATING",
+                "label": "متموّج",
+                "fromPct": 2,
+                "toPct": 10
+              },
+              {
+                "code": "ROLLING",
+                "label": "تضاريس متدرجة",
+                "fromPct": 10,
+                "toPct": 15
+              },
+              {
+                "code": "HILLY",
+                "label": "تلال",
+                "fromPct": 15,
+                "toPct": 30
+              },
+              {
+                "code": "MOUNTAINOUS",
+                "label": "جبلي / شديد التضرس",
+                "fromPct": 30,
+                "toPct": null
+              }
+            ]
+          }
+        },
+        {
+          "key": "terrainAllowancesM",
+          "previous": null,
+          "current": {
+            "FLAT": 0,
+            "HILLY": 1500,
+            "ROLLING": 1000,
+            "UNDULATING": 500,
+            "MOUNTAINOUS": 2000
+          }
+        },
+        {
+          "key": "terrainClassPriority",
+          "previous": null,
+          "current": [
+            "MOUNTAINOUS",
+            "HILLY",
+            "ROLLING",
+            "UNDULATING",
+            "FLAT"
+          ]
+        },
+        {
+          "key": "terrainAppliesTo",
+          "previous": null,
+          "current": "MAX_ONLY"
+        },
+        {
+          "key": "exception",
+          "previous": null,
+          "current": {
+            "allowed": true,
+            "maxExtraM": 2000
+          }
+        },
+        {
+          "key": "crossBranch",
+          "previous": null,
+          "current": {
+            "allowed": true,
+            "authorities": [
+              "OTHER_UNIT",
+              "SITE_RESPONSIBLE"
+            ],
+            "independent": false
+          }
+        },
+        {
+          "key": "routing",
+          "previous": null,
+          "current": {
+            "startAt": "SELF",
+            "levels": [
+              {
+                "level": 6,
+                "approves": true,
+                "label": "اعتماد المستوى L6",
+                "finalStage": true,
+                "dependsOn": []
+              },
+              {
+                "level": 7,
+                "approves": true,
+                "label": "اعتماد المستوى L7",
+                "finalStage": false,
+                "dependsOn": [
+                  "DURATION",
+                  "SCOPE",
+                  "DEPLOYMENT",
+                  "SITE",
+                  "CLASSIFICATION"
+                ]
+              },
+              {
+                "level": 8,
+                "approves": true,
+                "label": "اعتماد المستوى L8",
+                "finalStage": false,
+                "dependsOn": [
+                  "DURATION",
+                  "SCOPE",
+                  "DEPLOYMENT",
+                  "SITE",
+                  "CLASSIFICATION"
+                ]
+              },
+              {
+                "level": 9,
+                "approves": true,
+                "label": "اعتماد المستوى L9",
+                "finalStage": false,
+                "dependsOn": [
+                  "DURATION",
+                  "SCOPE",
+                  "DEPLOYMENT",
+                  "SITE",
+                  "CLASSIFICATION"
+                ]
+              },
+              {
+                "level": 10,
+                "approves": true,
+                "label": "اعتماد المستوى L10",
+                "finalStage": false,
+                "dependsOn": [
+                  "DURATION",
+                  "SCOPE",
+                  "DEPLOYMENT",
+                  "SITE",
+                  "CLASSIFICATION"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

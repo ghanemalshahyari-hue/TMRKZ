@@ -1,0 +1,4 @@
+2026-11-04T07:25:30.529Z  INFO [] 1 --- [mover] [           main] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://db:5432/mover (PostgreSQL 17.11)
+2026-11-04T07:25:30.576Z  INFO [] 1 --- [mover] [           main] o.f.core.internal.command.DbValidate     : Successfully validated 19 migrations (execution time 00:00.026s)
+2026-11-04T07:25:30.594Z  INFO [] 1 --- [mover] [           main] o.f.core.internal.command.DbMigrate      : Current version of schema "public": 19
+2026-11-04T07:25:30.597Z  INFO [] 1 --- [mover] [           main] o.f.core.internal.command.DbMigrate      : Schema "public" is up to date. No migration necessary.

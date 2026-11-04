@@ -1,0 +1,7 @@
+Regression at the end of the acceptance gate, 4 Nov 2026 (working tree = cea09c7 + the acceptance test and documentation
+changes of C5; no product code beyond cea09c7)
+backend   sh ops/test-backend.sh — Tests run: 197, Failures: 0, Errors: 0, Skipped: 0; BUILD SUCCESS (3 min 18 s; disposable
+          PostgreSQL 17 + PostGIS 3.5 with OpenFGA in the loop). 196 earlier tests + RestationingHrSyncIT (journey G through the
+          HR synchronisation path), which also passed on its own (1/1, 38 s).
+frontend  npm test — 10 files, 94 tests passed (93 earlier + the boundary-copy fallback test); npm run build — OK.
+web image mover/web:rel-cea09c7-v3 built from git archive cea09c7 (its Dockerfile runs npm test before the flagged build).

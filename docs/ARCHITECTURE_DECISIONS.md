@@ -1205,6 +1205,26 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   - **On `tmrkz-test`** (owner approval of the sequence): a backend release without migrations, the web image built
     with `--build-arg STATIONING_V3=true` (sets `VITE_STATIONING_V3` for the bundle only; off by default), and the offline map packages mounted read-only
     under `/map-data/` (`ops/test-env/compose.v3-maps.yml`). The earlier images are kept for recovery.
-- **Not done.** Extensions, early return, cancellation before start; publication of the acceptance policy (by the
-  owner in the studio); production build of the page and packaging of the map data; the full §4 journey; real Oracle
-  and touch (release gates).
+- **Owner final acceptance settings and the real-application acceptance (4 Nov 2026).** This supersedes the two
+  «disabled / set by the owner» points above for the acceptance policy only.
+  - **Settings:**
+    - L6–L10 approve, final L6, ancestry routing from the requesting unit's own approver;
+    - deployment areas REQUIRED;
+    - distance exception enabled with `maxExtraM` 2,000, an ACCEPTANCE TEST VALUE measured beyond the terrain-adjusted
+      maximum; beyond it is a hard refusal;
+    - local sections without an HR level do not request.
+  - **Published** as version 1 through the studio (no SQL). The hierarchy stages rest on scope, classification,
+    duration, site and deployment, from the owner model (V2 §4.5).
+  - **MultiPolygon decision:** the owner-approved target is copying the complete MultiPolygon (every part, shape, area
+    and relative position) and moving it as one rigid group, followed by «تعديل الحدود» / «رسم حدود جديدة». It is never
+    reduced to its largest part, merged, hulled or turned into one Polygon. Until grouped movement is built, the editor
+    falls back to «رسم حدود جديدة» and says why. A Point has no footprint to copy.
+  - **Acceptance result:** journeys A, X, B, C, D, E, F and S passed on `tmrkz-test`. G was proven through the HR sync
+    path in `RestationingHrSyncIT`, because no HR source is attached there.
+  - **Defects found by the acceptance, fixed in local commit `cea09c7`:**
+    - the web image served MapLibre's `.mjs` worker with a non-JavaScript type, so the map was blank;
+    - the misleading copy fallback.
+  - Evidence: `docs/evidence/acceptance-journeys/stationing-v3/SUMMARY.md`.
+- **Not done.** Extensions, early return, cancellation before start; grouped MultiPolygon copy-and-move; vertex
+  editing; production build of the page and packaging of the map data; routes from L8–L10 on the acceptance
+  environment (no fictional requesters or seats there); real non-production Oracle and touch (release gates).

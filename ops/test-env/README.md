@@ -30,7 +30,11 @@ It is idempotent and publishes no policy. Terrain is loaded separately with `ops
 - **Map files:** mounts the offline map packages read-only under `/map-data/` (`compose.v3-maps.yml`).
 - **Recovery:** `MAPS=0 sh ops/test-env/upgrade-web.sh mover/web:1.0.0 <label>`.
 - **Policy:** import `acceptance-v3-policy-template.json` in «سياسة التمركز», set the routing levels and the deployment
-  requirement, check, and publish as the System Administrator.
+  requirement, check, and publish as the System Administrator. `node tests/acceptance/publish-acceptance-policy.mjs`
+  does this through the page (version 1 published 4 Nov 2026), or only reads back and checks a version already in force.
+- **Acceptance:** `node tests/acceptance/restationing-acceptance.mjs` (headless Edge, real Keycloak sign-in; `ONLY=A,X,…`
+  runs a subset, `SHIFT_M=-40000` moves the layouts clear of an earlier run's sites). Journey B waits about five minutes
+  for the real scheduler. Journey G needs an HR source, which this environment does not have.
 
 **Stationing V3 development environment (4 Nov 2026).** `sh ops/test-env/dev-v3.sh build|up|seed|down` runs the
 disposable project `tmrkz-v3dev` on :8097. It has the same fictional directory and data, the backend built from the

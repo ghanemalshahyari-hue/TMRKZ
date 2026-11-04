@@ -1,0 +1,64 @@
+policy version 1 (ACCEPTANCE-V3-POLICY-1): primary 5000–8000 m, alternative 3000–5000 m, deployment REQUIRED, exception +2000 m
+PASS  A1  permanent draft passes the server checks, no exception needed  — منطقة الانتشار الرئيسية: 6004 m, OK, allowed 5000–8500 (exception to 10500), UNDULATING +500 | منطقة الانتشار البديلة: 3996 m, OK, allowed 3000–5000 (exception to 7000), FLAT +0
+PASS  A2  submitted on the page; policy version locked  — UNDER_REVIEW, policy 1, 2 stages: اعتماد المستوى L7 — الخدمات المشتركة ← اعتماد المستوى L6 — المؤسسة
+PASS  A3  ancestry route from the L7 requesting unit: its own approver, then L6 final (no unrelated unit)
+PASS  MAP1  current site, proposed site, both deployment areas and the guidance rings drawn and labelled  — الموقع الحالي الموقع المقترح الانتشار الرئيسية الانتشار البديلة النطاق المسموح (إرشاد)
+PASS  MAP2  terrain mode (GLO-30 notice) and back to street mode keep the request selected  — طبيعة الأرض: Copernicus GLO-30 — نموذج سطح DSM وليس تضاريس رسمية (للعرض فقط)
+PASS  A4  each stage approved on the page by its own seat holder  — APPROVED_NOT_ACTIVATED; اعتماد المستوى L7 — الخدمات المشتركة [APPROVED] ← اعتماد المستوى L6 — المؤسسة [APPROVED]; final approver صاحب الاعتماد التجريبي
+PASS  A5  activated on the page by an independent activator  — ACTIVATED_PERMANENT, by مراجع المرافق التجريبي, site موقع RS-2026-0001
+PASS  A6  new authoritative stationing in the read contract  — موقع RS-2026-0001 PERMANENT REQUEST
+PASS  A7  site links unchanged by the activation (O-14)  — 0 links before and after
+PASS  X1  normal: inside the effective range, no exception stage  — منطقة الانتشار الرئيسية: 6004 m, OK, allowed 5000–8000 (exception to 10000), FLAT +0 | منطقة الانتشار البديلة: 3995 m, OK, allowed 3000–5000 (exception to 7000), FLAT +0
+PASS  X2  within maxExtra: an exception is required, with a written reason  — منطقة الانتشار الرئيسية: 9005 m, NEEDS_EXCEPTION, allowed 5000–8000 (exception to 10000), FLAT +0 | منطقة الانتشار البديلة: 3995 m, OK, allowed 3000–5000 (exception to 7000), FLAT +0
+PASS  X3  with the reason: a separate exception stage just before the final stage  — اعتماد المستوى L7 — الخدمات المشتركة ← اعتماد استثناء مسافة الانتشار ← اعتماد المستوى L6 — المؤسسة
+PASS  X4  submitted; the reason is part of the submitted content  — UNDER_REVIEW, 3 stages: اعتماد المستوى L7 — الخدمات المشتركة ← اعتماد استثناء مسافة الانتشار ← اعتماد المستوى L6 — المؤسسة
+PASS  X5  the written reason is in the audit history of the submission  — audit «RESTATIONING_SUBMITTED» RS-2026-0002
+PASS  X6  a seat holder without «اعتماد استثناء مسافة الانتشار» cannot decide the exception stage  — 403 ليس صاحب قرار المرحلة الحالية («اعتماد استثناء مسافة الانتشار»).
+PASS  X7  the holder of «اعتماد استثناء مسافة الانتشار» decides it  — 200 
+PASS  X8  then the final stage: approved, not activated  — APPROVED_NOT_ACTIVATED; اعتماد المستوى L7 — الخدمات المشتركة [APPROVED] ← اعتماد استثناء مسافة الانتشار [APPROVED] ← اعتماد المستوى L6 — المؤسسة [APPROVED]
+PASS  X9  too far: beyond effective maximum + maxExtra is a hard refusal, no exception stage  — منطقة الانتشار الرئيسية: 10606 m, OUT_OF_RANGE, allowed 5000–8000 (exception to 10000), FLAT +0 | منطقة الانتشار البديلة: 3995 m, OK, allowed 3000–5500 (exception to 7500), UNDULATING +500; submit 400 منطقة الانتشار الرئيسية خارج النطاق المسموح (10606 م، المسموح 5000–8000 م).
+PASS  C1  a deployment area over occupied ground is refused by the checks  — منطقة الانتشار الرئيسية تتداخل مع أرض مشغولة: المقر الإداري — يجب نقلها إلى أرض خالية.
+PASS  C2  and the submission is refused (hard block, O-08)  — 400 منطقة الانتشار الرئيسية تتداخل مع أرض مشغولة: المقر الإداري — يجب نقلها إلى أرض خالية.
+FAIL  D1  flat ground near the acceptance sites: FLAT, no allowance  — UNDULATING +500 m, copernicus-glo30 2026.11 DSM
+PASS  D2  non-zero allowance: beyond the base maximum, inside base + allowance, accepted (maximum only, O-06)  — MOUNTAINOUS «جبلي / شديد التضرس» +2000 m: 9205 m within 5000–10000 (base 5000–8000); shares UNDULATING 5.9%, ROLLING 9.2%, HILLY 17.4%, MOUNTAINOUS 67.4%
+PASS  D3  submitted with the terrain decision and the policy version recorded  — policy 1; منطقة الانتشار الرئيسية: 9205 m, OK, allowed 5000–10000 (exception to 12000), MOUNTAINOUS +2000 | منطقة الانتشار البديلة: 3496 m, OK, allowed 3000–5500 (exception to 7500), UNDULATING +500
+PASS  D4  approved through its route (not activated)  — APPROVED_NOT_ACTIVATED
+NOTE  D5  terrain tie on real data  — an exact area tie on real GLO-30 cells is not practical to construct; the tie, the priority and the block are proven on a synthetic raster (StationingFoundationIT, StationingRulesTest)
+PASS  E1  a unit of another branch is never moved implicitly  — وحدات خارج فرع الوحدة الطالبة: إدارة المشاريع
+PASS  E2  explicit inclusion: one stage of the other unit satisfies OTHER_UNIT and SITE_RESPONSIBLE (not independent)  — موافقة الوحدة من الفرع الآخر — يستوفي: موافقة الوحدة من الفرع الآخر (ضم إدارة المشاريع)، موافقة المسؤول عن موقعها (ضم إدارة المشاريع)
+PASS  E3  submitted  — 3 stages: اعتماد المستوى L7 — الخدمات المشتركة ← موافقة الوحدة من الفرع الآخر ← اعتماد المستوى L6 — المؤسسة
+PASS  F1  returned for changes at the final stage  — اعتماد المستوى L7 — الخدمات المشتركة [APPROVED] ← موافقة الوحدة من الفرع الآخر [APPROVED] ← اعتماد المستوى L6 — المؤسسة
+PASS  F2  resubmitted: only the deployment changed  — changed DEPLOYMENT
+PASS  F3  only the decisions resting on the deployment are taken again; the cross-branch decision is carried (D18)  — invalidated اعتماد المستوى L7 — الخدمات المشتركة; carried موافقة الوحدة من الفرع الآخر; اعتماد المستوى L7 — الخدمات المشتركة ← موافقة الوحدة من الفرع الآخر [CARRIED] ← اعتماد المستوى L6 — المؤسسة
+PASS  F4  the re-taken stages are decided again; the request completes  — APPROVED_NOT_ACTIVATED; اعتماد المستوى L7 — الخدمات المشتركة [APPROVED] ← موافقة الوحدة من الفرع الآخر [CARRIED] ← اعتماد المستوى L6 — المؤسسة [APPROVED]
+PASS  S1  the requester cannot approve their own request  — 403 SEPARATION_OF_DUTIES مقدم الطلب لا يقرر مراحل طلبه.
+PASS  S2  a seat delegated to the requester does not let them approve their own request  — 403 SEPARATION_OF_DUTIES مقدم الطلب لا يقرر مراحل طلبه.
+NOTE  S2r  delegation revoked after the check  — 204
+PASS  S3  a user of another branch cannot see the request
+PASS  S4  nor act on it
+PASS  S5  another unit's approver cannot decide this stage  — 404 العنصر المطلوب غير موجود أو خارج نطاق صلاحياتك.
+PASS  S6  the final approver cannot decide before the current stage  — 403 ليس صاحب قرار المرحلة الحالية («اعتماد المستوى L7 — الخدمات المشتركة»).
+PASS  S7  activation before final approval is refused  — 400 التفعيل بعد الاعتماد النهائي فقط
+PASS  S8  the security request is closed by rejection  — 200 REJECTED
+NOTE  S9  second account of the same human  — accepted by the owner as backend/OpenFGA evidence (RestationingWorkflowIT.permanentJourney); the acceptance directory holds no linked second account
+PASS  K-Polygon  «نسخ حدود الموقع الحالي» on a Polygon current site (moving unit الخدمات المشتركة)  — نُسخت حدود «موقع RS-2026-0001» — انقر على الخريطة حيث تريد نقلها; draw button «نقل الموقع المقترح»; draft RS-2026-0008
+FAIL  K-MultiPolygon  «نسخ حدود الموقع الحالي» on a MultiPolygon current site (moving unit قسم الخدمات العامة)  — ; draw button «رسم موقع جديد»; draft RS-2026-0009
+FAIL  K-Point  «نسخ حدود الموقع الحالي» on a Point current site (moving unit إدارة التقنية)  — ; draw button «رسم موقع جديد»; draft RS-2026-0010
+NOTE  G  hierarchy change through HR synchronisation  — NOT RUN on this environment: HR source «مصدر الموارد البشرية — بيئة الاختبار» enabled=false, no connection settings; its HR mirror was loaded by ops/test-env/seed.sql. The synchronisation reads Oracle only (JDBC thin) and the owner forbids direct SQL as equivalent evidence. Proven through HrSyncService with the Oracle-compatible test source: RestationingHrSyncIT.
+PASS  B1  temporary approved and activated: scheduled for its start  — TEMPORARY_SCHEDULED; 2 stages; start 2026-11-04T08:06:17.888Z, end 2026-11-04T08:09:17.888Z; original مكتب التقنية PERMANENT
+PASS  B2  the real scheduler started it at its start; the authoritative stationing is the temporary site  — 2026-11-04T08:07:04.292Z: مكتب التقنية PERMANENT, موقع RS-2026-0011 TEMPORARY until 2026-11-04T08:09:17.888Z
+PASS  B3  returned automatically at its end; the preserved original stationing is the authoritative one again  — TEMPORARY_RETURNED; temporary 2026-11-04T08:06:17.888Z → 2026-11-04T08:09:17.888Z (RETURNED); now مكتب التقنية PERMANENT
+NOTE  B4  extension, early return, cancellation before start  — not built yet — remaining implementation work, not accepted here
+PASS  NET  zero external requests from the real page
+FAIL  CONSOLE  no console or page errors on the real page  — t.requester: Error: Worker failed to load. Check that the worker URL is correct.
+    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.requester: Error: Worker failed to load. Check that the worker URL is correct.
+    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.manager: Error: Worker failed to load. Check that the worker URL is correct.
+    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.manager: Error: Worker failed to load. Check that the worker URL is correct.
+    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.approver: Error: Worker failed to load. Check that the worker URL is correct.
+    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.approver: Error: Worker failed to load. Check that the worker URL is correct.
+    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.facilities: Error: Worker failed to load. Check that the worker URL is correct.
+    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214) | t.facilities: Error: Worker failed to load. Check that the worker URL is correct.
+    at Worker.<anonymous> (http://localhost:8088/assets/RestationingPage-QrLrGzd0.js:2:276214)
+
+4 check(s) FAILED (43 pass, 5 notes)
+exit=1
