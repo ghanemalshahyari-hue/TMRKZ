@@ -1,0 +1,67 @@
+{
+  "ranAt": "2026-11-04T10:22:45.934Z",
+  "base": "http://localhost:8097",
+  "results": [
+    {
+      "id": "G1a",
+      "label": "Polygon copied exactly (saved by the server)",
+      "result": "FAIL",
+      "extra": "نُسخت حدود «موقع RS-2026-0004» — اسحب الموقع لنقله بشكله; 4 vertices"
+    },
+    {
+      "id": "G1b",
+      "label": "grouped drag: shape and area kept; the server accepts the saved geometry",
+      "result": "PASS",
+      "extra": "moved 359 m; area Δ 0.0000 %; max edge Δ 0.000 m; server site area 64312 m²"
+    },
+    {
+      "id": "G2a",
+      "label": "one vertex moved; area and validity update live; the server stores it as EDITED",
+      "result": "FAIL",
+      "extra": "readout: المساحة: 82,337 م² من حد 200,000 م²الأجزاء: 1الجزء النشط: 1 · الرأس 2الحدود صالحة; server area 81984 m²"
+    },
+    {
+      "id": "G2b",
+      "label": "after reload and reopening, the editor holds exactly the saved geometry (saved again unchanged)",
+      "result": "PASS",
+      "extra": "المساحة: 82,337 م² من حد 200,000 م²الأجزاء: 1الحدود صالحة"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors",
+      "result": "PASS",
+      "extra": ""
+    }
+  ],
+  "perf": [
+    {
+      "site": "Polygon (4 vertices)",
+      "step": "grouped drag",
+      "ms": 633,
+      "steps": 24,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "Polygon (4 vertices)",
+      "step": "vertex drag",
+      "ms": 519,
+      "steps": 16,
+      "longest": 0,
+      "longTasks": 0
+    }
+  ],
+  "requests": [
+    {
+      "scenario": "G1 مضلع",
+      "id": "5ee54a98-5da1-4f20-969f-3160ef0bcf20",
+      "user": "t.requester"
+    }
+  ]
+}

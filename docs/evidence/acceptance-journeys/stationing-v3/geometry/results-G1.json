@@ -1,0 +1,47 @@
+{
+  "ranAt": "2026-11-04T10:24:14.269Z",
+  "base": "http://localhost:8097",
+  "results": [
+    {
+      "id": "G1a",
+      "label": "Polygon copied exactly (saved by the server)",
+      "result": "FAIL",
+      "extra": "نُسخت حدود «موقع RS-2026-0004» — اسحب الموقع لنقله بشكله; 4 vertices; shape DRAWN, same true; diff 126: [55.3148,25.1913]]]} || [55.3148,25.1913]]]}"
+    },
+    {
+      "id": "G1b",
+      "label": "grouped drag: shape and area kept; the server accepts the saved geometry",
+      "result": "PASS",
+      "extra": "moved 359 m; area Δ 0.0000 %; max edge Δ 0.000 m; server site area 64312 m²"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors",
+      "result": "PASS",
+      "extra": ""
+    }
+  ],
+  "perf": [
+    {
+      "site": "Polygon (4 vertices)",
+      "step": "grouped drag",
+      "ms": 627,
+      "steps": 24,
+      "longest": 0,
+      "longTasks": 0
+    }
+  ],
+  "requests": [
+    {
+      "scenario": "G1 مضلع",
+      "id": "026f9a35-49ff-49d0-b45e-ef0e7368a5f5",
+      "user": "t.requester"
+    }
+  ]
+}

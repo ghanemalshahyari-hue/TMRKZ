@@ -472,7 +472,8 @@ try {
   if (run('K')) {
     const cases = [
       ['t.requester', 'الخدمات المشتركة', 'الخدمات المشتركة', 'Polygon', 'نُسخت حدود'],
-      ['t.requester', 'الخدمات المشتركة', 'قسم الخدمات العامة', 'MultiPolygon', 'متعددة الأجزاء'],
+      // a MultiPolygon is copied whole since the geometry editing phase (owner, 4 Nov 2026)
+      ['t.requester', 'الخدمات المشتركة', 'قسم الخدمات العامة', 'MultiPolygon', 'كاملة'],
       ['t.requester2', 'إدارة التقنية', 'إدارة التقنية', 'Point', 'نقطةً بلا حدود'],
     ];
     for (const [user, unitName, movingName, type, expect] of cases) {

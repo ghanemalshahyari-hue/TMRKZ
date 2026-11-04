@@ -1338,3 +1338,51 @@ D12, D16, A4, A5, A6). Plan: `docs/audit/stationing-v3-production/LIFECYCLE_PLAN
 **Not done.**
 - D11 end-of-temporary reminders.
 - Showing the time of the effective end in the lifecycle panel.
+
+## ADR-035 Stationing V3 geometry editing: a MultiPolygon copied whole and moved as one, vertex editing — Development, not on the acceptance database (2026-11-04)
+
+**Context.** Owner gate «GEOMETRY EDITING PHASE — GO»:
+- the final behaviour for a current site of several parts is to copy the complete MultiPolygon and move it as one rigid
+  group;
+- vertex editing is an advanced mode;
+- the server stays authoritative;
+- undo, redo and reset follow the accepted footprint engine;
+- no new MultiPolygon operation may be invented.
+
+**Decision.**
+- **No migration.** The V19 request content (`site.geometry`), the submitted revisions and the site geometry versions
+  already hold a Polygon or a MultiPolygon.
+- **Rules (`lib/siteGeometry`):**
+  - a Polygon stays a Polygon, and a MultiPolygon keeps every part in order;
+  - the site moves as one rigid object: every vertex keeps its geodesic offset from an anchor shared by all parts (the
+    accepted engine's `offsetsOf`/`rebuild`);
+  - a vertex edit changes one existing vertex of one part;
+  - nothing is added, removed, split, merged, hulled, holed or converted.
+- **Map editor (`SiteEditor`, MapLibre):**
+  - **move:** the normal journey, with no handles; one grouped drag from any part;
+  - **vertices:** the advanced mode; choose a part, then drag one of its vertices;
+  - **history:** undo, redo and reset as `SiteHistory`;
+  - **responsiveness:** updates coalesced to animation frames, and cheap validation while dragging;
+  - **pointer:** followed at window level, for mouse, touch and pen.
+- **Copy and redraw:**
+  - «نسخ حدود الموقع الحالي» copies a MultiPolygon whole;
+  - «رسم حدود جديدة» replaces it only after the requester confirms;
+  - a Point still has no footprint to copy.
+- **Server (`RestationingChecks.siteProblem`):** accepts one valid Polygon or MultiPolygon, refuses any part without area
+  and repairs nothing.
+  - Activation registers the submitted geometry with its own type.
+  - Saved edits and submissions audit the site's type, part count, area and SHA-256.
+  - The revisions hold the geometry itself.
+- **Parity:** client and server validity agree on the shared cases (`siteGeometryCases.json`). The client's area is the
+  PostGIS geography area (WGS84 spheroid) within 0.05 %.
+
+**Verified.**
+- Unit tests: frontend 102/102 (`siteGeometry.test.ts` 8).
+- Backend: `RestationingWorkflowIT` 15/15 (parity, MultiPolygon through activation, invalid MultiPolygon); full suite
+  209/209.
+- Real page on the development environment: G1–G9, approver view and performance 17/17, 0 console errors, 0 external
+  requests (`docs/evidence/acceptance-journeys/stationing-v3/geometry/SUMMARY.md`).
+
+**Not done.**
+- The journeys on `tmrkz-test` (owner approval). Committed as `58423ce`.
+- Real touch.

@@ -294,9 +294,18 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     - tests: `RestationingLifecycleIT` 8/8, backend 206/206, frontend 94/94.
 
     Open: D11 reminders; the time of the effective end in the panel.
+  - **Geometry editing (ADR-035, 4 Nov) — commit `58423ce`, pushed at the owner's request; NOT on `tmrkz-test`:**
+    - a MultiPolygon copied whole and moved as one rigid group;
+    - Polygon and MultiPolygon vertex editing (advanced mode);
+    - undo, redo and reset;
+    - server validation of Polygon and MultiPolygon, with the parity cases and spheroid areas;
+    - no migration.
+
+    Real page on the development environment: G1–G9 17/17, 0 long tasks during drags, up to the 1,500-vertex polygon.
+    Tests: frontend 102/102, backend 209/209. Next: deployment to `tmrkz-test` and the journeys there (owner
+    approval).
   - **Before production readiness (owner list):**
-    - grouped MultiPolygon copy and move;
-    - corner/vertex editing;
+    - geometry editing on `tmrkz-test` (above);
     - the long mixed-label wrap on the map;
     - production packaging of the page and map data;
     - a controlled terrain-tie scenario (preferred);
