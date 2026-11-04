@@ -4,7 +4,8 @@
   python ops/map-package/readiness.py --root <map-root> [--url http://localhost:8088] [--db-container <name>]
                                       [--expect-package tmrkz-map-2026.11.1] [--quick]
 
-Package (from <map-root>/current, package_format.verify): package present, manifest valid, checksums valid (every file
+Package (from <map-root>/current, package_format.verify): package present, manifest valid, required files present (no
+file missing or unexpected), checksums valid (every file
 hashed unless --quick), basemap readable, required fonts present, style local, terrain dataset consistent, geographic
 coverage complete, attribution and licence notices present.
 
@@ -34,7 +35,7 @@ import package_format as pf  # noqa: E402
 PKG_CHECKS = {  # verifier check → readiness question
     "package present": "package present",
     "manifest structure": "manifest valid",
-    "layout complete and exact": "manifest valid",
+    "layout complete and exact": "required files present",
     "file sizes": "checksums valid",
     "SHA256SUMS matches the manifest": "checksums valid",
     "checksums": "checksums valid",
