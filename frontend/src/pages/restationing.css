@@ -70,3 +70,16 @@
   .rs-layout, .rs-editor, .rs-columns { grid-template-columns: 1fr; }
   .rs-list { max-height: none; }
 }
+/* «سياسة التمركز» */
+.rs-policy { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+.rs-policy-state { grid-column: 1 / -1; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.rs-policy .rs-form { max-height: none; overflow: visible; }
+.rs-policy h3 { margin: 0; font-size: 1rem; }
+.rs-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.rs-table th, .rs-table td { border-bottom: 1px solid var(--line); padding: 4px 6px; text-align: start; vertical-align: top; }
+.rs-table input:not([type='checkbox']):not([type='radio']) { width: 100%; min-width: 60px; border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; font: inherit; }
+.rs-facts-cell { display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.rs-priority { margin: 6px 0; padding-inline-start: 20px; }
+.rs-priority li { margin-bottom: 4px; }
+.rs-policy .chip { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 1px 8px; cursor: pointer; font: inherit; margin-inline-start: 6px; }
+@media (max-width: 1100px) { .rs-policy { grid-template-columns: 1fr; } }

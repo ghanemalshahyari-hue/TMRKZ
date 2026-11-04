@@ -20,6 +20,7 @@ import { StationingPage } from './pages/StationingPage';
 import { WorkflowStudio } from './pages/WorkflowStudio';
 
 // Stationing V3 (behind VITE_STATIONING_V3): loaded on demand, so the offline map code is a separate chunk
+const StationingPolicyPage = lazy(() => import('./pages/StationingPolicyPage').then((m) => ({ default: m.StationingPolicyPage })));
 const RestationingPage = lazy(() => import('./pages/RestationingPage').then((m) => ({ default: m.RestationingPage })));
 
 const POLL_MS = 30_000;
@@ -39,6 +40,7 @@ function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: b
   if (view === 'permissions') return !can('MANAGE_ACCESS');
   if (view === 'org') return !(can('VIEW') || can('MANAGE_ACCESS') || can('MANAGE_FACILITIES') || can('CONFIGURE'));
   if (['stationing', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
+  if (view === 'stationingPolicy') return !can('CONFIGURE');
   if (view === 'restationing') return !(can('VIEW') || can('CREATE_RESTATIONING') || can('APPROVE') || can('ACTIVATE_STATIONING') || can('APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION'));
   if (summaryOnly) return true;
   if (view === 'review') return !can('REVIEW');
@@ -183,6 +185,11 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
 
   const pages: Record<View, () => ReactNode> = {
     stationing: () => <StationingPage />,
+    stationingPolicy: () => (
+      <Suspense fallback={<div className="empty">جارٍ التحميل…</div>}>
+        <StationingPolicyPage />
+      </Suspense>
+    ),
     restationing: () => (
       <Suspense fallback={<div className="empty">جارٍ تحميل الخريطة…</div>}>
         <RestationingPage />

@@ -1,0 +1,349 @@
+import { useEffect, useState } from 'react';
+import { api } from '../api/client';
+import type {
+  HierarchyLevel,
+  PolicyChange,
+  RoutingLevelValue,
+  StationingFact,
+  StationingPolicyValues,
+  StationingPolicyVersion,
+  TerrainDatasetView,
+} from '../api/types';
+import { Heading } from '../components/ui';
+import { useApp } from '../lib/app';
+import { fullDate } from '../lib/dates';
+import './restationing.css';
+
+const FACTS: [StationingFact, string][] = [
+  ['SCOPE', 'الوحدات المنتقلة'],
+  ['CLASSIFICATION', 'النوع (دائم / مؤقت)'],
+  ['DURATION', 'المدة'],
+  ['SITE', 'الموقع المقترح'],
+  ['DEPLOYMENT', 'الانتشار'],
+  ['AVAILABILITY', 'الإتاحة'],
+];
+const AUTHORITIES: [StationingPolicyValues['crossBranch']['authorities'][number], string][] = [
+  ['OTHER_UNIT', 'موافقة الوحدة من الفرع الآخر'],
+  ['OTHER_UNIT_PARENT', 'موافقة أب الوحدة من الفرع الآخر'],
+  ['SITE_RESPONSIBLE', 'موافقة المسؤول عن موقعها'],
+];
+
+/** A blank starting point: the owner-approved initial slope classes (decision 2) and nothing else assumed. */
+function blank(classes: StationingPolicyValues['terrainSlopeClassification']['classes'], dataset: TerrainDatasetView | undefined, levels: HierarchyLevel[]): StationingPolicyValues {
+  return {
+    maxFootprintAreaM2: 0,
+    deploymentRequirement: null,
+    primary: { minM: 0, maxM: 0, terrainApplies: true },
+    alternative: { minM: 0, maxM: 0, terrainApplies: true },
+    terrainSlopeClassification: { datasetCode: dataset?.code ?? '', datasetVersion: dataset?.version ?? '', classes },
+    terrainAllowancesM: {},
+    terrainClassPriority: [],
+    terrainAppliesTo: 'MAX_ONLY',
+    exception: { allowed: false, maxExtraM: 0 },
+    crossBranch: { allowed: false, authorities: [], independent: false },
+    routing: { startAt: 'SELF', levels: levels.map((l) => ({ level: l.level, approves: false, label: '', finalStage: false, dependsOn: [] })) },
+  };
+}
+
+/**
+ * «سياسة التمركز»: the System Administrator's versioned Stationing policy (Model V3 §8). Every value is the
+ * administrator's; the page assumes none. It starts from the version in force (or the approved initial slope classes),
+ * can import values from a JSON file, checks them on the server before publishing, and shows every version with its
+ * changes. Publishing is append-only, effective-dated, reasoned and audited on the server.
+ */
+export function StationingPolicyPage() {
+  const app = useApp();
+  const [values, setValues] = useState<StationingPolicyValues | null>(null);
+  const [inForce, setInForce] = useState<StationingPolicyVersion | null>(null);
+  const [history, setHistory] = useState<{ version: StationingPolicyVersion; changes: PolicyChange[] }[]>([]);
+  const [levels, setLevels] = useState<HierarchyLevel[]>([]);
+  const [datasets, setDatasets] = useState<TerrainDatasetView[]>([]);
+  const [reason, setReason] = useState('');
+  const [reference, setReference] = useState('');
+  const [effective, setEffective] = useState('');
+  const [check, setCheck] = useState<{ ok: boolean; problems: string[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+
+  const load = async () => {
+    const [ov, hist, lv, ds] = await Promise.all([api.stationingPolicy(), api.stationingPolicyVersions(), api.hierarchyLevels(), api.terrainDatasets()]);
+    setInForce(ov.inForce);
+    setHistory(hist);
+    setLevels(lv);
+    setDatasets(ds);
+    setValues(ov.inForce ? structuredClone(ov.inForce.values) : blank(ov.initialSlopeClasses, ds[0], lv));
+  };
+  useEffect(() => {
+    load().catch((e: Error) => app.toast(e.message));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!values) return <div className="card empty">جارٍ التحميل…</div>;
+  const set = (patch: Partial<StationingPolicyValues>) => {
+    setValues({ ...values, ...patch });
+    setCheck(null);
+  };
+  const classes = values.terrainSlopeClassification.classes;
+  const setLevel = (i: number, patch: Partial<RoutingLevelValue>) =>
+    set({ routing: { ...values.routing, levels: values.routing.levels.map((l, j) => (j === i ? { ...l, ...patch } : l)) } });
+
+  const importFile = async (f: File) => {
+    try {
+      const raw = JSON.parse(await f.text()) as Partial<StationingPolicyValues> & { reason?: string; reference?: string; _note?: string };
+      const keep = values.routing.levels;
+      const next = { ...values } as Record<string, unknown>;
+      for (const k of Object.keys(values) as (keyof StationingPolicyValues)[]) if (raw[k] !== undefined) next[k] = raw[k];
+      const merged = next as StationingPolicyValues;
+      // a file with no routing levels keeps the rows already on the page (the administrator sets them here)
+      if (!raw.routing?.levels?.length) merged.routing = { startAt: raw.routing?.startAt ?? values.routing.startAt, levels: keep };
+      setValues(merged);
+      if (raw.reason) setReason(raw.reason);
+      if (raw.reference) setReference(raw.reference);
+      setNote(raw._note ?? null);
+      setCheck(null);
+      app.toast('استُوردت القيم من الملف — راجعها قبل الفحص والنشر');
+    } catch (e) {
+      app.toast('ملف غير مقروء: ' + (e as Error).message);
+    }
+  };
+
+  const validate = async () => {
+    setBusy(true);
+    try {
+      const local: string[] = [];
+      if (!values.deploymentRequirement) local.push('اختر هل منطقتا الانتشار مطلوبتان أم اختياريتان');
+      const r = await api.validateStationingPolicy(values);
+      setCheck({ ok: r.ok && local.length === 0, problems: [...local, ...r.problems] });
+    } catch (e) {
+      app.toast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const publish = async () => {
+    setBusy(true);
+    try {
+      const r = await api.publishStationingPolicy(values, effective ? new Date(effective).toISOString() : null, reason, reference);
+      app.toast('نُشرت نسخة السياسة ' + r.version.version);
+      setCheck(null);
+      await load();
+    } catch (e) {
+      const err = e as Error & { details?: { problems?: string[] } };
+      setCheck({ ok: false, problems: err.details?.problems ?? [err.message] });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const km = (m: number) => (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 2 }) + ' كم';
+  const num = (v: string) => (v === '' ? 0 : Number(v));
+
+  return (
+    <>
+      <Heading
+        en="STATIONING POLICY / SYSTEM ADMINISTRATOR"
+        title="سياسة التمركز"
+        description="كل قيمة هنا يحددها مسؤول النظام، ولا يفترض النظام أي قيمة. النشر نسخة جديدة بتاريخ سريان وسبب ومرجع وتدقيق، والطلب يبقى مقفلاً على نسخة إرساله."
+        actions={
+          <label className="button">
+            استيراد قيم من ملف JSON
+            <input type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && importFile(e.target.files[0])} />
+          </label>
+        }
+      />
+      <div className="rs-policy">
+        <div className="card rs-policy-state">
+          {inForce ? (
+            <span>
+              النسخة السارية: <b>{inForce.version}</b> منذ {fullDate(inForce.effectiveFrom)} · {inForce.createdByName} · {inForce.reference}
+            </span>
+          ) : (
+            <span className="rs-bad">لا توجد سياسة تمركز نافذة — الطلبات لا تُرسل حتى تُنشر نسخة.</span>
+          )}
+          {note && <div className="rs-banner orange">{note}</div>}
+        </div>
+
+        <section className="card rs-form">
+          <h3>منطقتا الانتشار والمسافات (من المركز إلى المركز)</h3>
+          <fieldset className="rs-inline">
+            <legend>هل منطقتا الانتشار مطلوبتان؟</legend>
+            <label><input type="radio" checked={values.deploymentRequirement === 'REQUIRED'} onChange={() => set({ deploymentRequirement: 'REQUIRED' })} /> مطلوبتان (الموقع والرئيسية والبديلة)</label>
+            <label><input type="radio" checked={values.deploymentRequirement === 'OPTIONAL'} onChange={() => set({ deploymentRequirement: 'OPTIONAL' })} /> اختياريتان (لا شيء أو المنطقتان معاً)</label>
+          </fieldset>
+          {(['primary', 'alternative'] as const).map((leg) => (
+            <fieldset key={leg} className="rs-inline">
+              <legend>{leg === 'primary' ? 'الموقع ← منطقة الانتشار الرئيسية' : 'الرئيسية ← منطقة الانتشار البديلة'}</legend>
+              <label>من (م) <input type="number" min={0} value={values[leg].minM} onChange={(e) => set({ [leg]: { ...values[leg], minM: num(e.target.value) } })} /></label>
+              <label>إلى (م) <input type="number" min={0} value={values[leg].maxM} onChange={(e) => set({ [leg]: { ...values[leg], maxM: num(e.target.value) } })} /></label>
+              <span className="muted">{km(values[leg].minM)}–{km(values[leg].maxM)}</span>
+              <label><input type="checkbox" checked={values[leg].terrainApplies} onChange={(e) => set({ [leg]: { ...values[leg], terrainApplies: e.target.checked } })} /> إضافة الأرض تنطبق</label>
+            </fieldset>
+          ))}
+          <label>
+            الحد الأقصى لمساحة الموقع المقترح (م²)
+            <input type="number" min={0} value={values.maxFootprintAreaM2} onChange={(e) => set({ maxFootprintAreaM2: num(e.target.value) })} />
+          </label>
+        </section>
+
+        <section className="card rs-form">
+          <h3>طبيعة الأرض (الميل بالنسبة المئوية؛ الإضافة تمد الحد الأقصى فقط)</h3>
+          <label>
+            مجموعة بيانات الأرض
+            <select
+              value={values.terrainSlopeClassification.datasetCode + '|' + values.terrainSlopeClassification.datasetVersion}
+              onChange={(e) => {
+                const [code, version] = e.target.value.split('|');
+                set({ terrainSlopeClassification: { ...values.terrainSlopeClassification, datasetCode: code, datasetVersion: version } });
+              }}
+            >
+              <option value="|">— اختر —</option>
+              {datasets.map((d) => (
+                <option key={d.id} value={d.code + '|' + d.version}>
+                  {d.code} {d.version} (نموذج سطح {d.surfaceModel})
+                </option>
+              ))}
+            </select>
+          </label>
+          <table className="rs-table">
+            <thead>
+              <tr><th>الفئة</th><th>التسمية</th><th>من ٪</th><th>إلى ٪</th><th>الإضافة (م)</th></tr>
+            </thead>
+            <tbody>
+              {classes.map((c, i) => (
+                <tr key={c.code}>
+                  <td>{c.code}</td>
+                  <td><input value={c.label} onChange={(e) => set({ terrainSlopeClassification: { ...values.terrainSlopeClassification, classes: classes.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) } })} /></td>
+                  <td>{c.fromPct}</td>
+                  <td>{c.toPct ?? '∞'}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min={0}
+                      value={values.terrainAllowancesM[c.code] ?? ''}
+                      placeholder="—"
+                      onChange={(e) => {
+                        const a = { ...values.terrainAllowancesM };
+                        if (e.target.value === '') delete a[c.code];
+                        else a[c.code] = Number(e.target.value);
+                        set({ terrainAllowancesM: a });
+                      }}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div>
+            <b>ترتيب الأولوية عند تعادل أكبر مساحة (الأعلى أولاً):</b>
+            <ol className="rs-priority">
+              {values.terrainClassPriority.map((code, i) => (
+                <li key={code}>
+                  {classes.find((c) => c.code === code)?.label ?? code}
+                  <button className="chip" disabled={i === 0} onClick={() => { const p = [...values.terrainClassPriority]; [p[i - 1], p[i]] = [p[i], p[i - 1]]; set({ terrainClassPriority: p }); }}>▲</button>
+                  <button className="chip" onClick={() => set({ terrainClassPriority: values.terrainClassPriority.filter((x) => x !== code) })}>✕</button>
+                </li>
+              ))}
+            </ol>
+            {classes.filter((c) => !values.terrainClassPriority.includes(c.code)).map((c) => (
+              <button key={c.code} className="chip" onClick={() => set({ terrainClassPriority: [...values.terrainClassPriority, c.code] })}>＋ {c.label}</button>
+            ))}
+          </div>
+        </section>
+
+        <section className="card rs-form">
+          <h3>استثناء المسافة (O-17) والضم من فرع آخر (O-03)</h3>
+          <fieldset className="rs-inline">
+            <legend>استثناء مسافة الانتشار</legend>
+            <label><input type="checkbox" checked={values.exception.allowed} onChange={(e) => set({ exception: { ...values.exception, allowed: e.target.checked } })} /> مسموح بمرحلة اعتماد منفصلة</label>
+            <label>أقصى زيادة (م) <input type="number" min={0} disabled={!values.exception.allowed} value={values.exception.maxExtraM} onChange={(e) => set({ exception: { ...values.exception, maxExtraM: num(e.target.value) } })} /></label>
+          </fieldset>
+          <fieldset>
+            <legend>الضم من فرع آخر</legend>
+            <label className="rs-check"><input type="checkbox" checked={values.crossBranch.allowed} onChange={(e) => set({ crossBranch: { ...values.crossBranch, allowed: e.target.checked } })} /> مسموح (صريحاً ومُدقَّقاً، لا نقل تلقائي)</label>
+            {AUTHORITIES.map(([a, label]) => (
+              <label key={a} className="rs-check">
+                <input
+                  type="checkbox"
+                  disabled={!values.crossBranch.allowed}
+                  checked={values.crossBranch.authorities.includes(a)}
+                  onChange={(e) => set({ crossBranch: { ...values.crossBranch, authorities: e.target.checked ? [...values.crossBranch.authorities, a] : values.crossBranch.authorities.filter((x) => x !== a) } })}
+                />{' '}
+                {label}
+              </label>
+            ))}
+            <label className="rs-check"><input type="checkbox" disabled={!values.crossBranch.allowed} checked={values.crossBranch.independent} onChange={(e) => set({ crossBranch: { ...values.crossBranch, independent: e.target.checked } })} /> موافقات مستقلة بإنسان مختلف (O-03b)</label>
+          </fieldset>
+        </section>
+
+        <section className="card rs-form">
+          <h3>مسار الاعتماد (من الوحدة الطالبة صعوداً في هيكل Oracle)</h3>
+          <fieldset className="rs-inline">
+            <legend>المرحلة الأولى</legend>
+            <label><input type="radio" checked={values.routing.startAt === 'SELF'} onChange={() => set({ routing: { ...values.routing, startAt: 'SELF' } })} /> معتمد الوحدة الطالبة</label>
+            <label><input type="radio" checked={values.routing.startAt === 'PARENT'} onChange={() => set({ routing: { ...values.routing, startAt: 'PARENT' } })} /> أبوها</label>
+          </fieldset>
+          <table className="rs-table">
+            <thead>
+              <tr><th>المستوى</th><th>في الهيكل</th><th>يعتمد</th><th>التسمية</th><th>نهائي</th><th>تقوم المرحلة على (تُعاد إن تغيّر)</th><th /></tr>
+            </thead>
+            <tbody>
+              {values.routing.levels.map((l, i) => (
+                <tr key={i}>
+                  <td><input type="number" value={l.level} onChange={(e) => setLevel(i, { level: num(e.target.value) })} style={{ width: 60 }} /></td>
+                  <td className="muted">{levels.find((x) => x.level === l.level)?.examples.join('، ') ?? '—'}</td>
+                  <td><input type="checkbox" checked={l.approves} onChange={(e) => setLevel(i, { approves: e.target.checked })} /></td>
+                  <td><input value={l.label} placeholder="مثل: اعتماد الإدارة" onChange={(e) => setLevel(i, { label: e.target.value })} /></td>
+                  <td><input type="radio" name="final" checked={l.finalStage} onChange={() => set({ routing: { ...values.routing, levels: values.routing.levels.map((x, j) => ({ ...x, finalStage: j === i })) } })} /></td>
+                  <td className="rs-facts-cell">
+                    {l.finalStage ? (
+                      <span className="muted">كل الحقائق (النهائي)</span>
+                    ) : (
+                      FACTS.map(([f, label]) => (
+                        <label key={f} className="rs-check">
+                          <input type="checkbox" checked={l.dependsOn.includes(f)} onChange={(e) => setLevel(i, { dependsOn: e.target.checked ? [...l.dependsOn, f] : l.dependsOn.filter((x) => x !== f) })} /> {label}
+                        </label>
+                      ))
+                    )}
+                  </td>
+                  <td><button className="chip" onClick={() => set({ routing: { ...values.routing, levels: values.routing.levels.filter((_, j) => j !== i) } })}>✕</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button className="button" onClick={() => set({ routing: { ...values.routing, levels: [...values.routing.levels, { level: 0, approves: false, label: '', finalStage: false, dependsOn: [] }] } })}>＋ مستوى</button>
+          <small className="muted">المستويات من Oracle: {levels.map((l) => `L${l.level} (${l.units})`).join('، ') || '—'}. المستوى بلا صف لا يعتمد؛ والمسار يقف عند المستوى النهائي.</small>
+        </section>
+
+        <section className="card rs-form">
+          <h3>النشر</h3>
+          <label>سبب التغيير<textarea value={reason} onChange={(e) => setReason(e.target.value)} /></label>
+          <label>المرجع<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
+          <label>تاريخ السريان (فارغ = الآن)<input type="datetime-local" value={effective} onChange={(e) => setEffective(e.target.value)} /></label>
+          <div className="rs-tools">
+            <button className="button" disabled={busy} onClick={validate}>فحص على الخادم</button>
+            <button className="button primary" disabled={busy || !check?.ok || reason.trim().length < 5} onClick={publish}>نشر نسخة جديدة</button>
+          </div>
+          {check && (
+            <div>
+              <div className={'rs-verdict ' + (check.ok ? 'ok' : 'no')}>{check.ok ? 'القيم صالحة للنشر' : 'قيم غير صالحة'}</div>
+              <ul className="rs-problems">{check.problems.map((p) => <li key={p}>{p}</li>)}</ul>
+            </div>
+          )}
+        </section>
+
+        <section className="card rs-form">
+          <h3>النسخ المنشورة</h3>
+          {history.length === 0 && <span className="muted">لا نسخ بعد.</span>}
+          <ul className="rs-revisions">
+            {history.map((h) => (
+              <li key={h.version.id}>
+                <b>نسخة {h.version.version}</b> · سارية من {fullDate(h.version.effectiveFrom)} · {h.version.createdByName} · {h.version.reference} — {h.version.reason}
+                {h.changes.length > 0 && <div className="muted">تغيّر: {h.changes.map((c) => c.key).join('، ')}</div>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+    </>
+  );
+}

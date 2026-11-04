@@ -87,6 +87,37 @@ public class StationingController {
         return new VersionView(v, policies.changes(v));
     }
 
+    public record ValidateInput(StationingPolicy values) {
+    }
+
+    /** Dry run for the policy studio: the problems publishing these values would meet; nothing is written. */
+    @PostMapping("/stationing/policy/validate")
+    public Map<String, Object> validatePolicy(Actor actor, @RequestBody ValidateInput in) {
+        var ctx = access.context(actor);
+        if (!ctx.canEverywhere(Permission.CONFIGURE)) {
+            throw ApiException.forbidden("سياسة التمركز لمسؤول النظام فقط (CONFIGURE على كل الجهات).");
+        }
+        if (in == null || in.values() == null) {
+            throw ApiException.validation("أرسل قيم السياسة كاملة.");
+        }
+        List<String> problems = policies.validate(in.values());
+        return Map.of("ok", problems.isEmpty(), "problems", problems);
+    }
+
+    public record HierarchyLevel(int level, long units, List<String> examples) {
+    }
+
+    /** The levels the published HR snapshot carries (sent by Oracle; never written in code), for configuring the route. */
+    @GetMapping("/stationing/hierarchy-levels")
+    public List<HierarchyLevel> hierarchyLevels(Actor actor) {
+        access.context(actor).requireAny(POLICY_READERS);
+        return jdbc.sql("""
+                select h.level, count(*) as units, (array_agg(h.name order by h.name))[1:3] as examples
+                  from hr_unit h where h.snapshot_id = (select id from hr_snapshot where status = 'PUBLISHED') and h.level is not null
+                 group by h.level order by h.level""")
+                .query((rs, n) -> new HierarchyLevel(rs.getInt("level"), rs.getLong("units"), Db.strings(rs, "examples"))).list();
+    }
+
     // ---- terrain -------------------------------------------------------------------------------------
 
     public record AssessInput(Map<String, Object> geometry, Integer policyVersion) {

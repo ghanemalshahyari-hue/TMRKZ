@@ -1186,6 +1186,25 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
     and seats for selected fictional users, starting stationing, the one missing boundary; the GLO-30 dataset loaded
     separately. The page stays hidden there (D3). Submissions stay refused until the owner supplies the terrain
     allowance values.
-- **Not done.** Extensions, early return, cancellation before start; the acceptance policy (allowance values from the
-  owner); production build of the page and packaging of the map data; the full §4 journey; real Oracle
+- **Acceptance policy and the policy studio (owner decisions, 4 Nov 2026).**
+  - **Decided by the owner for the acceptance policy only, «ACCEPTANCE TEST POLICY — NOT A PRODUCTION DEFAULT»:**
+    - base ranges 5–8 km and 3–5 km;
+    - terrain allowances on the maximum: FLAT 0, UNDULATING 500, ROLLING 1,000, HILLY 1,500, MOUNTAINOUS 2,000 m;
+    - tie priority MOUNTAINOUS > HILLY > ROLLING > UNDULATING > FLAT;
+    - maximum footprint 0.5 km²;
+    - cross-branch inclusion allowed, with OTHER_UNIT and SITE_RESPONSIBLE as conditions, without independence
+      (O-03b).
+  - **Distance exception:** disabled, because there is no owner value for `maxExtraM`.
+  - **Set by the owner in the app:** the routing levels (approving levels, labels, the facts each rests on, the final
+    level) and the deployment requirement. Nothing was assumed for them.
+  - **The «سياسة التمركز» studio** (behind the V3 flag, System Administrator only) starts from the version in force
+    or the approved initial slope classes and imports values from a JSON file. The acceptance values live in
+    `ops/test-env/acceptance-v3-policy-template.json`, never in code. Before publishing, the server checks them
+    (`POST /stationing/policy/validate`, a dry run) and lists the levels Oracle sends
+    (`GET /stationing/hierarchy-levels`). Publishing remains the versioned, audited API.
+  - **On `tmrkz-test`** (owner approval of the sequence): a backend release without migrations, the web image built
+    with `VITE_STATIONING_V3=true` (build argument, off by default), and the offline map packages mounted read-only
+    under `/map-data/` (`ops/test-env/compose.v3-maps.yml`). The earlier images are kept for recovery.
+- **Not done.** Extensions, early return, cancellation before start; publication of the acceptance policy (by the
+  owner in the studio); production build of the page and packaging of the map data; the full §4 journey; real Oracle
   and touch (release gates).

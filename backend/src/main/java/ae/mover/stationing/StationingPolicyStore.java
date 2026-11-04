@@ -100,11 +100,7 @@ public class StationingPolicyStore {
         if (effective.isBefore(now.minusSeconds(1))) {
             throw ApiException.validation("لا تسري نسخة سياسة بأثر رجعي: تاريخ السريان من الآن فصاعداً.");
         }
-        List<String> problems = new ArrayList<>(in.values().problems());
-        var sc = in.values().terrainSlopeClassification();
-        if (sc != null && sc.datasetCode() != null && !datasetLoaded(sc.datasetCode(), sc.datasetVersion())) {
-            problems.add("مجموعة بيانات الأرض " + sc.datasetCode() + " / " + sc.datasetVersion() + " غير محمّلة");
-        }
+        List<String> problems = validate(in.values());
         if (!problems.isEmpty()) {
             throw ApiException.validation("قيم السياسة غير صالحة.", Map.of("problems", problems));
         }
@@ -137,6 +133,16 @@ public class StationingPolicyStore {
         audit.recordAs(ctx.actor(), "STATIONING_POLICY_PUBLISHED", "STATIONING_POLICY", id.toString(), "النسخة " + version,
                 detail, saved.reason());
         return saved;
+    }
+
+    /** Every problem that would refuse publishing these values (the dry run of the policy studio); empty when valid. */
+    public List<String> validate(StationingPolicy values) {
+        List<String> problems = new ArrayList<>(values.problems());
+        var sc = values.terrainSlopeClassification();
+        if (sc != null && sc.datasetCode() != null && !datasetLoaded(sc.datasetCode(), sc.datasetVersion())) {
+            problems.add("مجموعة بيانات الأرض " + sc.datasetCode() + " / " + sc.datasetVersion() + " غير محمّلة");
+        }
+        return problems;
     }
 
     boolean datasetLoaded(String code, String version) {

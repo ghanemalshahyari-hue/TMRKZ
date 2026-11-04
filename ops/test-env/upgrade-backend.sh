@@ -8,12 +8,13 @@
 # AFTER_SQL checks → health. Any refusal or failure before the image swap leaves the database untouched.
 #
 # Usage: EXPECT_PENDING="17" [AFTER_SQL=ops/sql/checks/V17-after.sql] sh ops/test-env/upgrade-backend.sh <image> <label>
+#        EXPECT_PENDING="" … for a release without migrations (the plan must then be empty; it must be set explicitly)
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
 IMAGE="${1:?release image}"
 LABEL="${2:?label}"
-EXPECT_PENDING="${EXPECT_PENDING:?versions the plan must contain exactly}"
+[ "${EXPECT_PENDING+set}" = set ] || { echo "set EXPECT_PENDING to the exact pending versions (\"\" for none)" >&2; exit 2; }
 P="${P:-tmrkz-test}"
 case "$P" in tmrkz-mover) echo "refused: $P is an owner-retained production project" >&2; exit 2;; esac
 EV="docs/evidence/acceptance-upgrade/$LABEL"

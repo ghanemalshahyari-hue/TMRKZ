@@ -1084,3 +1084,37 @@ export type RestationingChecks = {
   route?: { key: string; kind: string; label: string; unit: Ref | null; satisfies: string[]; final: boolean }[];
   needsDistanceException?: boolean;
 };
+
+// ---- Stationing V3 policy studio (ADR-031, ADR-033) ------------------------------------------------------------------
+
+export type StationingFact = 'SCOPE' | 'CLASSIFICATION' | 'DURATION' | 'SITE' | 'DEPLOYMENT' | 'AVAILABILITY';
+export type SlopeClassValue = { code: string; label: string; fromPct: number; toPct: number | null };
+export type RoutingLevelValue = { level: number; approves: boolean; label: string; finalStage: boolean; dependsOn: StationingFact[] };
+export type StationingPolicyValues = {
+  maxFootprintAreaM2: number;
+  deploymentRequirement: 'REQUIRED' | 'OPTIONAL' | null;
+  primary: { minM: number; maxM: number; terrainApplies: boolean };
+  alternative: { minM: number; maxM: number; terrainApplies: boolean };
+  terrainSlopeClassification: { datasetCode: string; datasetVersion: string; classes: SlopeClassValue[] };
+  terrainAllowancesM: Record<string, number>;
+  terrainClassPriority: string[];
+  terrainAppliesTo: 'MAX_ONLY';
+  exception: { allowed: boolean; maxExtraM: number };
+  crossBranch: { allowed: boolean; authorities: ('OTHER_UNIT' | 'OTHER_UNIT_PARENT' | 'SITE_RESPONSIBLE')[]; independent: boolean };
+  routing: { startAt: 'SELF' | 'PARENT'; levels: RoutingLevelValue[] };
+};
+export type StationingPolicyVersion = {
+  id: string;
+  version: number;
+  previousVersion: number | null;
+  values: StationingPolicyValues;
+  effectiveFrom: string;
+  reason: string;
+  reference: string | null;
+  createdByName: string | null;
+  createdAt: string;
+};
+export type StationingPolicyOverview = { inForce: StationingPolicyVersion | null; scheduled: StationingPolicyVersion[]; initialSlopeClasses: SlopeClassValue[] };
+export type PolicyChange = { key: string; previous: unknown; current: unknown };
+export type HierarchyLevel = { level: number; units: number; examples: string[] };
+export type TerrainDatasetView = { id: string; code: string; version: string; surfaceModel: string; encoding: string; loadedAt: string };

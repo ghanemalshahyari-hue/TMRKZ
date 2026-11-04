@@ -1,0 +1,6 @@
+# Acceptance environment only: the git-ignored offline map packages (basemap and terrain hillshade PMTiles) served by
+# the web entry point under /map-data/ for the Stationing V3 map (ADR-033). Read-only; never a production layout.
+services:
+  web:
+    volumes:
+      - ./map-data:/usr/share/nginx/map-data:ro

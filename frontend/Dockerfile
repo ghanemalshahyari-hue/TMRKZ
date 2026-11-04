@@ -6,6 +6,9 @@ WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
+# Stationing V3 page and policy studio: off unless the build asks for it (the acceptance environment, ADR-033)
+ARG VITE_STATIONING_V3=false
+ENV VITE_STATIONING_V3=$VITE_STATIONING_V3
 RUN npm test && npm run build
 
 FROM nginx:1.28.3-alpine

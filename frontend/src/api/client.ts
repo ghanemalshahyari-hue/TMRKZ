@@ -1,4 +1,10 @@
 import type {
+  HierarchyLevel,
+  PolicyChange,
+  StationingPolicyOverview,
+  StationingPolicyValues,
+  StationingPolicyVersion,
+  TerrainDatasetView,
   RestationingChecks,
   RestationingContent,
   RestationingListItem,
@@ -480,4 +486,13 @@ export const api = {
   decideRestationing: (id: string, decision: 'APPROVE' | 'RETURN' | 'REJECT', reason?: string) =>
     post<RestationingRequest>(`/restationing-requests/${id}/decision`, { decision, reason }),
   activateRestationing: (id: string, reason?: string) => post<RestationingRequest>(`/restationing-requests/${id}/activate`, { reason }),
+
+  // Stationing V3 policy studio (System Administrator)
+  stationingPolicy: () => get<StationingPolicyOverview>('/stationing/policy'),
+  stationingPolicyVersions: () => get<{ version: StationingPolicyVersion; changes: PolicyChange[] }[]>('/stationing/policy/versions'),
+  validateStationingPolicy: (values: StationingPolicyValues) => post<{ ok: boolean; problems: string[] }>('/stationing/policy/validate', { values }),
+  publishStationingPolicy: (values: StationingPolicyValues, effectiveFrom: string | null, reason: string, reference: string) =>
+    post<{ version: StationingPolicyVersion; changes: PolicyChange[] }>('/stationing/policy/versions', { values, effectiveFrom, reason, reference }),
+  hierarchyLevels: () => get<HierarchyLevel[]>('/stationing/hierarchy-levels'),
+  terrainDatasets: () => get<TerrainDatasetView[]>('/terrain/datasets'),
 };

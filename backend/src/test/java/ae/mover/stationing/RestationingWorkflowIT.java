@@ -345,6 +345,28 @@ class RestationingWorkflowIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("Policy studio: dry-run validation for the System Administrator only; the levels Oracle sends")
+    void policyStudioEndpoints() {
+        Map<String, Object> values = new LinkedHashMap<>(json(latestVersion()));
+        assertThat(login("sysadmin").post("/stationing/policy/validate", Map.of("values", values)).body().path("ok").asBoolean()).isTrue();
+        values.put("terrainClassPriority", List.of("UNKNOWN_CLASS"));
+        JsonNode bad = login("sysadmin").post("/stationing/policy/validate", Map.of("values", values)).body();
+        assertThat(bad.path("ok").asBoolean()).isFalse();
+        assertThat(texts(bad.path("problems"))).anyMatch(p -> p.contains("UNKNOWN_CLASS"));
+        assertThat(login("req").post("/stationing/policy/validate", Map.of("values", values)).status()).isEqualTo(403);
+        int versions = jdbc.sql("select count(*) from stationing_policy_version").query(Integer.class).single();
+        assertThat(versions).as("a dry run writes nothing").isEqualTo(latestVersion());
+        JsonNode levels = login("sysadmin").get("/stationing/hierarchy-levels").body();
+        List<Integer> seen = new ArrayList<>();
+        levels.forEach(l -> seen.add(l.path("level").asInt()));
+        assertThat(seen).contains(6, 7, 8, 10);
+    }
+
+    int latestVersion() {
+        return jdbc.sql("select max(version) from stationing_policy_version").query(Integer.class).single();
+    }
+
+    @Test
     @DisplayName("Visibility: the requester, viewers of the units and the deciders see a request; others get 404")
     void visibility() {
         String id = create("req", permanent(List.of(sec)));

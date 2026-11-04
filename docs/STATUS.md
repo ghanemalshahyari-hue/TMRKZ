@@ -211,7 +211,16 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     - 8 HR levels, 4 single-action roles, 8 seats for explicitly selected fictional users;
     - 10 starting stationing records, 1 missing boundary (site 10);
     - the full GLO-30 2026.11 terrain loaded separately (6,300 rows, all cell counts equal, 453 MB, 106 s).
-    - **No policy published:** submissions stay refused until the owner supplies the allowances.
+    - **No policy published:** submissions stay refused until the owner publishes it.
+    - **Owner values for the acceptance policy (4 Nov):**
+      - ranges 5–8 and 3–5 km;
+      - allowances 0 / 500 / 1,000 / 1,500 / 2,000 m;
+      - priority MOUNTAINOUS first;
+      - footprint 0.5 km²;
+      - cross-branch with OTHER_UNIT and SITE_RESPONSIBLE;
+      - exception disabled (no `maxExtraM`).
+
+      The owner sets the routing levels and the deployment requirement in the new «سياسة التمركز» studio.
     - **The page stays hidden** on `tmrkz-test` (D3). Evidence: `docs/evidence/acceptance-data/tmrkz-test-v3/`.
   - **Not yet:** extensions, early return, cancellation before start, vertex editing, production packaging of the page
     and map data, V19 on `tmrkz-test` (owner approval).
