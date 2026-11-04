@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as MlMap } from 'maplibre-gl';
 import { api } from '../api/client';
-import type { GeoPolygon, Ref, RestationingChecks, RestationingListItem, RestationingRequest, RestationingState, SiteGeometry } from '../api/types';
+import type { Ref, RestationingChecks, RestationingListItem, RestationingRequest, RestationingState } from '../api/types';
 import { Heading, Icon } from '../components/ui';
 import { OfflineMapLibre, addOverlayLayer } from '../components/map/maplibre';
 import { LABEL_FONT, type BasemapMode } from '../components/map/maplibre/offlineStyle';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
 import { formatArea } from '../lib/footprint';
-import { circle } from '../lib/geo';
-import { anchorOf, partsOf, siteArea } from '../lib/siteGeometry';
+import { centre, requestFeatures } from '../lib/requestMap';
+import { partsOf, siteArea } from '../lib/siteGeometry';
 import { HIERARCHY_CHANGED } from '../lib/stationingV3';
 import { RestationingEditor } from './RestationingEditor';
 import './restationing.css';
@@ -535,14 +535,11 @@ function Lifecycle({ r, busy, act, onOpen }: { r: RestationingRequest; busy: boo
   );
 }
 
-/** The centre a site or an area is measured from: the shared anchor of every part (a MultiPolygon included). */
-const centre = (g: SiteGeometry) => anchorOf(partsOf(g));
-
 /** The request on the offline map: current sites, the proposed site, the deployment areas and their guidance bands. */
 export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZoom = 15, hideSite = false, fit = true }: { request: RestationingRequest; checks: RestationingChecks | null; mode: BasemapMode; height?: number; onMap?: (m: MlMap) => void; fitMaxZoom?: number; hideSite?: boolean; fit?: boolean }) {
   const [map, setMap] = useState<MlMap | null>(null);
   // the editor draws the proposed site itself while it is being edited (hideSite); the bands still follow it
-  const data = useMemo(() => features(request, checks, hideSite), [request, checks, hideSite]);
+  const data = useMemo(() => requestFeatures(request, checks, hideSite), [request, checks, hideSite]);
   const initial = useMemo(() => {
     const c = request.content.site?.geometry ? centre(request.content.site.geometry) : { lng: 55.3, lat: 25.2 };
     return [c.lng, c.lat] as [number, number];
@@ -602,6 +599,7 @@ export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZ
               id: 'rs-label',
               type: 'symbol',
               source: 'rs',
+              // only the label points carry a label: one per site or area, a MultiPolygon included (requestFeatures)
               filter: ['has', 'label'],
               // labels never overlap (owner, 4 Nov 2026): each may move around its polygon; when none fits at this zoom the
               // least important waits for a closer zoom (proposed site first, then the primary, alternative, current site)
@@ -628,33 +626,4 @@ export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZ
       />
     </div>
   );
-}
-
-type F = GeoJSON.Feature<GeoJSON.Geometry, { role: string; label?: string }>;
-function features(r: RestationingRequest, checks: RestationingChecks | null, hideSite = false): GeoJSON.FeatureCollection<GeoJSON.Geometry, { role: string; label?: string }> {
-  const out: F[] = [];
-  const poly = (g: GeoPolygon, role: string, label?: string) => out.push({ type: 'Feature', geometry: g as GeoJSON.Polygon, properties: { role, label } });
-  for (const s of r.currentSites) {
-    // a MultiPolygon current site is drawn with every part (owner, 4 Nov 2026); a Point has no footprint to draw
-    if (s.geometry?.type === 'Polygon' || s.geometry?.type === 'MultiPolygon') {
-      out.push({ type: 'Feature', geometry: s.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: { role: 'CURRENT', label: s.site.name + ' (الحالي)' } });
-    }
-  }
-  const c = r.content;
-  // the proposed site as submitted: one Polygon or one MultiPolygon with every part
-  if (c.site?.geometry && !hideSite) out.push({ type: 'Feature', geometry: c.site.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: { role: 'SITE', label: 'الموقع المقترح' } });
-  if (c.primary) poly(c.primary, 'PRIMARY', 'منطقة الانتشار الرئيسية');
-  if (c.alternative) poly(c.alternative, 'ALTERNATIVE', 'منطقة الانتشار البديلة');
-  // guidance bands: the allowed centre-to-centre distance around the reference centre — guidance only (O-04)
-  const band = (from: SiteGeometry | null | undefined, leg: 'primary' | 'alternative') => {
-    const l = checks?.legs?.find((x) => x.leg === leg);
-    if (!from || !l) return;
-    const ctr = centre(from);
-    const outer = circle(ctr, l.effectiveMaxM).map(([lat, lng]) => [lng, lat]);
-    const inner = circle(ctr, Math.max(1, l.effectiveMinM)).map(([lat, lng]) => [lng, lat]).reverse();
-    out.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [outer, inner] }, properties: { role: 'BAND' } });
-  };
-  band(c.site?.geometry, 'primary');
-  band(c.primary, 'alternative');
-  return { type: 'FeatureCollection', features: out };
 }
