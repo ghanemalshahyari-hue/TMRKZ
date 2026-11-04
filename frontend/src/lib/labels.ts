@@ -40,6 +40,10 @@ export const PERMISSIONS: Permission[] = [
   'CREATE_RESTATIONING',
   'ACTIVATE_STATIONING',
   'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION',
+  'DECIDE_PRE_ACTIVATION_CANCELLATION',
+  'ACTIVATE_TEMPORARY_EXTENSION',
+  'DECIDE_EARLY_RETURN',
+  'DECIDE_BEFORE_START_CANCELLATION',
 ];
 export const PERMISSION_NAMES: Record<Permission, string> = {
   VIEW: 'عرض',
@@ -62,6 +66,10 @@ export const PERMISSION_NAMES: Record<Permission, string> = {
   CREATE_RESTATIONING: 'طلب إعادة التمركز',
   ACTIVATE_STATIONING: 'تفعيل التمركز',
   APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION: 'اعتماد استثناء مسافة الانتشار',
+  DECIDE_PRE_ACTIVATION_CANCELLATION: 'قرار الإلغاء قبل التفعيل',
+  ACTIVATE_TEMPORARY_EXTENSION: 'تفعيل تمديد التمركز المؤقت',
+  DECIDE_EARLY_RETURN: 'قرار العودة المبكرة',
+  DECIDE_BEFORE_START_CANCELLATION: 'قرار إلغاء المؤقت قبل بدء نفاذه',
 };
 
 export const SCOPES: [Scope, string][] = [

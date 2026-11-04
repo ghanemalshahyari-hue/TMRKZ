@@ -20,7 +20,11 @@ export type Permission =
   | 'REPLAY_STATIONING_EVENTS'
   | 'CREATE_RESTATIONING'
   | 'ACTIVATE_STATIONING'
-  | 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION';
+  | 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION'
+  | 'DECIDE_PRE_ACTIVATION_CANCELLATION'
+  | 'ACTIVATE_TEMPORARY_EXTENSION'
+  | 'DECIDE_EARLY_RETURN'
+  | 'DECIDE_BEFORE_START_CANCELLATION';
 export type Scope = 'ALL' | 'ORGANIZATION' | 'SITE' | 'ORGANIZATION_AND_SITE';
 export type Ref = { id: string; name: string; code?: string };
 export type Period = { start: string; end: string | null };
@@ -975,11 +979,32 @@ export type RestationingState =
   | 'PAUSED_HIERARCHY_CHANGED'
   | 'REJECTED'
   | 'APPROVED_NOT_ACTIVATED'
+  | 'CANCELLATION_PENDING'
+  | 'CANCELLED_BEFORE_ACTIVATION'
   | 'ACTIVATED_PERMANENT'
   | 'TEMPORARY_SCHEDULED'
+  | 'START_HELD_PENDING_CANCELLATION'
   | 'ACTIVE_TEMPORARY'
   | 'TEMPORARY_RETURNED'
-  | 'TEMPORARY_CANCELLED_BEFORE_START';
+  | 'TEMPORARY_CANCELLED_BEFORE_START'
+  | 'TEMPORARY_WINDOW_EXPIRED_WITHOUT_START'
+  | 'EXTENSION_ACTIVATED'
+  | 'LAPSED_NOT_ACTIVATED';
+/** A lifecycle action (ADR-034): asked by one human, decided by another holding its own right. */
+export type RestationingAction = {
+  id: string;
+  kind: 'PRE_ACTIVATION_CANCELLATION' | 'BEFORE_START_CANCELLATION' | 'EARLY_RETURN';
+  state: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'NO_LONGER_ACTIONABLE' | 'SUPERSEDED';
+  reason: string;
+  requestedAt: string;
+  requestedBy: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  decisionReason: string | null;
+  heldAt: string | null;
+  closedAt: string | null;
+  closeReason: string | null;
+};
 export type RestationingContent = {
   kind: 'PERMANENT' | 'TEMPORARY';
   start?: string | null;
@@ -1010,7 +1035,7 @@ export type RestationingListItem = {
   id: string;
   number: string;
   state: RestationingState;
-  kind: 'PERMANENT' | 'TEMPORARY';
+  kind: 'PERMANENT' | 'TEMPORARY' | 'EXTENSION';
   requestingUnit: Ref;
   requester: Ref;
   units: number;
@@ -1048,7 +1073,22 @@ export type RestationingRequest = {
   paused: { at: string; reason: string; from: string } | null;
   finalApprover: Ref | null;
   activation?: { by: Ref; at: string; site: Ref };
-  can: { edit: boolean; submit: boolean; decide: boolean; activate: boolean };
+  requestKind?: 'PERMANENT' | 'TEMPORARY' | 'EXTENSION';
+  parent?: { id: string; number: string } | null;
+  effectiveEnd?: string;
+  extensions?: { id: string; number: string; state: RestationingState; end: string; lapseReason: string | null }[];
+  actions?: RestationingAction[];
+  can: {
+    edit: boolean;
+    submit: boolean;
+    decide: boolean;
+    activate: boolean;
+    askCancellation?: boolean;
+    askStartCancellation?: boolean;
+    askEarlyReturn?: boolean;
+    askExtension?: boolean;
+    decideAction?: string | null;
+  };
 };
 export type RestationingLeg = {
   leg: 'primary' | 'alternative';

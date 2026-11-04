@@ -63,7 +63,7 @@ public class StationingRegister {
 
     /** Current stationing (permanent, and a temporary one in force) of the units this actor may read. */
     public List<StationingRecord> current(AccessContext ctx, UUID orgId, UUID siteId, Instant at) {
-        String where = "where s.valid_from <= :at and (s.valid_to is null or s.valid_to > :at)"
+        String where = "where s.valid_from <= :at and (s.valid_to is null or s.valid_to > :at) and s.start_held_at is null"
                 + (orgId == null ? "" : " and s.organization_id = :org") + (siteId == null ? "" : " and s.site_id = :site");
         Map<String, Object> p = new LinkedHashMap<>();
         p.put("at", Db.ts(at));

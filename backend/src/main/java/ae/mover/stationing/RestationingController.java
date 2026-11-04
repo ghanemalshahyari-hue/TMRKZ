@@ -14,13 +14,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import ae.mover.access.AccessContext;
 import ae.mover.access.AccessService;
 import ae.mover.security.Actor;
 
 /**
- * Re-stationing requests of Model V3 (ADR-033): draft, checks, submission, stage decisions, activation. Every
- * operation is authorised on the server ({@link RestationingService}, {@link ae.mover.access.AccessContext} confirmed
- * by OpenFGA); the page only shows what the response allows.
+ * Re-stationing requests of Model V3 (ADR-033): draft, checks, submission, stage decisions, activation; and their
+ * lifecycle (ADR-034): cancellation before activation, cancellation before start, early return, extensions. Every
+ * operation is authorised on the server ({@link RestationingService}, {@link RestationingLifecycle},
+ * {@link ae.mover.access.AccessContext} confirmed by OpenFGA); the page only shows what the response allows.
  */
 @RestController
 @RequestMapping("/api/v1/restationing-requests")
@@ -28,12 +30,18 @@ public class RestationingController {
 
     private final AccessService access;
     private final RestationingService service;
+    private final RestationingLifecycle lifecycle;
     private final Clock clock;
 
-    public RestationingController(AccessService access, RestationingService service, Clock clock) {
+    public RestationingController(AccessService access, RestationingService service, RestationingLifecycle lifecycle, Clock clock) {
         this.access = access;
         this.service = service;
+        this.lifecycle = lifecycle;
         this.clock = clock;
+    }
+
+    private Map<String, Object> view(AccessContext ctx, UUID id) {
+        return lifecycle.decorate(ctx, service.view(ctx, id, clock.instant()), clock.instant());
     }
 
     @GetMapping
@@ -45,7 +53,7 @@ public class RestationingController {
     public Map<String, Object> create(Actor actor, @RequestBody RestationingService.CreateInput in) {
         var ctx = access.context(actor);
         UUID id = service.create(ctx, in, clock.instant());
-        return service.view(ctx, id, clock.instant());
+        return view(ctx, id);
     }
 
     @GetMapping("/units")
@@ -55,14 +63,14 @@ public class RestationingController {
 
     @GetMapping("/{id}")
     public Map<String, Object> get(Actor actor, @PathVariable UUID id) {
-        return service.view(access.context(actor), id, clock.instant());
+        return view(access.context(actor), id);
     }
 
     @PutMapping("/{id}/content")
     public Map<String, Object> edit(Actor actor, @PathVariable UUID id, @RequestBody RestationingService.ContentInput in) {
         var ctx = access.context(actor);
         service.edit(ctx, id, in, clock.instant());
-        return service.view(ctx, id, clock.instant());
+        return view(ctx, id);
     }
 
     /** The submission checks of the current content (validation against the policy version, never a recommendation). */
@@ -76,7 +84,7 @@ public class RestationingController {
     public Map<String, Object> submit(Actor actor, @PathVariable UUID id, @RequestBody(required = false) RestationingService.ReasonInput in) {
         var ctx = access.context(actor);
         service.submit(ctx, id, in, clock.instant());
-        return service.view(ctx, id, clock.instant());
+        return view(ctx, id);
     }
 
     /** APPROVE, RETURN or REJECT on the current stage. */
@@ -84,13 +92,57 @@ public class RestationingController {
     public Map<String, Object> decide(Actor actor, @PathVariable UUID id, @RequestBody RestationingService.DecisionInput in) {
         var ctx = access.context(actor);
         service.decide(ctx, id, in, clock.instant());
-        return service.view(ctx, id, clock.instant());
+        return view(ctx, id);
     }
 
+    /** Activation of an approved request, or of an approved extension (its own right, D10). */
     @PostMapping("/{id}/activate")
     public Map<String, Object> activate(Actor actor, @PathVariable UUID id, @RequestBody(required = false) RestationingService.ReasonInput in) {
         var ctx = access.context(actor);
         service.activate(ctx, id, in, clock.instant());
-        return service.view(ctx, id, clock.instant());
+        return view(ctx, id);
+    }
+
+    // ---- lifecycle (ADR-034) --------------------------------------------------------------------------------
+
+    /** D9/D16: ask to cancel a request before its activation. */
+    @PostMapping("/{id}/cancellation")
+    public Map<String, Object> askCancellation(Actor actor, @PathVariable UUID id, @RequestBody RestationingLifecycle.AskInput in) {
+        var ctx = access.context(actor);
+        lifecycle.askCancellation(ctx, id, in, clock.instant());
+        return view(ctx, id);
+    }
+
+    /** A4: ask to cancel an activated temporary before its start. */
+    @PostMapping("/{id}/start-cancellation")
+    public Map<String, Object> askStartCancellation(Actor actor, @PathVariable UUID id, @RequestBody RestationingLifecycle.AskInput in) {
+        var ctx = access.context(actor);
+        lifecycle.askStartCancellation(ctx, id, in, clock.instant());
+        return view(ctx, id);
+    }
+
+    /** D12: ask to end a temporary in force early. */
+    @PostMapping("/{id}/early-return")
+    public Map<String, Object> askEarlyReturn(Actor actor, @PathVariable UUID id, @RequestBody RestationingLifecycle.AskInput in) {
+        var ctx = access.context(actor);
+        lifecycle.askEarlyReturn(ctx, id, in, clock.instant());
+        return view(ctx, id);
+    }
+
+    /** APPROVE or REJECT (with a reason) on a pending action, by another human holding its right. */
+    @PostMapping("/{id}/actions/{actionId}/decision")
+    public Map<String, Object> decideAction(Actor actor, @PathVariable UUID id, @PathVariable UUID actionId,
+                                            @RequestBody RestationingLifecycle.DecideInput in) {
+        var ctx = access.context(actor);
+        lifecycle.decide(ctx, id, actionId, in, clock.instant());
+        return view(ctx, id);
+    }
+
+    /** D10: prepare an extension of a temporary stationing (a draft of its own, submitted and decided as usual). */
+    @PostMapping("/{id}/extensions")
+    public Map<String, Object> createExtension(Actor actor, @PathVariable UUID id, @RequestBody RestationingLifecycle.ExtensionInput in) {
+        var ctx = access.context(actor);
+        UUID ext = lifecycle.createExtension(ctx, id, in, clock.instant());
+        return view(ctx, ext);
     }
 }

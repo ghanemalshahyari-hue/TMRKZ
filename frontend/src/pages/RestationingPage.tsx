@@ -20,11 +20,31 @@ export const RS_STATE: Record<RestationingState, [string, string]> = {
   PAUSED_HIERARCHY_CHANGED: ['موقوف — تغيّر الهيكل', 'red'],
   REJECTED: ['مرفوض', 'red'],
   APPROVED_NOT_ACTIVATED: ['معتمد — بانتظار التفعيل', 'blue'],
+  CANCELLATION_PENDING: ['بانتظار قرار الإلغاء', 'orange'],
+  CANCELLED_BEFORE_ACTIVATION: ['أُلغي قبل التفعيل', ''],
   ACTIVATED_PERMANENT: ['مفعّل — دائم', 'green'],
   TEMPORARY_SCHEDULED: ['مؤقت مجدول', 'blue'],
+  START_HELD_PENDING_CANCELLATION: ['البدء موقوف — بانتظار قرار الإلغاء', 'orange'],
   ACTIVE_TEMPORARY: ['مؤقت نافذ', 'green'],
   TEMPORARY_RETURNED: ['انتهى المؤقت — عادت الوحدات', ''],
   TEMPORARY_CANCELLED_BEFORE_START: ['أُلغي قبل البدء', ''],
+  TEMPORARY_WINDOW_EXPIRED_WITHOUT_START: ['انقضت النافذة دون بدء', ''],
+  EXTENSION_ACTIVATED: ['تمديد مفعّل', 'green'],
+  LAPSED_NOT_ACTIVATED: ['سقط دون تفعيل', ''],
+};
+
+/** The lifecycle actions (ADR-034) with the owner's wording. */
+const ACTION_KIND: Record<string, string> = {
+  PRE_ACTIVATION_CANCELLATION: 'إلغاء قبل التفعيل',
+  BEFORE_START_CANCELLATION: 'إلغاء التمركز المؤقت قبل بدء نفاذه',
+  EARLY_RETURN: 'عودة مبكرة',
+};
+const ACTION_STATE: Record<string, string> = {
+  REQUESTED: 'بانتظار القرار',
+  APPROVED: 'قُبل',
+  REJECTED: 'رُفض',
+  NO_LONGER_ACTIONABLE: 'لم يعد قابلاً للقرار',
+  SUPERSEDED: 'تجاوزه انتهاء المؤقت',
 };
 
 const LEG_STATUS: Record<string, string> = {
@@ -119,14 +139,14 @@ export function RestationingPage() {
               </button>
             ))}
           </aside>
-          {selected ? <RequestDetail id={selected} onChanged={reload} onEdit={() => setEditing({ id: selected })} /> : <div className="card empty">اختر طلباً.</div>}
+          {selected ? <RequestDetail id={selected} onChanged={reload} onEdit={() => setEditing({ id: selected })} onOpen={(x) => { setSelected(x); reload(); }} /> : <div className="card empty">اختر طلباً.</div>}
         </div>
       )}
     </>
   );
 }
 
-function RequestDetail({ id, onChanged, onEdit }: { id: string; onChanged: () => void; onEdit: () => void }) {
+function RequestDetail({ id, onChanged, onEdit, onOpen }: { id: string; onChanged: () => void; onEdit: () => void; onOpen: (id: string) => void }) {
   const app = useApp();
   const [r, setR] = useState<RestationingRequest | null>(null);
   const [checks, setChecks] = useState<RestationingChecks | null>(null);
@@ -369,15 +389,133 @@ function RequestDetail({ id, onChanged, onEdit }: { id: string; onChanged: () =>
           </>
         )}
         {r.can.activate && (
-          <button className="button primary" disabled={busy} onClick={() => act(() => api.activateRestationing(r.id, reason), 'فُعّل الطلب')}>
-            تفعيل (إجراء مستقل)
+          <button className="button primary" disabled={busy} onClick={() => act(() => api.activateRestationing(r.id, reason), r.requestKind === 'EXTENSION' ? 'فُعّل التمديد' : 'فُعّل الطلب')}>
+            {r.requestKind === 'EXTENSION' ? 'تفعيل التمديد (إجراء مستقل)' : 'تفعيل (إجراء مستقل)'}
           </button>
         )}
-        {!r.can.edit && !r.can.submit && !r.can.decide && !r.can.activate && (
+        {!r.can.edit && !r.can.submit && !r.can.decide && !r.can.activate && !hasLifecycle(r) && (
           <span className="muted">لا إجراء لك على هذا الطلب في حالته الحالية — الخادم يقرر من يرى ويقرر.</span>
         )}
       </div>
+
+      <Lifecycle r={r} busy={busy} act={act} onOpen={onOpen} />
     </section>
+  );
+}
+
+const hasLifecycle = (r: RestationingRequest) =>
+  !!(r.can.askCancellation || r.can.askStartCancellation || r.can.askEarlyReturn || r.can.askExtension || r.can.decideAction);
+
+/**
+ * The lifecycle of a request (ADR-034): ask for a cancellation, a cancellation before the start, an early return or an
+ * extension; decide a pending action (another human with its own right); and the history of actions and extensions.
+ * Every button follows the server's `can`; the server refuses anything else.
+ */
+function Lifecycle({ r, busy, act, onOpen }: { r: RestationingRequest; busy: boolean; act: (what: () => Promise<RestationingRequest>, done: string) => void; onOpen: (id: string) => void }) {
+  const [why, setWhy] = useState('');
+  const [end, setEnd] = useState('');
+  const pending = r.actions?.find((a) => a.state === 'REQUESTED');
+  const asks = r.can.askCancellation || r.can.askStartCancellation || r.can.askEarlyReturn || r.can.askExtension;
+  if (!asks && !pending && !(r.actions?.length || r.extensions?.length || r.parent)) return null;
+  return (
+    <div className="card rs-lifecycle">
+      <h3>دورة حياة الطلب</h3>
+      {r.parent && (
+        <p>
+          تمديد للتمركز المؤقت{' '}
+          <button className="link" onClick={() => onOpen(r.parent!.id)}>
+            {r.parent.number}
+          </button>
+        </p>
+      )}
+      {r.effectiveEnd && r.requestKind === 'TEMPORARY' && <p className="muted">النهاية الفعالة: {fullDate(r.effectiveEnd)}</p>}
+      {pending && (
+        <div className="rs-banner orange">
+          <b>{ACTION_KIND[pending.kind]}</b> — طلبه {pending.requestedBy} · {fullDate(pending.requestedAt)} · السبب: {pending.reason}
+          {pending.heldAt && <div>أُوقف البدء في {fullDate(pending.heldAt)}: التمركز الدائم هو المعتمد حتى القرار.</div>}
+        </div>
+      )}
+      {(asks || r.can.decideAction) && (
+        <textarea className="rs-reason" placeholder="السبب (مطلوب للطلب وللرفض)" value={why} onChange={(e) => setWhy(e.target.value)} />
+      )}
+      <div className="rs-tools">
+        {r.can.decideAction && (
+          <>
+            <button className="button primary" disabled={busy} onClick={() => act(() => api.decideRestationingAction(r.id, r.can.decideAction!, 'APPROVE', why), 'قُبل الإجراء')}>
+              قبول {pending ? ACTION_KIND[pending.kind] : ''}
+            </button>
+            <button className="button danger" disabled={busy} onClick={() => act(() => api.decideRestationingAction(r.id, r.can.decideAction!, 'REJECT', why), 'رُفض الإجراء')}>
+              رفض
+            </button>
+          </>
+        )}
+        {r.can.askCancellation && (
+          <button className="button" disabled={busy} onClick={() => act(() => api.askRestationingCancellation(r.id, why), 'طُلب الإلغاء قبل التفعيل')}>
+            طلب إلغاء قبل التفعيل
+          </button>
+        )}
+        {r.can.askStartCancellation && (
+          <button className="button" disabled={busy} onClick={() => act(() => api.askStartCancellation(r.id, why), 'طُلب إلغاء التمركز المؤقت قبل بدئه')}>
+            طلب إلغاء قبل بدء النفاذ
+          </button>
+        )}
+        {r.can.askEarlyReturn && (
+          <button className="button" disabled={busy} onClick={() => act(() => api.askEarlyReturn(r.id, why), 'طُلبت العودة المبكرة')}>
+            طلب عودة مبكرة
+          </button>
+        )}
+        {r.can.askExtension && (
+          <>
+            <label>
+              نهاية التمديد <input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} />
+            </label>
+            <button
+              className="button"
+              disabled={busy || !end}
+              onClick={() =>
+                act(async () => {
+                  const ext = await api.createRestationingExtension(r.id, new Date(end).toISOString(), why);
+                  onOpen(ext.id);
+                  return ext;
+                }, 'أُعدّت مسودة التمديد — أرسلها للاعتماد')
+              }
+            >
+              طلب تمديد
+            </button>
+          </>
+        )}
+      </div>
+      {!!r.actions?.length && (
+        <details open={!!pending}>
+          <summary>الإجراءات ({r.actions.length})</summary>
+          <ul className="rs-revisions">
+            {r.actions.map((a) => (
+              <li key={a.id}>
+                <b>{ACTION_KIND[a.kind]}</b> · {ACTION_STATE[a.state]} — طلبه {a.requestedBy} ({fullDate(a.requestedAt)}): {a.reason}
+                {a.decidedBy && <> · قرره {a.decidedBy} ({fullDate(a.decidedAt ?? '')}){a.decisionReason ? ': ' + a.decisionReason : ''}</>}
+                {a.closeReason && <> · {a.closeReason}</>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {!!r.extensions?.length && (
+        <details>
+          <summary>التمديدات ({r.extensions.length})</summary>
+          <ul className="rs-revisions">
+            {r.extensions.map((e) => (
+              <li key={e.id}>
+                <button className="link" onClick={() => onOpen(e.id)}>
+                  {e.number}
+                </button>{' '}
+                · حتى {fullDate(e.end)} · <StatePill state={e.state} />
+                {e.lapseReason && <> · {e.lapseReason}</>}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
   );
 }
 
@@ -456,6 +594,8 @@ export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZ
                 'text-field': ['get', 'label'],
                 'text-font': [LABEL_FONT],
                 'text-size': 13,
+                // one line: a mixed Arabic/Latin name («موقع RS-2026-0012 (الحالي)») must not wrap inside its number
+                'text-max-width': 40,
                 'text-allow-overlap': false,
                 'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
                 'text-radial-offset': 0.9,

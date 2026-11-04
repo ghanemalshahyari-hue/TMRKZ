@@ -480,6 +480,13 @@ export const api = {
   restationingRequests: (state?: string) => get<RestationingListItem[]>('/restationing-requests' + query({ state })),
   restationingRequest: (id: string) => get<RestationingRequest>(`/restationing-requests/${id}`),
   restationingUnits: () => get<RestationingUnit[]>('/restationing-requests/units'),
+  askRestationingCancellation: (id: string, reason: string) => post<RestationingRequest>(`/restationing-requests/${id}/cancellation`, { reason }),
+  askStartCancellation: (id: string, reason: string) => post<RestationingRequest>(`/restationing-requests/${id}/start-cancellation`, { reason }),
+  askEarlyReturn: (id: string, reason: string) => post<RestationingRequest>(`/restationing-requests/${id}/early-return`, { reason }),
+  decideRestationingAction: (id: string, action: string, decision: 'APPROVE' | 'REJECT', reason: string) =>
+    post<RestationingRequest>(`/restationing-requests/${id}/actions/${action}/decision`, { decision, reason: reason || undefined }),
+  createRestationingExtension: (id: string, end: string, reason: string) =>
+    post<RestationingRequest>(`/restationing-requests/${id}/extensions`, { end, reason }),
   createRestationing: (requestingUnitId: string, content: RestationingContent) =>
     post<RestationingRequest>('/restationing-requests', { requestingUnitId, content }),
   editRestationing: (id: string, content: RestationingContent) => put<RestationingRequest>(`/restationing-requests/${id}/content`, content),

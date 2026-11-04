@@ -83,3 +83,6 @@
 .rs-priority li { margin-bottom: 4px; }
 .rs-policy .chip { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 1px 8px; cursor: pointer; font: inherit; margin-inline-start: 6px; }
 @media (max-width: 1100px) { .rs-policy { grid-template-columns: 1fr; } }
+/* lifecycle (ADR-034) */
+.rs-lifecycle { display: flex; flex-direction: column; gap: 8px; }
+.rs-lifecycle .link { background: none; border: 0; padding: 0; color: var(--green); font: inherit; text-decoration: underline; cursor: pointer; }

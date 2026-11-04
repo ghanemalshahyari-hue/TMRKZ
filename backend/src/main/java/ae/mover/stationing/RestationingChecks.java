@@ -163,13 +163,41 @@ public class RestationingChecks {
         return new Result(problems, area, policy.maxFootprintAreaM2(), siteConflicts, legs, others, route, exception, current);
     }
 
+    /**
+     * The checks of an extension (D10): the units, site and deployment areas are the temporary stationing's own and are
+     * not checked again; the new end must come after the current effective end, the reason is written, and the route
+     * from the requesting unit reaches the configured final stage (an extension changes the duration, which the
+     * hierarchy stages rest on).
+     */
+    public Result evaluateExtension(UUID requestingUnit, RestationingContent c, Instant effectiveEnd, StationingPolicy policy, Instant now) {
+        List<String> problems = new ArrayList<>();
+        List<OrgUnit> path = hierarchy.path(requestingUnit);
+        if (path.isEmpty()) {
+            throw ApiException.validation("الوحدة الطالبة غير موجودة.");
+        }
+        if (c.end() == null || effectiveEnd == null || !c.end().isAfter(effectiveEnd)) {
+            problems.add("نهاية التمديد يجب أن تكون بعد النهاية الفعالة الحالية للتمركز المؤقت.");
+        }
+        if (effectiveEnd != null && !effectiveEnd.isAfter(now)) {
+            problems.add("انتهى التمركز المؤقت؛ لا يُمدَّد.");
+        }
+        if (c.reason().trim().length() < 5) {
+            problems.add("سبب التمديد مطلوب (5 أحرف على الأقل).");
+        }
+        List<RouteStage> route = RouteDerivation.derive(path, policy.routing(), policy.crossBranch(), List.of(), false);
+        if (!RouteDerivation.complete(route)) {
+            problems.add("لم يُشتق مسار اعتماد كامل من هيكل الوحدة الطالبة والإعداد (لا مرحلة نهائية).");
+        }
+        return new Result(problems, null, policy.maxFootprintAreaM2(), List.of(), List.of(), List.of(), route, false, Map.of());
+    }
+
     /** Occupied geography intersecting a geometry now (also the atomic re-check at activation). */
     public List<String> occupiedIntersecting(String geoJson, List<UUID> moving, Instant now) {
         return jdbc.sql("""
                 with eff as (
                   select distinct on (s.organization_id) s.organization_id, s.site_id
                     from org_stationing s
-                   where s.valid_from <= :now and (s.valid_to is null or s.valid_to > :now)
+                   where s.valid_from <= :now and (s.valid_to is null or s.valid_to > :now) and s.start_held_at is null
                    order by s.organization_id, case s.kind when 'TEMPORARY' then 0 else 1 end),
                 occupied as (
                   select site_id from eff where not (organization_id = any(string_to_array(:moving, ',')::uuid[]))
@@ -194,7 +222,7 @@ public class RestationingChecks {
         jdbc.sql("""
                 select distinct on (s.organization_id) s.organization_id, s.site_id from org_stationing s
                  where s.organization_id = any(string_to_array(:ids, ',')::uuid[])
-                   and s.valid_from <= :now and (s.valid_to is null or s.valid_to > :now)
+                   and s.valid_from <= :now and (s.valid_to is null or s.valid_to > :now) and s.start_held_at is null
                  order by s.organization_id, case s.kind when 'TEMPORARY' then 0 else 1 end""")
                 .param("ids", Db.ids(units)).param("now", Db.ts(now))
                 .query((rs, n) -> out.put(Db.uuid(rs, "organization_id"), Db.uuid(rs, "site_id"))).list();
@@ -283,7 +311,7 @@ public class RestationingChecks {
                 with eff as (
                   select distinct on (s.organization_id) s.organization_id, s.site_id
                     from org_stationing s
-                   where s.valid_from <= :now and (s.valid_to is null or s.valid_to > :now)
+                   where s.valid_from <= :now and (s.valid_to is null or s.valid_to > :now) and s.start_held_at is null
                    order by s.organization_id, case s.kind when 'TEMPORARY' then 0 else 1 end)
                 select e.organization_id, o.name, e.site_id, st.name as site_name, r.organization_id as responsible
                   from eff e join organization o on o.id = e.organization_id join site st on st.id = e.site_id

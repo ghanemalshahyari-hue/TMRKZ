@@ -140,5 +140,21 @@ public class AuditService {
             Map.entry("RESTATIONING_PAUSED", "إيقاف طلب إعادة تمركز لتغيّر الهيكل التنظيمي"),
             Map.entry("RESTATIONING_ACTIVATED", "تفعيل طلب إعادة تمركز"),
             Map.entry("RESTATIONING_TEMPORARY_STARTED", "بدء تمركز مؤقت"),
-            Map.entry("RESTATIONING_TEMPORARY_RETURNED", "انتهاء تمركز مؤقت والعودة إلى التمركز الأصلي"));
+            Map.entry("RESTATIONING_TEMPORARY_RETURNED", "انتهاء تمركز مؤقت والعودة إلى التمركز الأصلي"),
+            Map.entry("RESTATIONING_CANCELLATION_REQUESTED", "طلب إلغاء طلب إعادة تمركز قبل التفعيل"),
+            Map.entry("RESTATIONING_PRE_ACTIVATION_CANCELLATION_APPROVED", "قبول الإلغاء قبل التفعيل"),
+            Map.entry("RESTATIONING_PRE_ACTIVATION_CANCELLATION_REJECTED", "رفض الإلغاء قبل التفعيل"),
+            Map.entry("RESTATIONING_START_CANCELLATION_REQUESTED", "طلب إلغاء تمركز مؤقت قبل بدء نفاذه"),
+            Map.entry("RESTATIONING_BEFORE_START_CANCELLATION_APPROVED", "قبول إلغاء التمركز المؤقت قبل بدء نفاذه"),
+            Map.entry("RESTATIONING_BEFORE_START_CANCELLATION_REJECTED", "رفض إلغاء التمركز المؤقت قبل بدء نفاذه"),
+            Map.entry("RESTATIONING_EARLY_RETURN_REQUESTED", "طلب عودة مبكرة من تمركز مؤقت"),
+            Map.entry("RESTATIONING_EARLY_RETURN_APPROVED", "قبول العودة المبكرة"),
+            Map.entry("RESTATIONING_EARLY_RETURN_REJECTED", "رفض العودة المبكرة"),
+            Map.entry("RESTATIONING_RETURNED_EARLY", "عودة مبكرة من تمركز مؤقت"),
+            Map.entry("RESTATIONING_EXTENSION_CREATED", "إعداد تمديد تمركز مؤقت"),
+            Map.entry("RESTATIONING_EXTENSION_ACTIVATED", "تفعيل تمديد تمركز مؤقت"),
+            Map.entry("RESTATIONING_EXTENSION_LAPSED", "سقوط تمديد لم يُفعَّل قبل انتهاء التمركز المؤقت"),
+            Map.entry("STATIONING_START_HELD", "إيقاف بدء تمركز مؤقت بانتظار قرار الإلغاء"),
+            Map.entry("STATIONING_TEMPORARY_STARTED", "بدء نفاذ تمركز مؤقت بعد رفض إلغائه"),
+            Map.entry("STATIONING_TEMPORARY_WINDOW_EXPIRED_WITHOUT_START", "انقضاء نافذة تمركز مؤقت دون بدء"));
 }

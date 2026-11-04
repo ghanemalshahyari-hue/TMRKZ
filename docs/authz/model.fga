@@ -50,6 +50,14 @@ type system
     define activate_stationing_any: [grant#holder]
     define approve_deployment_distance_exception: [grant#holder]
     define approve_deployment_distance_exception_any: [grant#holder]
+    define decide_pre_activation_cancellation: [grant#holder]
+    define decide_pre_activation_cancellation_any: [grant#holder]
+    define activate_temporary_extension: [grant#holder]
+    define activate_temporary_extension_any: [grant#holder]
+    define decide_early_return: [grant#holder]
+    define decide_early_return_any: [grant#holder]
+    define decide_before_start_cancellation: [grant#holder]
+    define decide_before_start_cancellation_any: [grant#holder]
 
 type organization
   relations
@@ -136,6 +144,22 @@ type organization
     define approve_deployment_distance_exception_tree: [grant#holder]
     define approve_deployment_distance_exception_inh: approve_deployment_distance_exception_tree or approve_deployment_distance_exception_inh from parent
     define approve_deployment_distance_exception: approve_deployment_distance_exception_here or approve_deployment_distance_exception_inh or approve_deployment_distance_exception from system
+    define decide_pre_activation_cancellation_here: [grant#holder]
+    define decide_pre_activation_cancellation_tree: [grant#holder]
+    define decide_pre_activation_cancellation_inh: decide_pre_activation_cancellation_tree or decide_pre_activation_cancellation_inh from parent
+    define decide_pre_activation_cancellation: decide_pre_activation_cancellation_here or decide_pre_activation_cancellation_inh or decide_pre_activation_cancellation from system
+    define activate_temporary_extension_here: [grant#holder]
+    define activate_temporary_extension_tree: [grant#holder]
+    define activate_temporary_extension_inh: activate_temporary_extension_tree or activate_temporary_extension_inh from parent
+    define activate_temporary_extension: activate_temporary_extension_here or activate_temporary_extension_inh or activate_temporary_extension from system
+    define decide_early_return_here: [grant#holder]
+    define decide_early_return_tree: [grant#holder]
+    define decide_early_return_inh: decide_early_return_tree or decide_early_return_inh from parent
+    define decide_early_return: decide_early_return_here or decide_early_return_inh or decide_early_return from system
+    define decide_before_start_cancellation_here: [grant#holder]
+    define decide_before_start_cancellation_tree: [grant#holder]
+    define decide_before_start_cancellation_inh: decide_before_start_cancellation_tree or decide_before_start_cancellation_inh from parent
+    define decide_before_start_cancellation: decide_before_start_cancellation_here or decide_before_start_cancellation_inh or decide_before_start_cancellation from system
 
 type site
   relations
@@ -282,6 +306,34 @@ type site
     define approve_deployment_distance_exception_direct: approve_deployment_distance_exception_here or approve_deployment_distance_exception_inh
     define approve_deployment_distance_exception_req: approve_deployment_distance_exception_direct or approve_deployment_distance_exception from responsible
     define approve_deployment_distance_exception: approve_deployment_distance_exception_req or approve_deployment_distance_exception_contains or approve_deployment_distance_exception from system
+    define decide_pre_activation_cancellation_here: [grant#holder]
+    define decide_pre_activation_cancellation_tree: [grant#holder]
+    define decide_pre_activation_cancellation_contains: [grant#holder]
+    define decide_pre_activation_cancellation_inh: decide_pre_activation_cancellation_tree or decide_pre_activation_cancellation_inh from parent
+    define decide_pre_activation_cancellation_direct: decide_pre_activation_cancellation_here or decide_pre_activation_cancellation_inh
+    define decide_pre_activation_cancellation_req: decide_pre_activation_cancellation_direct or decide_pre_activation_cancellation from responsible
+    define decide_pre_activation_cancellation: decide_pre_activation_cancellation_req or decide_pre_activation_cancellation_contains or decide_pre_activation_cancellation from system
+    define activate_temporary_extension_here: [grant#holder]
+    define activate_temporary_extension_tree: [grant#holder]
+    define activate_temporary_extension_contains: [grant#holder]
+    define activate_temporary_extension_inh: activate_temporary_extension_tree or activate_temporary_extension_inh from parent
+    define activate_temporary_extension_direct: activate_temporary_extension_here or activate_temporary_extension_inh
+    define activate_temporary_extension_req: activate_temporary_extension_direct or activate_temporary_extension from responsible
+    define activate_temporary_extension: activate_temporary_extension_req or activate_temporary_extension_contains or activate_temporary_extension from system
+    define decide_early_return_here: [grant#holder]
+    define decide_early_return_tree: [grant#holder]
+    define decide_early_return_contains: [grant#holder]
+    define decide_early_return_inh: decide_early_return_tree or decide_early_return_inh from parent
+    define decide_early_return_direct: decide_early_return_here or decide_early_return_inh
+    define decide_early_return_req: decide_early_return_direct or decide_early_return from responsible
+    define decide_early_return: decide_early_return_req or decide_early_return_contains or decide_early_return from system
+    define decide_before_start_cancellation_here: [grant#holder]
+    define decide_before_start_cancellation_tree: [grant#holder]
+    define decide_before_start_cancellation_contains: [grant#holder]
+    define decide_before_start_cancellation_inh: decide_before_start_cancellation_tree or decide_before_start_cancellation_inh from parent
+    define decide_before_start_cancellation_direct: decide_before_start_cancellation_here or decide_before_start_cancellation_inh
+    define decide_before_start_cancellation_req: decide_before_start_cancellation_direct or decide_before_start_cancellation from responsible
+    define decide_before_start_cancellation: decide_before_start_cancellation_req or decide_before_start_cancellation_contains or decide_before_start_cancellation from system
 
 type resource
   relations
@@ -326,6 +378,14 @@ type resource
     define activate_stationing: activate_stationing_here or activate_stationing from system
     define approve_deployment_distance_exception_here: [grant#holder]
     define approve_deployment_distance_exception: approve_deployment_distance_exception_here or approve_deployment_distance_exception from system
+    define decide_pre_activation_cancellation_here: [grant#holder]
+    define decide_pre_activation_cancellation: decide_pre_activation_cancellation_here or decide_pre_activation_cancellation from system
+    define activate_temporary_extension_here: [grant#holder]
+    define activate_temporary_extension: activate_temporary_extension_here or activate_temporary_extension from system
+    define decide_early_return_here: [grant#holder]
+    define decide_early_return: decide_early_return_here or decide_early_return from system
+    define decide_before_start_cancellation_here: [grant#holder]
+    define decide_before_start_cancellation: decide_before_start_cancellation_here or decide_before_start_cancellation from system
 
 type request
   relations
@@ -375,6 +435,14 @@ type request
     define activate_stationing_task: activate_stationing from related_org or activate_stationing_direct from site or activate_stationing from resource or activate_stationing from system
     define approve_deployment_distance_exception: approve_deployment_distance_exception from related_org or approve_deployment_distance_exception_req from site or approve_deployment_distance_exception from resource or approve_deployment_distance_exception from system
     define approve_deployment_distance_exception_task: approve_deployment_distance_exception from related_org or approve_deployment_distance_exception_direct from site or approve_deployment_distance_exception from resource or approve_deployment_distance_exception from system
+    define decide_pre_activation_cancellation: decide_pre_activation_cancellation from related_org or decide_pre_activation_cancellation_req from site or decide_pre_activation_cancellation from resource or decide_pre_activation_cancellation from system
+    define decide_pre_activation_cancellation_task: decide_pre_activation_cancellation from related_org or decide_pre_activation_cancellation_direct from site or decide_pre_activation_cancellation from resource or decide_pre_activation_cancellation from system
+    define activate_temporary_extension: activate_temporary_extension from related_org or activate_temporary_extension_req from site or activate_temporary_extension from resource or activate_temporary_extension from system
+    define activate_temporary_extension_task: activate_temporary_extension from related_org or activate_temporary_extension_direct from site or activate_temporary_extension from resource or activate_temporary_extension from system
+    define decide_early_return: decide_early_return from related_org or decide_early_return_req from site or decide_early_return from resource or decide_early_return from system
+    define decide_early_return_task: decide_early_return from related_org or decide_early_return_direct from site or decide_early_return from resource or decide_early_return from system
+    define decide_before_start_cancellation: decide_before_start_cancellation from related_org or decide_before_start_cancellation_req from site or decide_before_start_cancellation from resource or decide_before_start_cancellation from system
+    define decide_before_start_cancellation_task: decide_before_start_cancellation from related_org or decide_before_start_cancellation_direct from site or decide_before_start_cancellation from resource or decide_before_start_cancellation from system
     define view_full: creator or view
     define view_any: view_full or view_summary
     define info_view: info_member from info_org
