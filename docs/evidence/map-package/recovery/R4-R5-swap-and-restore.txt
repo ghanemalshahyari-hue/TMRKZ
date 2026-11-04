@@ -1,0 +1,41 @@
+### R4 install a second package (tmrkz-map-2026.11.1-rehearsal) while the web container serves the first
+[map-install] package C:\Users\ADMIN\AppData\Local\Temp\claude\c--Users-ADMIN-Desktop-TMRKZ\e179f7e6-221d-49f8-ad52-b56cb655402c\scratchpad\pkg-rehearsal\tmrkz-map-2026.11.1-rehearsal.tar
+[map-install] archive sha256 matches the expected 4a8dc04b96c257e1516491287b6ea42da99b07d2125d0f9280d1ba171ea459b2
+[map-install] plan
+  map root        : C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime
+  package         : tmrkz-map-2026.11.1-rehearsal (41 files, 583757786 bytes, contentSha256 9ee9058154fe0b6f634566746d1ce0fdb1d23491cf7119bd215c47bce53da45f)
+  active now      : tmrkz-map-2026.11.1 (e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515)
+  kept now        : none
+  will copy to    : C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\.staging-tmrkz-map-2026.11.1-rehearsal (then verify it again)
+  then            : current → previous; staging → current
+  disk            : 464509628416 bytes free, 583757786 needed
+[map-install] copying 41 files to C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\.staging-tmrkz-map-2026.11.1-rehearsal-3400
+[map-install] installed tmrkz-map-2026.11.1-rehearsal at C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\current; tmrkz-map-2026.11.1 kept at C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\previous (2 s)
+exit=0
+served now: "packageId": "tmrkz-map-2026.11.1-rehearsal"
+.
+..
+current
+history
+previous
+
+### R5 restore-previous: plan, then carry out
+[map-install] plan
+  map root   : C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime
+  restore    : tmrkz-map-2026.11.1 (e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515) → current
+  active now : tmrkz-map-2026.11.1-rehearsal → previous (so the change can be undone the same way)
+[map-install] plan only: run again with --confirm C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime to restore
+exit=0
+[map-install] plan
+  map root   : C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime
+  restore    : tmrkz-map-2026.11.1 (e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515) → current
+  active now : tmrkz-map-2026.11.1-rehearsal → previous (so the change can be undone the same way)
+[map-install] restored tmrkz-map-2026.11.1 as current; tmrkz-map-2026.11.1-rehearsal is now previous
+exit=0
+served now: "packageId": "tmrkz-map-2026.11.1"
+[map-install] status of C:/Users/ADMIN/Desktop/TMRKZ/map-data/runtime
+  current : tmrkz-map-2026.11.1 contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515 — VALID (full)
+  previous: tmrkz-map-2026.11.1-rehearsal contentSha256 9ee9058154fe0b6f634566746d1ce0fdb1d23491cf7119bd215c47bce53da45f — VALID (full)
+  log     : 2026-11-04T22:44:41Z install tmrkz-map-2026.11.1 (previous None)
+  log     : 2026-11-04T22:48:37Z install tmrkz-map-2026.11.1-rehearsal (previous tmrkz-map-2026.11.1)
+  log     : 2026-11-04T22:48:38Z restore-previous tmrkz-map-2026.11.1 (previous tmrkz-map-2026.11.1-rehearsal)

@@ -1,0 +1,23 @@
+tmrkz-test — production map package (owner gate «PRODUCTION MAP PACKAGING PHASE — GO», 4–5 Nov 2026)
+
+environment                  : tmrkz-test, ACCEPTANCE / V20 (unchanged; no migration)
+backend                      : mover/backend:rel-58423ce (unchanged)
+web before                   : mover/web:rel-9e02088-v3 sha256:f56a0753e5542224747ceb4b71c5d2dd674b35491f27eb7d804916448ec0fda0
+                               mount: map-data -> /usr/share/nginx/map-data (raw working folder; no manifest; slope analysis served)
+web after                    : mover/web:rel-8400e58-v3 sha256:ef1ef2fd13d38a54fe6c4b49ab91182d9ae5cce6d2f0c30a64fb47779a1ae07c
+                               built 2026-11-04T22:42:54Z from git archive of 8400e58 (MAP-1 on MAP-2 c6d63ad), STATIONING_V3=true
+                               mount: map-data/runtime -> /srv/tmrkz-map (ro); nginx serves only current/ under /map-data/
+map package                  : tmrkz-map-2026.11.1, contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515
+                               archive 8233ac8b9416f59a915454a9cd7b1745a31701aae661ceba5523fbd466d2b6f5 (583,823,360 bytes)
+                               installed 2026-11-04T22:44:41Z by ops/map-package/install_package.py (install-plan.txt, install.txt)
+swap                         : ops/test-env/upgrade-web.sh (run.log in tmrkz-test-web-map-8400e58/)
+state across the swap        : state-before-swap.txt / state-after-swap.txt / state-swap-compare.txt
+                               only the web mount and what it serves changed: schema, policy v1, terrain, every Stationing
+                               fingerprint and all counts identical
+readiness                    : readiness.txt — READY, 20 checks (readiness-run1-psql-echo-defect.txt: the first run, which
+                               found the readiness tool's own psql echo defect, fixed in bc6279d; readiness-after-recovery.txt)
+after the acceptance runs    : state-after-acceptance.txt / state-acceptance-compare.txt — one draft RS-2026-0056 created by
+                               the parallel UI-rebuild work (fictional, «مسودة لا تُرسل»); this gate's checks saved nothing
+rollback                     : MAPS=0 sh ops/test-env/upgrade-web.sh mover/web:rel-9e02088-v3 <label> restores the previous image
+                               (it expects the old raw mount: run it with the previous compose.v3-maps.yml from e84d324)
+evidence                     : docs/evidence/map-package/SUMMARY.md

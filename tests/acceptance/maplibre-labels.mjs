@@ -14,12 +14,14 @@ import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
 const REPO = fileURLToPath(new URL('../../', import.meta.url));
-const OUT = REPO + 'docs/evidence/maplibre-labels/';
+const SRC = REPO + 'docs/evidence/maplibre-labels/';
+// LABELS_OUT keeps a later run's evidence apart (map packaging gate: the same checks on the installed package)
+const OUT = process.env.LABELS_OUT ? REPO + process.env.LABELS_OUT.replace(/\/?$/, '/') : SRC;
 mkdirSync(OUT, { recursive: true });
 const HOST = '127.0.0.1';
 const BASE = `http://${HOST}:5197`;
 const HILLSHADE = 'map-data/terrain/glo30/visualization/hillshade.pmtiles';
-const CMAP = new Set(JSON.parse(readFileSync(OUT + 'font-cmap.json', 'utf8')).codepoints);
+const CMAP = new Set(JSON.parse(readFileSync(SRC + 'font-cmap.json', 'utf8')).codepoints);
 
 const checks = [];
 const check = (id, title, ok, detail) => {

@@ -1,0 +1,22 @@
+[readiness] offline map: root C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime, package tmrkz-map-2026.11.1 (e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515)
+  [PASS] package present: C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\current
+  [PASS] manifest valid: 41 files, 583757776 bytes
+  [PASS] manifest valid: 43 files, none unexpected
+  [PASS] checksums valid: every size as listed
+  [PASS] checksums valid: contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515
+  [PASS] checksums valid: all 41 files
+  [PASS] basemap readable: PMTiles v3 mvt z0-15, bounds [51.1303709, 22.451649, 56.689453, 26.332807], Protomaps 4.14.9, 263479 tiles, sample tiles z0 66803 B and z12 248 B
+  [PASS] required fonts present: Noto Sans Arabic Regular for ['Noto Sans Arabic Regular']
+  [PASS] style local: 19 layers, 3 URLs, all under /map-data/
+  [PASS] terrain dataset present: copernicus-glo30 2026.11 (DSM, tmrkz-terrain-1.0.0), 28 slope files, product 9a91d9af6153…, 28 source tiles listed
+  [PASS] geographic coverage valid: required [51.5, 22.6, 56.4, 26.1] inside the basemap [51.1303709, 22.451649, 56.689453, 26.332807]; terrain grid N22-N26 × E051-E056: 28 present, 2 open sea (N25E053, N26E052); hillshade z12: 4003 tiles over present cells, 0 missing
+  [PASS] attribution/licence present: ATTRIBUTION.txt and 3 licence notices
+  [PASS] expected package: tmrkz-map-2026.11.1 (expected tmrkz-map-2026.11.1)
+  [PASS] terrain dataset loaded: copernicus-glo30 2026.11: product 9a91d9af6153… (same as the package), DSM, SLOPE_PERCENT_X100_FLOOR_U16, 6300 tiles
+  [PASS] terrain version expected: policy v1 in force names copernicus-glo30 2026.11; the package carries copernicus-glo30 2026.11
+  [PASS] served package is the installed one: GET /map-data/manifest.json → 200, identical to C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\current\manifest.json
+  [PASS] served basemap/uae.pmtiles: range request → 206, 127 bytes, bytes 0-126/123069269
+  [PASS] served terrain/glo30/visualization/hillshade.pmtiles: range request → 206, 127 bytes, bytes 0-126/128653915
+  [PASS] served fonts/NotoSansArabic.ttf: GET → 200, 192144 bytes
+  [PASS] business analysis not served: GET /map-data/terrain/glo30/analysis/slope_pct_x100_N22E051.tif → 404
+[readiness] READY: 20 checks passed

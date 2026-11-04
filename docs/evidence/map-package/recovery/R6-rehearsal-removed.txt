@@ -1,0 +1,14 @@
+### R6 the rehearsal package (a test artefact) removed from previous/ by hand after the recovery test, 2026-11-04T22:48:53Z
+previous was tmrkz-map-2026.11.1-rehearsal
+.
+..
+current
+history
+
+{"at": "2026-11-04T22:44:41Z", "action": "install", "packageId": "tmrkz-map-2026.11.1", "contentSha256": "e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515", "manifestSha256": "4329a7556444f282d911c9e5a4ba4f7d9550804155b98d8706b02121a6b50bca", "previous": null, "previousContentSha256": null, "from": "C:\\Users\\ADMIN\\Desktop\\TMRKZ\\map-data\\packages\\tmrkz-map-2026.11.1.tar", "archiveSha256": "8233ac8b9416f59a915454a9cd7b1745a31701aae661ceba5523fbd466d2b6f5", "manifestCopy": "history/2026-11-04T224441Z-tmrkz-map-2026.11.1-installed.manifest.json", "replacedManifestCopy": null, "seconds": 1.5}
+{"at": "2026-11-04T22:48:37Z", "action": "install", "packageId": "tmrkz-map-2026.11.1-rehearsal", "contentSha256": "9ee9058154fe0b6f634566746d1ce0fdb1d23491cf7119bd215c47bce53da45f", "manifestSha256": "0b7d349a071295b3a1f927a923b12a2b1ba1fa4f38cd71116a669504148fb971", "previous": "tmrkz-map-2026.11.1", "previousContentSha256": "e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515", "from": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\claude\\c--Users-ADMIN-Desktop-TMRKZ\\e179f7e6-221d-49f8-ad52-b56cb655402c\\scratchpad\\pkg-rehearsal\\tmrkz-map-2026.11.1-rehearsal.tar", "archiveSha256": "4a8dc04b96c257e1516491287b6ea42da99b07d2125d0f9280d1ba171ea459b2", "manifestCopy": "history/2026-11-04T224836Z-tmrkz-map-2026.11.1-rehearsal-installed.manifest.json", "replacedManifestCopy": "history/2026-11-04T224836Z-tmrkz-map-2026.11.1-replaced.manifest.json", "seconds": 1.7}
+{"at": "2026-11-04T22:48:38Z", "action": "restore-previous", "packageId": "tmrkz-map-2026.11.1", "contentSha256": "e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515", "previous": "tmrkz-map-2026.11.1-rehearsal", "previousContentSha256": "9ee9058154fe0b6f634566746d1ce0fdb1d23491cf7119bd215c47bce53da45f"}
+2026-11-04T224441Z-tmrkz-map-2026.11.1-installed.manifest.json
+2026-11-04T224836Z-tmrkz-map-2026.11.1-rehearsal-installed.manifest.json
+2026-11-04T224836Z-tmrkz-map-2026.11.1-replaced.manifest.json
+install-log.jsonl

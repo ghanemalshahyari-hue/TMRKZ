@@ -1,0 +1,445 @@
+{
+  "base": "http://localhost:8088",
+  "when": "2026-11-04T23:05:14.911Z",
+  "passed": 27,
+  "total": 27,
+  "perf": {
+    "initialLoad": {
+      "ms": 950,
+      "longTasks": [
+        51,
+        117,
+        84
+      ]
+    },
+    "openRequest": {
+      "ms": 345,
+      "longTasks": []
+    },
+    "toTerrain": {
+      "ms": 432,
+      "longTasks": []
+    },
+    "toStreet": {
+      "ms": 135,
+      "longTasks": []
+    },
+    "zoomSweep": {
+      "ms": 6883,
+      "longTasks": []
+    },
+    "pan": {
+      "ms": 4640,
+      "longTasks": []
+    },
+    "bands": {
+      "ms": 611,
+      "longTasks": []
+    },
+    "drag": {
+      "ms": 723,
+      "longTasks": []
+    }
+  },
+  "results": [
+    {
+      "id": "OFF",
+      "pass": true,
+      "title": "external network unavailable to the browser (name resolution and non-loopback traffic cut)",
+      "detail": {
+        "https://tile.openstreetmap.org/0/0/0.png": "blocked: TypeError",
+        "https://1.1.1.1/": "blocked: TypeError",
+        "https://unpkg.com/maplibre-gl": "blocked: TypeError"
+      }
+    },
+    {
+      "id": "PERF-LOAD",
+      "pass": true,
+      "title": "initial map load: full page load of a request (application, map, basemap, font, overlays) until the map is idle",
+      "detail": {
+        "ms": 950,
+        "longTasks": [
+          51,
+          117,
+          84
+        ]
+      }
+    },
+    {
+      "id": "PKG",
+      "pass": true,
+      "title": "the map reads only the installed package: basemap, hillshade and font under /map-data/, no glyph or sprite server",
+      "detail": {
+        "sources": {
+          "basemap": {
+            "type": "vector",
+            "url": "pmtiles://http://localhost:8088/map-data/basemap/uae.pmtiles"
+          },
+          "hillshade": {
+            "type": "raster",
+            "url": "pmtiles://http://localhost:8088/map-data/terrain/glo30/visualization/hillshade.pmtiles"
+          },
+          "rs": {
+            "type": "geojson",
+            "url": null
+          }
+        },
+        "fontFaces": {
+          "Noto Sans Arabic Regular": [
+            {
+              "url": "http://localhost:8088/map-data/fonts/NotoSansArabic.ttf"
+            }
+          ]
+        },
+        "glyphs": null,
+        "sprite": null
+      }
+    },
+    {
+      "id": "ML1-z14",
+      "pass": true,
+      "title": "RS-2026-0048: the two-part site is named once (current and proposed, each one label point), zoom 14",
+      "detail": {
+        "counts": {
+          "الموقع المقترح": 1
+        },
+        "source": [
+          "CURRENT:Point",
+          "SITE:Point",
+          "PRIMARY:Point",
+          "ALTERNATIVE:Point"
+        ]
+      }
+    },
+    {
+      "id": "ML1-z15",
+      "pass": true,
+      "title": "RS-2026-0048: the two-part site is named once (current and proposed, each one label point), zoom 15",
+      "detail": {
+        "counts": {
+          "الموقع المقترح": 1,
+          "موقع RS-2026-0048 (الحالي)": 1
+        },
+        "source": [
+          "CURRENT:Point",
+          "SITE:Point",
+          "PRIMARY:Point",
+          "ALTERNATIVE:Point"
+        ]
+      }
+    },
+    {
+      "id": "ML1-z16",
+      "pass": true,
+      "title": "RS-2026-0048: the two-part site is named once (current and proposed, each one label point), zoom 16",
+      "detail": {
+        "counts": {
+          "الموقع المقترح": 1,
+          "موقع RS-2026-0048 (الحالي)": 1
+        },
+        "source": [
+          "CURRENT:Point",
+          "SITE:Point",
+          "PRIMARY:Point",
+          "ALTERNATIVE:Point"
+        ]
+      }
+    },
+    {
+      "id": "ML1-z17",
+      "pass": true,
+      "title": "RS-2026-0048: the two-part site is named once (current and proposed, each one label point), zoom 17",
+      "detail": {
+        "counts": {
+          "الموقع المقترح": 1,
+          "موقع RS-2026-0048 (الحالي)": 1
+        },
+        "source": [
+          "CURRENT:Point",
+          "SITE:Point",
+          "PRIMARY:Point",
+          "ALTERNATIVE:Point"
+        ]
+      }
+    },
+    {
+      "id": "ST1",
+      "pass": true,
+      "title": "street basemap at Dubai z14: highways, major and minor roads, water and buildings drawn from the package",
+      "detail": {
+        "label-place": 2,
+        "label-route": 7,
+        "label-road": 27,
+        "rs-band-line": 6,
+        "rs-band": 6,
+        "road-highway": 16,
+        "road-highway-casing": 16,
+        "road-major_road": 96,
+        "road-major_road-casing": 97,
+        "road-minor_road": 132,
+        "road-minor_road-casing": 132,
+        "buildings": 167,
+        "water": 9,
+        "landuse": 203
+      }
+    },
+    {
+      "id": "ST2",
+      "pass": true,
+      "title": "road hierarchy by zoom: at z8 only the major network, minor roads from z13",
+      "detail": {
+        "label-place": 5,
+        "label-route": 17,
+        "road-highway": 28,
+        "road-highway-casing": 28,
+        "road-major_road": 41,
+        "road-major_road-casing": 41,
+        "water": 10
+      }
+    },
+    {
+      "id": "LB1",
+      "pass": true,
+      "title": "Arabic road and place labels and route-number shields drawn with the packaged font",
+      "detail": {
+        "arabic": 127,
+        "sampleArabic": [
+          "الوصل",
+          "برج خليفة",
+          "شارع الصفا",
+          "شارع الشيخ زايد"
+        ],
+        "routes": [
+          "شارع الصفا",
+          "شارع الشيخ زايد",
+          "شارع المستقبل",
+          "شارع المركز المالي - المستوى العلوي",
+          "طريق الخيل",
+          "D90",
+          "شارع الأصايل",
+          "شارع الحديقة"
+        ]
+      }
+    },
+    {
+      "id": "LB2",
+      "pass": true,
+      "title": "English (fallback) and mixed Arabic/Latin/digit labels drawn",
+      "detail": {
+        "latin": [
+          "Red Line Metro",
+          "Dubai Trolley",
+          "H",
+          "N",
+          "Al Asayel Street"
+        ],
+        "mixed": [
+          "12a شارع",
+          "40a شارع",
+          "48a شارع",
+          "6a شارع",
+          "30a شارع"
+        ]
+      }
+    },
+    {
+      "id": "LB3",
+      "pass": true,
+      "title": "street attribution (ODbL) and the unofficial road-name notice",
+      "detail": {
+        "attribution": "© OpenStreetMap contributors (ODbL) · Protomaps — أسماء الطرق من OpenStreetMap وليست أسماء رسمية",
+        "notice": "أسماء الطرق من OpenStreetMap وليست أسماء رسمية"
+      }
+    },
+    {
+      "id": "ML2",
+      "pass": true,
+      "title": "RS-2026-0049: the four-part current site (ACC-GEO-MP4) is named once, not four times",
+      "detail": {
+        "counts": {
+          "موقع قبول الأداء — أربعة أجزاء (وهمي) (الحالي)": 1
+        },
+        "source": [
+          "CURRENT:Point",
+          "SITE:Point"
+        ],
+        "currentParts": [
+          4
+        ]
+      }
+    },
+    {
+      "id": "PERF-OPEN",
+      "pass": true,
+      "title": "opening a request from the list (RS-2026-0043): its page, map and overlays idle",
+      "detail": {
+        "ms": 345,
+        "longTasks": []
+      }
+    },
+    {
+      "id": "TR1",
+      "pass": true,
+      "title": "terrain mode shows the GLO-30 hillshade group and hides the street group",
+      "detail": {
+        "before": {
+          "street": "visible",
+          "terrain": "none",
+          "labels": "none/visible"
+        },
+        "terrain": {
+          "street": "none",
+          "terrain": "visible",
+          "labels": "none/visible"
+        }
+      }
+    },
+    {
+      "id": "SP1",
+      "pass": true,
+      "title": "street → terrain → street keeps the request, the selected unit/site and the proposed-site facts",
+      "detail": {
+        "hash": "#restationing",
+        "summary": "RS-2026-0043إعادة تمركز دائمة — الخدمات المشتركةتحرير الهندسة — G3 متعدد الأجزاء (بيانات قبول وهمية)قيد الاعتمادالوحدات المنتقلةقسم الخدمات العامةمنموقع RS-2026-0048الموقع المقترحمضلع متعدد · 2 أجزاء · 12,889 م² · الإرسال #2النفاذعند التفعيل المستقلنسخة السياسة1مقدم الطلبمقدم طلب تجريبي",
+        "proposed": "مضلع متعدد · 2 أجزاء · 12,889 م² · الإرسال #2"
+      }
+    },
+    {
+      "id": "SP2",
+      "pass": true,
+      "title": "the proposed geometry, deployment areas and deployment bands (overlay layers and data) are unchanged across both switches",
+      "detail": {
+        "layers": [
+          "rs-band:visible",
+          "rs-band-line:visible",
+          "rs-fill:visible",
+          "rs-line:visible",
+          "rs-label:visible"
+        ],
+        "features": [
+          "CURRENT",
+          "CURRENT",
+          "SITE",
+          "SITE",
+          "PRIMARY",
+          "PRIMARY",
+          "ALTERNATIVE",
+          "ALTERNATIVE",
+          "BAND",
+          "BAND"
+        ]
+      }
+    },
+    {
+      "id": "SP3",
+      "pass": true,
+      "title": "the camera (centre, zoom, bearing, pitch) is unchanged across both switches",
+      "detail": {
+        "lng": 55.3463456,
+        "lat": 25.1744726,
+        "zoom": 10.4667,
+        "bearing": 0,
+        "pitch": 0
+      }
+    },
+    {
+      "id": "PERF-MODE",
+      "pass": true,
+      "title": "street ↔ terrain switch until the map is idle",
+      "detail": {
+        "toTerrain": {
+          "ms": 432,
+          "longTasks": []
+        },
+        "toStreet": {
+          "ms": 135,
+          "longTasks": []
+        }
+      }
+    },
+    {
+      "id": "TR2",
+      "pass": true,
+      "title": "terrain over the UAE, the eastern mountains and Liwa read from the packaged hillshade (range requests), DSM notice and Copernicus 6(b) attribution",
+      "detail": {
+        "hillshadeRequests": 43,
+        "statuses": [
+          206
+        ],
+        "notice": "طبيعة الأرض: Copernicus GLO-30 — نموذج سطح DSM وليس تضاريس رسمية (للعرض فقط)"
+      }
+    },
+    {
+      "id": "INSTRUMENT",
+      "pass": true,
+      "title": "the long-task observer records a deliberate 120 ms page task",
+      "detail": [
+        120
+      ]
+    },
+    {
+      "id": "PERF-BANDS",
+      "pass": true,
+      "title": "deployment bands drawn when zoomed out (z10)",
+      "detail": {
+        "ms": 611,
+        "longTasks": [],
+        "bandFeatures": 8
+      }
+    },
+    {
+      "id": "PERF-ZOOM",
+      "pass": true,
+      "title": "zoom sweep z10→z16→z11 (10 steps, idle at each, label placement included) and 8 pans",
+      "detail": {
+        "zoom": {
+          "ms": 6883,
+          "longTasks": []
+        },
+        "pan": {
+          "ms": 4640,
+          "longTasks": []
+        }
+      }
+    },
+    {
+      "id": "PERF-EDIT",
+      "pass": true,
+      "title": "RS-2026-0050: grouped drag of the copied two-part site on the packaged map (30 pointer moves, not saved): no long task",
+      "detail": {
+        "ms": 723,
+        "longTasks": [],
+        "movedPx": 135,
+        "accepted": "geometry acceptance 708–720 ms, 0 long tasks",
+        "readoutBefore": "المساحة: 15,403 م² من حد 500,000 م²الأجزاء: 2الحدود صالحة",
+        "readoutAfter": "المساحة: 15,403 م² من حد 500,000 م²الأجزاء: 2الحدود صالحة"
+      }
+    },
+    {
+      "id": "NET-PKG",
+      "pass": true,
+      "title": "every map file came from the installed package and answered (basemap and hillshade by range, the font in full)",
+      "detail": {
+        "files": [
+          "/map-data/basemap/uae.pmtiles",
+          "/map-data/terrain/glo30/visualization/hillshade.pmtiles",
+          "/map-data/fonts/NotoSansArabic.ttf"
+        ],
+        "requests": 233,
+        "failed": []
+      }
+    },
+    {
+      "id": "NET",
+      "pass": true,
+      "title": "zero external requests from the application pages",
+      "detail": []
+    },
+    {
+      "id": "CONSOLE",
+      "pass": true,
+      "title": "no console or page errors",
+      "detail": []
+    }
+  ]
+}

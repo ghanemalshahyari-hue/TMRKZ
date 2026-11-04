@@ -1,0 +1,31 @@
+### R0 before: served "packageId": "tmrkz-map-2026.11.1"
+[map-install] status of C:/Users/ADMIN/Desktop/TMRKZ/map-data/runtime
+  current : tmrkz-map-2026.11.1 contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515 — VALID (sizes only)
+  previous: none
+  log     : 2026-11-04T22:44:41Z install tmrkz-map-2026.11.1 (previous None)
+
+### R1 corrupted archive (one byte flipped at offset 300,000,000), expected sha256 given
+[map-install] package C:\Users\ADMIN\AppData\Local\Temp\claude\c--Users-ADMIN-Desktop-TMRKZ\e179f7e6-221d-49f8-ad52-b56cb655402c\scratchpad\corrupt.tar
+[map-install] REFUSED: archive sha256 15c9d5ffd206d626341dc9e58fe29c07b83aedeed00d54abaafe12c87764b969 is not the expected 8233ac8b9416f59a915454a9cd7b1745a31701aae661ceba5523fbd466d2b6f5
+exit=1
+
+### R2 the same corrupted archive without an expected sha256 (the package's own checksums must catch it)
+[map-install] package C:\Users\ADMIN\AppData\Local\Temp\claude\c--Users-ADMIN-Desktop-TMRKZ\e179f7e6-221d-49f8-ad52-b56cb655402c\scratchpad\corrupt.tar
+  [PASS] package present: C:\Users\ADMIN\AppData\Local\Temp\claude\c--Users-ADMIN-Desktop-TMRKZ\e179f7e6-221d-49f8-ad52-b56cb655402c\scratchpad\corrupt.tar
+  [PASS] manifest structure: 41 files, 583757776 bytes
+  [PASS] layout complete and exact: 43 files, none unexpected
+  [PASS] file sizes: every size as listed
+  [PASS] SHA256SUMS matches the manifest: contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515
+  [FAIL] checksums: sha256 differs: ['terrain/glo30/analysis/slope_pct_x100_N23E054.tif']
+[map-install] REFUSED: the package failed verification; nothing was installed
+exit=1
+
+### R3 after the refusals: served "packageId": "tmrkz-map-2026.11.1"
+[map-install] status of C:/Users/ADMIN/Desktop/TMRKZ/map-data/runtime
+  current : tmrkz-map-2026.11.1 contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515 — VALID (full)
+  previous: none
+  log     : 2026-11-04T22:44:41Z install tmrkz-map-2026.11.1 (previous None)
+.
+..
+current
+history

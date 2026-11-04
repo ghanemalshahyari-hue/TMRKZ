@@ -315,11 +315,29 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     - **Tests:** backend 209/209 (with a test-only fixture-placement fix), frontend 102/102, build OK.
     - **Evidence:** `docs/evidence/acceptance-journeys/stationing-v3/geometry/tmrkz-test/SUMMARY.md`.
     - **Not accepted:** real touch.
+  - **Production map package (ADR-036, 4–5 Nov) — accepted on `tmrkz-test`:**
+    - **What it is:** one offline package `tmrkz-map-2026.11.1` (format `tmrkz-offline-map-package` v1, modelled on
+      MOVER's): UAE basemap (Protomaps 4.14.9, OSM, unofficial road names), map font, style, GLO-30 slope analysis
+      (business data) and hillshade (display), provenance and the ODbL / Copernicus Article 6 / OFL notices; 41 files,
+      583,757,776 bytes, archive `8233ac8b…`. The 776 MB source tiles are listed with checksums, not included.
+    - **Tools (`ops/map-package/`):** build with every input checked against its recorded checksum; untrusted-package
+      verifier (layout, links, traversal, sizes, checksums, content); staged install with `previous/` and
+      `restore-previous`; readiness (package, database, served). nginx serves only `current/`, read-only, analysis
+      hidden. Air-gap bundle carries tools and archive.
+    - **Commits:** `c6d63ad` (MAP-2: one label per logical site, a MultiPolygon included), `8400e58` (MAP-1),
+      `bc6279d` and `a950d7a` (readiness fixes found by the acceptance run).
+    - **Running on `tmrkz-test`:** web `rel-8400e58-v3` serving the installed package; backend unchanged; V20.
+    - **Proven:** byte-identical rebuild (terrain products rebuilt from source included); corrupted archives refused
+      with the active package untouched; live swap and `restore-previous`; readiness READY 20/20; terrain business
+      parity 0 differences (54 submitted legs, 8 drafts, 2 constructed ties, full raster fingerprint, from a database
+      loaded from the package by the production loader); real page 27/27 with the external network unavailable,
+      0 external requests, 0 console errors; label suite 21/21 on the package; geometry drag 723 ms, 0 long tasks.
+    - **Evidence:** `docs/evidence/map-package/SUMMARY.md`; release record `map-packages/tmrkz-map-2026.11.1/`.
+    - **Open:** the terrain loader needs `rasterio` on the operator host; open-sea cells show the water colour in
+      terrain mode; 2–3 long tasks during a cold page load; assessment `processing` field empty (manifest key).
   - **Before production readiness (owner list):**
     - the long mixed-label wrap on the map;
-    - production packaging of the page and map data;
-    - a controlled terrain-tie scenario (preferred);
-    - D11 reminders and presentation polish (including the duplicate label of a read-only MultiPolygon);
+    - D11 reminders and presentation polish;
     - real non-production Oracle, real physical touch;
     - the final production-readiness audit.
 

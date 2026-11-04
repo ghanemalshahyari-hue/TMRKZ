@@ -1,0 +1,90 @@
+== captured 2026-11-04T22:45:33Z
+== containers
+tmrkz-test-backend-1 mover/backend:rel-58423ce Up 11 hours (healthy)
+tmrkz-test-db-1 postgis/postgis:17-3.5-alpine Up 20 hours (healthy)
+tmrkz-test-keycloak-1 e0c1339aabe9 Up 20 hours (healthy)
+tmrkz-test-openfga-1 openfga/openfga:v1.8.16 Up 20 hours (healthy)
+tmrkz-test-openldap-1 osixia/openldap:1.5.0 Up 20 hours
+tmrkz-test-web-1 mover/web:rel-8400e58-v3 Up 40 seconds (healthy)
+== health
+web / 200
+{"status":"UP"} (200)
+== database identity
+ACCEPTANCE / V20 — fictional acceptance data only; V20 applied 2026-11-04 from mover/backend:rel-86a58db (commit 86a58db; V19 earlier from rel-7152d53); running backend mover/backend:rel-58423ce (commit 58423ce, no migration) and web mover/web:rel-9e02088-v3 (commit 9e02088) since 2026-11-04 (Stationing V3 geometry editing; acceptance only); Stationing acceptance policy version 1 (ACCEPTANCE-V3-POLICY-1, not a production default); fictional L8–L10 and lifecycle accounts and the geometry performance fixtures ACC-GEO-MP4 / ACC-GEO-DENSE provisioned 2026-11-04; evidence docs/evidence/acceptance-upgrade/, docs/evidence/acceptance-data/ and docs/evidence/acceptance-journeys/stationing-v3/
+== schema
+flyway max V20, rows 20
+== policy
+policy v1 ACCEPTANCE-V3-POLICY-1 row_md5=5227e4ef5bcf3fc9223c9e84f0553c8a
+== terrain
+terrain copernicus-glo30 v2026.11 sha256=9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682 rasters=6300
+== stationing fingerprint
+stationing_policy_version=1 e15d5dfcb5e103a3b94d2477a9bd2d01
+org_stationing=23 bc1bb1f84b1a9c82bc2ac23fa4b0f370
+site_link=0 -
+restationing_request=55 3ccb7cffaf550ac80d71d948372a3fcb
+restationing_stage=67 86229542be27c4c50da36a1886716995
+restationing_revision=28 86ddca6f0e7cb888f0a6a5ac84b7898a
+deployment_area=20 8f8199e40bbb0fd787cbda5501e6bee6
+== counts
+sites=24 geometry_versions=165 organizations=12 responsibilities=14 audit=4106
+== requests by state
+ACTIVATED_PERMANENT=4
+APPROVED_NOT_ACTIVATED=9
+CANCELLED_BEFORE_ACTIVATION=1
+DRAFT=30
+EXTENSION_ACTIVATED=1
+REJECTED=1
+TEMPORARY_CANCELLED_BEFORE_START=1
+TEMPORARY_RETURNED=4
+TEMPORARY_WINDOW_EXPIRED_WITHOUT_START=1
+UNDER_REVIEW=3
+== open requests
+RS-2026-0002 APPROVED_NOT_ACTIVATED 689a7564-c15e-4db1-a352-2bc6e354df01
+RS-2026-0003 DRAFT 9d0e095c-22db-4c88-99cc-b727506dfae7
+RS-2026-0004 DRAFT 2417cc62-cfa6-4259-92fc-3b8356679cf0
+RS-2026-0005 APPROVED_NOT_ACTIVATED 48e605da-e29c-49cb-8338-65b102517eec
+RS-2026-0006 APPROVED_NOT_ACTIVATED 09a6fb5d-82cc-4160-b63b-1cb4f4e37d2b
+RS-2026-0008 DRAFT a8c06e2d-ef8f-4ebd-bd12-30a34fe1b34a
+RS-2026-0009 DRAFT 27934ab5-eef2-4327-9c96-c5cad7d37dd4
+RS-2026-0010 DRAFT ce496c2b-17ff-4938-87c7-f922ca537811
+RS-2026-0013 APPROVED_NOT_ACTIVATED 41891940-7e73-45db-b2bb-571af8b0ad5e
+RS-2026-0014 DRAFT 36bdf7c4-c3c7-4881-aecb-775ee371b3d8
+RS-2026-0015 DRAFT 78d37e4a-f740-4c82-ae58-e2e32b7e361f
+RS-2026-0016 DRAFT 17174597-8344-4888-855f-b22aad485f59
+RS-2026-0017 APPROVED_NOT_ACTIVATED b713d852-e93d-4080-a535-5edb7b94c7d7
+RS-2026-0018 APPROVED_NOT_ACTIVATED e7c840f9-0474-4aba-9c3a-5ab0498214ac
+RS-2026-0019 DRAFT f1333295-88fd-44c3-890e-0fb497b729f9
+RS-2026-0020 APPROVED_NOT_ACTIVATED d9d129f2-0233-4b28-9c34-8dba3c214135
+RS-2026-0021 UNDER_REVIEW f79fe693-29f8-4f41-aa4a-a2cacef46288
+RS-2026-0023 APPROVED_NOT_ACTIVATED 17ba4892-ff97-46f7-bb27-ba8a6034be06
+RS-2026-0026 UNDER_REVIEW 06418ce5-59e4-4734-91bc-e5c0f767333e
+RS-2026-0032 DRAFT 06f090cd-92b8-4576-bcf6-2c8173d42a6c
+RS-2026-0033 DRAFT 5930b670-7a91-4c92-9444-9af11704d06b
+RS-2026-0034 DRAFT 5199629c-cfef-4065-8f15-2dbdefac0d2e
+RS-2026-0035 DRAFT a334b021-4647-4669-b6bd-b198847982fb
+RS-2026-0036 DRAFT 242dae5a-5255-45b7-b6d6-7cf32be7ab06
+RS-2026-0037 DRAFT 80799af9-bfb0-454f-81af-fb6fdfeb8a8c
+RS-2026-0038 DRAFT b3fe1142-c106-4f3e-8de1-55d680b2b97a
+RS-2026-0039 DRAFT ae1b3b00-8a5e-4105-907f-0d5dd39e4287
+RS-2026-0040 DRAFT b507c812-1e7e-440f-ba00-816f05514ff3
+RS-2026-0041 DRAFT dad4b402-fcb5-4ceb-bf8e-eeaa9c25e1b4
+RS-2026-0042 DRAFT b5dfa3db-b74a-422c-a8a4-746d91b21e4b
+RS-2026-0043 UNDER_REVIEW 516b77e5-3952-48b0-b019-65cc9444f043
+RS-2026-0044 DRAFT 741ff432-2e12-43c9-8b75-206641945cd3
+RS-2026-0045 DRAFT 5db96c2b-1612-46af-8199-c641a038487d
+RS-2026-0046 DRAFT 32c575ad-33ae-4c3a-af9e-a2da684a212a
+RS-2026-0047 DRAFT 82f46506-a2bb-47a4-895d-a27ae4966ee1
+RS-2026-0049 DRAFT c865fd3e-a0c6-4042-836a-ed855db4ce54
+RS-2026-0050 DRAFT 7a2c439e-387c-4c74-8638-7c9262c7fc4a
+RS-2026-0051 APPROVED_NOT_ACTIVATED b5fc7bc3-b3a9-468b-979c-83a6a0786b35
+RS-2026-0052 DRAFT 7f962c63-52d6-4e89-9cf6-dbc7bc245fbd
+RS-2026-0053 DRAFT 11a287f2-9ec7-4dac-910d-13035f92d504
+RS-2026-0054 DRAFT 0a54a3ef-0e28-4e18-aa9c-4b6ce3229727
+RS-2026-0055 DRAFT 3bf2a4dc-39d0-4a44-a72e-78a8bd016fb6
+== web mounts
+C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime -> /srv/tmrkz-map (ro)
+
+== served map package
+GET /map-data/manifest.json 200
+GET /map-data/basemap/uae.pmtiles (range) 206
+GET /map-data/terrain/glo30/analysis/SHA256SUMS 404

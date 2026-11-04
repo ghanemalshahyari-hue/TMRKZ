@@ -1,0 +1,37 @@
+[map-install] package C:\Users\ADMIN\Desktop\TMRKZ\map-data\packages\tmrkz-map-2026.11.1.tar
+[map-install] archive sha256 matches the expected 8233ac8b9416f59a915454a9cd7b1745a31701aae661ceba5523fbd466d2b6f5
+  [PASS] package present: C:\Users\ADMIN\Desktop\TMRKZ\map-data\packages\tmrkz-map-2026.11.1.tar
+  [PASS] manifest structure: 41 files, 583757776 bytes
+  [PASS] layout complete and exact: 43 files, none unexpected
+  [PASS] file sizes: every size as listed
+  [PASS] SHA256SUMS matches the manifest: contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515
+  [PASS] checksums: all 41 files
+  [PASS] basemap readable: checked after installation (archive)
+  [PASS] required fonts present: Noto Sans Arabic Regular for ['Noto Sans Arabic Regular']
+  [PASS] style local and consistent: 19 layers, 3 URLs, all under /map-data/
+  [PASS] terrain dataset consistent: copernicus-glo30 2026.11 (DSM, tmrkz-terrain-1.0.0), 28 slope files, product 9a91d9af6153…, 28 source tiles listed
+  [PASS] geographic coverage: required [51.5, 22.6, 56.4, 26.1] inside the basemap [51.1303709, 22.451649, 56.689453, 26.332807]; terrain grid N22-N26 × E051-E056: 28 present, 2 open sea (N25E053, N26E052)
+  [PASS] attribution and licences: ATTRIBUTION.txt and 3 licence notices
+[map-install] plan
+  map root        : C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime
+  package         : tmrkz-map-2026.11.1 (41 files, 583757776 bytes, contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515)
+  active now      : none
+  kept now        : none
+  will copy to    : C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\.staging-tmrkz-map-2026.11.1 (then verify it again)
+  then            : staging → current
+  disk            : 467223617536 bytes free, 583757776 needed
+[map-install] copying 41 files to C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\.staging-tmrkz-map-2026.11.1-15452
+  [PASS] package present: C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\.staging-tmrkz-map-2026.11.1-15452
+  [PASS] manifest structure: 41 files, 583757776 bytes
+  [PASS] layout complete and exact: 43 files, none unexpected
+  [PASS] file sizes: every size as listed
+  [PASS] SHA256SUMS matches the manifest: contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515
+  [PASS] checksums: all 41 files
+  [PASS] basemap readable: PMTiles v3 mvt z0-15, bounds [51.1303709, 22.451649, 56.689453, 26.332807], Protomaps 4.14.9, 263479 tiles, sample tiles z0 66803 B and z12 248 B
+  [PASS] required fonts present: Noto Sans Arabic Regular for ['Noto Sans Arabic Regular']
+  [PASS] style local and consistent: 19 layers, 3 URLs, all under /map-data/
+  [PASS] terrain dataset consistent: copernicus-glo30 2026.11 (DSM, tmrkz-terrain-1.0.0), 28 slope files, product 9a91d9af6153…, 28 source tiles listed
+  [PASS] geographic coverage: required [51.5, 22.6, 56.4, 26.1] inside the basemap [51.1303709, 22.451649, 56.689453, 26.332807]; terrain grid N22-N26 × E051-E056: 28 present, 2 open sea (N25E053, N26E052); hillshade z12: 4003 tiles over present cells, 0 missing
+  [PASS] attribution and licences: ATTRIBUTION.txt and 3 licence notices
+[map-install] installed tmrkz-map-2026.11.1 at C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\current (2 s)
+exit=0

@@ -1,0 +1,41 @@
+[terrain] plan
+  target          : tmrkz-terrain-parity (container), database mover, schema version unknown
+  dataset         : copernicus-glo30 2026.11 (surface model DSM, manifest map-data/runtime/current/terrain/glo30/provenance/terrain-manifest.json)
+  product         : 28 files, 331759641 bytes, SHA256SUMS sha256 9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682
+  rows to insert  : 6300 tiles of 256x256 (empty tiles kept)
+  cells           : 362880000, of which 362779204 with a value
+  schema present  : true
+  already loaded  : no
+Processing 1/28: /data/slope_pct_x100_N22E051.tif
+Processing 2/28: /data/slope_pct_x100_N22E052.tif
+Processing 3/28: /data/slope_pct_x100_N22E053.tif
+Processing 4/28: /data/slope_pct_x100_N22E054.tif
+Processing 5/28: /data/slope_pct_x100_N22E055.tif
+Processing 6/28: /data/slope_pct_x100_N22E056.tif
+Processing 7/28: /data/slope_pct_x100_N23E051.tif
+Processing 8/28: /data/slope_pct_x100_N23E052.tif
+Processing 9/28: /data/slope_pct_x100_N23E053.tif
+Processing 10/28: /data/slope_pct_x100_N23E054.tif
+Processing 11/28: /data/slope_pct_x100_N23E055.tif
+Processing 12/28: /data/slope_pct_x100_N23E056.tif
+Processing 13/28: /data/slope_pct_x100_N24E051.tif
+Processing 14/28: /data/slope_pct_x100_N24E052.tif
+Processing 15/28: /data/slope_pct_x100_N24E053.tif
+Processing 16/28: /data/slope_pct_x100_N24E054.tif
+Processing 17/28: /data/slope_pct_x100_N24E055.tif
+Processing 18/28: /data/slope_pct_x100_N24E056.tif
+Processing 19/28: /data/slope_pct_x100_N25E051.tif
+Processing 20/28: /data/slope_pct_x100_N25E052.tif
+Processing 21/28: /data/slope_pct_x100_N25E054.tif
+Processing 22/28: /data/slope_pct_x100_N25E055.tif
+Processing 23/28: /data/slope_pct_x100_N25E056.tif
+Processing 24/28: /data/slope_pct_x100_N26E051.tif
+Processing 25/28: /data/slope_pct_x100_N26E053.tif
+Processing 26/28: /data/slope_pct_x100_N26E054.tif
+Processing 27/28: /data/slope_pct_x100_N26E055.tif
+Processing 28/28: /data/slope_pct_x100_N26E056.tif
+NOTICE:  terrain check: 6300 rows, 362880000 cells, 362779204 with a value
+copernicus-glo30 | 2026.11 | 9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682 | 6300 | 453 MB
+[terrain] loaded in 112 s
+exit=0
+disposable parity database removed 2026-11-04T22:57:40Z

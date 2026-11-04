@@ -1,0 +1,11 @@
+[terrain] plan
+  target          : tmrkz-test (compose project (service db)), database mover, schema version 20
+  dataset         : copernicus-glo30 2026.11 (surface model DSM, manifest map-data/runtime/current/terrain/glo30/provenance/terrain-manifest.json)
+  product         : 28 files, 331759641 bytes, SHA256SUMS sha256 9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682
+  rows to insert  : 6300 tiles of 256x256 (empty tiles kept)
+  cells           : 362880000, of which 362779204 with a value
+  schema present  : true
+  already loaded  : 9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682
+NOTICE:  terrain check: 6300 rows, 362880000 cells, 362779204 with a value
+[terrain] same product already loaded and checked; nothing to do
+exit=0

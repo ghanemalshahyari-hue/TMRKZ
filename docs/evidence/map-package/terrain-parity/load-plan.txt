@@ -1,0 +1,10 @@
+[terrain] plan
+  target          : tmrkz-terrain-parity (container), database mover, schema version unknown
+  dataset         : copernicus-glo30 2026.11 (surface model DSM, manifest map-data/runtime/current/terrain/glo30/provenance/terrain-manifest.json)
+  product         : 28 files, 331759641 bytes, SHA256SUMS sha256 9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682
+  rows to insert  : 6300 tiles of 256x256 (empty tiles kept)
+  cells           : 362880000, of which 362779204 with a value
+  schema present  : true
+  already loaded  : no
+[terrain] dry run: set CONFIRM_TARGET=tmrkz-terrain-parity to load
+exit=3

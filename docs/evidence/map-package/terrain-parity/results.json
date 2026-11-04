@@ -1,0 +1,5814 @@
+{
+ "acceptanceDb": "tmrkz-test-db-1",
+ "packageDb": "tmrkz-terrain-parity",
+ "datasets": {
+  "acceptance": {
+   "id": "470a1f86-c415-48fc-b22e-9b27bb619f6f",
+   "code": "copernicus-glo30",
+   "version": "2026.11",
+   "surfaceModel": "DSM",
+   "encoding": "SLOPE_PERCENT_X100_FLOOR_U16",
+   "slopeSha256": "9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682",
+   "manifestMd5": "ccd764a09771e5026616e2542b4b77a0",
+   "tiles": 6300,
+   "rasterFingerprint": "a9f676e67e63b33d25fe98ea343d2b26",
+   "cellsWithValue": 362779204
+  },
+  "package": {
+   "id": "d258c1f3-0737-4dc3-b5f8-9e098476296d",
+   "code": "copernicus-glo30",
+   "version": "2026.11",
+   "surfaceModel": "DSM",
+   "encoding": "SLOPE_PERCENT_X100_FLOOR_U16",
+   "slopeSha256": "9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682",
+   "manifestMd5": "ccd764a09771e5026616e2542b4b77a0",
+   "tiles": 6300,
+   "rasterFingerprint": "a9f676e67e63b33d25fe98ea343d2b26",
+   "cellsWithValue": 362779204
+  },
+  "same": {
+   "code": true,
+   "version": true,
+   "surfaceModel": true,
+   "encoding": true,
+   "slopeSha256": true,
+   "manifestMd5": true,
+   "tiles": true,
+   "rasterFingerprint": true,
+   "cellsWithValue": true
+  }
+ },
+ "submittedCases": [
+  {
+   "request": "RS-2026-0001",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 162,
+     "UNDULATING": 237,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 162,
+     "UNDULATING": 237,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 40.601504,
+     "UNDULATING": 59.398496,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359813.3343012333,
+    "values": 257
+   },
+   "package": {
+    "cells": {
+     "FLAT": 162,
+     "UNDULATING": 237,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 40.601504,
+     "UNDULATING": 59.398496,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359813.3343012333,
+    "values": 257
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0001",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 276,
+     "UNDULATING": 112,
+     "ROLLING": 7,
+     "HILLY": 4,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 276,
+     "UNDULATING": 112,
+     "ROLLING": 7,
+     "HILLY": 4,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 69.172932,
+     "UNDULATING": 28.070175,
+     "ROLLING": 1.754386,
+     "HILLY": 1.002506,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359810.9964983463,
+    "values": 237
+   },
+   "package": {
+    "cells": {
+     "FLAT": 276,
+     "UNDULATING": 112,
+     "ROLLING": 7,
+     "HILLY": 4,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 69.172932,
+     "UNDULATING": 28.070175,
+     "ROLLING": 1.754386,
+     "HILLY": 1.002506,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359810.9964983463,
+    "values": 237
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0002",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 362,
+     "UNDULATING": 58,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 362,
+     "UNDULATING": 58,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 86.190476,
+     "UNDULATING": 13.809524,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359806.3282880783,
+    "values": 199
+   },
+   "package": {
+    "cells": {
+     "FLAT": 362,
+     "UNDULATING": 58,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 86.190476,
+     "UNDULATING": 13.809524,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359806.3282880783,
+    "values": 199
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0002",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 362,
+     "UNDULATING": 58,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 362,
+     "UNDULATING": 58,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 86.190476,
+     "UNDULATING": 13.809524,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359803.9978878498,
+    "values": 203
+   },
+   "package": {
+    "cells": {
+     "FLAT": 362,
+     "UNDULATING": 58,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 86.190476,
+     "UNDULATING": 13.809524,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359803.9978878498,
+    "values": 203
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0005",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 0,
+     "UNDULATING": 43,
+     "ROLLING": 67,
+     "HILLY": 126,
+     "MOUNTAINOUS": 489
+    },
+    "controllingClass": "MOUNTAINOUS",
+    "tie": false,
+    "tied": [
+     "MOUNTAINOUS"
+    ],
+    "resolved": true,
+    "allowanceM": 2000.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 10000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 0,
+     "UNDULATING": 43,
+     "ROLLING": 67,
+     "HILLY": 126,
+     "MOUNTAINOUS": 489
+    },
+    "covered": 725,
+    "percent": {
+     "FLAT": 0.0,
+     "UNDULATING": 5.931034,
+     "ROLLING": 9.241379,
+     "HILLY": 17.37931,
+     "MOUNTAINOUS": 67.448276
+    },
+    "controllingClass": "MOUNTAINOUS",
+    "tie": false,
+    "tied": [
+     "MOUNTAINOUS"
+    ],
+    "resolved": true,
+    "allowanceM": 2000.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 10000.0,
+    "areaM2": 639622.0201678276,
+    "values": 697
+   },
+   "package": {
+    "cells": {
+     "FLAT": 0,
+     "UNDULATING": 43,
+     "ROLLING": 67,
+     "HILLY": 126,
+     "MOUNTAINOUS": 489
+    },
+    "covered": 725,
+    "percent": {
+     "FLAT": 0.0,
+     "UNDULATING": 5.931034,
+     "ROLLING": 9.241379,
+     "HILLY": 17.37931,
+     "MOUNTAINOUS": 67.448276
+    },
+    "controllingClass": "MOUNTAINOUS",
+    "tie": false,
+    "tied": [
+     "MOUNTAINOUS"
+    ],
+    "resolved": true,
+    "allowanceM": 2000.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 10000.0,
+    "areaM2": 639622.0201678276,
+    "values": 697
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0005",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 27,
+     "UNDULATING": 245,
+     "ROLLING": 56,
+     "HILLY": 83,
+     "MOUNTAINOUS": 9
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 27,
+     "UNDULATING": 245,
+     "ROLLING": 56,
+     "HILLY": 83,
+     "MOUNTAINOUS": 9
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 6.428571,
+     "UNDULATING": 58.333333,
+     "ROLLING": 13.333333,
+     "HILLY": 19.761905,
+     "MOUNTAINOUS": 2.142857
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359789.40971779823,
+    "values": 372
+   },
+   "package": {
+    "cells": {
+     "FLAT": 27,
+     "UNDULATING": 245,
+     "ROLLING": 56,
+     "HILLY": 83,
+     "MOUNTAINOUS": 9
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 6.428571,
+     "UNDULATING": 58.333333,
+     "ROLLING": 13.333333,
+     "HILLY": 19.761905,
+     "MOUNTAINOUS": 2.142857
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359789.40971779823,
+    "values": 372
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0006",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 288,
+     "UNDULATING": 111,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 288,
+     "UNDULATING": 111,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 72.180451,
+     "UNDULATING": 27.819549,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359809.82852077484,
+    "values": 235
+   },
+   "package": {
+    "cells": {
+     "FLAT": 288,
+     "UNDULATING": 111,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 72.180451,
+     "UNDULATING": 27.819549,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359809.82852077484,
+    "values": 235
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0006",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 192,
+     "UNDULATING": 223,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 192,
+     "UNDULATING": 223,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 45.714286,
+     "UNDULATING": 53.095238,
+     "ROLLING": 1.190476,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359807.4944152832,
+    "values": 290
+   },
+   "package": {
+    "cells": {
+     "FLAT": 192,
+     "UNDULATING": 223,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 45.714286,
+     "UNDULATING": 53.095238,
+     "ROLLING": 1.190476,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359807.4944152832,
+    "values": 290
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0006",
+   "revision": 2,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 288,
+     "UNDULATING": 111,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 288,
+     "UNDULATING": 111,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 72.180451,
+     "UNDULATING": 27.819549,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359809.82852077484,
+    "values": 235
+   },
+   "package": {
+    "cells": {
+     "FLAT": 288,
+     "UNDULATING": 111,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 72.180451,
+     "UNDULATING": 27.819549,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359809.82852077484,
+    "values": 235
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0006",
+   "revision": 2,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 313,
+     "UNDULATING": 102,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 313,
+     "UNDULATING": 102,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 74.52381,
+     "UNDULATING": 24.285714,
+     "ROLLING": 1.190476,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359807.3194565773,
+    "values": 241
+   },
+   "package": {
+    "cells": {
+     "FLAT": 313,
+     "UNDULATING": 102,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 74.52381,
+     "UNDULATING": 24.285714,
+     "ROLLING": 1.190476,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359807.3194565773,
+    "values": 241
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0007",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 58,
+     "UNDULATING": 328,
+     "ROLLING": 12,
+     "HILLY": 1,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 58,
+     "UNDULATING": 328,
+     "ROLLING": 12,
+     "HILLY": 1,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 14.536341,
+     "UNDULATING": 82.205514,
+     "ROLLING": 3.007519,
+     "HILLY": 0.250627,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359808.07771110535,
+    "values": 312
+   },
+   "package": {
+    "cells": {
+     "FLAT": 58,
+     "UNDULATING": 328,
+     "ROLLING": 12,
+     "HILLY": 1,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 14.536341,
+     "UNDULATING": 82.205514,
+     "ROLLING": 3.007519,
+     "HILLY": 0.250627,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359808.07771110535,
+    "values": 312
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0007",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 341,
+     "UNDULATING": 58,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 341,
+     "UNDULATING": 58,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 85.463659,
+     "UNDULATING": 14.536341,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359805.74545669556,
+    "values": 199
+   },
+   "package": {
+    "cells": {
+     "FLAT": 341,
+     "UNDULATING": 58,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 85.463659,
+     "UNDULATING": 14.536341,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359805.74545669556,
+    "values": 199
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0011",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 30,
+     "UNDULATING": 306,
+     "ROLLING": 45,
+     "HILLY": 18,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 30,
+     "UNDULATING": 306,
+     "ROLLING": 45,
+     "HILLY": 18,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 7.518797,
+     "UNDULATING": 76.691729,
+     "ROLLING": 11.278195,
+     "HILLY": 4.511278,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359810.22147607803,
+    "values": 335
+   },
+   "package": {
+    "cells": {
+     "FLAT": 30,
+     "UNDULATING": 306,
+     "ROLLING": 45,
+     "HILLY": 18,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 7.518797,
+     "UNDULATING": 76.691729,
+     "ROLLING": 11.278195,
+     "HILLY": 4.511278,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359810.22147607803,
+    "values": 335
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0011",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 102,
+     "UNDULATING": 278,
+     "ROLLING": 18,
+     "HILLY": 1,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 102,
+     "UNDULATING": 278,
+     "ROLLING": 18,
+     "HILLY": 1,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 25.56391,
+     "UNDULATING": 69.674185,
+     "ROLLING": 4.511278,
+     "HILLY": 0.250627,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359807.88695669174,
+    "values": 316
+   },
+   "package": {
+    "cells": {
+     "FLAT": 102,
+     "UNDULATING": 278,
+     "ROLLING": 18,
+     "HILLY": 1,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 25.56391,
+     "UNDULATING": 69.674185,
+     "ROLLING": 4.511278,
+     "HILLY": 0.250627,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359807.88695669174,
+    "values": 316
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0012",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 230,
+     "UNDULATING": 210,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 230,
+     "UNDULATING": 210,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 52.272727,
+     "UNDULATING": 47.727273,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359790.06758761406,
+    "values": 276
+   },
+   "package": {
+    "cells": {
+     "FLAT": 230,
+     "UNDULATING": 210,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 52.272727,
+     "UNDULATING": 47.727273,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359790.06758761406,
+    "values": 276
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0012",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 439,
+     "UNDULATING": 1,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 439,
+     "UNDULATING": 1,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 99.772727,
+     "UNDULATING": 0.227273,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359787.7545866966,
+    "values": 123
+   },
+   "package": {
+    "cells": {
+     "FLAT": 439,
+     "UNDULATING": 1,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 99.772727,
+     "UNDULATING": 0.227273,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359787.7545866966,
+    "values": 123
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0013",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 0,
+     "UNDULATING": 43,
+     "ROLLING": 67,
+     "HILLY": 126,
+     "MOUNTAINOUS": 489
+    },
+    "controllingClass": "MOUNTAINOUS",
+    "tie": false,
+    "tied": [
+     "MOUNTAINOUS"
+    ],
+    "resolved": true,
+    "allowanceM": 2000.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 10000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 0,
+     "UNDULATING": 43,
+     "ROLLING": 67,
+     "HILLY": 126,
+     "MOUNTAINOUS": 489
+    },
+    "covered": 725,
+    "percent": {
+     "FLAT": 0.0,
+     "UNDULATING": 5.931034,
+     "ROLLING": 9.241379,
+     "HILLY": 17.37931,
+     "MOUNTAINOUS": 67.448276
+    },
+    "controllingClass": "MOUNTAINOUS",
+    "tie": false,
+    "tied": [
+     "MOUNTAINOUS"
+    ],
+    "resolved": true,
+    "allowanceM": 2000.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 10000.0,
+    "areaM2": 639622.0201678276,
+    "values": 697
+   },
+   "package": {
+    "cells": {
+     "FLAT": 0,
+     "UNDULATING": 43,
+     "ROLLING": 67,
+     "HILLY": 126,
+     "MOUNTAINOUS": 489
+    },
+    "covered": 725,
+    "percent": {
+     "FLAT": 0.0,
+     "UNDULATING": 5.931034,
+     "ROLLING": 9.241379,
+     "HILLY": 17.37931,
+     "MOUNTAINOUS": 67.448276
+    },
+    "controllingClass": "MOUNTAINOUS",
+    "tie": false,
+    "tied": [
+     "MOUNTAINOUS"
+    ],
+    "resolved": true,
+    "allowanceM": 2000.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 10000.0,
+    "areaM2": 639622.0201678276,
+    "values": 697
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0013",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 27,
+     "UNDULATING": 245,
+     "ROLLING": 56,
+     "HILLY": 83,
+     "MOUNTAINOUS": 9
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 27,
+     "UNDULATING": 245,
+     "ROLLING": 56,
+     "HILLY": 83,
+     "MOUNTAINOUS": 9
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 6.428571,
+     "UNDULATING": 58.333333,
+     "ROLLING": 13.333333,
+     "HILLY": 19.761905,
+     "MOUNTAINOUS": 2.142857
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359789.40971779823,
+    "values": 372
+   },
+   "package": {
+    "cells": {
+     "FLAT": 27,
+     "UNDULATING": 245,
+     "ROLLING": 56,
+     "HILLY": 83,
+     "MOUNTAINOUS": 9
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 6.428571,
+     "UNDULATING": 58.333333,
+     "ROLLING": 13.333333,
+     "HILLY": 19.761905,
+     "MOUNTAINOUS": 2.142857
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359789.40971779823,
+    "values": 372
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0017",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 83,
+     "UNDULATING": 332,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 83,
+     "UNDULATING": 332,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 19.761905,
+     "UNDULATING": 79.047619,
+     "ROLLING": 1.190476,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359772.7811870575,
+    "values": 324
+   },
+   "package": {
+    "cells": {
+     "FLAT": 83,
+     "UNDULATING": 332,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 19.761905,
+     "UNDULATING": 79.047619,
+     "ROLLING": 1.190476,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359772.7811870575,
+    "values": 324
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0017",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 247,
+     "UNDULATING": 152,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 247,
+     "UNDULATING": 152,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 61.904762,
+     "UNDULATING": 38.095238,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359770.4870252609,
+    "values": 254
+   },
+   "package": {
+    "cells": {
+     "FLAT": 247,
+     "UNDULATING": 152,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 61.904762,
+     "UNDULATING": 38.095238,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359770.4870252609,
+    "values": 254
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0018",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 146,
+     "UNDULATING": 219,
+     "ROLLING": 45,
+     "HILLY": 10,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 146,
+     "UNDULATING": 219,
+     "ROLLING": 45,
+     "HILLY": 10,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 34.761905,
+     "UNDULATING": 52.142857,
+     "ROLLING": 10.714286,
+     "HILLY": 2.380952,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359772.7811870575,
+    "values": 340
+   },
+   "package": {
+    "cells": {
+     "FLAT": 146,
+     "UNDULATING": 219,
+     "ROLLING": 45,
+     "HILLY": 10,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 34.761905,
+     "UNDULATING": 52.142857,
+     "ROLLING": 10.714286,
+     "HILLY": 2.380952,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359772.7811870575,
+    "values": 340
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0018",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 146,
+     "UNDULATING": 253,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 146,
+     "UNDULATING": 253,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 36.591479,
+     "UNDULATING": 63.408521,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359770.4870252609,
+    "values": 282
+   },
+   "package": {
+    "cells": {
+     "FLAT": 146,
+     "UNDULATING": 253,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 36.591479,
+     "UNDULATING": 63.408521,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359770.4870252609,
+    "values": 282
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0020",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 83,
+     "UNDULATING": 332,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 83,
+     "UNDULATING": 332,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 19.761905,
+     "UNDULATING": 79.047619,
+     "ROLLING": 1.190476,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359772.7811870575,
+    "values": 324
+   },
+   "package": {
+    "cells": {
+     "FLAT": 83,
+     "UNDULATING": 332,
+     "ROLLING": 5,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 19.761905,
+     "UNDULATING": 79.047619,
+     "ROLLING": 1.190476,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359772.7811870575,
+    "values": 324
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0020",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 247,
+     "UNDULATING": 152,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 247,
+     "UNDULATING": 152,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 61.904762,
+     "UNDULATING": 38.095238,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359770.4870252609,
+    "values": 254
+   },
+   "package": {
+    "cells": {
+     "FLAT": 247,
+     "UNDULATING": 152,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 61.904762,
+     "UNDULATING": 38.095238,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359770.4870252609,
+    "values": 254
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0021",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 44,
+     "UNDULATING": 340,
+     "ROLLING": 29,
+     "HILLY": 5,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 44,
+     "UNDULATING": 340,
+     "ROLLING": 29,
+     "HILLY": 5,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 10.526316,
+     "UNDULATING": 81.339713,
+     "ROLLING": 6.937799,
+     "HILLY": 1.196172,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359755.63672447205,
+    "values": 338
+   },
+   "package": {
+    "cells": {
+     "FLAT": 44,
+     "UNDULATING": 340,
+     "ROLLING": 29,
+     "HILLY": 5,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 10.526316,
+     "UNDULATING": 81.339713,
+     "ROLLING": 6.937799,
+     "HILLY": 1.196172,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359755.63672447205,
+    "values": 338
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0021",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 122,
+     "UNDULATING": 296,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 122,
+     "UNDULATING": 296,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 29.186603,
+     "UNDULATING": 70.813397,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359753.3616018295,
+    "values": 307
+   },
+   "package": {
+    "cells": {
+     "FLAT": 122,
+     "UNDULATING": 296,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 29.186603,
+     "UNDULATING": 70.813397,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359753.3616018295,
+    "values": 307
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0022",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 251,
+     "UNDULATING": 147,
+     "ROLLING": 1,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 251,
+     "UNDULATING": 147,
+     "ROLLING": 1,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 62.907268,
+     "UNDULATING": 36.842105,
+     "ROLLING": 0.250627,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359749.95370435715,
+    "values": 262
+   },
+   "package": {
+    "cells": {
+     "FLAT": 251,
+     "UNDULATING": 147,
+     "ROLLING": 1,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 62.907268,
+     "UNDULATING": 36.842105,
+     "ROLLING": 0.250627,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359749.95370435715,
+    "values": 262
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0022",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 353,
+     "UNDULATING": 67,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 353,
+     "UNDULATING": 67,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 84.047619,
+     "UNDULATING": 15.952381,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359747.6849730015,
+    "values": 219
+   },
+   "package": {
+    "cells": {
+     "FLAT": 353,
+     "UNDULATING": 67,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 84.047619,
+     "UNDULATING": 15.952381,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359747.6849730015,
+    "values": 219
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0023",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 203,
+     "UNDULATING": 166,
+     "ROLLING": 34,
+     "HILLY": 15,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 203,
+     "UNDULATING": 166,
+     "ROLLING": 34,
+     "HILLY": 15,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 48.564593,
+     "UNDULATING": 39.712919,
+     "ROLLING": 8.133971,
+     "HILLY": 3.588517,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359749.95370435715,
+    "values": 323
+   },
+   "package": {
+    "cells": {
+     "FLAT": 203,
+     "UNDULATING": 166,
+     "ROLLING": 34,
+     "HILLY": 15,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 48.564593,
+     "UNDULATING": 39.712919,
+     "ROLLING": 8.133971,
+     "HILLY": 3.588517,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359749.95370435715,
+    "values": 323
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0023",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 216,
+     "UNDULATING": 218,
+     "ROLLING": 6,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 216,
+     "UNDULATING": 218,
+     "ROLLING": 6,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 49.090909,
+     "UNDULATING": 49.545455,
+     "ROLLING": 1.363636,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359747.6849730015,
+    "values": 306
+   },
+   "package": {
+    "cells": {
+     "FLAT": 216,
+     "UNDULATING": 218,
+     "ROLLING": 6,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 49.090909,
+     "UNDULATING": 49.545455,
+     "ROLLING": 1.363636,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359747.6849730015,
+    "values": 306
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0024",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 75,
+     "UNDULATING": 346,
+     "ROLLING": 16,
+     "HILLY": 3,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 75,
+     "UNDULATING": 346,
+     "ROLLING": 16,
+     "HILLY": 3,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 17.045455,
+     "UNDULATING": 78.636364,
+     "ROLLING": 3.636364,
+     "HILLY": 0.681818,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359733.000824213,
+    "values": 344
+   },
+   "package": {
+    "cells": {
+     "FLAT": 75,
+     "UNDULATING": 346,
+     "ROLLING": 16,
+     "HILLY": 3,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 17.045455,
+     "UNDULATING": 78.636364,
+     "ROLLING": 3.636364,
+     "HILLY": 0.681818,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359733.000824213,
+    "values": 344
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0024",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 56,
+     "UNDULATING": 296,
+     "ROLLING": 41,
+     "HILLY": 46,
+     "MOUNTAINOUS": 1
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 56,
+     "UNDULATING": 296,
+     "ROLLING": 41,
+     "HILLY": 46,
+     "MOUNTAINOUS": 1
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 12.727273,
+     "UNDULATING": 67.272727,
+     "ROLLING": 9.318182,
+     "HILLY": 10.454545,
+     "MOUNTAINOUS": 0.227273
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359730.751393795,
+    "values": 372
+   },
+   "package": {
+    "cells": {
+     "FLAT": 56,
+     "UNDULATING": 296,
+     "ROLLING": 41,
+     "HILLY": 46,
+     "MOUNTAINOUS": 1
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 12.727273,
+     "UNDULATING": 67.272727,
+     "ROLLING": 9.318182,
+     "HILLY": 10.454545,
+     "MOUNTAINOUS": 0.227273
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359730.751393795,
+    "values": 372
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0025",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 258,
+     "UNDULATING": 141,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 258,
+     "UNDULATING": 141,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 64.661654,
+     "UNDULATING": 35.338346,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359731.3135089874,
+    "values": 250
+   },
+   "package": {
+    "cells": {
+     "FLAT": 258,
+     "UNDULATING": 141,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 64.661654,
+     "UNDULATING": 35.338346,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359731.3135089874,
+    "values": 250
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0025",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 57,
+     "UNDULATING": 310,
+     "ROLLING": 27,
+     "HILLY": 5,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 57,
+     "UNDULATING": 310,
+     "ROLLING": 27,
+     "HILLY": 5,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 14.285714,
+     "UNDULATING": 77.694236,
+     "ROLLING": 6.766917,
+     "HILLY": 1.253133,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359729.0660209656,
+    "values": 343
+   },
+   "package": {
+    "cells": {
+     "FLAT": 57,
+     "UNDULATING": 310,
+     "ROLLING": 27,
+     "HILLY": 5,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 14.285714,
+     "UNDULATING": 77.694236,
+     "ROLLING": 6.766917,
+     "HILLY": 1.253133,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359729.0660209656,
+    "values": 343
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0026",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 149,
+     "UNDULATING": 237,
+     "ROLLING": 7,
+     "HILLY": 6,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 149,
+     "UNDULATING": 237,
+     "ROLLING": 7,
+     "HILLY": 6,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 37.343358,
+     "UNDULATING": 59.398496,
+     "ROLLING": 1.754386,
+     "HILLY": 1.503759,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359727.9432477951,
+    "values": 310
+   },
+   "package": {
+    "cells": {
+     "FLAT": 149,
+     "UNDULATING": 237,
+     "ROLLING": 7,
+     "HILLY": 6,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 37.343358,
+     "UNDULATING": 59.398496,
+     "ROLLING": 1.754386,
+     "HILLY": 1.503759,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359727.9432477951,
+    "values": 310
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0026",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 14,
+     "UNDULATING": 153,
+     "ROLLING": 81,
+     "HILLY": 143,
+     "MOUNTAINOUS": 29
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 14,
+     "UNDULATING": 153,
+     "ROLLING": 81,
+     "HILLY": 143,
+     "MOUNTAINOUS": 29
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 3.333333,
+     "UNDULATING": 36.428571,
+     "ROLLING": 19.285714,
+     "HILLY": 34.047619,
+     "MOUNTAINOUS": 6.904762
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359725.6996483803,
+    "values": 398
+   },
+   "package": {
+    "cells": {
+     "FLAT": 14,
+     "UNDULATING": 153,
+     "ROLLING": 81,
+     "HILLY": 143,
+     "MOUNTAINOUS": 29
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 3.333333,
+     "UNDULATING": 36.428571,
+     "ROLLING": 19.285714,
+     "HILLY": 34.047619,
+     "MOUNTAINOUS": 6.904762
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359725.6996483803,
+    "values": 398
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0028",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 144,
+     "UNDULATING": 276,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 144,
+     "UNDULATING": 276,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 34.285714,
+     "UNDULATING": 65.714286,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359724.5788207054,
+    "values": 290
+   },
+   "package": {
+    "cells": {
+     "FLAT": 144,
+     "UNDULATING": 276,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 34.285714,
+     "UNDULATING": 65.714286,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359724.5788207054,
+    "values": 290
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0028",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 84,
+     "UNDULATING": 303,
+     "ROLLING": 18,
+     "HILLY": 15,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 84,
+     "UNDULATING": 303,
+     "ROLLING": 18,
+     "HILLY": 15,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 20.0,
+     "UNDULATING": 72.142857,
+     "ROLLING": 4.285714,
+     "HILLY": 3.571429,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359722.339117527,
+    "values": 339
+   },
+   "package": {
+    "cells": {
+     "FLAT": 84,
+     "UNDULATING": 303,
+     "ROLLING": 18,
+     "HILLY": 15,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 20.0,
+     "UNDULATING": 72.142857,
+     "ROLLING": 4.285714,
+     "HILLY": 3.571429,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359722.339117527,
+    "values": 339
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0029",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 149,
+     "UNDULATING": 237,
+     "ROLLING": 7,
+     "HILLY": 6,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 149,
+     "UNDULATING": 237,
+     "ROLLING": 7,
+     "HILLY": 6,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 37.343358,
+     "UNDULATING": 59.398496,
+     "ROLLING": 1.754386,
+     "HILLY": 1.503759,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359727.9432477951,
+    "values": 310
+   },
+   "package": {
+    "cells": {
+     "FLAT": 149,
+     "UNDULATING": 237,
+     "ROLLING": 7,
+     "HILLY": 6,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 399,
+    "percent": {
+     "FLAT": 37.343358,
+     "UNDULATING": 59.398496,
+     "ROLLING": 1.754386,
+     "HILLY": 1.503759,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359727.9432477951,
+    "values": 310
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0029",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 14,
+     "UNDULATING": 153,
+     "ROLLING": 81,
+     "HILLY": 143,
+     "MOUNTAINOUS": 29
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 14,
+     "UNDULATING": 153,
+     "ROLLING": 81,
+     "HILLY": 143,
+     "MOUNTAINOUS": 29
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 3.333333,
+     "UNDULATING": 36.428571,
+     "ROLLING": 19.285714,
+     "HILLY": 34.047619,
+     "MOUNTAINOUS": 6.904762
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359725.6996483803,
+    "values": 398
+   },
+   "package": {
+    "cells": {
+     "FLAT": 14,
+     "UNDULATING": 153,
+     "ROLLING": 81,
+     "HILLY": 143,
+     "MOUNTAINOUS": 29
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 3.333333,
+     "UNDULATING": 36.428571,
+     "ROLLING": 19.285714,
+     "HILLY": 34.047619,
+     "MOUNTAINOUS": 6.904762
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359725.6996483803,
+    "values": 398
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0030",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 244,
+     "UNDULATING": 196,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 244,
+     "UNDULATING": 196,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 55.454545,
+     "UNDULATING": 44.545455,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359733.000824213,
+    "values": 271
+   },
+   "package": {
+    "cells": {
+     "FLAT": 244,
+     "UNDULATING": 196,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 55.454545,
+     "UNDULATING": 44.545455,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359733.000824213,
+    "values": 271
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0030",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 230,
+     "UNDULATING": 210,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 230,
+     "UNDULATING": 210,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 52.272727,
+     "UNDULATING": 47.727273,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359730.751393795,
+    "values": 267
+   },
+   "package": {
+    "cells": {
+     "FLAT": 230,
+     "UNDULATING": 210,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 52.272727,
+     "UNDULATING": 47.727273,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359730.751393795,
+    "values": 267
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0031",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 420,
+     "UNDULATING": 0,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 420,
+     "UNDULATING": 0,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 100.0,
+     "UNDULATING": 0.0,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359733.000824213,
+    "values": 103
+   },
+   "package": {
+    "cells": {
+     "FLAT": 420,
+     "UNDULATING": 0,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 100.0,
+     "UNDULATING": 0.0,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8000.0,
+    "areaM2": 359733.000824213,
+    "values": 103
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0031",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 61,
+     "UNDULATING": 296,
+     "ROLLING": 47,
+     "HILLY": 16,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 61,
+     "UNDULATING": 296,
+     "ROLLING": 47,
+     "HILLY": 16,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 14.52381,
+     "UNDULATING": 70.47619,
+     "ROLLING": 11.190476,
+     "HILLY": 3.809524,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359730.751393795,
+    "values": 359
+   },
+   "package": {
+    "cells": {
+     "FLAT": 61,
+     "UNDULATING": 296,
+     "ROLLING": 47,
+     "HILLY": 16,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 420,
+    "percent": {
+     "FLAT": 14.52381,
+     "UNDULATING": 70.47619,
+     "ROLLING": 11.190476,
+     "HILLY": 3.809524,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5500.0,
+    "areaM2": 359730.751393795,
+    "values": 359
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0043",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "package": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0043",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "package": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0043",
+   "revision": 2,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "package": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0043",
+   "revision": 2,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "package": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0048",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "package": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0048",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "package": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0048",
+   "revision": 2,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "package": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0048",
+   "revision": 2,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "package": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0051",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "primary",
+   "stored": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "package": {
+    "cells": {
+     "FLAT": 194,
+     "UNDULATING": 246,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 440,
+    "percent": {
+     "FLAT": 44.090909,
+     "UNDULATING": 55.909091,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": false,
+    "tied": [
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0,
+    "areaM2": 359812.1764872074,
+    "values": 307
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  },
+  {
+   "request": "RS-2026-0051",
+   "revision": 1,
+   "policyVersion": 1,
+   "leg": "alternative",
+   "stored": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "package": {
+    "cells": {
+     "FLAT": 388,
+     "UNDULATING": 30,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 418,
+    "percent": {
+     "FLAT": 92.822967,
+     "UNDULATING": 7.177033,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "FLAT",
+    "tie": false,
+    "tied": [
+     "FLAT"
+    ],
+    "resolved": true,
+    "allowanceM": 0.0,
+    "effectiveMinM": 3000.0,
+    "effectiveMaxM": 5000.0,
+    "areaM2": 359809.83990359306,
+    "values": 165
+   },
+   "storedEqualsAcceptance": {
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   },
+   "acceptanceEqualsPackage": {
+    "histogram": true,
+    "pixel": true,
+    "cells": true,
+    "controllingClass": true,
+    "tie": true,
+    "tied": true,
+    "resolved": true,
+    "allowanceM": true,
+    "effectiveMinM": true,
+    "effectiveMaxM": true
+   }
+  }
+ ],
+ "draftCases": [
+  {
+   "request": "RS-2026-0003",
+   "state": "DRAFT",
+   "leg": "primary",
+   "controllingClass": "FLAT",
+   "tie": false,
+   "allowanceM": 0.0,
+   "covered": 420,
+   "same": true
+  },
+  {
+   "request": "RS-2026-0003",
+   "state": "DRAFT",
+   "leg": "alternative",
+   "controllingClass": "UNDULATING",
+   "tie": false,
+   "allowanceM": 500.0,
+   "covered": 399,
+   "same": true
+  },
+  {
+   "request": "RS-2026-0004",
+   "state": "DRAFT",
+   "leg": "primary",
+   "controllingClass": "UNDULATING",
+   "tie": false,
+   "allowanceM": 500.0,
+   "covered": 754,
+   "same": true
+  },
+  {
+   "request": "RS-2026-0004",
+   "state": "DRAFT",
+   "leg": "alternative",
+   "controllingClass": "FLAT",
+   "tie": false,
+   "allowanceM": 0.0,
+   "covered": 420,
+   "same": true
+  },
+  {
+   "request": "RS-2026-0019",
+   "state": "DRAFT",
+   "leg": "primary",
+   "controllingClass": "UNDULATING",
+   "tie": false,
+   "allowanceM": 500.0,
+   "covered": 420,
+   "same": true
+  },
+  {
+   "request": "RS-2026-0019",
+   "state": "DRAFT",
+   "leg": "alternative",
+   "controllingClass": "UNDULATING",
+   "tie": false,
+   "allowanceM": 500.0,
+   "covered": 399,
+   "same": true
+  },
+  {
+   "request": "RS-2026-0035",
+   "state": "DRAFT",
+   "leg": "primary",
+   "controllingClass": "UNDULATING",
+   "tie": false,
+   "allowanceM": 500.0,
+   "covered": 420,
+   "same": true
+  },
+  {
+   "request": "RS-2026-0035",
+   "state": "DRAFT",
+   "leg": "alternative",
+   "controllingClass": "FLAT",
+   "tie": false,
+   "allowanceM": 0.0,
+   "covered": 420,
+   "same": true
+  }
+ ],
+ "constructedTies": [
+  {
+   "name": "Hajar mountains",
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       56.144638888888885,
+       25.15075
+      ],
+      [
+       56.14508333333334,
+       25.15075
+      ],
+      [
+       56.14508333333334,
+       25.150916666666664
+      ],
+      [
+       56.144638888888885,
+       25.150916666666664
+      ],
+      [
+       56.144638888888885,
+       25.15075
+      ]
+     ]
+    ]
+   },
+   "histogram": {
+    "2981": 1,
+    "3211": 1
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 0,
+     "UNDULATING": 0,
+     "ROLLING": 0,
+     "HILLY": 1,
+     "MOUNTAINOUS": 1
+    },
+    "covered": 2,
+    "percent": {
+     "FLAT": 0.0,
+     "UNDULATING": 0.0,
+     "ROLLING": 0.0,
+     "HILLY": 50.0,
+     "MOUNTAINOUS": 50.0
+    },
+    "controllingClass": "MOUNTAINOUS",
+    "tie": true,
+    "tied": [
+     "HILLY",
+     "MOUNTAINOUS"
+    ],
+    "resolved": true,
+    "allowanceM": 2000.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 10000.0
+   },
+   "package": {
+    "cells": {
+     "FLAT": 0,
+     "UNDULATING": 0,
+     "ROLLING": 0,
+     "HILLY": 1,
+     "MOUNTAINOUS": 1
+    },
+    "covered": 2,
+    "percent": {
+     "FLAT": 0.0,
+     "UNDULATING": 0.0,
+     "ROLLING": 0.0,
+     "HILLY": 50.0,
+     "MOUNTAINOUS": 50.0
+    },
+    "controllingClass": "MOUNTAINOUS",
+    "tie": true,
+    "tied": [
+     "HILLY",
+     "MOUNTAINOUS"
+    ],
+    "resolved": true,
+    "allowanceM": 2000.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 10000.0
+   },
+   "same": true
+  },
+  {
+   "name": "inland plain",
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       55.59463888888888,
+       24.40352777777778
+      ],
+      [
+       55.595083333333335,
+       24.40352777777778
+      ],
+      [
+       55.595083333333335,
+       24.403694444444444
+      ],
+      [
+       55.59463888888888,
+       24.403694444444444
+      ],
+      [
+       55.59463888888888,
+       24.40352777777778
+      ]
+     ]
+    ]
+   },
+   "histogram": {
+    "155": 1,
+    "701": 1
+   },
+   "acceptance": {
+    "cells": {
+     "FLAT": 1,
+     "UNDULATING": 1,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 2,
+    "percent": {
+     "FLAT": 50.0,
+     "UNDULATING": 50.0,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": true,
+    "tied": [
+     "FLAT",
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "package": {
+    "cells": {
+     "FLAT": 1,
+     "UNDULATING": 1,
+     "ROLLING": 0,
+     "HILLY": 0,
+     "MOUNTAINOUS": 0
+    },
+    "covered": 2,
+    "percent": {
+     "FLAT": 50.0,
+     "UNDULATING": 50.0,
+     "ROLLING": 0.0,
+     "HILLY": 0.0,
+     "MOUNTAINOUS": 0.0
+    },
+    "controllingClass": "UNDULATING",
+    "tie": true,
+    "tied": [
+     "FLAT",
+     "UNDULATING"
+    ],
+    "resolved": true,
+    "allowanceM": 500.0,
+    "effectiveMinM": 5000.0,
+    "effectiveMaxM": 8500.0
+   },
+   "same": true
+  }
+ ],
+ "differences": []
+}

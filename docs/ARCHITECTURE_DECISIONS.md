@@ -1407,7 +1407,7 @@ D12, D16, A4, A5, A6). Plan: `docs/audit/stationing-v3-production/LIFECYCLE_PLAN
 - **Still open:** real touch; production map packaging; the final production-readiness audit. Geometry editing is
   accepted on `tmrkz-test`; Stationing V3 is not production-ready.
 
-## ADR-036 Production offline map package: one verified package, a staged install, served read-only — Proposed (2026-11-05)
+## ADR-036 Production offline map package: one verified package, a staged install, served read-only — Accepted on `tmrkz-test` (2026-11-05)
 
 **Context.** Owner gate «PRODUCTION MAP PACKAGING PHASE — GO»: the accepted Stationing V3 map ran from the git-ignored
 working folder `map-data/`, mounted raw into the acceptance web container. It must become one deterministic, documented
@@ -1462,3 +1462,25 @@ offline package, installed and verified without internet access. The gate also r
 - the terrain classes and thresholds;
 - the database load path (`ops/terrain/load-slope.sh`, now pointed at the installed package);
 - the schema (V20).
+
+**Verified (5 Nov 2026, `docs/evidence/map-package/SUMMARY.md`).**
+- **Package:** `tmrkz-map-2026.11.1` (41 files, 583,757,776 bytes, archive `8233ac8b…`); every input checked against
+  its recorded checksum.
+- **Reproducible:** the terrain products rebuilt from the 28 source tiles give the same archive byte for byte.
+- **Installed on `tmrkz-test`** from the archive (verified, staged, verified again, swapped).
+- **Refusals and recovery:**
+  - corrupted archives are refused with the active package unchanged;
+  - a live swap and `restore-previous` work;
+  - map-package tests 18 passed.
+- **Readiness:** READY 20/20. Its first run found two defects in the readiness tool itself (psql echo, label), fixed in
+  `bc6279d` and `a950d7a`.
+- **Terrain parity:** 0 differences between the acceptance dataset and a database loaded from the package by the
+  production loader: dataset fingerprint, 54 submitted legs (stored = recomputed), drafts, constructed ties.
+- **Real page:** 27/27 with the external network unavailable (0 external requests, 0 console errors); one label per
+  MultiPolygon site; geometry drag 723 ms with no long task.
+- **Open:**
+  - `rasterio` for the terrain loader on an isolated host;
+  - the open-sea cells' colour in terrain mode;
+  - long tasks during a cold page load;
+  - the assessment `processing` field.
+

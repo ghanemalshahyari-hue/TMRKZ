@@ -1,0 +1,32 @@
+### N1 a scratch install of a package whose required font was then deleted
+[readiness] offline map: root C:\Users\ADMIN\AppData\Local\Temp\claude\C--Users-ADMIN-Desktop-TMRKZ\e179f7e6-221d-49f8-ad52-b56cb655402c\scratchpad\maproot-neg, package tmrkz-map-2026.11.1-rehearsal (9ee9058154fe0b6f634566746d1ce0fdb1d23491cf7119bd215c47bce53da45f)
+  [PASS] package present: C:\Users\ADMIN\AppData\Local\Temp\claude\C--Users-ADMIN-Desktop-TMRKZ\e179f7e6-221d-49f8-ad52-b56cb655402c\scratchpad\maproot-neg\current
+  [PASS] manifest valid: 41 files, 583757786 bytes
+  [FAIL] required files present: unexpected [], missing ['fonts/NotoSansArabic.ttf']
+  [NOT CHECKED] terrain dataset loaded: no --db-container given
+  [NOT CHECKED] terrain version expected: no --db-container given
+  [NOT CHECKED] served package is the installed one: no --url given
+[readiness] NOT READY: 1 failed (required files present)
+exit=1
+
+### N2 the acceptance root without the database and web sections
+[readiness] offline map: root C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime, package tmrkz-map-2026.11.1 (e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515)
+  [PASS] package present: C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime\current
+  [PASS] manifest valid: 41 files, 583757776 bytes
+  [PASS] required files present: 43 files, none unexpected
+  [PASS] checksums valid: every size as listed
+  [PASS] checksums valid: contentSha256 e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515
+  [NOT CHECKED] terrain dataset loaded: no --db-container given
+  [NOT CHECKED] terrain version expected: no --db-container given
+  [NOT CHECKED] served package is the installed one: no --url given
+[readiness] INCOMPLETE: not checked: terrain dataset loaded, terrain version expected, served package is the installed one
+exit=2
+
+### N3 a map root with no package
+[readiness] offline map: root C:\Users\ADMIN\AppData\Local\Temp\claude\C--Users-ADMIN-Desktop-TMRKZ\e179f7e6-221d-49f8-ad52-b56cb655402c\scratchpad\maproot-empty
+  [FAIL] package present: C:\Users\ADMIN\AppData\Local\Temp\claude\C--Users-ADMIN-Desktop-TMRKZ\e179f7e6-221d-49f8-ad52-b56cb655402c\scratchpad\maproot-empty\current: The system cannot find the file specified
+  [NOT CHECKED] terrain dataset loaded: no --db-container given
+  [NOT CHECKED] terrain version expected: no --db-container given
+  [NOT CHECKED] served package is the installed one: no --url given
+[readiness] NOT READY: 1 failed (package present)
+exit=1

@@ -1,0 +1,41 @@
+# Reproducibility of tmrkz-map-2026.11.1 (2026-11-04/05)
+
+## 1. Terrain products rebuilt from the 28 verified GLO-30 source tiles
+python ops/terrain/build_terrain.py --source map-data/terrain/glo30/source --out <scratch>/glo30-rebuild --package ''
+(165.9 s; log terrain-rebuild.log)
+
+| Product | Original (packaged) | Rebuilt |
+|---|---|---|
+| slope analysis SHA256SUMS (product checksum) | 9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682 | 9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682 |
+| 28 slope files | SHA256SUMS lines | identical file (diff: no difference) |
+| hillshade.pmtiles | a033c2487a3474078fff8fa11412c087bea700c11ebe6895127eb315c8f9e84f | a033c2487a3474078fff8fa11412c087bea700c11ebe6895127eb315c8f9e84f |
+| build-report.json | — | identical after removing run timings ("seconds": 164.2 vs 165.9 overall, per tile likewise) |
+
+The run timings are the only nondeterministic data the terrain build writes; the package copies the build report
+without them (build_package.strip_timings).
+
+## 2. Package A (release, from the original products) vs package B (from the rebuilt products)
+Both: SOURCE_DATE_EPOCH=1793832114 (2026-11-04T22:41:54Z, the MAP-1 commit time), revision 8400e58.
+
+| | A (map-data/packages) | B (scratch, rebuilt terrain) |
+|---|---|---|
+| contentSha256 (sha256 of SHA256SUMS: all 41 files) | e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515 | e836825bcb5e08ba4bf31ee5cfe619d55f1d52f83f9224efe224d1ad9b539515 |
+| SHA256SUMS | — | identical (cmp) |
+| manifest.json | 4329a7556444f282d911c9e5a4ba4f7d9550804155b98d8706b02121a6b50bca | 2a0b391ab19c4f149dff8df416ed2cde860150004c292c6abc86ab60664cf1a8 |
+| tar | 8233ac8b9416f59a915454a9cd7b1745a31701aae661ceba5523fbd466d2b6f5 | 1b7d3dcdf7add30e2edfc695ec3c284201ef5eaf965411343adc59414668c15b |
+
+The one manifest difference: "sourceTreeClean": true → false. B was built while one map tool (readiness.py, the psql
+quiet fix) had an uncommitted change; the manifest records that honestly. It is build metadata, not package content.
+
+## 3. Package B2: rebuilt products, same revision, same clean tree as A
+(readiness.py temporarily set back to the committed 8400e58 text by a plain file copy, then restored.)
+
+| | A | B2 |
+|---|---|---|
+| manifest.json | 4329a755…0bca | 4329a755…0bca — identical (cmp) |
+| tar sha256 | 8233ac8b9416f59a915454a9cd7b1745a31701aae661ceba5523fbd466d2b6f5 | 8233ac8b9416f59a915454a9cd7b1745a31701aae661ceba5523fbd466d2b6f5 — byte-identical (cmp) |
+
+Result: from the same verified sources, processing version (tmrkz-terrain-1.0.0), revision and SOURCE_DATE_EPOCH the
+package is byte-identical, archive included. What can legitimately differ between builds is only manifest metadata:
+createdAt (when SOURCE_DATE_EPOCH is not set), builtBy.sourceRevision and builtBy.sourceTreeClean. The logical
+content (contentSha256) does not depend on any of them.

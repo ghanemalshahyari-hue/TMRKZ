@@ -189,3 +189,4 @@ Site 05 itself is unchanged.
 
 - Real physical touch: no device. The interactions use pointer events at window level for mouse, touch and pen alike.
 - Duplicate label on a read-only MultiPolygon: later polish; the renderer is not changed in this phase.
+  Fixed afterwards by the map packaging gate (`c6d63ad`, `docs/evidence/map-package/SUMMARY.md`): one label per logical site.

@@ -1,0 +1,12 @@
+78c78
+< C:\Users\ADMIN\Desktop\TMRKZ\map-data -> /usr/share/nginx/map-data (ro)
+---
+> C:\Users\ADMIN\Desktop\TMRKZ\map-data\runtime -> /srv/tmrkz-map (ro)
+81c81
+< GET /map-data/manifest.json 404
+---
+> GET /map-data/manifest.json 200
+83c83
+< GET /map-data/terrain/glo30/analysis/SHA256SUMS 200
+---
+> GET /map-data/terrain/glo30/analysis/SHA256SUMS 404
