@@ -1,0 +1,610 @@
+--- docs/evidence/acceptance-upgrade/tmrkz-test-v18/schema-before.sql	2026-11-04 09:38:39.713259300 +0400
++++ docs/evidence/acceptance-upgrade/tmrkz-test-v18/schema-after.sql	2026-11-04 09:39:08.501387400 +0400
+@@ -2,7 +2,7 @@
+ -- PostgreSQL database dump
+ --
+ 
+-\restrict C5Fq35TVpiNvzLzbI4WvqQm1LyxVkhFKK8b4WoEBfa0BjCVZ3ZSbrg8XPNoDbdw
++\restrict exiOxqa0Vy8Qg6LCWDzXuFrZ0BzQX3WCjpEPORx6epfHQBrqB2VQpwVzDGYzZRh
+ 
+ -- Dumped from database version 17.11
+ -- Dumped by pg_dump version 17.11
+@@ -48,6 +48,20 @@
+ 
+ 
+ --
++-- Name: postgis_raster; Type: EXTENSION; Schema: -; Owner: -
++--
++
++CREATE EXTENSION IF NOT EXISTS postgis_raster WITH SCHEMA public;
++
++
++--
++-- Name: EXTENSION postgis_raster; Type: COMMENT; Schema: -; Owner: -
++--
++
++COMMENT ON EXTENSION postgis_raster IS 'PostGIS raster types and functions';
++
++
++--
+ -- Name: access_policy_version_guard(); Type: FUNCTION; Schema: public; Owner: -
+ --
+ 
+@@ -311,6 +325,18 @@
+ end $$;
+ 
+ 
++--
++-- Name: stationing_policy_version_append_only(); Type: FUNCTION; Schema: public; Owner: -
++--
++
++CREATE FUNCTION public.stationing_policy_version_append_only() RETURNS trigger
++    LANGUAGE plpgsql
++    AS $$
++begin
++  raise exception 'stationing policy versions are append-only; publish a new version instead' using errcode = '42501';
++end $$;
++
++
+ SET default_tablespace = '';
+ 
+ SET default_table_access_method = heap;
+@@ -2139,6 +2165,39 @@
+ 
+ 
+ --
++-- Name: org_stationing; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.org_stationing (
++    id uuid NOT NULL,
++    organization_id uuid NOT NULL,
++    site_id uuid NOT NULL,
++    kind text NOT NULL,
++    base_id uuid,
++    valid_from timestamp with time zone NOT NULL,
++    valid_to timestamp with time zone,
++    planned_end timestamp with time zone,
++    origin text NOT NULL,
++    request_id uuid,
++    reason text NOT NULL,
++    reference text,
++    recorded_by uuid NOT NULL,
++    recorded_at timestamp with time zone DEFAULT now() NOT NULL,
++    end_reason text,
++    ended_by uuid,
++    ended_at timestamp with time zone,
++    CONSTRAINT org_stationing_check CHECK (((valid_to IS NULL) OR (valid_to >= valid_from))),
++    CONSTRAINT org_stationing_check1 CHECK (((valid_to IS NULL) = (end_reason IS NULL))),
++    CONSTRAINT org_stationing_check2 CHECK ((((kind = 'PERMANENT'::text) AND (base_id IS NULL) AND (planned_end IS NULL)) OR ((kind = 'TEMPORARY'::text) AND (base_id IS NOT NULL) AND (planned_end IS NOT NULL) AND (planned_end > valid_from)))),
++    CONSTRAINT org_stationing_check3 CHECK (((origin = 'CORRECTION'::text) OR (request_id IS NOT NULL))),
++    CONSTRAINT org_stationing_end_reason_check CHECK ((end_reason = ANY (ARRAY['SUPERSEDED'::text, 'CORRECTED'::text, 'RETURNED'::text, 'CANCELLED'::text, 'ENDED_EARLY'::text]))),
++    CONSTRAINT org_stationing_kind_check CHECK ((kind = ANY (ARRAY['PERMANENT'::text, 'TEMPORARY'::text]))),
++    CONSTRAINT org_stationing_origin_check CHECK ((origin = ANY (ARRAY['CORRECTION'::text, 'REQUEST'::text]))),
++    CONSTRAINT org_stationing_reason_check CHECK ((length(btrim(reason)) >= 5))
++);
++
++
++--
+ -- Name: org_unit_symbol; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -2677,6 +2736,29 @@
+ 
+ 
+ --
++-- Name: site_link; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.site_link (
++    id uuid NOT NULL,
++    site_id uuid NOT NULL,
++    organization_id uuid NOT NULL,
++    valid_from timestamp with time zone NOT NULL,
++    valid_to timestamp with time zone,
++    source text DEFAULT 'TMRKZ'::text NOT NULL,
++    reason text NOT NULL,
++    created_by uuid NOT NULL,
++    created_at timestamp with time zone DEFAULT now() NOT NULL,
++    ended_by uuid,
++    ended_reason text,
++    CONSTRAINT site_link_check CHECK (((valid_to IS NULL) OR (valid_to > valid_from))),
++    CONSTRAINT site_link_check1 CHECK (((valid_to IS NULL) = (ended_reason IS NULL))),
++    CONSTRAINT site_link_reason_check CHECK ((length(btrim(reason)) >= 5)),
++    CONSTRAINT site_link_source_check CHECK (((length(btrim(source)) >= 2) AND (length(btrim(source)) <= 40)))
++);
++
++
++--
+ -- Name: site_responsibility; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -2691,6 +2773,67 @@
+ 
+ 
+ --
++-- Name: stationing_outbox; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.stationing_outbox (
++    seq bigint NOT NULL,
++    event_id uuid NOT NULL,
++    event_type text NOT NULL,
++    organization_id uuid NOT NULL,
++    payload jsonb NOT NULL,
++    state text DEFAULT 'PENDING'::text NOT NULL,
++    attempts integer DEFAULT 0 NOT NULL,
++    available_at timestamp with time zone DEFAULT now() NOT NULL,
++    last_error text,
++    created_at timestamp with time zone DEFAULT now() NOT NULL,
++    delivered_at timestamp with time zone,
++    CONSTRAINT stationing_outbox_check CHECK (((state = 'DELIVERED'::text) = (delivered_at IS NOT NULL))),
++    CONSTRAINT stationing_outbox_state_check CHECK ((state = ANY (ARRAY['PENDING'::text, 'DELIVERED'::text, 'FAILED'::text])))
++);
++
++
++--
++-- Name: stationing_outbox_seq_seq; Type: SEQUENCE; Schema: public; Owner: -
++--
++
++CREATE SEQUENCE public.stationing_outbox_seq_seq
++    START WITH 1
++    INCREMENT BY 1
++    NO MINVALUE
++    NO MAXVALUE
++    CACHE 1;
++
++
++--
++-- Name: stationing_outbox_seq_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
++--
++
++ALTER SEQUENCE public.stationing_outbox_seq_seq OWNED BY public.stationing_outbox.seq;
++
++
++--
++-- Name: stationing_policy_version; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.stationing_policy_version (
++    id uuid NOT NULL,
++    version integer NOT NULL,
++    previous_id uuid,
++    policy_values jsonb NOT NULL,
++    effective_from timestamp with time zone NOT NULL,
++    reason text NOT NULL,
++    reference text,
++    created_by uuid NOT NULL,
++    created_at timestamp with time zone DEFAULT now() NOT NULL,
++    CONSTRAINT stationing_policy_version_check CHECK (((version = 1) = (previous_id IS NULL))),
++    CONSTRAINT stationing_policy_version_check1 CHECK ((effective_from >= (created_at - '00:00:05'::interval))),
++    CONSTRAINT stationing_policy_version_reason_check CHECK ((length(btrim(reason)) >= 5)),
++    CONSTRAINT stationing_policy_version_version_check CHECK ((version > 0))
++);
++
++
++--
+ -- Name: task_assignment; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -2742,6 +2885,53 @@
+ 
+ 
+ --
++-- Name: terrain_dataset; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.terrain_dataset (
++    id uuid NOT NULL,
++    code text NOT NULL,
++    version text NOT NULL,
++    surface_model text NOT NULL,
++    slope_encoding text NOT NULL,
++    manifest jsonb NOT NULL,
++    slope_sha256 text NOT NULL,
++    loaded_at timestamp with time zone DEFAULT now() NOT NULL,
++    CONSTRAINT terrain_dataset_surface_model_check CHECK ((surface_model = ANY (ARRAY['DSM'::text, 'DTM'::text])))
++);
++
++
++--
++-- Name: terrain_slope; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.terrain_slope (
++    rid bigint NOT NULL,
++    dataset_id uuid NOT NULL,
++    rast public.raster NOT NULL
++);
++
++
++--
++-- Name: terrain_slope_rid_seq; Type: SEQUENCE; Schema: public; Owner: -
++--
++
++CREATE SEQUENCE public.terrain_slope_rid_seq
++    START WITH 1
++    INCREMENT BY 1
++    NO MINVALUE
++    NO MAXVALUE
++    CACHE 1;
++
++
++--
++-- Name: terrain_slope_rid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
++--
++
++ALTER SEQUENCE public.terrain_slope_rid_seq OWNED BY public.terrain_slope.rid;
++
++
++--
+ -- Name: unit_symbol_catalog; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -2878,6 +3068,20 @@
+ 
+ 
+ --
++-- Name: stationing_outbox seq; Type: DEFAULT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.stationing_outbox ALTER COLUMN seq SET DEFAULT nextval('public.stationing_outbox_seq_seq'::regclass);
++
++
++--
++-- Name: terrain_slope rid; Type: DEFAULT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.terrain_slope ALTER COLUMN rid SET DEFAULT nextval('public.terrain_slope_rid_seq'::regclass);
++
++
++--
+ -- Name: flw_channel_definition FLW_CHANNEL_DEFINITION_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -3630,6 +3834,22 @@
+ 
+ 
+ --
++-- Name: org_stationing org_stationing_no_overlap; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.org_stationing
++    ADD CONSTRAINT org_stationing_no_overlap EXCLUDE USING gist (organization_id WITH =, kind WITH =, tstzrange(valid_from, valid_to, '[)'::text) WITH &&);
++
++
++--
++-- Name: org_stationing org_stationing_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.org_stationing
++    ADD CONSTRAINT org_stationing_pkey PRIMARY KEY (id);
++
++
++--
+ -- Name: org_unit_symbol org_unit_symbol_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -3894,6 +4114,14 @@
+ 
+ 
+ --
++-- Name: site_link site_link_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.site_link
++    ADD CONSTRAINT site_link_pkey PRIMARY KEY (id);
++
++
++--
+ -- Name: site site_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -3918,6 +4146,46 @@
+ 
+ 
+ --
++-- Name: stationing_outbox stationing_outbox_event_id_key; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.stationing_outbox
++    ADD CONSTRAINT stationing_outbox_event_id_key UNIQUE (event_id);
++
++
++--
++-- Name: stationing_outbox stationing_outbox_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.stationing_outbox
++    ADD CONSTRAINT stationing_outbox_pkey PRIMARY KEY (seq);
++
++
++--
++-- Name: stationing_policy_version stationing_policy_version_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.stationing_policy_version
++    ADD CONSTRAINT stationing_policy_version_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: stationing_policy_version stationing_policy_version_previous_id_key; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.stationing_policy_version
++    ADD CONSTRAINT stationing_policy_version_previous_id_key UNIQUE (previous_id);
++
++
++--
++-- Name: stationing_policy_version stationing_policy_version_version_key; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.stationing_policy_version
++    ADD CONSTRAINT stationing_policy_version_version_key UNIQUE (version);
++
++
++--
+ -- Name: task_assignment task_assignment_flowable_task_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -3942,6 +4210,30 @@
+ 
+ 
+ --
++-- Name: terrain_dataset terrain_dataset_code_version_key; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.terrain_dataset
++    ADD CONSTRAINT terrain_dataset_code_version_key UNIQUE (code, version);
++
++
++--
++-- Name: terrain_dataset terrain_dataset_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.terrain_dataset
++    ADD CONSTRAINT terrain_dataset_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: terrain_slope terrain_slope_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.terrain_slope
++    ADD CONSTRAINT terrain_slope_pkey PRIMARY KEY (rid);
++
++
++--
+ -- Name: unit_symbol_catalog unit_symbol_catalog_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -5153,6 +5445,20 @@
+ 
+ 
+ --
++-- Name: org_stationing_org_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX org_stationing_org_idx ON public.org_stationing USING btree (organization_id, valid_from);
++
++
++--
++-- Name: org_stationing_site_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX org_stationing_site_idx ON public.org_stationing USING btree (site_id) WHERE (valid_to IS NULL);
++
++
++--
+ -- Name: organization_parent_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -5314,6 +5620,13 @@
+ 
+ 
+ --
++-- Name: site_link_open_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE UNIQUE INDEX site_link_open_idx ON public.site_link USING btree (site_id, organization_id) WHERE (valid_to IS NULL);
++
++
++--
+ -- Name: site_marker_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -5335,6 +5648,20 @@
+ 
+ 
+ --
++-- Name: stationing_outbox_due_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX stationing_outbox_due_idx ON public.stationing_outbox USING btree (available_at, seq) WHERE (state = 'PENDING'::text);
++
++
++--
++-- Name: stationing_outbox_org_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX stationing_outbox_org_idx ON public.stationing_outbox USING btree (organization_id, seq) WHERE (state <> 'DELIVERED'::text);
++
++
++--
+ -- Name: task_assignment_open_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -5363,6 +5690,20 @@
+ 
+ 
+ --
++-- Name: terrain_slope_dataset_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX terrain_slope_dataset_idx ON public.terrain_slope USING btree (dataset_id);
++
++
++--
++-- Name: terrain_slope_hull; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX terrain_slope_hull ON public.terrain_slope USING gist (public.st_convexhull(rast));
++
++
++--
+ -- Name: user_session_person_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -5622,6 +5963,13 @@
+ 
+ 
+ --
++-- Name: stationing_policy_version stationing_policy_version_frozen; Type: TRIGGER; Schema: public; Owner: -
++--
++
++CREATE TRIGGER stationing_policy_version_frozen BEFORE DELETE OR UPDATE ON public.stationing_policy_version FOR EACH ROW EXECUTE FUNCTION public.stationing_policy_version_append_only();
++
++
++--
+ -- Name: validation_report validation_report_append_only; Type: TRIGGER; Schema: public; Owner: -
+ --
+ 
+@@ -6580,6 +6928,46 @@
+ 
+ 
+ --
++-- Name: org_stationing org_stationing_base_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.org_stationing
++    ADD CONSTRAINT org_stationing_base_id_fkey FOREIGN KEY (base_id) REFERENCES public.org_stationing(id);
++
++
++--
++-- Name: org_stationing org_stationing_ended_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.org_stationing
++    ADD CONSTRAINT org_stationing_ended_by_fkey FOREIGN KEY (ended_by) REFERENCES public.person(id);
++
++
++--
++-- Name: org_stationing org_stationing_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.org_stationing
++    ADD CONSTRAINT org_stationing_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id);
++
++
++--
++-- Name: org_stationing org_stationing_recorded_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.org_stationing
++    ADD CONSTRAINT org_stationing_recorded_by_fkey FOREIGN KEY (recorded_by) REFERENCES public.person(id);
++
++
++--
++-- Name: org_stationing org_stationing_site_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.org_stationing
++    ADD CONSTRAINT org_stationing_site_id_fkey FOREIGN KEY (site_id) REFERENCES public.site(id);
++
++
++--
+ -- Name: org_unit_symbol org_unit_symbol_catalog_code_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -7020,6 +7408,38 @@
+ 
+ 
+ --
++-- Name: site_link site_link_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.site_link
++    ADD CONSTRAINT site_link_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.person(id);
++
++
++--
++-- Name: site_link site_link_ended_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.site_link
++    ADD CONSTRAINT site_link_ended_by_fkey FOREIGN KEY (ended_by) REFERENCES public.person(id);
++
++
++--
++-- Name: site_link site_link_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.site_link
++    ADD CONSTRAINT site_link_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id);
++
++
++--
++-- Name: site_link site_link_site_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.site_link
++    ADD CONSTRAINT site_link_site_id_fkey FOREIGN KEY (site_id) REFERENCES public.site(id);
++
++
++--
+ -- Name: site site_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -7044,6 +7464,30 @@
+ 
+ 
+ --
++-- Name: stationing_outbox stationing_outbox_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.stationing_outbox
++    ADD CONSTRAINT stationing_outbox_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organization(id);
++
++
++--
++-- Name: stationing_policy_version stationing_policy_version_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.stationing_policy_version
++    ADD CONSTRAINT stationing_policy_version_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.person(id);
++
++
++--
++-- Name: stationing_policy_version stationing_policy_version_previous_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.stationing_policy_version
++    ADD CONSTRAINT stationing_policy_version_previous_id_fkey FOREIGN KEY (previous_id) REFERENCES public.stationing_policy_version(id);
++
++
++--
+ -- Name: task_assignment task_assignment_assigned_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -7108,6 +7552,14 @@
+ 
+ 
+ --
++-- Name: terrain_slope terrain_slope_dataset_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.terrain_slope
++    ADD CONSTRAINT terrain_slope_dataset_id_fkey FOREIGN KEY (dataset_id) REFERENCES public.terrain_dataset(id);
++
++
++--
+ -- Name: unit_symbol_catalog unit_symbol_catalog_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -7175,5 +7627,5 @@
+ -- PostgreSQL database dump complete
+ --
+ 
+-\unrestrict C5Fq35TVpiNvzLzbI4WvqQm1LyxVkhFKK8b4WoEBfa0BjCVZ3ZSbrg8XPNoDbdw
++\unrestrict exiOxqa0Vy8Qg6LCWDzXuFrZ0BzQX3WCjpEPORx6epfHQBrqB2VQpwVzDGYzZRh
+ 

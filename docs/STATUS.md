@@ -187,9 +187,16 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     `ACCEPTANCE / V17`. The `tmrkz-mover` volume on this machine is owner-retained and untouched. `up.sh` /
     `up-offline.sh` now refuse a rebuild that would apply migrations unless they are named.
   - **V18 `stationing_foundation`:** policy versions, authoritative stationing, site links, outbound outbox, terrain
-    slope dataset (+`postgis_raster`). Clean V18 path PASS on a disposable environment. **Not applied to `tmrkz-test`**:
-    by the owner's next-gate decision it waits until the owner has reviewed section 9 of the report itself. V18 is
-    schema only, and the first production policy is not published (allowances are administrator configuration).
+    slope dataset (+`postgis_raster`). Clean V18 path PASS on a disposable environment.
+    - **Applied to `tmrkz-test` on 4 Nov after the owner approved section 9; the database is now `ACCEPTANCE / V18`.**
+    - Image and commits: release image `mover/backend:rel-4f7ea08`, built from local commit `4f7ea08` (not pushed).
+    - Procedure: plan [18]; backup verified by restore (6,432 rows equal); V18 in 0.268 s.
+    - Data: all 6,432 earlier rows unchanged; schema change identical to the clean path; 6 tables, 0 rows.
+    - Health and access: journey PASS before and after; OpenFGA model equals the reviewed DSL.
+    - Side effects: no outbound delivery, no Oracle access, no terrain rows, no policy published. Evidence:
+      `docs/evidence/acceptance-upgrade/tmrkz-test-v18/`.
+    - V18 is schema only, and the first production policy is not published (allowances are administrator
+      configuration).
   - **Backend:** versioned policy with `terrain_slope_classification` (FAO initial bands) and separate allowances,
     terrain assessment from the slope raster, data correction of stationing, links, read API, outbox with HTTP sender
     (no consumer connected), three new permissions in the OpenFGA model. Full backend suite 185/185.

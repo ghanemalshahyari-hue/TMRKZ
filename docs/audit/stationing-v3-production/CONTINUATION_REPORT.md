@@ -315,3 +315,25 @@ Full report: `MAPLIBRE_LABELS.md`; ADR-032.
 | Frontend | `npm test`; `npm run build` | 93/93 (3 new); build OK |
 
 Nothing was committed or pushed. `tmrkz-test` remains at V17, and `tmrkz-mover` was not touched.
+
+## 13. V18 applied to the acceptance database (owner approval of §9, 4 Nov 2026)
+
+The owner approved §9 with clarifications: `tmrkz-test` only; no terrain load; no policy; release image from a local commit; step 4 is recovery only.
+
+| Item | Result |
+|---|---|
+| Local commits (not pushed) | `21f6689` release and migration safety; `4f7ea08` Stationing V3 foundation (V18) |
+| Image | `mover/backend:rel-4f7ea08`, id `sha256:d63e22aa4c25ee8e60774e2c53506e9ee2d8c7cfcfbf51b04bddecd16db5ba0e`, built 2026-11-04T05:37:18Z from `git archive` of `4f7ea08`, revision label set; no uncommitted file in the build context |
+| V18 checksum | sha256 `183c357f62dbda8506335c8416b16eecec0b05607cfc4fe7cfeae6af5c89bf87` (image = commit = clean path); Flyway 1034779267 |
+| Target | `tmrkz-test-db-1`, comment `ACCEPTANCE / V17` checked by the tool |
+| Before | Schema 17. The 6,340 V17 rows unchanged. Health 200; journey PASSED. 6,432 rows fingerprinted. Plan exactly [18] |
+| Backup | `tmrkz-test-20261104T053841Z`, verified: 7 checksums, 3 readable dumps; restored with 20 table counts, schema 17 and 6,432 rows equal to the live database |
+| Migration | V18 in 0.268 s; history 18 successful |
+| After | 6,432 earlier rows unchanged. The schema change (452 lines added, 0 removed) is identical to the clean path. `V18-after.sql`: 6 tables, 0 rows, 0 mismatches |
+| Journey, health | PASSED; UP |
+| OpenFGA | Held model = `docs/authz/model.fga` (7 types, 306 relations, V3 relations present); sync 405/405, no error |
+| Side effects | No outbound URL and an empty outbox; internal network only; Oracle source disabled with no route; 0 terrain rows; 0 policy versions |
+| Rollback | Not needed |
+| Final state | **`tmrkz-test` is ACCEPTANCE / V18** (database comment) |
+
+Evidence: `docs/evidence/acceptance-upgrade/tmrkz-test-v18/summary.txt`. The next phase is the re-stationing request workflow (§11 item 2).

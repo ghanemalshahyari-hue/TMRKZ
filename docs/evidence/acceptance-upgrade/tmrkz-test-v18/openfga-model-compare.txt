@@ -1,0 +1,4 @@
+schema_version 1.1 | model id 01M6JH2Y43NNP2PX1KJT140PV6
+types: OpenFGA 7 / DSL 7 | relations: OpenFGA 306 / DSL 306
+V3 relations present: yes
+RESULT: MATCH

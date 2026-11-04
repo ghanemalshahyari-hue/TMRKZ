@@ -1,0 +1,57 @@
+V18 acceptance migration of tmrkz-test (owner approval of 4 Nov 2026 after the review of CONTINUATION_REPORT section 9)
+
+Scope: tmrkz-test only (fictional acceptance data). No terrain load, no Stationing policy published, no other database.
+
+Release
+  commits (local, not pushed)  21f6689 release and migration safety; 4f7ea08 Stationing V3 foundation (V18)
+  image                        mover/backend:rel-4f7ea08
+  image id                     sha256:d63e22aa4c25ee8e60774e2c53506e9ee2d8c7cfcfbf51b04bddecd16db5ba0e (local image, no registry digest)
+  built from                   git archive of commit 4f7ea08a0a41e933a0ef372d8fb6f489fec51f3d (backend/pom.xml, backend/src,
+                               backend/Dockerfile, map-packages); labels org.opencontainers.image.revision = that commit,
+                               created 2026-11-04T05:37:18Z. The working tree held unrelated uncommitted files (Stationing V2
+                               prototype A8, enterprise audit folders); none is in the build context.
+  V18 checksum                 sha256 183c357f62dbda8506335c8416b16eecec0b05607cfc4fe7cfeae6af5c89bf87, identical in the
+                               image, in commit 4f7ea08 and in the clean-path run (docs/evidence/migration-path/v18);
+                               Flyway checksum 1034779267
+
+Before (all recorded immediately before the image swap)
+  target identity              tmrkz-test-db-1 (7bd37f0b7418), database comment "ACCEPTANCE / V17 …" (required by the tool)
+  schema version               17
+  schema fingerprint           pg_dump sha256 43696621…0ee5; without pg_dump's random \restrict key 1665e0cc…696f
+  V17 acceptance rows          the 6,340 rows fingerprinted at the V17 upgrade: 0 changed or missing
+  V17 health / journey         health 200; journey PASSED (journey-before.txt)
+  rows fingerprinted           6,432 (the 6,340 plus rows added by two journey runs)
+  plan                         exactly [18]
+  backup                       backups/tmrkz-test-20261104T053841Z (git-ignored), manifest schema 17
+  backup verification          PASS: 7 manifest checksums, 3 readable dumps, restore into a throw-away PostGIS
+                               container with 20 table counts and schema 17 equal, 6,432 restored rows equal to the
+                               live fingerprint (backup-verify.txt)
+
+Migration
+  Flyway                       "Successfully applied 1 migration to schema public, now at version v18" (0.268 s);
+                               flyway_schema_history 18 "stationing foundation" success
+
+After
+  schema                       the V18 change (452 lines added, 0 removed) is identical to the approved clean-path
+                               change (delta sha256 1ec28d1a…7076, schema-compare.txt); normalised schema-after 35b72929…6dcf
+  V18-after.sql                tables=6 rows=0 postgis_raster=3.5.7 append_only_trigger=1 overlap_exclusion=1
+                               legacy_relocation_rows_unchanged=21/2 mismatches=0
+  new tables                   stationing_policy_version 0, org_stationing 0, site_link 0, stationing_outbox 0,
+                               terrain_dataset 0, terrain_slope 0
+  earlier rows                 upgrade-check PASS: all 6,432 present and unchanged; the 6,340 V17 acceptance rows
+                               unchanged after V18 and the journey (acceptance-rows-compare.txt)
+  journey                      PASSED on V18 (journey-after.txt)
+  health                       /api/v1/system/health 200 {"status":"UP"}; container healthy
+  OpenFGA                      store 01M63D2R…, model 01M6JH2Y… written at start for the new code; the held model equals
+                               docs/authz/model.fga (7 types, 306 relations, the three V3 relations present); sync
+                               applied 405 of 405 changes, no error (openfga-model-compare.txt)
+  outbound                     TMRKZ_STATIONING_OUTBOUND_URL not set (processor not scheduled); outbox 0 rows,
+                               0 delivered; backend only on the internal network tmrkz-test_internal (internal=true)
+  Oracle                       HR source provider ORACLE is disabled; no Oracle container or route in this environment;
+                               the HR adapter only reads
+  terrain                      0 datasets, 0 tiles (no load)
+  policy                       0 Stationing policy versions (none published)
+  rollback                     not needed; recovery would be ops/restore.sh backups/tmrkz-test-20261104T053841Z into a
+                               clean project with image sha256:ac0f6583… (mover/backend:rel-6186016)
+
+Final state: ACCEPTANCE / V18 (database comment set after every check passed).

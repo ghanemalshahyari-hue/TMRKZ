@@ -1,0 +1,1 @@
+V17 acceptance baseline rows: 6340; changed-or-missing after V18 and journey: 0; pre-migration rows (6432) changed-or-missing now: 0

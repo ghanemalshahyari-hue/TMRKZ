@@ -996,6 +996,24 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
     - Disposable PostGIS with V18 and a two-tile real subset: 12 load and removal steps, evidence
       `docs/evidence/terrain-load/loader-checks-2026-11-04.txt`.
     - `python -m pytest ops/terrain`: 13/13.
+- **Applied to the acceptance database (owner approval of section 9, 4 Nov 2026).**
+  - **Image.** Local commits `21f6689` (release safety) and `4f7ea08` (this foundation), not pushed. Release image
+    `mover/backend:rel-4f7ea08` (id `sha256:d63e22aa…5ba0e`) is built from `git archive` of `4f7ea08`. The V18 sha256
+    `183c357f…bf87` is identical in the image, the commit and the clean path.
+  - **Application** (`ops/test-env/upgrade-backend.sh` on `tmrkz-test`):
+    - the ACCEPTANCE label was checked;
+    - plan [18];
+    - backup `tmrkz-test-20261104T053841Z`, verified by restore (6,432 rows equal);
+    - V18 in 0.268 s.
+  - **Invariants proved:**
+    - 6,432 earlier rows unchanged, including the 6,340 of the V17 acceptance;
+    - the schema change is identical to the clean path (452 lines added, 0 removed);
+    - 6 tables, 0 rows; `V18-after.sql` 0 mismatches;
+    - journey PASS before and after; health UP;
+    - the OpenFGA model equals `docs/authz/model.fga` (7 types, 306 relations);
+    - no outbound URL, outbox empty; the Oracle source disabled with no route;
+    - 0 terrain rows, 0 policy versions.
+  - **Result.** Database comment `ACCEPTANCE / V18`. Evidence `docs/evidence/acceptance-upgrade/tmrkz-test-v18/`.
 
 ## ADR-032 Offline MapLibre map for Stationing V3, Arabic labels without a right-to-left plugin — Accepted, module not yet wired (2026-11-04)
 
