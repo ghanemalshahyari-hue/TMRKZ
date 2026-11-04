@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { DAY, check, effectiveOf, impact, perform, permanentOf, temporaryOf, type World } from './domain';
-import { NOW, baseWorld, stagesTemplate } from './fixtures';
+import { centroid } from '../../../../frontend/src/lib/footprint';
+import { DAY, changedFacts, check, deriveRoute, effectiveOf, footprintCheck, impact, participants, perform, permanentOf, policyAt, proposalAreas, requirementOf, temporaryOf, type World } from './domain';
+import { NOW, areaShape, baseWorld, shape } from './fixtures';
+import { nearest } from './geometry';
 import { SCENARIOS } from './scenarios';
 
 const ok = (w: World, actor: string, a: Parameters<typeof check>[2]) => check(w, actor, a).ok;
@@ -77,13 +79,13 @@ describe('stationing domain model V2 (simulated rules of docs/STATIONING_DOMAIN_
     expect(ok(w, 'p-act', { t: 'ACTIVATE_EXTENSION', ext: 'ext-it' })).toBe(false);
   });
 
-  it('A3: a temporary stationing, even of the whole organisation, keeps the permanent stationing and its associated areas', () => {
+  it('A3: a temporary stationing, even of the whole organisation, keeps the permanent stationing and its deployment areas', () => {
     let w = baseWorld();
     expect(temporaryOf(w, 'o-it')!.state).toBe('ACTIVE');
     expect(permanentOf(w, 'o-it')!.id).toBe('st-o-it');
-    expect(w.areas.filter((a) => a.org === 'o-it').every((a) => a.status === 'ACTIVE')).toBe(true);
+    expect(w.areas.filter((a) => a.stationingId === 'st-o-it').every((a) => a.status === 'ACTIVE')).toBe(true);
     w = perform(w, 'system', { t: 'TICK', to: NOW + 13 * DAY }); // the temporary one expires
-    expect(w.areas.filter((a) => a.org === 'o-it').every((a) => a.status === 'ACTIVE')).toBe(true);
+    expect(w.areas.filter((a) => a.stationingId === 'st-o-it').every((a) => a.status === 'ACTIVE')).toBe(true);
   });
 
   it('A4: an activated temporary stationing cancelled before its start never becomes effective; not an early return', () => {
@@ -293,32 +295,21 @@ describe('stationing domain model V2 (simulated rules of docs/STATIONING_DOMAIN_
     expect(effectiveOf(w, 'o-ga-adm')!.kind).toBe('PERMANENT');
   });
 
-  it('D15/D2: switching needs SWITCH_RELOCATION_CANDIDATE; review resumes at the anchor; location-independent decisions are carried', () => {
-    const w0 = baseWorld();
-    expect(why(w0, 'p-req-dir', { t: 'SWITCH', req: 'r-ss-gen', reason: 'x' })).toMatch(/SWITCH_RELOCATION_CANDIDATE|مقدم الطلب/);
-    const w = perform(w0, 'p-dec', { t: 'SWITCH', req: 'r-ss-gen', reason: 'البديل يجتاز التحقق' });
+  it('D18: a resubmission invalidates only the decisions whose facts changed', () => {
+    const st = deriveRoute(baseWorld(), 'o-ss-gen', 'PERMANENT').map((s) => ({ ...s, mark: 'APPROVED' as const }));
+    expect(st.map((s) => s.key)).toEqual(['h-o-ss', 'site', 'scope', 'final']);
+    expect(impact(st, ['SITE'])).toMatchObject({ restart: 0, invalidated: ['h-o-ss', 'site', 'final'], carried: ['scope'] });
+    expect(impact(st, ['DURATION'])).toMatchObject({ restart: 0, invalidated: ['h-o-ss', 'site', 'scope', 'final'], carried: [] });
+    // returned at the final decision, resubmitted with a new site: review resumes at the hierarchy, the scope review is carried
+    let w = perform(baseWorld(), 'p-apr', { t: 'RETURN', req: 'r-ss-gen', reason: 'يلزم موقع آخر' });
+    w = structuredClone(w);
     const r = w.requests.find((x) => x.id === 'r-ss-gen')!;
-    expect(r.state).toBe('UNDER_REVIEW_ALTERNATIVE');
-    expect(r.stages[r.cursor].key).toBe('site');
-    expect(r.stages.find((s) => s.key === 'org')!.mark).toBe('APPROVED');
-    expect(r.stages.find((s) => s.key === 'scope')!.mark).toBe('CARRIED');
-    expect(r.stages.find((s) => s.key === 'site')!.mark).toBe('INVALIDATED');
-    expect(w.events.at(-1)!.type).toBe('RELOCATION_ACTIVE_CANDIDATE_CHANGED');
-  });
-
-  it('D15: a candidate that was not accepted can be reopened; a finally rejected one cannot', () => {
-    let w = perform(baseWorld(), 'p-dec', { t: 'SWITCH', req: 'r-ss-gen', reason: 'تبديل' });
-    expect(ok(w, 'p-dec', { t: 'REOPEN', req: 'r-ss-gen', role: 'PRIMARY', reason: 'زال التعارض' })).toBe(true);
-    w.requests.find((x) => x.id === 'r-ss-gen')!.candidates.PRIMARY.status = 'REJECTED_FINAL';
-    expect(why(w, 'p-dec', { t: 'REOPEN', req: 'r-ss-gen', role: 'PRIMARY', reason: 'x' })).toContain('مرفوض نهائياً');
-  });
-
-  it('D18: invalidation follows what changed', () => {
-    const st = stagesTemplate().map((s) => ({ ...s, mark: 'APPROVED' as const }));
-    expect(impact(st, ['SCOPE'])).toMatchObject({ restart: 0, invalidated: ['org', 'site', 'scope', 'final'] });
-    expect(impact(st, ['DURATION'])).toMatchObject({ restart: 1, invalidated: ['site', 'scope', 'final'], carried: [] });
-    expect(impact(st, ['CANDIDATE'])).toMatchObject({ restart: 1, invalidated: ['site', 'final'], carried: ['scope'] });
-    expect(impact(st, ['CLASSIFICATION']).restart).toBe(0);
+    r.proposal.ring = r.proposal.ring.map((p) => ({ lat: p.lat + 0.01, lng: p.lng }));
+    expect(changedFacts(r)).toEqual(['SITE']);
+    w = perform(w, 'p-req', { t: 'RESUBMIT', req: 'r-ss-gen', changed: changedFacts(r), reason: 'موقع جديد بلا تعارض' });
+    const r2 = w.requests.find((x) => x.id === 'r-ss-gen')!;
+    expect(r2.cursor).toBe(0);
+    expect(r2.stages.map((s) => s.mark)).toEqual(['INVALIDATED', 'INVALIDATED', 'CARRIED', undefined]); // the final decision had not been taken
   });
 
   it('invariants 1–3: activation never touches facility responsibility, and never deletes history', () => {
@@ -326,6 +317,236 @@ describe('stationing domain model V2 (simulated rules of docs/STATIONING_DOMAIN_
     const w = perform(w0, 'p-act', { t: 'ACTIVATE', req: 'r-ga-fin' });
     expect(w.sites).toEqual(w0.sites); // no facility record changed
     expect(w.stationings.find((s) => s.id === 'st-o-ga-fin')!.state).toBe('ENDED');
-    expect(permanentOf(w, 'o-ga-fin')!.siteId).toBe('c-ga-fin-alt');
+    expect(permanentOf(w, 'o-ga-fin')!.siteId).toBe('c-ga-fin');
+  });
+});
+
+// owner correction of 3 Nov 2026
+describe('one proposed site, the hierarchical route, the policies and the deployment package', () => {
+  const setRequired = (w: World, at = NOW) => perform(w, 'p-sys', { t: 'SET_POLICY', key: 'stationing_areas_requirement', value: 'REQUIRED', effectiveFrom: at, reason: 'منطقتا الانتشار شرط للإرسال' });
+  const req = (w: World, id: string) => w.requests.find((r) => r.id === id)!;
+  const approveAll = (w0: World, id: string, deciders: string[]) => deciders.reduce((w, who) => perform(w, who, { t: 'APPROVE_STAGE', req: id }), w0);
+  /** Takes MV-2026-0402 (temporary, a complete package) to final approval and registers its proposed site. */
+  const approve0402 = (w0: World) => {
+    let w = approveAll(perform(w0, 'p-req', { t: 'SUBMIT', req: 'r-hr-trn' }), 'r-hr-trn', ['p-rev', 'p-apr']);
+    w = structuredClone(w);
+    const p = req(w, 'r-hr-trn').proposal;
+    w.sites.push({ id: 'c-hr-trn', name: p.name, ring: p.ring, lat: 0, lng: 0, registered: true });
+    p.siteId = 'c-hr-trn';
+    return w;
+  };
+
+  it('a request carries exactly one proposed site; nothing in the model offers a second one', () => {
+    for (const r of baseWorld().requests) {
+      expect(r.proposal.ring.length).toBeGreaterThanOrEqual(3);
+      expect(Object.keys(r)).not.toContain('candidates');
+      expect(Object.keys(r)).not.toContain('active');
+    }
+  });
+
+  it('the route is derived from the hierarchy and the request type — never a fixed number of levels', () => {
+    const w = baseWorld();
+    const keys = (org: string, t: 'PERMANENT' | 'TEMPORARY') => deriveRoute(w, org, t).map((s) => s.key);
+    expect(keys('o-pm-bld-sv-n', 'PERMANENT')).toEqual(['h-o-pm-bld-sv', 'h-o-pm-bld', 'h-o-pm', 'site', 'scope', 'final']);
+    expect(keys('o-pm-bld', 'PERMANENT')).toEqual(['h-o-pm', 'site', 'scope', 'final']);
+    expect(keys('o-ga', 'PERMANENT')).toEqual(['site', 'scope', 'final']);
+    expect(keys('o-ss-mt-s', 'TEMPORARY')).toEqual(['h-o-ss-mt', 'site', 'final']);
+    expect(deriveRoute(w, 'o-pm-bld-sv-n', 'PERMANENT').at(-1)!.org).toBe('o-root');
+    expect(deriveRoute(w, 'o-ss-mt-s', 'TEMPORARY').at(-1)!.org).toBe('o-ss');
+  });
+
+  it('each hierarchy stage is decided only by its organisation\'s assigned approver, in order; the requester never decides', () => {
+    let w = perform(baseWorld(), 'p-req-sv', { t: 'SUBMIT', req: 'r-pm-sv-n' });
+    const a = { t: 'APPROVE_STAGE', req: 'r-pm-sv-n' } as const;
+    expect(why(w, 'p-h-bld', a)).toContain('المعتمد المُسند');
+    expect(why(w, 'p-apr', a)).toContain('المعتمد المُسند');
+    expect(why(w, 'p-req-sv', a)).toBeTruthy();
+    w = approveAll(w, 'r-pm-sv-n', ['p-h-sv', 'p-h-bld', 'p-h-pm']);
+    expect(req(w, 'r-pm-sv-n').stages[req(w, 'r-pm-sv-n').cursor].key).toBe('site');
+    expect(why(w, 'p-apr', a)).toContain('مرحلة');
+    w = approveAll(w, 'r-pm-sv-n', ['p-rev', 'p-rev', 'p-apr']);
+    expect(req(w, 'r-pm-sv-n').state).toBe('APPROVED_NOT_ACTIVATED');
+    expect(req(w, 'r-pm-sv-n').stages.map((s) => s.by)).toEqual(['p-h-sv', 'p-h-bld', 'p-h-pm', 'p-rev', 'p-rev', 'p-apr']);
+  });
+
+  it('participants come from the hierarchy, the scope and the route; only MANAGE_REQUEST_ROUTING changes them, audited', () => {
+    let w = perform(baseWorld(), 'p-req', { t: 'SUBMIT', req: 'r-pm-bld' });
+    const ps = participants(w, req(w, 'r-pm-bld'));
+    expect(ps.filter((p) => p.role === 'APPROVER').map((p) => p.org)).toEqual(['o-pm']);
+    expect(ps.find((p) => p.role === 'FINAL')!.org).toBe('o-root');
+    expect(ps.filter((p) => p.role === 'AFFECTED').map((p) => p.org)).toEqual(['o-pm-bld-sv', 'o-pm-bld-sv-n']);
+    const add = { t: 'ROUTE_CHANGE', req: 'r-pm-bld', op: 'ADD_APPROVER', org: 'o-ga', reason: 'موافقة الإدارة العامة على المبنى المشترك' } as const;
+    expect(why(w, 'p-req', add)).toContain('MANAGE_REQUEST_ROUTING');
+    expect(why(w, 'p-wf', { ...add, reason: '' })).toContain('سبب');
+    expect(why(w, 'p-wf', { ...add, op: 'REMOVE_RECIPIENT', org: 'o-pm' })).toContain('مستلم إشعار فقط');
+    w = perform(w, 'p-wf', add);
+    expect(req(w, 'r-pm-bld').stages.map((s) => s.key)).toEqual(['h-o-pm', 'site', 'scope', 'a-o-ga', 'final']);
+    expect(w.events.at(-1)).toMatchObject({ type: 'REQUEST_ROUTING_CHANGED', actor: 'p-wf' });
+    w = perform(w, 'p-wf', { t: 'ROUTE_CHANGE', req: 'r-pm-bld', op: 'REMOVE_RECIPIENT', org: 'o-pm-bld-sv-n', reason: 'الفريق لا يتأثر بالنقل' });
+    expect(participants(w, req(w, 'r-pm-bld')).some((p) => p.org === 'o-pm-bld-sv-n')).toBe(false);
+  });
+
+  it('policies: only the system administrator, a reason, no backdating, a real change; every fact recorded; append-only', () => {
+    const w0 = baseWorld();
+    const a = { t: 'SET_POLICY', key: 'stationing_areas_requirement', value: 'REQUIRED', effectiveFrom: NOW, reason: 'منطقتا الانتشار شرط للإرسال' } as const;
+    expect(why(w0, 'p-stn', a)).toContain('MANAGE_STATIONING_POLICY');
+    expect(why(w0, 'p-sys', { ...a, reason: '' })).toContain('سبب التغيير');
+    expect(why(w0, 'p-sys', { ...a, effectiveFrom: NOW - DAY })).toContain('أثر رجعي');
+    expect(why(w0, 'p-sys', { ...a, value: 'OPTIONAL' })).toContain('القيمة نفسها');
+    expect(why(w0, 'p-sys', { ...a, key: 'max_restationing_footprint_area', value: -5 })).toContain('موجبة');
+    const w = perform(w0, 'p-sys', a);
+    expect(w.policies.at(-1)).toMatchObject({ key: a.key, version: 2, value: 'REQUIRED', previous: 'OPTIONAL', effectiveFrom: NOW, changedBy: 'p-sys', changedAt: NOW, reason: a.reason });
+    expect(w.policies.slice(0, 2)).toEqual(w0.policies);
+    expect(w.events.at(-1)!.data).toMatchObject({ policy: a.key, version: '2', previous: 'OPTIONAL', value: 'REQUIRED', changedBy: 'p-sys', reason: a.reason });
+    // a future version applies only from its time
+    let f = setRequired(baseWorld(), NOW + 3 * DAY);
+    expect(policyAt(f, 'stationing_areas_requirement').value).toBe('OPTIONAL');
+    f = perform(f, 'system', { t: 'TICK', to: NOW + 3 * DAY });
+    expect(policyAt(f, 'stationing_areas_requirement').version).toBe(2);
+    expect(f.events.some((x) => x.type === 'STATIONING_POLICY_EFFECTIVE')).toBe(true);
+  });
+
+  it('REQUIRED: site + primary + alternative deployment area; OPTIONAL: none, or both — never one alone', () => {
+    const base = baseWorld();
+    expect(ok(base, 'p-req', { t: 'SUBMIT', req: 'r-pm-bld' })).toBe(true); // optional, site only
+    expect(ok(base, 'p-req', { t: 'SUBMIT', req: 'r-hr-trn' })).toBe(true); // optional, complete package
+    const reqd = setRequired(baseWorld());
+    expect(why(reqd, 'p-req', { t: 'SUBMIT', req: 'r-pm-bld' })).toMatch(/إلزامية.*الإصدار 2/);
+    expect(ok(reqd, 'p-req', { t: 'SUBMIT', req: 'r-hr-trn' })).toBe(true);
+    for (const missing of ['ALTERNATIVE_AREA', 'PRIMARY_AREA'] as const) {
+      const w = structuredClone(base);
+      delete req(w, 'r-hr-trn').proposal.areas![missing];
+      expect(why(w, 'p-req', { t: 'SUBMIT', req: 'r-hr-trn' })).toContain('حزمة واحدة');
+    }
+  });
+
+  it('distances use the shortest distance between the actual geometries (0 when they touch); centre to centre is information', () => {
+    const w = baseWorld();
+    const c = proposalAreas(w, req(w, 'r-hr-trn'));
+    expect(c.present).toBe('COMPLETE');
+    expect(c.siteToPrimary!.measure).toBe('NEAREST_GEOMETRY');
+    expect(c.siteToPrimary!.dist).toBeLessThan(c.siteToPrimary!.centre - 300);
+    expect(c.siteToPrimary!.ok && c.primaryToAlternative!.ok).toBe(true);
+    expect(c.problems).toEqual([]);
+    const ring = req(w, 'r-hr-trn').proposal.areas!.PRIMARY_AREA!;
+    expect(nearest(ring, ring.map((p) => ({ lat: p.lat + 0.0005, lng: p.lng }))).dist).toBe(0); // overlap
+    const touch = [ring[0], { lat: ring[0].lat + 0.01, lng: ring[0].lng }, { lat: ring[0].lat, lng: ring[0].lng - 0.01 }];
+    expect(nearest(ring, touch).dist).toBeLessThan(0.01); // a shared vertex
+    expect(nearest(centroid(ring), ring).dist).toBe(0); // a point inside
+  });
+
+  it('a request pinned to a centre-to-centre profile keeps that method; drafts use the published shortest-distance profile', () => {
+    const w = structuredClone(baseWorld());
+    const r = req(w, 'r-ga'); // submitted under profile version 1
+    r.proposal.areas = structuredClone(req(w, 'r-hr-trn').proposal.areas);
+    expect(proposalAreas(w, r).siteToPrimary!.measure).toBe('CENTROID');
+    expect(proposalAreas(w, req(w, 'r-hr-trn')).siteToPrimary!.measure).toBe('NEAREST_GEOMETRY');
+  });
+
+  it('the proposed footprint above the administrator\'s maximum blocks submission, with the area, the limit and the version; never resized', () => {
+    let w = perform(baseWorld(), 'p-sys', { t: 'SET_POLICY', key: 'max_restationing_footprint_area', value: 15000, effectiveFrom: NOW, reason: 'حد مساحة أصغر' });
+    const before = structuredClone(req(w, 'r-pm-bld').proposal.ring);
+    const fp = footprintCheck(w, req(w, 'r-pm-bld'));
+    expect(fp.ok).toBe(false);
+    expect(fp.area).toBeGreaterThan(15000);
+    expect(why(w, 'p-req', { t: 'SUBMIT', req: 'r-pm-bld' })).toMatch(/تتجاوز الحد المهيأ .*الإصدار 2/);
+    expect(req(w, 'r-pm-bld').proposal.ring).toEqual(before);
+    w = structuredClone(w);
+    req(w, 'r-pm-bld').proposal.ring = shape(25.13, 55.2605, 120, 100);
+    expect(ok(w, 'p-req', { t: 'SUBMIT', req: 'r-pm-bld' })).toBe(true);
+  });
+
+  it('the proposed site has no distance rule from the current stationing', () => {
+    const w = structuredClone(setRequired(baseWorld()));
+    const r = req(w, 'r-hr-trn');
+    const cur = w.sites.find((s) => s.id === 'site-C-06')!.ring;
+    const shift = (ring: typeof cur, dLat: number, dLng: number) => ring.map((p) => ({ lat: p.lat + dLat, lng: p.lng + dLng }));
+    const [c0, c1] = [centroid(r.proposal.ring), centroid(cur)];
+    const [dLat, dLng] = [c1.lat + 0.0027 - c0.lat, c1.lng - c0.lng]; // about 300 m from the current site
+    r.proposal = { ...r.proposal, ring: shift(r.proposal.ring, dLat, dLng), areas: { PRIMARY_AREA: shift(r.proposal.areas!.PRIMARY_AREA!, dLat, dLng), ALTERNATIVE_AREA: shift(r.proposal.areas!.ALTERNATIVE_AREA!, dLat, dLng) } };
+    expect(why(w, 'p-req', { t: 'SUBMIT', req: 'r-hr-trn' })).toBe('');
+  });
+
+  it('the policy versions are pinned at the first submission: a later version never changes an already-submitted request', () => {
+    let w = perform(setRequired(baseWorld()), 'p-req', { t: 'SUBMIT', req: 'r-hr-trn' });
+    expect(req(w, 'r-hr-trn').policy).toMatchObject({ areas: { version: 2, value: 'REQUIRED' }, maxArea: { version: 1 }, profile: 2, pinnedAt: NOW });
+    w = perform(w, 'p-sys', { t: 'SET_POLICY', key: 'stationing_areas_requirement', value: 'OPTIONAL', effectiveFrom: NOW, reason: 'تخفيف الشرط' });
+    expect(requirementOf(w, req(w, 'r-hr-trn')).areas).toMatchObject({ version: 2, value: 'REQUIRED' });
+    w = perform(w, 'p-rev', { t: 'RETURN', req: 'r-hr-trn', reason: 'تعديل' });
+    w = structuredClone(w);
+    req(w, 'r-hr-trn').proposal.areas = undefined;
+    expect(why(w, 'p-req', { t: 'RESUBMIT', req: 'r-hr-trn', changed: ['SITE'], reason: 'حذف المنطقتين' })).toContain('الإصدار 2');
+    expect(requirementOf(w, req(w, 'r-pm-bld')).areas).toMatchObject({ version: 3, value: 'OPTIONAL' });
+  });
+
+  it('permanent activation: the new site becomes current, the previous one stays in history, no automatic return; moving again needs a new request', () => {
+    let w = perform(baseWorld(), 'p-act', { t: 'ACTIVATE', req: 'r-ga-fin' });
+    expect(permanentOf(w, 'o-ga-fin')!.siteId).toBe('c-ga-fin');
+    expect(w.stationings.find((s) => s.id === 'st-o-ga-fin')).toMatchObject({ state: 'ENDED', endReason: 'REPLACED_BY_ACTIVATION' });
+    w = perform(w, 'system', { t: 'TICK', to: NOW + 400 * DAY });
+    expect(permanentOf(w, 'o-ga-fin')!.siteId).toBe('c-ga-fin');
+    for (const t of ['SUBMIT', 'ACTIVATE', 'REQUEST_CANCEL'] as const) expect(ok(w, 'p-req', { t, req: 'r-ga-fin' } as Parameters<typeof check>[2])).toBe(false);
+    expect(req(w, 'r-ga-fin').state).toBe('ACTIVATED_PERMANENT');
+  });
+
+  it('activation without deployment areas creates no empty record; they come later by an authorised registration', () => {
+    const w0 = perform(baseWorld(), 'p-act', { t: 'ACTIVATE', req: 'r-ga-fin' });
+    const st = permanentOf(w0, 'o-ga-fin')!;
+    expect(w0.areas.filter((a) => a.stationingId === st.id)).toEqual([]);
+    expect(w0.events.some((e) => e.type === 'STATIONING_WITHOUT_AREAS' && e.ref === 'MV-2026-0406')).toBe(true);
+    const a = { t: 'REGISTER_AREAS', stationing: st.id, primary: areaShape(25.205, 55.41, true), alternative: areaShape(25.245, 55.42, false), authority: 'جهة اعتماد وهمية', reference: 'ق-وهمي/204', reason: 'قرار منطقتي الانتشار بعد نفاذ التمركز' } as const;
+    expect(why(w0, 'p-req', a)).toContain('MANAGE_STATIONING');
+    expect(why(w0, 'p-stn', { ...a, alternative: [] })).toContain('حزمة واحدة');
+    expect(why(w0, 'p-stn', { ...a, alternative: areaShape(25.205, 55.43, false) })).toContain('منطقة الانتشار البديلة على بعد');
+    const w = perform(w0, 'p-stn', a);
+    const areas = w.areas.filter((x) => x.stationingId === st.id);
+    expect(areas.map((x) => x.role).sort()).toEqual(['ALTERNATIVE_AREA', 'PRIMARY_AREA']);
+    expect(areas.every((x) => x.status === 'ACTIVE' && x.provenance.kind === 'EXTERNAL_DECISION' && x.provenance.registeredBy === 'p-stn')).toBe(true);
+    expect(why(w, 'p-stn', a)).toContain('نشطتان');
+  });
+
+  it('a temporary stationing\'s own deployment areas end with it and never become the original stationing\'s', () => {
+    let w = perform(approve0402(setRequired(baseWorld())), 'p-act', { t: 'ACTIVATE', req: 'r-hr-trn' });
+    const t = w.stationings.find((s) => s.requestId === 'r-hr-trn' && s.org === 'o-hr-trn')!;
+    const areas = w.areas.filter((a) => a.stationingId === t.id);
+    expect(areas.length).toBe(2);
+    expect(areas.every((a) => a.validFrom === NOW + 10 * DAY && a.validTo === NOW + 100 * DAY && a.provenance.kind === 'IN_APP_REQUEST')).toBe(true);
+    w = perform(w, 'system', { t: 'TICK', to: NOW + 101 * DAY });
+    expect(effectiveOf(w, 'o-hr-trn')!.id).toBe('st-o-hr-trn'); // back to the preserved original
+    expect(w.areas.filter((a) => a.stationingId === t.id).every((a) => a.status === 'RETIRED')).toBe(true);
+    expect(w.areas.some((a) => a.stationingId === 'st-o-hr-trn')).toBe(false);
+    // the fixture temporary of MV-2026-0408 too: its package retires at expiry, the original's stays
+    const e = perform(baseWorld(), 'system', { t: 'TICK', to: NOW + 13 * DAY });
+    expect(e.areas.filter((a) => a.stationingId === 'tmp-o-it').every((a) => a.status === 'RETIRED')).toBe(true);
+    expect(e.areas.filter((a) => a.stationingId === 'st-o-it').every((a) => a.status === 'ACTIVE')).toBe(true);
+  });
+
+  it('an activated extension carries the temporary stationing and its deployment areas to the new end', () => {
+    let w = perform(baseWorld(), 'p-act', { t: 'ACTIVATE_EXTENSION', ext: 'ext-it' });
+    expect(w.areas.filter((a) => a.stationingId === 'tmp-o-it').every((a) => a.validTo === NOW + 42 * DAY)).toBe(true);
+    w = perform(w, 'system', { t: 'TICK', to: NOW + 13 * DAY });
+    expect(temporaryOf(w, 'o-it')!.extendsId).toBe('tmp-o-it');
+    expect(w.areas.filter((a) => a.stationingId === 'tmp-o-it').every((a) => a.status === 'ACTIVE')).toBe(true);
+    w = perform(w, 'system', { t: 'TICK', to: NOW + 43 * DAY });
+    expect(effectiveOf(w, 'o-it')!.kind).toBe('PERMANENT');
+    expect(w.areas.filter((a) => a.stationingId === 'tmp-o-it').every((a) => a.status === 'RETIRED')).toBe(true);
+  });
+
+  it('a temporary stationing cancelled before its start retires its deployment areas: they never became effective', () => {
+    let w = perform(approve0402(setRequired(baseWorld())), 'p-act', { t: 'ACTIVATE', req: 'r-hr-trn' });
+    w = perform(w, 'p-req', { t: 'REQUEST_START_CANCEL', req: 'r-hr-trn', reason: 'تأجل التدريب' });
+    w = perform(w, 'p-dec', { t: 'DECIDE_START_CANCEL', sc: w.startCancellations.at(-1)!.id, approve: true, reason: 'مقبول' });
+    const t = w.stationings.find((s) => s.requestId === 'r-hr-trn' && s.org === 'o-hr-trn')!;
+    expect(t.state).toBe('CANCELLED_BEFORE_START');
+    expect(w.areas.filter((a) => a.stationingId === t.id).every((a) => a.status === 'RETIRED')).toBe(true);
+  });
+
+  it('every scenario 26–41 loads through guarded actions', () => {
+    for (const sc of SCENARIOS.filter((s) => s.n >= 26)) {
+      let w = baseWorld();
+      for (const [who, a] of sc.setup ?? []) w = perform(w, who, a);
+      sc.draft?.(w);
+      expect(w).toBeTruthy();
+    }
   });
 });

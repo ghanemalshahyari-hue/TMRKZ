@@ -52,6 +52,18 @@ add cancellation before start and the reservation / covered-scope / exception fl
 reason dialogs (`src/model/dialog.tsx`); phones get a three-height bottom sheet. `window.__stationingModel` is a
 prototype-only test hook for the browser evidence.
 
+**Owner correction A8 (3 Nov 2026; scenarios 26–41):** a re-stationing request has ONE proposed site — the earlier
+primary/alternative relocation candidates are removed. The site is a polygon (moved copy of the current footprint, or a
+newly drawn boundary) checked against an administrator-configured maximum area; it has no distance rule from the current
+stationing. Its optional deployment package — «منطقة الانتشار الرئيسية» and «منطقة الانتشار البديلة» — is drawn vertex by
+vertex (`src/model/areas.tsx`) and measured site → primary → alternative by the published profile's method, by default
+the shortest distance between the actual geometries (`src/model/geometry.ts`). Two versioned policies, changed only by
+the simulated system administrator («سياسات التمركز» in the simulation bar, `src/model/policy.tsx`): the deployment
+requirement (`REQUIRED` / `OPTIONAL`, never one area alone) and the maximum footprint area; a request keeps the versions
+pinned at its first submission. The approval path is derived from the organisation hierarchy and a route policy (one
+approval per level by that organisation's assigned approver, configured reviews, final scope by type), with the
+participants shown and changed only by an authorised, audited routing change.
+
 **Basemap tiles (`src/svgBasemap.ts`, both pages):** the regional SVG basemap is drawn as vector tiles — parsed once,
 each tile drawing only the shapes that touch it — instead of one `L.imageOverlay` the browser re-rasterised on every
 zoom step (measured up to 160–200 ms frames; now ≤ 14 ms). Same picture and georeferencing. The application's

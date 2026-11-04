@@ -1,7 +1,10 @@
-// Browser evidence for the stationing domain model V2 prototype (owner briefs of 3 Nov 2026): 25 scenarios plus the
+// Browser evidence for the stationing domain model V2 prototype (owner briefs of 3 Nov 2026): 41 scenarios plus the
 // polygon-drag acceptance, at 1920×1080 and 1366×768 first, then 768×1024 and 390×844 (touch). Each step records what
 // was done, the states shown, every action with whether it is enabled and why not, each sensitive action's dialog, and
 // layout facts; drags assert the GEOGRAPHIC state (centroid moved, area kept, distances recomputed), not pointer movement.
+// Owner correction of 3 Nov 2026: ONE proposed site; steps 26–40 are the owner's fifteen coverage items in order, 41 the
+// later registration of deployment areas. Areas are drawn by placing vertices on the map, as a user would; distances
+// are checked here with the driver's own shortest-distance computation, independent of the page's code.
 // Headless Microsoft Edge (playwright-core); fictional data; the prototype must run on :5194.
 // Usage (from tests/acceptance): node ../../docs/audit/stationing-ux/model-v2/model-run.mjs        SIZES=768,390 for touch sizes;
 // ONLY=23,24,25 for a subset of steps
@@ -27,6 +30,25 @@ const area = (ring) => {
   const c = centre(ring);
   const xy = ring.map((p) => [rad(p.lng - c.lng) * R * Math.cos(rad(c.lat)), rad(p.lat - c.lat) * R]);
   return Math.abs(xy.reduce((s, [x, y], i) => s + x * xy[(i + 1) % xy.length][1] - xy[(i + 1) % xy.length][0] * y, 0) / 2);
+};
+/** Shortest distance between two polygons (planar, local metres; enough for the tolerance used). */
+const nearestM = (A, B) => {
+  const ref = centre([...A, ...B]);
+  const k = Math.cos(rad(ref.lat));
+  const xy = (p) => [(p.lng - ref.lng) * 111320 * k, (p.lat - ref.lat) * 111320];
+  const a = A.map(xy);
+  const b = B.map(xy);
+  const seg = (p, s, e) => {
+    const dx = e[0] - s[0];
+    const dy = e[1] - s[1];
+    const L = dx * dx + dy * dy;
+    const t = L ? Math.max(0, Math.min(1, ((p[0] - s[0]) * dx + (p[1] - s[1]) * dy) / L)) : 0;
+    return Math.hypot(p[0] - s[0] - t * dx, p[1] - s[1] - t * dy);
+  };
+  let best = Infinity;
+  for (const p of a) b.forEach((s, i) => (best = Math.min(best, seg(p, s, b[(i + 1) % b.length]))));
+  for (const p of b) a.forEach((s, i) => (best = Math.min(best, seg(p, s, a[(i + 1) % a.length]))));
+  return best;
 };
 const km = (t) => {
   const m = /([\d.,]+)\s*(كم|م)/.exec(t ?? '');
@@ -112,6 +134,67 @@ for (const size of SIZES) {
     const m = window.__stationingModel;
     return { world: m.world, center: m.map.getCenter(), sheet: m.sheet };
   });
+  const screenOf = (p) =>
+    page.evaluate(([lat, lng]) => {
+      const m = window.__stationingModel.map;
+      const pt = m.latLngToContainerPoint([lat, lng]);
+      const r = m.getContainer().getBoundingClientRect();
+      return { x: r.left + pt.x, y: r.top + pt.y };
+    }, [p.lat, p.lng]);
+  /** Drags the proposal by its symbol handle — mouse, or touch through CDP — and waits for the committed state. */
+  const drag = async (dx, dy) => {
+    const b = await page.locator('.stw-prop-sym').first().boundingBox();
+    const from = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    if (touch) {
+      const cdp = await ctx.newCDPSession(page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y }] });
+      for (let i = 1; i <= 24; i++) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + (dx * i) / 24, y: from.y + (dy * i) / 24 }] });
+        await page.waitForTimeout(16);
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else {
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(from.x + dx, from.y + dy, { steps: 24 });
+      await page.mouse.up();
+    }
+    await settle(1100);
+  };
+  /** Draws an area as a user would: six vertices placed on the map around a centre (the engine closes it at the sixth). */
+  const drawArea = async (lat, lng, r = 420, zoom = 13) => {
+    // centred in the part of the map a user sees: above the phone's sheet and clear of the map's own controls
+    await page.evaluate(([la, ln, z]) => {
+      const m = window.__stationingModel.map;
+      m.setView([la, ln], z, { animate: false });
+      const box = m.getContainer().getBoundingClientRect();
+      const dock = document.querySelector('.ux.phone .md-dock')?.getBoundingClientRect();
+      const bottom = dock ? Math.min(box.bottom, dock.top) - 60 : box.bottom;
+      m.panBy([0, box.top + box.height / 2 - (box.top + bottom) / 2], { animate: false });
+    }, [lat, lng, zoom]);
+    await settle(500);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      const s = await screenOf({ lat: lat + (Math.sin(a) * r) / 111320, lng: lng + (Math.cos(a) * r) / (111320 * Math.cos(rad(lat))) });
+      if (touch) await page.touchscreen.tap(s.x, s.y);
+      else await page.mouse.click(s.x, s.y);
+      await page.waitForTimeout(150);
+    }
+    await settle(900);
+  };
+  const pick = async (t) => {
+    await tap(page.locator('[data-target=' + t + ']').first());
+    await settle(1300);
+  };
+  /** A step of the request editor; on a phone the collapsed sheet is raised first, as a user would. */
+  const toStep = async (n) => {
+    if (touch && (await page.locator('.md-dock').getAttribute('data-sheet')) === 'collapsed') {
+      await tap(page.locator('[data-testid=sheet-handle]'));
+      await settle(500);
+    }
+    await tap(page.getByRole('button', { name: new RegExp('^' + n + ' ') }));
+    await settle(1000);
+  };
 
   const step = async (n, name, run) => {
     if (ONLY && !ONLY.has(String(n))) return;
@@ -152,16 +235,19 @@ for (const size of SIZES) {
   });
   await step(3, 'whole-permanent', async (expect) => {
     await open(3);
-    expect(await page.locator('[data-testid=step-compare]').isVisible(), 'comparison step');
+    expect(await page.locator('[data-testid=step-compare]').isVisible(), 'route and submission step');
     expect((await text('[data-testid=step-compare]')).includes('دائم'), 'permanent');
-    expect((await page.locator('.md-compare td.good').count()) >= 2, 'both relations within the configured ranges');
+    const cmp = await text('[data-testid=compare]');
+    expect(cmp.includes('للمعلومة فقط') && cmp.includes('لا قاعدة مسافة بين التمركز الحالي والموقع المقترح'), 'one proposed site; its distance from the current site is information only');
+    expect(!cmp.includes('البديل المقترح') && (await page.locator('.md-compare thead th').count()) === 3, 'no second proposed site: current and proposed columns only');
+    expect(cmp.includes('لم تُرسم (اختيارية)') && !(await page.locator('[data-act=SUBMIT]').isDisabled()), 'optional policy: submission possible without deployment areas');
     return [await shot('03-whole-permanent')];
   });
 
-  // B1: actual polygon dragging in steps 3 and 4 — the geographic state must change
+  // B1: actual polygon dragging of the ONE proposed site — the geographic state must change
   await step('B1', 'polygon-drag', async (expect, ms) => {
     await open(3);
-    await page.getByRole('button', { name: /^3 الموقع الرئيسي/ }).click();
+    await toStep(3);
     await page.locator('.stw-prop-sym').first().waitFor({ timeout: 8000 });
     await settle(1200);
     if (touch) expect((await model()).sheet === 'collapsed' && (await page.locator('[data-testid=compact-status]').isVisible()), 'phone: the sheet steps down to its working height with a compact readout');
@@ -171,80 +257,37 @@ for (const size of SIZES) {
       const s = w.stationings.find((x) => x.org === 'o-pm-bld' && x.kind === 'PERMANENT' && x.state === 'CURRENT');
       return w.sites.find((x) => x.id === s.siteId).ring;
     });
-    const readout = async (k) => text(touch ? '[data-testid=compact-readout]' : '[data-testid=readout-' + k + ']');
-    const screenOf = (p) =>
-      page.evaluate(([lat, lng]) => {
-        const m = window.__stationingModel.map;
-        const pt = m.latLngToContainerPoint([lat, lng]);
-        const r = m.getContainer().getBoundingClientRect();
-        return { x: r.left + pt.x, y: r.top + pt.y };
-      }, [p.lat, p.lng]);
-    const drag = async (dx, dy) => {
-      const b = await page.locator('.stw-prop-sym').first().boundingBox();
-      const from = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
-      if (touch) {
-        const cdp = await ctx.newCDPSession(page);
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from.x, y: from.y }] });
-        for (let i = 1; i <= 24; i++) {
-          await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from.x + (dx * i) / 24, y: from.y + (dy * i) / 24 }] });
-          await page.waitForTimeout(16);
-        }
-        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-      } else {
-        await page.mouse.move(from.x, from.y);
-        await page.mouse.down();
-        await page.mouse.move(from.x + dx, from.y + dy, { steps: 24 });
-        await page.mouse.up();
-      }
-      await settle(1100);
-    };
-    const shots = [await shot('B1-1-primary-before')];
+    const readout = async () => text(touch ? '[data-testid=compact-readout]' : '[data-testid=readout-site]');
+    const shots = [await shot('B1-1-site-before')];
     let s0 = await model();
-    const p0 = req(s0.world).candidates.PRIMARY.ring;
-    const r0 = await readout('primary');
+    const p0 = req(s0.world).proposal.ring;
+    const r0 = await readout();
     await drag(110, -50);
     let s1 = await model();
-    const p1 = req(s1.world).candidates.PRIMARY.ring;
-    ms.primaryMoveM = Math.round(dist(centre(p0), centre(p1)));
-    ms.primaryAreaChangePct = +((Math.abs(area(p1) - area(p0)) / area(p0)) * 100).toFixed(4);
+    const p1 = req(s1.world).proposal.ring;
+    ms.siteMoveM = Math.round(dist(centre(p0), centre(p1)));
+    ms.siteAreaChangePct = +((Math.abs(area(p1) - area(p0)) / area(p0)) * 100).toFixed(4);
     ms.mapPannedM = Math.round(dist(s0.center, s1.center));
-    const d1 = dist(centre(cur), centre(p1));
-    const r1 = await readout('primary');
-    expect(ms.primaryMoveM > 80, 'primary polygon moved on the map (' + ms.primaryMoveM + ' m)');
-    expect(ms.primaryAreaChangePct < 0.5, 'shape and area kept by the engine (Δ ' + ms.primaryAreaChangePct + ' %)');
+    const d1 = nearestM(cur, p1);
+    const r1 = await readout();
+    expect(ms.siteMoveM > 80, 'proposed site moved on the map (' + ms.siteMoveM + ' m)');
+    expect(ms.siteAreaChangePct < 0.5, 'shape and area kept by the engine (Δ ' + ms.siteAreaChangePct + ' %)');
     expect(ms.mapPannedM < 5, (touch ? 'touch' : 'mouse') + ' drag moved the proposal, not the base map (map moved ' + ms.mapPannedM + ' m)');
-    expect(r1 !== r0 && Math.abs(km(r1) - d1) < 60, 'distance readout recomputed (' + r1.split('·')[0] + ' ≈ ' + Math.round(d1) + ' m)');
-    shots.push(await shot('B1-2-primary-moved'));
-    // towards the current site until the configured range is broken: validation must turn invalid
+    expect(r1 !== r0 && Math.abs(km(r1) - d1) < 60, 'shortest distance from the current site recomputed (' + r1.split('·')[0] + ' ≈ ' + Math.round(d1) + ' m)');
+    shots.push(await shot('B1-2-site-moved'));
+    // towards the current site, to about 2.5 km: the proposed site has NO distance rule, so the request stays valid
     const a = await screenOf(centre(cur));
     const b = await screenOf(centre(p1));
-    const f = 1 - 3000 / d1;
+    const dc = dist(centre(cur), centre(p1));
+    const f = 1 - 2500 / dc;
     await drag((a.x - b.x) * f, (a.y - b.y) * f);
     const s2 = await model();
-    const d2 = dist(centre(cur), centre(req(s2.world).candidates.PRIMARY.ring));
-    ms.invalidDistanceM = Math.round(d2);
-    expect(d2 < 5000 && (await readout('primary')).includes('✕') && (await page.locator('[data-testid=next]').isDisabled()), 'validation updated: out of range, next step blocked (' + Math.round(d2) + ' m)');
-    shots.push(await shot('B1-3-primary-invalid'));
-    await drag(-(a.x - b.x) * f, -(a.y - b.y) * f);
-    s1 = await model();
-    expect(!(await page.locator('[data-testid=next]').isDisabled()), 'back within range: next step available');
-    await tap(page.locator('[data-testid=next]'));
-    await page.locator('.stw-prop-sym').first().waitFor({ timeout: 8000 });
-    await settle(1200);
-    s0 = await model();
-    const pr = req(s0.world).candidates.PRIMARY.ring;
-    const q0 = req(s0.world).candidates.ALTERNATIVE.ring;
-    const ra = await readout('alternative');
-    await drag(-90, 70);
-    const s3 = await model();
-    const q1 = req(s3.world).candidates.ALTERNATIVE.ring;
-    ms.alternativeMoveM = Math.round(dist(centre(q0), centre(q1)));
-    const dPA = dist(centre(pr), centre(q1));
-    const rb = await readout('alternative');
-    expect(ms.alternativeMoveM > 80, 'alternative polygon moved (' + ms.alternativeMoveM + ' m)');
-    expect(rb !== ra && Math.abs(km(rb) - dPA) < 60, 'primary → alternative distance recomputed from the primary (' + rb.split('·')[0] + ' ≈ ' + Math.round(dPA) + ' m)');
-    expect(dist(s0.center, s3.center) < 5, 'the base map did not pan');
-    shots.push(await shot('B1-4-alternative-moved'));
+    const d2 = nearestM(cur, req(s2.world).proposal.ring);
+    ms.closeDistanceM = Math.round(d2);
+    const rr = await readout();
+    expect(d2 < 5000 && !rr.includes('✕') && !(await page.locator('[data-testid=next]').first().isDisabled()), 'no distance rule on the proposed site: ' + Math.round(d2) + ' m from the current site is still valid');
+    if (!touch) expect((await text('[data-testid=readout-site]')).includes('للمعلومة فقط'), 'the readout says the distance is information only');
+    shots.push(await shot('B1-3-site-close-still-valid'));
     if (touch) {
       // B4: the sheet's three heights; controls above it; nothing trapped
       const heights = {};
@@ -268,8 +311,7 @@ for (const size of SIZES) {
     await open(4);
     expect((await text('[data-testid=step-compare]')).includes('مؤقت'), 'temporary with dates');
     const a = await shot('04-whole-temporary');
-    await tap(page.getByRole('button', { name: /2 المدة/ }));
-    await settle(500);
+    await toStep(2);
     expect(await page.locator('[data-testid=step-duration] input[type=date]').nth(1).isVisible(), 'end date is mandatory for temporary');
     return [a, await shot('04b-temporary-dates')];
   });
@@ -280,36 +322,29 @@ for (const size of SIZES) {
   });
   await step(6, 'comparison', async (expect) => {
     await open(6);
+    const cmp = await text('[data-testid=compare]');
     expect(await page.locator('[data-testid=compare]').isVisible(), 'comparison table');
-    expect(
-      (await facts(page)).tags.some((t) => t.includes('من الرئيسي')) || (touch && (await text('[data-testid=compare]')).includes('من الموقع الرئيسي المقترح')),
-      'the alternative distance is labelled from the primary',
-    );
-    return [await shot('06-current-primary-alternative')];
+    expect(cmp.includes('للمعلومة فقط'), 'the distance from the current site is information only');
+    expect(cmp.includes('منطقة الانتشار الرئيسية') && cmp.includes('منطقة الانتشار البديلة'), 'the owner\'s deployment-area terms');
+    expect((await page.locator('.md-compare thead th').count()) === 3, 'one proposed site');
+    return [await shot('06-current-proposed-deployment')];
   });
-  await step(7, 'fallback', async (expect) => {
+  await step(7, 'return-resubmit', async (expect, ms) => {
     await open(7);
-    expect((await facts(page)).states.includes('PRIMARY_NOT_ACCEPTED'), 'primary not accepted');
-    const a = await shot('07a-primary-not-accepted');
-    const r = await confirm('button[data-act=SWITCH]', { snap: '07-dialog-switch' });
-    dialogOk(expect, r, 'switch');
-    const f = await facts(page);
-    expect(f.states.includes('UNDER_REVIEW_ALTERNATIVE'), 'alternative under review');
-    expect((await text('.md-stages')).includes('محمول') && (await text('.md-stages')).includes('أُبطل'), 'carried and invalidated decisions shown');
-    expect((await text('[data-testid=events]')).includes('RELOCATION_ACTIVE_CANDIDATE_CHANGED'), 'switch audited');
-    const b = await shot('07b-alternative-under-review');
-    await page.locator('.md-stages').scrollIntoViewIfNeeded();
-    await settle(300);
-    const c = await shot('07c-stages-carried-invalidated');
-    // reopening the primary (not accepted, not finally rejected) has its own dialog too
-    await tap(page.locator('button[data-act=REOPEN]'));
-    await page.locator('[data-testid=action-dialog]').waitFor({ timeout: 5000 });
-    expect(await page.locator('[data-testid=dialog-confirm]').isDisabled(), 'reopen dialog: no confirmation without a reason');
-    expect((await text('[data-testid=dialog-consequence]')).length > 20 && (await text('[data-testid=dialog-actor]')).includes('محاكاة'), 'reopen dialog states consequence and simulated actor');
-    const d = await shot('07d-dialog-reopen');
-    await page.getByRole('button', { name: 'تراجع' }).click();
-    await settle(300);
-    return [a, r.file, b, c, d];
+    expect((await facts(page)).states.includes('RETURNED_FOR_CHANGES'), 'returned for changes');
+    await page.locator('.stw-prop-sym').first().waitFor({ timeout: 8000 });
+    await settle(900);
+    await drag(90, 60);
+    await toStep(4);
+    expect((await text('[data-testid=returned]')).includes('الموقع ومنطقتا الانتشار'), 'the changed fact is shown');
+    const a = await shot('07a-returned-site-changed');
+    const r = await confirm('button[data-act=RESUBMIT]', { reason: 'موقع جديد بلا تعارض مع أعمال الصيانة', snap: '07-dialog-resubmit' });
+    dialogOk(expect, r, 'resubmission');
+    const marks = await page.locator('[data-testid=route] li[data-stage]').evaluateAll((els) => els.map((e) => e.dataset.stage + ':' + e.dataset.mark));
+    ms.marks = marks;
+    expect(JSON.stringify(marks) === JSON.stringify(['h-o-ss:INVALIDATED', 'site:INVALIDATED', 'scope:CARRIED', 'final:']), 'site decisions invalidated, the scope review carried (D18): ' + marks.join(' '));
+    expect((await text('[data-testid=events]')).includes('WORKFLOW_INVALIDATION'), 'invalidation audited');
+    return [a, r.file, await shot('07b-resubmitted-invalidated-carried')];
   });
   await step(8, 'approved-not-activated', async (expect) => {
     await open(8);
@@ -557,6 +592,253 @@ for (const size of SIZES) {
     expect(t.from === t.plannedStart && !t.startRef, 'effective from the ORIGINAL approved start');
     expect((await page.locator('[data-testid=late-start]').count()) === 0, 'no late-start notice');
     return [r.file, a, await shot('25b-started-at-original-start')];
+  });
+
+  // owner correction of 3 Nov 2026: one proposed site, a hierarchical route, policies, deployment package (items 1–15)
+  const stagesOf = () => page.locator('[data-testid=route] li[data-stage]').evaluateAll((els) => els.map((e) => e.dataset.stage));
+  const marksOf = () => page.locator('[data-testid=route] li[data-stage]').evaluateAll((els) => els.map((e) => e.dataset.mark));
+  const policy = (k) => page.locator('[data-testid=policy-' + k + ']').evaluate((e) => ({ value: e.dataset.value, version: e.dataset.version }));
+  const approveAs = async (who) => {
+    await actor(who);
+    await tap(page.locator('button[data-act=APPROVE_STAGE]').first());
+    await settle(700);
+  };
+  await step(26, 'child-permanent', async (expect) => {
+    await open(26);
+    const st = await stagesOf();
+    expect(JSON.stringify(st) === JSON.stringify(['h-o-pm-bld-sv', 'h-o-pm-bld', 'h-o-pm', 'site', 'scope', 'final']), 'route derived from the hierarchy above the child unit: three levels, the configured reviews, the final decision');
+    const roles = await page.locator('[data-testid=participants] li').evaluateAll((els) => els.map((e) => e.dataset.role));
+    expect(roles.filter((r) => r === 'APPROVER').length === 3 && roles.includes('FINAL') && roles.includes('REQUESTER') && roles.includes('ACTIVATION'), 'participants determined by the system and shown to the requester');
+    expect(await page.locator('[data-testid=route-locked]').isVisible(), 'the requester cannot alter the system-selected routing');
+    expect(!(await page.locator('[data-act=SUBMIT]').isDisabled()), 'submission possible');
+    await page.locator('[data-testid=route]').scrollIntoViewIfNeeded();
+    return [await shot('26-child-permanent-route')];
+  });
+  await step(27, 'child-temporary', async (expect) => {
+    await open(27);
+    const st = await stagesOf();
+    expect(JSON.stringify(st) === JSON.stringify(['h-o-ss-mt', 'site', 'final']), 'temporary: the parent, the site review, the final decision at the top-level directorate');
+    expect((await text('[data-testid=route] li[data-stage=final]')).includes('الخدمات المشتركة'), 'final scope: the requester\'s top-level directorate');
+    await page.locator('[data-testid=route]').scrollIntoViewIfNeeded();
+    return [await shot('27-child-temporary-route')];
+  });
+  await step(28, 'required-complete', async (expect, ms) => {
+    await open(28);
+    expect((await page.locator('[data-testid=policy-badge]').first().getAttribute('data-value')) === 'REQUIRED', 'required policy in force');
+    expect(touch || (await text('[data-testid=readout-site]')).includes('للمعلومة فقط'), 'the proposed site has no distance rule');
+    const a = await shot('28a-site-no-rule');
+    await pick('PRIMARY_AREA');
+    expect(await page.locator('[data-testid=live-distance]').isVisible(), 'live distance measured by the profile method while editing');
+    const req = (w) => w.requests.find((r) => r.id === 'r-hr-trn');
+    let m = await model();
+    const site = req(m.world).proposal.ring;
+    const p0 = req(m.world).proposal.areas.PRIMARY_AREA;
+    ms.nearestBeforeM = Math.round(nearestM(site, p0));
+    // about 3 km from the site (nearest geometry): out of the configured 5–8 km
+    const s = await screenOf(centre(site));
+    const q = await screenOf(centre(p0));
+    const f = 1 - 3500 / dist(centre(site), centre(p0));
+    await drag((s.x - q.x) * f, (s.y - q.y) * f);
+    m = await model();
+    ms.outOfRangeM = Math.round(nearestM(site, req(m.world).proposal.areas.PRIMARY_AREA));
+    const t = await text(touch ? '[data-testid=compact-readout]' : '[data-testid=area-primary]');
+    expect(ms.outOfRangeM < 5000 && t.includes('✕') && Math.abs(km(t) - ms.outOfRangeM) < 60 && (await page.locator('[data-testid=next]').first().isDisabled()), 'primary deployment area out of range by the shortest distance: refused (' + ms.outOfRangeM + ' m)');
+    const b = await shot('28b-primary-out-of-range');
+    await drag(-(s.x - q.x) * f, -(s.y - q.y) * f);
+    m = await model();
+    ms.backM = Math.round(nearestM(site, req(m.world).proposal.areas.PRIMARY_AREA));
+    expect(!(await page.locator('[data-testid=next]').first().isDisabled()), 'back in range (' + ms.backM + ' m)');
+    await toStep(4);
+    expect((await page.locator('[data-testid=submit-checklist] li[data-ok=true]').count()) === 2 && !(await page.locator('[data-act=SUBMIT]').isDisabled()), 'site + primary + alternative deployment area: submission allowed');
+    const c = await shot('28c-required-complete');
+    await tap(page.locator('[data-act=SUBMIT]'));
+    await settle();
+    const badge = page.locator('[data-testid=policy-badge]').first();
+    expect((await badge.getAttribute('data-version')) === '2' && (await badge.innerText()).includes('مثبَّت عند الإرسال'), 'version 2 pinned at submission');
+    return [a, b, c, await shot('28d-submitted-pinned')];
+  });
+  await step(29, 'optional-site-only', async (expect) => {
+    await open(29);
+    expect((await text('[data-testid=compare]')).includes('لم تُرسم (اختيارية)'), 'no deployment areas, optional');
+    expect((await page.locator('[data-testid=submit-checklist] li[data-ok=true]').count()) === 2, 'both checklist items satisfied');
+    await tap(page.locator('[data-act=SUBMIT]'));
+    await settle();
+    expect((await facts(page)).states.includes('UNDER_REVIEW'), 'submitted with the site only');
+    return [await shot('29-optional-site-only-submitted')];
+  });
+  await step(30, 'optional-complete', async (expect) => {
+    await open(30);
+    const p = await text('[data-testid=compare-area-primary]');
+    const a = await text('[data-testid=compare-area-alternative]');
+    expect(p.includes('✓') && p.includes('من مركز إلى مركز') && a.includes('✓'), 'both relations within the profile; centre to centre shown for information');
+    expect(!(await page.locator('[data-act=SUBMIT]').isDisabled()), 'submission allowed');
+    return [await shot('30-optional-complete-package')];
+  });
+  await step(31, 'optional-primary-only', async (expect) => {
+    await open(31);
+    expect(await page.locator('[data-act=SUBMIT]').isDisabled(), 'submission blocked');
+    expect((await text('[data-testid=submit-why]')).includes('حزمة واحدة'), 'one deployment area alone is never accepted');
+    expect((await page.locator('[data-testid=submit-checklist] li[data-ok=false]').count()) === 1, 'the package item fails');
+    return [await shot('31-optional-primary-only-blocked')];
+  });
+  await step(32, 'policy-change', async (expect, ms) => {
+    await open(32);
+    ms.before = await policy('stationing_areas_requirement');
+    expect(ms.before.value === 'OPTIONAL' && ms.before.version === '1', 'version 1 in force: optional');
+    expect((await text('[data-testid=profile-relations]')).includes('أقصر مسافة بين الشكلين'), 'the published profile states its measurement method');
+    const a = await shot('32a-policy-optional');
+    const r = await confirm('[data-testid=policy-stationing_areas_requirement] button[data-act=SET_POLICY]', { reason: 'منطقتا الانتشار شرط لإرسال طلبات إعادة التمركز', snap: '32-dialog-policy-change' });
+    dialogOk(expect, r, 'policy change');
+    expect(r.info.consequence.includes('تبقى على الإصدار المثبَّت لها'), 'the dialog states that submitted requests keep their version');
+    ms.after = await policy('stationing_areas_requirement');
+    expect(ms.after.value === 'REQUIRED' && ms.after.version === '2', 'version 2 in force: required');
+    expect((await page.locator('[data-testid=policy-history-stationing_areas_requirement] li').count()) === 2, 'append-only history: two versions');
+    const ev = await text('[data-testid=events]');
+    expect(ev.includes('STATIONING_POLICY_CHANGED') && ['previous', 'value', 'version', 'effectiveFrom', 'changedBy', 'changedAt', 'reason'].every((k) => ev.includes(k)), 'actor, time, previous and new value, reason, effective date and version recorded');
+    const b = await shot('32b-policy-required');
+    await page.locator('[data-testid=policy-effective]').fill(new Date(Date.UTC(2026, 10, 17)).toISOString().slice(0, 10));
+    await settle(300);
+    await confirm('[data-testid=policy-stationing_areas_requirement] button[data-act=SET_POLICY]', { reason: 'العودة إلى الاختيارية من الأسبوع القادم' });
+    expect((await policy('stationing_areas_requirement')).value === 'REQUIRED' && (await page.locator('[data-testid=policy-scheduled]').isVisible()), 'back to optional, scheduled; version 2 stays in force until then');
+    await actor('p-stn');
+    const other = (await facts(page)).actions.find((x) => x.act === 'SET_POLICY');
+    expect(other && !other.enabled && other.why.includes('MANAGE_STATIONING_POLICY'), 'only the system administrator can change it');
+    return [a, r.file, b, await shot('32c-policy-scheduled-other-person')];
+  });
+  await step(33, 'version-locked', async (expect) => {
+    await open(33);
+    const badge = page.locator('[data-testid=policy-badge]').first();
+    expect((await badge.getAttribute('data-value')) === 'REQUIRED' && (await badge.getAttribute('data-version')) === '2', 'the submitted request keeps version 2 (required)');
+    expect((await badge.innerText()).includes('الإصدار 3'), 'and states that version 3 (optional) is in force now without changing it');
+    const a = await shot('33a-request-pinned');
+    await tap(page.locator('[data-testid=open-policy]'));
+    await settle();
+    expect((await text('[data-testid=policy-pinning-stationing_areas_requirement]')).includes('الإصدار 2: 1'), 'one request pinned to version 2');
+    return [a, await shot('33b-policy-pinning')];
+  });
+  await step(34, 'footprint-over-max', async (expect, ms) => {
+    await open(34);
+    const t = await text('[data-testid=site-area]');
+    expect(t.includes('15,000') && t.includes('الإصدار 2') && t.includes('✕'), 'actual area, configured maximum and policy version shown: ' + t);
+    expect(await page.locator('[data-testid=area-limit]').isVisible(), 'not resized automatically; the requester is told what to do');
+    expect(await page.locator('[data-testid=next]').first().isDisabled(), 'cannot continue');
+    const a = await shot('34a-footprint-over-max');
+    await tap(page.locator('[data-site-mode=draw]').first());
+    await settle(900);
+    const m0 = await model();
+    const c = centre(m0.world.requests.find((r) => r.id === 'r-pm-bld').proposal.ring);
+    await drawArea(c.lat, c.lng, 55, 17);
+    const m1 = await model();
+    ms.newAreaM2 = Math.round(area(m1.world.requests.find((r) => r.id === 'r-pm-bld').proposal.ring));
+    expect(ms.newAreaM2 < 15000 && (await text('[data-testid=site-area]')).includes('✓'), 'a newly drawn smaller boundary passes (' + ms.newAreaM2 + ' m²)');
+    await toStep(4);
+    expect(!(await page.locator('[data-act=SUBMIT]').isDisabled()), 'submission allowed');
+    return [a, await shot('34b-redrawn-within-max')];
+  });
+  await step(35, 'hierarchy-one-intermediate', async (expect) => {
+    await open(35);
+    expect(JSON.stringify(await stagesOf()) === JSON.stringify(['h-o-pm', 'site', 'scope', 'final']), 'one intermediate hierarchy approver, then the configured reviews and the final decision');
+    await actor('p-apr');
+    const early = await byAct('APPROVE_STAGE');
+    expect(early && !early.enabled && early.why.includes('المعتمد المُسند'), 'the final approver cannot jump the hierarchy');
+    const a = await shot('35a-awaiting-parent');
+    await approveAs('p-h-pm');
+    await approveAs('p-rev');
+    await approveAs('p-rev');
+    await approveAs('p-apr');
+    expect((await facts(page)).states.includes('APPROVED_NOT_ACTIVATED'), 'approved along the path');
+    expect((await marksOf()).every((x) => x === 'APPROVED'), 'every stage approved in order');
+    return [a, await shot('35b-approved-along-path')];
+  });
+  await step(36, 'hierarchy-multiple', async (expect) => {
+    await open(36);
+    await actor('p-h-bld');
+    const wrong = await byAct('APPROVE_STAGE');
+    expect(wrong && !wrong.enabled && wrong.why.includes('وحدة الإشراف الهندسي'), 'each level only by its own organisation\'s approver, in order');
+    await approveAs('p-h-sv');
+    await approveAs('p-h-bld');
+    await approveAs('p-h-pm');
+    expect(JSON.stringify((await marksOf()).slice(0, 3)) === JSON.stringify(['APPROVED', 'APPROVED', 'APPROVED']), 'three hierarchy approvals in order');
+    const a = await shot('36a-three-levels-approved');
+    await actor('p-wf');
+    await page.locator('[data-testid=route-org]').selectOption('o-ga');
+    await settle(300);
+    const r = await confirm('[data-testid=route-change] button[data-act=ROUTE_CHANGE]', { reason: 'موافقة الإدارة العامة على المقر المشترك', snap: '36-dialog-route-change' });
+    dialogOk(expect, r, 'routing change');
+    const st = await stagesOf();
+    expect(st.indexOf('a-o-ga') === st.length - 2, 'an added approver before the final decision');
+    expect((await text('[data-testid=events]')).includes('REQUEST_ROUTING_CHANGED') && (await page.locator('[data-testid=route-changes]').isVisible()), 'the change is audited and shown');
+    return [a, r.file, await shot('36b-route-changed-audited')];
+  });
+  await step(37, 'temporary-expiry-return', async (expect) => {
+    await open(37);
+    expect((await page.locator('[data-testid=effective-temporary]').count()) === 0, 'back on the preserved original stationing');
+    expect((await text('[data-testid=history]')).includes('انتهى عند نهايته المعتمدة'), 'the temporary record closed by the system, kept in history');
+    const m = await model();
+    expect(m.world.areas.filter((x) => x.stationingId === 'tmp-o-it').every((x) => x.status === 'RETIRED') && m.world.areas.filter((x) => x.stationingId === 'st-o-it').every((x) => x.status === 'ACTIVE'), 'the temporary deployment areas ended with it; the original stationing keeps its own');
+    return [await shot('37-temporary-expired-returned')];
+  });
+  await step(38, 'temporary-extension', async (expect) => {
+    await open(38);
+    expect((await facts(page)).states.includes('EXTENSION_ACTIVATED') && (await facts(page)).states.includes('ACTIVE_TEMPORARY'), 'extension activated; still temporary after the original end');
+    expect((await text('[data-testid=events]')).includes('STATIONING_TEMPORARY_EXTENDED'), 'the extension period began at the original end');
+    const m = await model();
+    expect(m.world.areas.filter((x) => x.stationingId === 'tmp-o-it').every((x) => x.status === 'ACTIVE' && x.validTo === m.world.requests.find((r) => r.id === 'r-it-temp').duration.end + 30 * 86400000), 'its deployment areas carried to the new end');
+    return [await shot('38-temporary-extended')];
+  });
+  await step(39, 'permanent-activated', async (expect) => {
+    await open(39);
+    const t = await text('.md-card');
+    expect(t.includes('مكتب المالية الجديد'), 'the new site is the current stationing');
+    expect((await text('[data-testid=history]')).includes('حلّ محله تمركز دائم مُفعَّل'), 'the previous stationing stays in history');
+    return [await shot('39-permanent-activated')];
+  });
+  await step(40, 'new-request-to-move-again', async (expect) => {
+    await open(40);
+    expect(await page.locator('[data-testid=permanent-done]').isVisible(), 'no automatic return; a later move needs a new request');
+    const acts = (await facts(page)).actions.map((x) => x.act);
+    expect(!acts.includes('ACTIVATE') && !acts.includes('REQUEST_CANCEL') && !acts.includes('APPROVE_STAGE'), 'nothing left to act on in the activated request');
+    const a = await shot('40a-activated-request');
+    await tap(page.locator('.md-head .ux-x'));
+    await settle();
+    await tap(page.getByRole('button', { name: /طلب إعادة تمركز/ }));
+    await settle(1200);
+    const head = await text('.md-editor .ux-crumbs');
+    expect(head.includes('مسودة') && head.includes('مكتب المالية الجديد'), 'a brand-new draft that starts from the new current stationing');
+    return [a, await shot('40b-new-request')];
+  });
+  await step(41, 'register-areas-later', async (expect, ms) => {
+    await open(41);
+    expect(await page.locator('[data-testid=no-areas]').isVisible(), 'activated without deployment areas: no empty record, the later process is offered');
+    await actor('p-req');
+    expect(await page.locator('[data-act=OPEN_REGISTER_AREAS]').isDisabled(), 'the requester cannot register them');
+    await actor('p-stn');
+    const a = await shot('41a-no-areas');
+    await tap(page.locator('[data-act=OPEN_REGISTER_AREAS]'));
+    await settle(1300);
+    await drawArea(25.205, 55.41);
+    await pick('ALTERNATIVE_AREA');
+    await drawArea(25.245, 55.42);
+    const [tp, ta] = [await text('[data-testid=area-primary]'), await text('[data-testid=area-alternative]')];
+    expect(tp.includes('✓') && ta.includes('✓'), 'both deployment areas drawn and within the published profile');
+    const b = await shot('41b-areas-drawn');
+    if (touch) {
+      await tap(page.locator('[data-testid=sheet-handle]'));
+      await tap(page.locator('[data-testid=sheet-handle]'));
+      await settle(600);
+    }
+    await page.locator('[data-testid=decision-authority]').fill('جهة اعتماد وهمية');
+    await page.locator('[data-testid=decision-reference]').fill('ق-وهمي/204');
+    await settle(300);
+    const r = await confirm('button[data-act=REGISTER_AREAS]', { reason: 'قرار منطقتي الانتشار بعد نفاذ التمركز الجديد', snap: '41-dialog-register' });
+    dialogOk(expect, r, 'registration');
+    const m1 = await model();
+    const st = m1.world.stationings.find((s) => s.org === 'o-ga-fin' && s.kind === 'PERMANENT' && s.state === 'CURRENT');
+    const areas = m1.world.areas.filter((x) => x.stationingId === st.id);
+    ms.registered = areas.map((x) => x.role);
+    expect(areas.length === 2 && areas.every((x) => x.status === 'ACTIVE' && x.provenance.registeredBy === 'p-stn'), 'two active records attached to the stationing');
+    expect((await text('.md-card')).includes('قرار خارجي ق-وهمي/204') && (await text('.md-card')).includes('منطقة الانتشار الرئيسية'), 'provenance and the owner\'s terms shown');
+    return [a, b, r.file, await shot('41c-areas-registered')];
   });
   await ctx.close();
   results.push({ size, scenario: ONLY ? 'dialogs ' + [...ONLY].join(',') : 'dialogs', name: 'dialogs', pass: dialogs.every((d) => d.confirmDisabledWithoutReason), dialogs, checks: [], shots: [], facts: {} });

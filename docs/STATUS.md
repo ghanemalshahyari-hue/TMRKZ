@@ -417,7 +417,7 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   - **Not done:** no backend, migration, real-page, Oracle or map-package change.
 
 - **Stationing domain model V2 (3 Nov 2026): owner-approved design baseline, NOT implemented.**
-  - **Design:** `docs/STATIONING_DOMAIN_MODEL_V2_AR.md` (5th revision), with owner decisions D1–D18, the
+  - **Design:** `docs/STATIONING_DOMAIN_MODEL_V2_AR.md` (7th revision), with owner decisions D1–D18, the
     conditional-approval corrections A1–A5, the held-start correction A6 and a consistency review. After A6 the owner
     accepted the document and the isolated prototype as the design baseline: no further redesign cycle unless real
     implementation exposes a contradiction. It covers authoritative stationing separate from facility responsibility,
@@ -436,6 +436,18 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     before the hold carries the window to its end.
   - **Not done:** no backend, migration (V18+ waits for ADR-028/V17) or real-page change. The two approved frontend
     fixes of the same day (basemap tiles, overlap predicate) are ADR-030, not part of this model.
+  - **Owner correction A8 (3 Nov 2026, 7th revision; prototype only; committed 4 Nov at the owner's request):** ONE proposed re-stationing site
+    (the primary/alternative relocation candidates, switching and reopening are removed and marked superseded); no
+    distance rule from the current stationing; an administrator-configured maximum footprint area
+    (`max_restationing_footprint_area`); the deployment requirement `stationing_areas_requirement` (REQUIRED: site +
+    primary + alternative deployment area; OPTIONAL: none or both, never one); deployment-area relations measured by the
+    published method (shortest distance between the actual geometries, 0 when touching; requests keep their pinned
+    method); policy, profile and route versions pinned at the first submission; an approval path derived from the
+    organisation hierarchy and a route policy, with system-determined participants changed only through
+    `MANAGE_REQUEST_ROUTING` (audited); owner-facing terms «منطقة الانتشار الرئيسية/البديلة». Evidence: 43 unit tests;
+    41 scenarios + drag × 4 sizes = 168/168 browser steps, 788 checks, 64 confirmed dialogs, 0 layout issues (report
+    §000; one transient blank load at 1920 passed on three reruns).
+    Three questions remain (§11 of the model document).
 
 - **Basemap tiles and overlap predicate (3 Nov 2026, ADR-030): two owner-approved frontend fixes, built and tested in
   the acceptance environment; committed 3 Nov 2026.**

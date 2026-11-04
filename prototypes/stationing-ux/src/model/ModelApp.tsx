@@ -7,17 +7,19 @@ import basemapUrl from '../../../../map-packages/regional-basemap-2026.10/basema
 import { BASEMAP_BOUNDS, ORGS } from '../data';
 import { svgBasemap } from '../svgBasemap';
 import { symbolHtml, useOrgSymbols } from '../symbols';
+import { AREA_LABEL, drawPair, type AreaTarget } from './areas';
 import { OrgCard, RequestCard, ReservationCard, SiteCard, type CardCtx } from './cards';
 import { ActionDialog, type Ask } from './dialog';
-import { comparison, formatKm, mainSiteOf, orgName, rangeText, siteOf } from './compare';
-import { DAY, blocking, check, clashes, day, descendants, perform, permanentOf, person, temporaryOf, type Action, type World } from './domain';
+import { comparison, formatKm, mainSiteOf, orgName, siteOf } from './compare';
+import { AREQ_LABEL, DAY, blocking, check, clashes, day, descendants, perform, permanentOf, person, policyAt, profileByVersion, requirementOf, temporaryOf, type Action, type World } from './domain';
 import { NOW, baseWorld } from './fixtures';
 import { fitPadding } from './fit';
+import { AreaRegistrar, PolicyCard } from './policy';
 import { RequestEditor } from './RequestEditor';
 import { SCENARIOS, type Sel } from './scenarios';
 
 const ll = (r: Ring) => r.map((p) => [p.lat, p.lng] as L.LatLngTuple);
-const C = { perm: '#2f6db0', temp: '#0e8f8f', areaP: '#7b4fb3', areaA: '#a46fd6', candP: '#1f9d55', candA: '#d9822b', off: '#8a999d' };
+const C = { perm: '#2f6db0', temp: '#0e8f8f', areaP: '#7b4fb3', areaA: '#a46fd6', prop: '#1f9d55', off: '#8a999d' };
 
 /** The scenario in the address (#s=7), applied to a fresh fictional world. */
 function fromHash() {
@@ -25,6 +27,7 @@ function fromHash() {
   const sc = SCENARIOS.find((s) => s.n === n) ?? null;
   let w = baseWorld();
   for (const [who, a] of sc?.setup ?? []) w = perform(w, who, a);
+  sc?.draft?.(w);
   return { sc, w };
 }
 
@@ -34,6 +37,8 @@ export function ModelApp() {
   const [actor, setActor] = useState(init.sc?.actor ?? 'p-req');
   const [sel, setSel] = useState<Sel>(init.sc?.sel ?? null);
   const [step, setStep] = useState(init.sc?.step ?? 1);
+  /** In step 3 of the request editor: the proposed site, or one of its deployment areas. */
+  const [areaTarget, setAreaTarget] = useState<AreaTarget>('SITE');
   const [showAreas, setShowAreas] = useState(!!init.sc?.showAreas);
   const [expandTemps, setExpandTemps] = useState(!!init.sc?.expandTemps);
   const [notice, setNotice] = useState<string | null>(null);
@@ -49,7 +54,8 @@ export function ModelApp() {
   const [map, setMap] = useState<L.Map | null>(null);
 
   // drawing a proposal on a phone: the sheet steps down to its working height; otherwise medium
-  useEffect(() => setSheet(sel?.k === 'edit' && (step === 3 || step === 4) ? 'collapsed' : 'medium'), [sel, step]);
+  useEffect(() => setSheet((sel?.k === 'edit' && step === 3) || sel?.k === 'areas' ? 'collapsed' : 'medium'), [sel, step]);
+  useEffect(() => setAreaTarget('SITE'), [sel, step]);
   // the map's own controls (zoom, scale) always sit just above the sheet
   useEffect(() => {
     const d = dockEl.current;
@@ -98,7 +104,11 @@ export function ModelApp() {
     setNotice(null);
     // the result is the new state at the top of the card
     requestAnimationFrame(() => document.querySelector('.md-dock .md-card')?.scrollTo({ top: 0 }));
-    if (a.t === 'SUBMIT') setSel({ k: 'req', id: a.req });
+    if (a.t === 'SUBMIT' || a.t === 'RESUBMIT') setSel({ k: 'req', id: a.req });
+    if (a.t === 'REGISTER_AREAS') {
+      setSel({ k: 'org', id: world.stationings.find((s) => s.id === a.stationing)!.org });
+      setShowAreas(true);
+    }
   };
   const newRequest = (org: string) => {
     const id = 'r-new-' + world.events.length;
@@ -113,15 +123,13 @@ export function ModelApp() {
         scope: { whole: true, units: [] },
         duration: { type: 'PERMANENT', start: w.now + 30 * DAY },
         fromSiteId: cur.id,
-        candidates: {
-          PRIMARY: { role: 'PRIMARY', name: 'الموقع الرئيسي المقترح', ring: cur.ring.map((p) => ({ ...p })), siteId: null, status: 'PROPOSED' },
-          ALTERNATIVE: { role: 'ALTERNATIVE', name: 'الموقع البديل المقترح', ring: cur.ring.map((p) => ({ ...p })), siteId: null, status: 'PROPOSED' },
-        },
-        active: 'PRIMARY',
+        proposal: { name: 'الموقع المقترح لإعادة التمركز', ring: cur.ring.map((p) => ({ ...p })), siteId: null },
         state: 'DRAFT',
         requester: actor,
-        stages: c.requests[0].stages.map((s) => ({ ...s, mark: undefined, by: undefined, candidate: undefined })),
+        stages: [],
         cursor: 0,
+        routeChanges: [],
+        createdUnder: { areas: policyAt(w, 'stationing_areas_requirement').version, maxArea: policyAt(w, 'max_restationing_footprint_area').version },
       });
       return c;
     });
@@ -130,7 +138,8 @@ export function ModelApp() {
   };
 
   // ---- map layers: only what the current context needs (progressive disclosure) ----
-  const fitKey = JSON.stringify(sel) + ':' + (sel?.k === 'edit' && step >= 3 && step <= 4 ? 'editing' : step) + ':' + expandTemps + ':' + showAreas;
+  const fitKey = JSON.stringify(sel) + ':' + (sel?.k === 'edit' && step === 3 ? 'editing' : step) + ':' + expandTemps + ':' + showAreas;
+  const editingMap = (sel?.k === 'edit' && step === 3) || sel?.k === 'areas';
   const lastFit = useRef('');
   useEffect(() => {
     if (!map) return;
@@ -186,7 +195,7 @@ export function ModelApp() {
       if (showAreas)
         for (const a of world.areas.filter((x) => x.stationingId === perm.id && x.status === 'ACTIVE')) {
           poly(a.ring, a.role === 'PRIMARY_AREA' ? C.areaP : C.areaA, { dashArray: a.role === 'PRIMARY_AREA' ? '2 6' : '1 5', weight: 2.5, fillOpacity: 0.1 });
-          named(a.ring, [centroid(site.ring)], a.role === 'PRIMARY_AREA' ? 'المنطقة الرئيسية المرتبطة بالتمركز' : 'المنطقة البديلة المرتبطة بالتمركز', a.role === 'PRIMARY_AREA' ? 'area-p' : 'area-a');
+          named(a.ring, [centroid(site.ring)], AREA_LABEL[a.role], a.role === 'PRIMARY_AREA' ? 'area-p' : 'area-a');
         }
       // units that moved together with this organisation are part of its own temporary stationing, not a separate group
       const away = descendants(world, id).filter((u) => temporaryOf(world, u) && temporaryOf(world, u)!.requestId !== t?.requestId);
@@ -208,37 +217,29 @@ export function ModelApp() {
       }
     };
 
-    const drawRequest = (id: string, editing?: 'PRIMARY' | 'ALTERNATIVE' | 'NONE') => {
+    /** The current stationing, the ONE proposed site and its deployment package (owner correction of 3 Nov 2026). */
+    const drawRequest = (id: string, editing: boolean) => {
       const r = world.requests.find((x) => x.id === id)!;
-      const rows = comparison(world, r);
-      const cur = rows[0];
-      const p = rows.find((x) => x.key === 'PRIMARY')!;
-      const a = rows.find((x) => x.key === 'ALTERNATIVE');
-      // the alternative appears once it is being defined (step 4) or reviewed, not while the primary is placed
-      const showAlt = !!a && editing !== 'PRIMARY' && (editing === 'ALTERNATIVE' || step >= 4 || r.state !== 'DRAFT');
-      const [cc, pcc, acc] = [centroid(cur.ring), centroid(p.ring), a ? centroid(a.ring) : null];
+      const cmp = comparison(world, r);
+      const cur = cmp.current;
+      const pr = r.proposal;
+      const [cc, pc] = [centroid(cur.ring), centroid(pr.ring)];
       poly(cur.ring, C.perm, { weight: 3 });
-      named(cur.ring, [pcc], symbolHtml(symbols.get(r.org), 20) + '<b>التمركز الحالي · ' + cur.name + '</b>', 'site perm');
-      const pc = r.candidates.PRIMARY;
-      const ac = r.candidates.ALTERNATIVE;
-      const st = (s: string) => (s === 'NOT_ACCEPTED' ? ' · لم يُقبل' : s === 'APPROVED' ? ' · معتمد' : s === 'STANDBY' ? ' · احتياطي' : s === 'UNDER_REVIEW' ? ' · قيد المراجعة' : '');
-      if (editing !== 'PRIMARY') {
-        poly(p.ring, pc.status === 'NOT_ACCEPTED' ? C.off : C.candP, { weight: 3, dashArray: pc.status === 'NOT_ACCEPTED' ? '4 6' : undefined });
-        named(p.ring, showAlt && acc ? [cc, acc] : [cc], 'الرئيسي المقترح' + st(pc.status), pc.status === 'NOT_ACCEPTED' ? 'off' : 'cand-p');
+      named(cur.ring, [pc], symbolHtml(symbols.get(r.org), 20) + '<b>التمركز الحالي · ' + cur.name + '</b>', 'site perm');
+      // while the site is being moved or drawn, the polygon engine draws it
+      const movingSite = editing && areaTarget === 'SITE';
+      // a new draft starts from a copy of the current boundary: until it is moved or drawn, the site is not set yet
+      const unset = cmp.proposed.fromCurrentCentre < 1;
+      if (unset && !movingSite) tag(bottom(cur.ring), 'لم يُحدَّد الموقع المقترح بعد', 'cand-p down');
+      if (!movingSite && !unset) {
+        poly(pr.ring, C.prop, { weight: 3 });
+        named(pr.ring, [cc], 'الموقع المقترح لإعادة التمركز' + (r.state === 'DRAFT' ? '' : ' · ' + (r.state === 'APPROVED_NOT_ACTIVATED' ? 'معتمد' : r.state === 'ACTIVATED_PERMANENT' ? 'مُفعَّل' : '')), 'cand-p');
+        // the distance from the current stationing is information only: no rule applies to the proposed site
+        line(cc, pc, '#16324f', formatKm(cmp.proposed.fromCurrent) + (narrow ? '' : ' · للمعلومة فقط'), '7 6', narrow ? 0.35 : 0.42, formatKm(cmp.proposed.fromCurrent));
       }
-      // on narrow screens a short distance on the map; the configured range is in the card's comparison
-      const chip = (d: number, range: { min: number; max: number }, ok: boolean, from = '') =>
-        formatKm(d) + from + (narrow ? '' : ' · المهيأ ' + rangeText(range)) + (ok ? ' ✓' : ' ✕');
-      const short = (d: number, ok: boolean) => formatKm(d) + (ok ? ' ✓' : ' ✕');
-      // while a candidate is being dragged the engine draws its own live connector and distance: no duplicate
-      if (editing !== 'PRIMARY') line(cc, pcc, '#16324f', chip(p.dist!, p.range!, !!p.inRange), '7 6', narrow ? 0.35 : 0.42, short(p.dist!, !!p.inRange));
-      if (showAlt && a && ac && acc) {
-        if (editing !== 'ALTERNATIVE') {
-          poly(a.ring, ac.status === 'NOT_ACCEPTED' ? C.off : C.candA, { weight: 3, dashArray: '9 6', fillOpacity: ac.status === 'STANDBY' ? 0.08 : 0.16 });
-          named(a.ring, [pcc], 'البديل المقترح' + st(ac.status), 'cand-a');
-        }
-        if (editing !== 'ALTERNATIVE') line(pcc, acc, C.candA, chip(a.dist!, a.range!, !!a.inRange, ' من الرئيسي'), '4 6', narrow ? 0.72 : 0.58, short(a.dist!, !!a.inRange));
-      }
+      for (const ring of Object.values(pr.areas ?? {})) if (ring) keep(ring);
+      const measure = profileByVersion(world, requirementOf(world, r).profile).measure;
+      drawPair(g, pr.ring, pr.areas, cmp.areas, measure, editing && areaTarget !== 'SITE' ? areaTarget : null, (at, html, cls) => tag(at, html, cls), line, narrow);
       // a temporary stationing that ends at the permanent activation (D13)
       const ending = new Map<string, number>(); // one shape and name per temporary site, with its unit count
       for (const tid of r.state === 'APPROVED_NOT_ACTIVATED' ? (r.supersedes ?? []) : []) {
@@ -264,8 +265,8 @@ export function ModelApp() {
         if (s) keep(s.ring);
       }
     } else if (sel.k === 'org') drawOrg(sel.id);
-    else if (sel.k === 'req') drawRequest(sel.id);
-    else if (sel.k === 'edit') drawRequest(sel.id, step === 3 ? 'PRIMARY' : step === 4 ? 'ALTERNATIVE' : 'NONE');
+    else if (sel.k === 'req') drawRequest(sel.id, false);
+    else if (sel.k === 'edit') drawRequest(sel.id, step === 3);
     else if (sel.k === 'res') {
       const res = world.reservations.find((x) => x.id === sel.id)!;
       const cl = clashes(world, res.org, res.ring, res.from, res.to, res.id);
@@ -275,11 +276,11 @@ export function ModelApp() {
         const other = world.reservations.find((r) => r.id === x.id);
         if (area) {
           poly(area.ring, area.role === 'PRIMARY_AREA' ? C.areaP : C.areaA, { dashArray: '2 6', fillOpacity: 0.1 });
-          named(area.ring, [centroid(res.ring)], (area.role === 'PRIMARY_AREA' ? 'المنطقة الرئيسية المرتبطة بتمركز ' : 'المنطقة البديلة المرتبطة بتمركز ') + orgName(area.org), 'area-p');
+          named(area.ring, [centroid(res.ring)], AREA_LABEL[area.role] + ' لتمركز ' + orgName(area.org), 'area-p');
         }
         if (other) poly(other.ring, C.off, { dashArray: '4 4' });
       }
-      const color = res.state === 'ACTIVE' ? C.candP : blocked ? '#c0392b' : C.candP;
+      const color = res.state === 'ACTIVE' ? C.prop : blocked ? '#c0392b' : C.prop;
       poly(res.ring, color, { weight: 3, fillOpacity: 0.3 });
       tag(top(res.ring), res.number + ' · ' + orgName(res.org) + (blocked && res.state !== 'ACTIVE' ? ' · منع' : res.state === 'ACTIVE' ? ' · نافذ' : ' · لا تعارض'), 'res ' + (blocked && res.state !== 'ACTIVE' ? 'bad' : 'good') + ' up');
     } else if (sel.k === 'site') {
@@ -297,7 +298,7 @@ export function ModelApp() {
       }
     }
 
-    if (lastFit.current !== fitKey && bounds.length && !(sel?.k === 'edit' && (step === 3 || step === 4))) {
+    if (lastFit.current !== fitKey && bounds.length && !editingMap) {
       lastFit.current = fitKey;
       map.flyToBounds(L.latLngBounds(bounds), { ...fitPadding(narrow), maxZoom: 15, duration: 0.4 });
     }
@@ -305,9 +306,11 @@ export function ModelApp() {
     const declutter = () => {
       const box = map.getContainer().getBoundingClientRect();
       const controls = [...map.getContainer().querySelectorAll<HTMLElement>('.leaflet-control-zoom, .leaflet-control-scale, .leaflet-control-attribution')].map((c) => c.getBoundingClientRect());
-      const all = [...map.getContainer().querySelectorAll<HTMLElement>('.md-tag')];
+      const all = [...map.getContainer().querySelectorAll<HTMLElement>('.md-tag:not(.live)')];
+      // chips and proposed-area names give way: shortened, then hidden (their values stay in the card)
+      const minor = (t: HTMLElement) => t.classList.contains('chip') || t.classList.contains('prop');
       // a name never sits under the zoom or scale controls, nor past the map's edge: it shifts sideways just enough
-      for (const t of all.filter((x) => !x.classList.contains('chip'))) {
+      for (const t of all.filter((x) => !minor(x))) {
         t.style.marginLeft = '';
         let r = t.getBoundingClientRect();
         const under = controls.find((c) => r.left < c.right && c.left < r.right && r.top < c.bottom && c.top < r.bottom);
@@ -319,11 +322,13 @@ export function ModelApp() {
           r = t.getBoundingClientRect();
         }
       }
-      const names = all.filter((t) => !t.classList.contains('chip')).map((t) => t.getBoundingClientRect());
+      const names = all.filter((t) => !minor(t)).map((t) => t.getBoundingClientRect());
       const placed: DOMRect[] = [];
-      const hits = (r: DOMRect) => [...names, ...controls, ...placed].some((o) => r.left < o.right && o.left < r.right && r.top < o.bottom && o.top < r.bottom);
-      for (const c of all.filter((t) => t.classList.contains('chip'))) {
+      const hits = (r: DOMRect) =>
+        r.left < box.left || r.right > box.right || r.top < box.top || r.bottom > box.bottom || [...names, ...controls, ...placed].some((o) => r.left < o.right && o.left < r.right && r.top < o.bottom && o.top < r.bottom);
+      for (const c of [...all.filter((t) => t.classList.contains('prop')), ...all.filter((t) => t.classList.contains('chip'))]) {
         c.classList.remove('hidden');
+        if (c.classList.contains('prop') && !c.dataset.full) Object.assign(c.dataset, { full: c.textContent, short: (c.textContent ?? '').replace('المنطقة ', '').replace(' المقترحة', '') });
         c.textContent = c.dataset.full ?? c.textContent;
         if (hits(c.getBoundingClientRect())) c.textContent = c.dataset.short ?? c.textContent;
         if (hits(c.getBoundingClientRect())) c.classList.add('hidden');
@@ -337,7 +342,7 @@ export function ModelApp() {
       map.off('moveend zoomend', declutter);
       g.remove();
     };
-  }, [map, world, sel, step, showAreas, expandTemps, symbols, fitKey, narrow]);
+  }, [map, world, sel, step, areaTarget, showAreas, expandTemps, symbols, fitKey, narrow]);
 
   const ctx: CardCtx = { world, actor, act, ask: setAsk, select: (s) => (setSel(s), setNotice(null)), symbols, showAreas, setShowAreas, expandTemps, setExpandTemps, newRequest };
   const me = person(world, actor)!;
@@ -422,6 +427,9 @@ export function ModelApp() {
               <button className={'ux-chip ' + (legend ? 'on' : '')} aria-expanded={legend} onClick={() => setLegend(!legend)}>
                 مفتاح الخريطة
               </button>
+              <button className={'ux-chip ' + (sel?.k === 'policy' ? 'on' : '')} onClick={() => (setSel({ k: 'policy' }), setNotice(null))} data-testid="open-policy">
+                سياسات التمركز: الانتشار {AREQ_LABEL[policyAt(world, 'stationing_areas_requirement').value as 'REQUIRED' | 'OPTIONAL']}
+              </button>
             </div>
             {sc && (
               <p className="md-sim-hint" data-testid="scenario-note">
@@ -439,13 +447,15 @@ export function ModelApp() {
                 <ul>
                   <li><i className="md-swatch perm" /> التمركز الدائم · المقر الرئيسي الحالي</li>
                   <li><i className="md-swatch temp" /> التمركز الفعلي المؤقت (فوق الدائم)</li>
-                  <li><i className="md-swatch area-p" /> المنطقة الرئيسية المرتبطة بالتمركز</li>
-                  <li><i className="md-swatch area-a" /> المنطقة البديلة المرتبطة بالتمركز</li>
-                  <li><i className="md-swatch cand-p" /> الموقع الرئيسي المقترح لإعادة التمركز</li>
-                  <li><i className="md-swatch cand-a" /> الموقع البديل المقترح لإعادة التمركز</li>
-                  <li><i className="md-swatch off" /> مرشح لم يُقبل</li>
+                  <li><i className="md-swatch area-p" /> منطقة الانتشار الرئيسية لتمركز نافذ</li>
+                  <li><i className="md-swatch area-a" /> منطقة الانتشار البديلة لتمركز نافذ</li>
+                  <li><i className="md-swatch cand-p" /> الموقع المقترح لإعادة التمركز (واحد)</li>
+                  <li><i className="md-swatch area-p-prop" /> منطقة الانتشار الرئيسية (مقترحة في الطلب)</li>
+                  <li><i className="md-swatch area-a-prop" /> منطقة الانتشار البديلة (مقترحة في الطلب)</li>
                 </ul>
-                <p className="ux-note">المنطقتان المرتبطتان تُكشفان من بطاقة الجهة، ولا تظهر الطبقات كلها معاً.</p>
+                <p className="ux-note">
+                  منطقتا الانتشار تُكشفان من بطاقة الجهة، ولا تظهر الطبقات كلها معاً. المسافة بين التمركز الحالي والموقع المقترح للمعلومة فقط؛ القيم المهيأة لمنطقتي الانتشار.
+                </p>
               </div>
             )}
             {notice && (
@@ -470,6 +480,8 @@ export function ModelApp() {
               {sel?.k === 'req' && <RequestCard key={sel.id + actor} c={ctx} id={sel.id} />}
               {sel?.k === 'res' && <ReservationCard key={sel.id + actor} c={ctx} id={sel.id} />}
               {sel?.k === 'site' && <SiteCard c={ctx} id={sel.id} />}
+              {sel?.k === 'policy' && <PolicyCard key={actor} c={ctx} />}
+              {sel?.k === 'areas' && <AreaRegistrar key={sel.id + actor} c={ctx} map={map} stationing={sel.id} narrow={narrow} />}
               {sel?.k === 'edit' && (
                 <RequestEditor
                   world={world}
@@ -479,8 +491,12 @@ export function ModelApp() {
                   actor={actor}
                   step={step}
                   setStep={setStep}
+                  target={areaTarget}
+                  setTarget={setAreaTarget}
                   symbols={symbols}
                   act={act}
+                  ask={setAsk}
+                  ctx={ctx}
                   narrow={narrow}
                   sheet={sheet}
                   onClose={() => setSel({ k: 'org', id: world.requests.find((r) => r.id === sel.id)!.org })}

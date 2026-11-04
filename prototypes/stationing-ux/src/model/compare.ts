@@ -1,18 +1,18 @@
-// Comparison of the current stationing, the primary and the alternative proposal (one source for the cards, the request
-// editor and the map). Distances are checked against the EXAMPLE policy profile only; the primary is measured from the
-// current main site, the alternative from the primary — never from the old site (docs §4.4).
-import { areaM2, centroid, formatArea, kinks, ringsIntersect, type Ring } from '../../../../frontend/src/lib/footprint';
-import { distanceM, formatKm } from '../../../../frontend/src/lib/geo';
-import { SITES, orgById } from '../data';
-import { blocking, clashes, permanentOf, type Request, type World } from './domain';
-import { PROFILE } from './fixtures';
+// The current stationing beside the ONE proposed re-stationing site and its deployment package (one source for the cards,
+// the request editor and the map). The proposed site has no distance rule from the current stationing — its distance is
+// shown for information only; the configured relations belong to the deployment areas (owner correction of 3 Nov 2026).
+import { areaM2, formatArea, kinks, ringsIntersect, type Ring } from '../../../../frontend/src/lib/footprint';
+import { formatKm } from '../../../../frontend/src/lib/geo';
+import { SITES } from '../data';
+import { blocking, clashes, footprintCheck, orgName, permanentOf, proposalAreas, type AreaCheck, type Range, type Request, type World } from './domain';
+import { centreDistance, nearest } from './geometry';
 
-export const orgName = (id: string) => orgById.get(id)?.name ?? id;
+export { orgName };
 export const siteOf = (w: World, id: string | undefined) => w.sites.find((s) => s.id === id);
 export const mainSiteOf = (w: World, org: string) => siteOf(w, permanentOf(w, org)?.siteId);
 
 /**
- * Availability conflicts of a proposed footprint over a period: associated areas and active reservations that overlap in
+ * Availability conflicts of a proposed footprint over a period: deployment areas and active reservations that overlap in
  * space AND time, except an area whose covered scope includes the organisation (D4, A2); and occupied sites.
  */
 export function conflicts(w: World, org: string, ring: Ring, from: number, to: number | undefined): string[] {
@@ -21,60 +21,44 @@ export function conflicts(w: World, org: string, ring: Ring, from: number, to: n
   return out;
 }
 
-export type Row = {
-  key: 'CURRENT' | 'PRIMARY' | 'ALTERNATIVE';
-  title: string;
-  name: string;
-  ring: Ring;
-  dist?: number;
-  from?: string;
-  range?: { min: number; max: number };
-  inRange?: boolean;
-  area: string;
-  shapeOk: boolean;
-  conflicts: string[];
+export type Comparison = {
+  current: { name: string; ring: Ring; area: string };
+  proposed: {
+    name: string;
+    ring: Ring;
+    /** Shortest distance from the current site, and centre to centre — both for information only. */
+    fromCurrent: number;
+    fromCurrentCentre: number;
+    area: number;
+    max: number;
+    maxVersion: number;
+    areaOk: boolean;
+    shapeOk: boolean;
+    conflicts: string[];
+  };
+  areas: AreaCheck;
 };
 
-export function comparison(w: World, r: Request): Row[] {
+export function comparison(w: World, r: Request): Comparison {
   const cur = mainSiteOf(w, r.org) ?? siteOf(w, r.fromSiteId)!;
-  const p = r.candidates.PRIMARY;
-  const a = r.candidates.ALTERNATIVE;
-  const cP = centroid(p.ring);
-  const dP = distanceM(centroid(cur.ring), cP);
-  const rows: Row[] = [
-    { key: 'CURRENT', title: 'التمركز الحالي', name: cur.name, ring: cur.ring, area: formatArea(areaM2(cur.ring)), shapeOk: true, conflicts: [] },
-    {
-      key: 'PRIMARY',
-      title: 'الموقع الرئيسي المقترح',
-      name: p.name,
-      ring: p.ring,
-      dist: dP,
-      from: 'من المقر الرئيسي الحالي',
-      range: PROFILE.currentToPrimary,
-      inRange: dP >= PROFILE.currentToPrimary.min && dP <= PROFILE.currentToPrimary.max,
-      area: formatArea(areaM2(p.ring)),
-      shapeOk: kinks(p.ring) === 0,
-      conflicts: conflicts(w, r.org, p.ring, r.duration.start, r.duration.end),
+  const fp = footprintCheck(w, r);
+  return {
+    current: { name: cur.name, ring: cur.ring, area: formatArea(areaM2(cur.ring)) },
+    proposed: {
+      name: r.proposal.name,
+      ring: r.proposal.ring,
+      fromCurrent: nearest(cur.ring, r.proposal.ring).dist,
+      fromCurrentCentre: centreDistance(cur.ring, r.proposal.ring),
+      area: fp.area,
+      max: fp.max,
+      maxVersion: fp.version,
+      areaOk: fp.ok,
+      shapeOk: kinks(r.proposal.ring) === 0,
+      conflicts: conflicts(w, r.org, r.proposal.ring, r.duration.start, r.duration.end),
     },
-  ];
-  if (a) {
-    const dA = distanceM(cP, centroid(a.ring));
-    rows.push({
-      key: 'ALTERNATIVE',
-      title: 'الموقع البديل المقترح',
-      name: a.name,
-      ring: a.ring,
-      dist: dA,
-      from: 'من الموقع الرئيسي المقترح',
-      range: PROFILE.primaryToAlternative,
-      inRange: dA >= PROFILE.primaryToAlternative.min && dA <= PROFILE.primaryToAlternative.max,
-      area: formatArea(areaM2(a.ring)),
-      shapeOk: kinks(a.ring) === 0,
-      conflicts: conflicts(w, r.org, a.ring, r.duration.start, r.duration.end),
-    });
-  }
-  return rows;
+    areas: proposalAreas(w, r),
+  };
 }
 
-export const rangeText = (r: { min: number; max: number }) => formatKm(r.min) + ' – ' + formatKm(r.max);
-export { formatKm };
+export const rangeText = (r: Range) => formatKm(r.min) + ' – ' + formatKm(r.max);
+export { formatKm, formatArea };

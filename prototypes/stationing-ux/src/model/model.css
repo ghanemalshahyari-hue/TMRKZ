@@ -173,9 +173,47 @@ details.md-block>summary{cursor:pointer}
 .md-data{display:flex;flex-wrap:wrap;gap:1px 10px;font-size:10.5px;color:#1f4f80}
 .md-note-a3{color:#0e6f6f;font-weight:600}
 
+/* the areas requirement and a proposed site's associated areas (owner's rule update of 3 Nov 2026) */
+.md-swatch.area-p-prop{border-color:var(--c-area-p);border-style:dashed;background:#7b4fb31a}
+.md-swatch.area-a-prop{border-color:var(--c-area-a);border-style:dashed}
+.md-tag.prop{background:#faf6ff}
+.md-policy{font-size:11.5px;border-radius:7px;padding:1px 8px;border:1.5px solid #7b4fb3;color:#5b3a8a;background:#faf6ff;line-height:1.6}
+.md-policy.required{border-color:#7b4fb3;background:#f1e9fb}
+.md-policy.optional{border-style:dashed}
+.md-policy em{font-style:normal;color:#7a5410;display:block}
+.md-policy-now.required{border-inline-start:4px solid #7b4fb3;padding-inline-start:8px}
+.md-areas{display:grid;gap:6px;border:1.5px dashed #a46fd6;border-radius:10px;padding:8px 10px;margin-top:6px;background:#fcfaff}
+.md-seg3{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--canvas);border-radius:10px;padding:3px}
+.md-card > .md-seg3{grid-template-columns:repeat(2,1fr)}
+.md-seg3 button{min-height:36px;border:0;border-radius:8px;background:none;font:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;padding:2px 4px}
+.md-seg3 button.on{background:#fff;color:#5b3a8a;box-shadow:0 1px 4px #0002}
+.md-seg3 button:disabled{opacity:.45;cursor:not-allowed}
+.md-area-dl dd .good{color:#16743f;font-weight:600}
+.md-area-dl dd .bad{color:#9c2f2f;font-weight:600}
+.md-checklist li{font-size:12px;line-height:1.5}
+.md-checklist li.good{color:#16743f}
+.md-checklist li.bad{color:#9c2f2f}
+/* the polygon engine draws an area in the area colour while it is valid; invalid stays red */
+.md-area-edit .stw-prop-path[stroke="#1f9d55"]{stroke:#7b4fb3;fill:#a46fd6}
+/* while a deployment area is edited, the engine's centre-to-centre line and chip give way to the measured live line */
+.md-area-edit .stw-dist,.md-area-edit path[stroke="#16324f"][stroke-dasharray="6 6"]{display:none}
+.md-tag.chip.live{background:#5b3a8a;border-color:#5b3a8a;z-index:2}
+.md-tag.chip.live.bad,.md-tag.chip.bad{background:#b83a3a;border-color:#b83a3a}
+.md-info{color:var(--muted);font-weight:400}
+.md-compare.two thead th:not(:first-child){width:auto}
+.md-seg3.two{grid-template-columns:repeat(2,1fr)}
+.md-route .md-stages li{align-items:flex-start}
+.md-kind{font-style:normal;font-size:10px;font-weight:600;color:#5b3a8a;border:1px solid #c9b3e6;border-radius:5px;padding:0 5px;margin-inline-start:4px}
+.md-note-route{color:var(--muted)}
+.md-policy-block{gap:6px}
+
 /* availability check of a reservation */
 .md-tag.res.bad{border-color:#c0392b;color:#c0392b}
 .md-tag.res.good{border-color:#1f9d55;color:#16743f}
 .md-verdict{font-weight:700;font-size:12.5px;margin:6px 0 0}
 .md-verdict.bad,.md-list .bad{color:#9c2f2f}
 .md-verdict.good,.md-list .good{color:#16743f}
+/* the phone's compact drawing header stays within the collapsed sheet: the site mode is an inline toggle, the switch is slim */
+.md-compact .md-seg3 button{min-height:30px;font-size:11.5px}
+.md-mode-toggle{justify-self:start;font-size:12px;min-height:24px}
+.md-compact-head{display:flex;align-items:center;justify-content:space-between;gap:8px}

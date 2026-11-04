@@ -1,33 +1,45 @@
 import { useState, type ReactNode } from 'react';
-import { SITES, orgById, pathOf } from '../data';
+import { ORGS, SITES, orgById, pathOf } from '../data';
 import { SymbolMark, type Symbols } from '../symbols';
-import { comparison, formatKm, mainSiteOf, orgName, rangeText, siteOf } from './compare';
+import { PolicyBadge } from './areas';
+import { comparison, formatArea, formatKm, mainSiteOf, orgName, rangeText, siteOf } from './compare';
 import type { Ask } from './dialog';
 import {
-  CAND_LABEL,
+  AREA_LABEL,
+  AREQ_LABEL,
   DAY,
   EXT_LABEL,
   FACT_LABEL,
+  MEASURE_LABEL,
   STATE_LABEL,
   blocking,
+  canRegisterAreas,
   check,
+  holds,
   clashes,
   coveredBy,
   day,
   descendants,
   when,
+  participants,
   permanentOf,
   person,
-  roleName,
+  profileByVersion,
+  profileRef,
+  requirementOf,
+  routeOf,
   temporaryOf,
   unitsOf,
   type Action,
   type Event,
+  type Participant,
+  type Relation,
   type Request,
+  type RouteChange,
+  type Stage,
   type Stationing,
   type World,
 } from './domain';
-import { PROFILE } from './fixtures';
 import type { Sel } from './scenarios';
 
 export type CardCtx = {
@@ -60,8 +72,8 @@ type ActKind = 'auth' | 'destructive' | 'primary' | 'plain';
  * A guarded action: enabled only when the simulated rules allow it for the simulated person, otherwise with the reason.
  * Sensitive ones open their own reason dialog (B3) and look different from ordinary buttons.
  */
-function Act({ c, a, label, kind = 'plain', dialog }: { c: CardCtx; a: Action; label: string; kind?: ActKind; dialog?: Omit<Ask, 'action'> }) {
-  const probe = (dialog ? { ...a, reason: 'سبب للتحقق من الإتاحة', policyRef: 'مرجع' } : a) as Action;
+export function Act({ c, a, label, kind = 'plain', dialog }: { c: CardCtx; a: Action; label: string; kind?: ActKind; dialog?: Omit<Ask, 'action'> }) {
+  const probe = (dialog ? { ...a, reason: 'سبب للتحقق من الإتاحة', ...(dialog.policyRef ? { policyRef: 'مرجع' } : {}) } : a) as Action;
   const v = check(c.world, c.actor, probe);
   const cls = kind === 'auth' ? 'md-auth' : kind === 'destructive' ? 'md-destr' : kind === 'primary' ? 'primary' : '';
   return (
@@ -76,7 +88,7 @@ function Act({ c, a, label, kind = 'plain', dialog }: { c: CardCtx; a: Action; l
   );
 }
 
-function Head({ c, title, sub, org, onClose }: { c: CardCtx; title: ReactNode; sub?: ReactNode; org?: string; onClose: () => void }) {
+export function Head({ c, title, sub, org, onClose }: { c: CardCtx; title: ReactNode; sub?: ReactNode; org?: string; onClose: () => void }) {
   return (
     <header className="ux-card-head md-head">
       <div className="ux-with-sym">
@@ -105,7 +117,7 @@ export function StateChip({ state, label }: { state: string; label: string }) {
 }
 
 /** Ordinary actions, then the binding ones in their own block. */
-function Actions({ plain, binding }: { plain: ReactNode[]; binding: ReactNode[] }) {
+export function Actions({ plain, binding }: { plain: ReactNode[]; binding: ReactNode[] }) {
   const p = plain.filter(Boolean);
   const b = binding.filter(Boolean);
   return (
@@ -121,7 +133,7 @@ function Actions({ plain, binding }: { plain: ReactNode[]; binding: ReactNode[] 
   );
 }
 
-function Events({ w, list }: { w: World; list: Event[] }) {
+export function Events({ w, list }: { w: World; list: Event[] }) {
   const [all, setAll] = useState(false);
   return (
     <details className="md-block" open>
@@ -170,6 +182,8 @@ export function OrgCard({ c, id }: { c: CardCtx; id: string }) {
     .sort((a, b) => (b.to ?? 0) - (a.to ?? 0));
   const held = temp && w.requests.find((r) => r.id === temp.requestId)?.state === 'START_HELD_PENDING_CANCELLATION';
   const covered = perm ? coveredBy(w, perm.id) : [];
+  // the temporary record's own deployment areas (on the first record of its extension chain)
+  const tempAreas = temp ? w.areas.filter((a) => a.status === 'ACTIVE' && w.stationings.some((s) => s.id === a.stationingId && s.kind === 'TEMPORARY' && s.requestId === temp.requestId && s.org === id)) : [];
   return (
     <section className="ux-card md-card" aria-label={'الجهة ' + orgName(id)}>
       <Head c={c} org={id} title={orgName(id)} sub={pathOf(id).map((o) => o.name).join(' / ') || 'الجهة العليا'} onClose={() => c.select(null)} />
@@ -207,7 +221,12 @@ export function OrgCard({ c, id }: { c: CardCtx; id: string }) {
           )}
           {areas.length > 0 && (
             <small className="md-note-a3" data-testid="a3-note">
-              المنطقتان المرتبطتان بالتمركز الدائم تبقيان سارية: المؤقت لا يُنهي الدائم ولا منطقتيه.
+              منطقتا الانتشار للتمركز الأصلي تبقيان سارية: المؤقت لا يُنهي التمركز الأصلي ولا منطقتيه.
+            </small>
+          )}
+          {tempAreas.length > 0 && (
+            <small data-testid="temp-areas">
+              لهذا التمركز المؤقت منطقتا انتشار خاصتان به ({tempAreas.map((a) => AREA_LABEL[a.role]).join('، ')}) حتى {day(tempAreas[0].validTo!)}: تنتهيان معه ولا تصيران للتمركز الأصلي.
             </small>
           )}
           <button className="ux-link" onClick={() => c.select({ k: 'req', id: temp.requestId! })}>
@@ -219,7 +238,7 @@ export function OrgCard({ c, id }: { c: CardCtx; id: string }) {
       {areas.length > 0 && (
         <div className="md-block">
           <button className={'ux-chip md-toggle ' + (c.showAreas ? 'on' : '')} aria-pressed={c.showAreas} onClick={() => c.setShowAreas(!c.showAreas)} data-testid="toggle-areas">
-            {c.showAreas ? 'إخفاء المنطقتين المرتبطتين' : 'إظهار المنطقتين المرتبطتين (' + areas.length + ')'}
+            {c.showAreas ? 'إخفاء منطقتي الانتشار' : 'إظهار منطقتي الانتشار (' + areas.length + ')'}
           </button>
           {c.showAreas && (
             <>
@@ -228,7 +247,7 @@ export function OrgCard({ c, id }: { c: CardCtx; id: string }) {
                   <li key={a.id}>
                     <span className={'md-swatch ' + (a.role === 'PRIMARY_AREA' ? 'area-p' : 'area-a')} />
                     <span>
-                      <b>{a.role === 'PRIMARY_AREA' ? 'المنطقة الرئيسية المرتبطة بالتمركز' : 'المنطقة البديلة المرتبطة بالتمركز'}</b>
+                      <b>{AREA_LABEL[a.role]}</b>
                       <small>
                         نشطة من {day(a.validFrom)}
                         {a.validTo ? ' حتى ' + day(a.validTo) : ''} · تمنع التداخل افتراضياً ·{' '}
@@ -241,13 +260,14 @@ export function OrgCard({ c, id }: { c: CardCtx; id: string }) {
                 ))}
               </ul>
               <small data-testid="covered-scope">
-                النطاق المغطى (covered_organization_scope): {covered.map(orgName).join('، ')} — حجوزاتها داخل المنطقتين لا تتعارض معهما وحدهما. غيرها، ومنها
+                النطاق المغطى (covered_organization_scope): {covered.map(orgName).join('، ')} — حجوزاتها داخل منطقتي الانتشار لا تتعارض معهما وحدهما. غيرها، ومنها
                 الوحدات غير المدرجة، يخضع للقاعدة العادية.
               </small>
             </>
           )}
         </div>
       )}
+      {perm && areas.length === 0 && <NoAreas c={c} stationing={perm.id} />}
 
       {units.length > 0 && (
         <div className="md-block" data-testid="units">
@@ -329,74 +349,220 @@ export function OrgCard({ c, id }: { c: CardCtx; id: string }) {
   );
 }
 
+/**
+ * A stationing without associated areas: nothing empty was created. The areas come later through their own authorised
+ * process and attach to this stationing (owner's rule update of 3 Nov 2026; D5).
+ */
+function NoAreas({ c, stationing }: { c: CardCtx; stationing: string }) {
+  const v = canRegisterAreas(c.world, c.actor, stationing);
+  return (
+    <div className="md-block" data-testid="no-areas">
+      <b className="md-k">منطقتا الانتشار</b>
+      <small>
+        لا منطقتي انتشار لهذا التمركز، ولم يُنشأ أي سجل فارغ. تُسجَّلان لاحقاً بإجراء مخوّل مستقل يُلحقهما بهذا التمركز: قرار خارجي بصلاحية MANAGE_STATIONING، أو طلب اعتماد
+        داخل التطبيق.
+      </small>
+      <div className="md-act">
+        <button className="ux-btn" disabled={!v.ok} onClick={() => c.select({ k: 'areas', id: stationing })} data-act="OPEN_REGISTER_AREAS">
+          تسجيل منطقتي الانتشار لهذا التمركز (قرار خارجي)
+        </button>
+        {!v.ok && <small className="md-why">{v.reason}</small>}
+      </div>
+    </div>
+  );
+}
+
 // ---- comparison ----
 
+/** One configured relation of the deployment package, or what is missing. */
+function RelCell({ x, from, missing }: { x: Relation | undefined; from: string; missing: string }) {
+  return x ? (
+    <td className={x.ok ? 'good' : 'bad'}>
+      {formatKm(x.dist)} {from} · المهيأ {rangeText(x.range)} {x.ok ? '✓' : '✕'}
+      {x.measure === 'NEAREST_GEOMETRY' && <small className="md-info"> (من مركز إلى مركز {formatKm(x.centre)} للمعلومة)</small>}
+    </td>
+  ) : (
+    <td className={missing.includes('مطلوبة') ? 'bad' : ''}>{missing}</td>
+  );
+}
+
+/** The current stationing beside the ONE proposed site and its deployment package. */
 export function CompareTable({ w, r }: { w: World; r: Request }) {
-  const rows = comparison(w, r);
-  const cell = (k: string) => rows.find((x) => x.key === k);
-  const cols = ['CURRENT', 'PRIMARY', 'ALTERNATIVE'].filter((k) => cell(k));
-  const cand = (k: string) => (k === 'CURRENT' ? null : r.candidates[k as 'PRIMARY' | 'ALTERNATIVE']);
+  const cmp = comparison(w, r);
+  const req = requirementOf(w, r);
+  const prof = profileByVersion(w, req.profile);
+  const missing = req.areas.value === 'REQUIRED' ? 'لم تُرسم — مطلوبة' : 'لم تُرسم (اختيارية)';
+  const p = cmp.proposed;
   return (
-    <table className="md-compare" data-testid="compare">
+    <table className="md-compare two" data-testid="compare">
       <thead>
         <tr>
           <th />
-          {cols.map((k) => (
-            <th key={k} className={'c-' + k.toLowerCase()}>
-              <span className={'md-swatch ' + (k === 'CURRENT' ? 'perm' : k === 'PRIMARY' ? 'cand-p' : 'cand-a')} /> {cell(k)!.title}
-              {r.active === k && r.state !== 'DRAFT' && <em className="md-active">نشط</em>}
-            </th>
-          ))}
+          <th className="c-current">
+            <span className="md-swatch perm" /> التمركز الحالي
+          </th>
+          <th className="c-proposed">
+            <span className="md-swatch cand-p" /> الموقع المقترح لإعادة التمركز
+          </th>
         </tr>
       </thead>
       <tbody>
         <tr>
           <td>الموقع</td>
-          {cols.map((k) => (
-            <td key={k}>{cell(k)!.name}</td>
-          ))}
+          <td>{cmp.current.name}</td>
+          <td>{p.name}</td>
         </tr>
         <tr>
-          <td>الحالة</td>
-          {cols.map((k) => (
-            <td key={k}>{cand(k) ? CAND_LABEL[cand(k)!.status] + (cand(k)!.reason ? ' — ' + cand(k)!.reason : '') : 'معتمد حالياً'}</td>
-          ))}
+          <td>المسافة من الموقع الحالي</td>
+          <td>—</td>
+          <td data-testid="compare-distance">{formatKm(p.fromCurrent)} — للمعلومة فقط</td>
         </tr>
         <tr>
-          <td>المسافة</td>
-          {cols.map((k) => (
-            <td key={k}>{cell(k)!.dist !== undefined ? formatKm(cell(k)!.dist!) + ' ' + cell(k)!.from : '—'}</td>
-          ))}
+          <td>المساحة</td>
+          <td>{cmp.current.area}</td>
+          <td className={p.areaOk ? '' : 'bad'} data-testid="compare-area">
+            {formatArea(p.area)} · الحد {formatArea(p.max)} (الإصدار {p.maxVersion}) {p.areaOk ? '✓' : '✕ تتجاوز الحد'}
+          </td>
         </tr>
         <tr>
-          <td>النطاق المهيأ</td>
-          {cols.map((k) => (
-            <td key={k} className={cell(k)!.range ? (cell(k)!.inRange ? 'good' : 'bad') : ''}>
-              {cell(k)!.range ? rangeText(cell(k)!.range!) + (cell(k)!.inRange ? ' ✓' : ' ✕ خارج النطاق') : '—'}
-            </td>
-          ))}
-        </tr>
-        <tr>
-          <td>الشكل · المساحة</td>
-          {cols.map((k) => (
-            <td key={k} className={cell(k)!.shapeOk ? '' : 'bad'}>
-              {(cell(k)!.shapeOk ? 'سليم' : 'متقاطع') + ' · ' + cell(k)!.area}
-            </td>
-          ))}
+          <td>الشكل</td>
+          <td>سليم</td>
+          <td className={p.shapeOk ? '' : 'bad'}>{p.shapeOk ? 'سليم' : 'متقاطع'}</td>
         </tr>
         <tr>
           <td>الإتاحة</td>
-          {cols.map((k) => (
-            <td key={k} className={cell(k)!.conflicts.length ? 'bad' : ''}>
-              {k === 'CURRENT' ? '—' : cell(k)!.conflicts.length ? 'تعارض: ' + cell(k)!.conflicts.join('، ') : 'لا تعارض'}
-            </td>
-          ))}
+          <td>—</td>
+          <td className={p.conflicts.length ? 'bad' : ''}>{p.conflicts.length ? 'تعارض: ' + p.conflicts.join('، ') : 'لا تعارض'}</td>
+        </tr>
+        <tr data-testid="compare-area-primary">
+          <td>
+            <span className="md-swatch area-p-prop" /> {AREA_LABEL.PRIMARY_AREA}
+          </td>
+          <td>—</td>
+          <RelCell x={cmp.areas.siteToPrimary} from="من الموقع المقترح" missing={missing} />
+        </tr>
+        <tr data-testid="compare-area-alternative">
+          <td>
+            <span className="md-swatch area-a-prop" /> {AREA_LABEL.ALTERNATIVE_AREA}
+          </td>
+          <td>—</td>
+          <RelCell x={cmp.areas.primaryToAlternative} from="من منطقة الانتشار الرئيسية" missing={missing} />
         </tr>
       </tbody>
       <caption>
-        القيم من «{PROFILE.name}» ({PROFILE.reference}) — مثال وهمي، لا قيمة في الكود. البديل يُقاس من الرئيسي المقترح لا من المقر الحالي.
+        لا قاعدة مسافة بين التمركز الحالي والموقع المقترح. علاقتا منطقتي الانتشار من «{prof.name}» ({profileRef(prof)}) بطريقة: {MEASURE_LABEL[prof.measure]} — مثال وهمي، لا قيمة في الكود:
+        الموقع ← منطقة الانتشار الرئيسية {rangeText(prof.siteToPrimaryArea)}، الرئيسية ← منطقة الانتشار البديلة {rangeText(prof.primaryAreaToAlternativeArea)}. منطقتا الانتشار للطلب:{' '}
+        {AREQ_LABEL[req.areas.value]} (الإصدار {req.areas.version}
+        {r.policy ? '، مثبَّت عند الإرسال' : '، النافذ الآن'}).
       </caption>
     </table>
+  );
+}
+
+// ---- the approval path and who takes part (owner correction §11–12) ----
+
+const ROLE_LABEL: Record<Participant['role'], string> = {
+  REQUESTER: 'الجهة الطالبة',
+  AFFECTED: 'وحدة مشمولة',
+  APPROVER: 'معتمد في الهيكل',
+  REVIEW: 'مراجعة مهيأة',
+  FINAL: 'الاعتماد النهائي',
+  ACTIVATION: 'التفعيل',
+  NOTIFY: 'إشعار',
+};
+const KIND_LABEL: Record<Stage['kind'], string> = { HIERARCHY: 'الهيكل', FUNCTIONAL: 'مراجعة مهيأة', ADDED: 'مُضاف بتغيير مسار', FINAL: 'نهائي' };
+
+/** The approval path derived from the hierarchy and the route policy, who takes part, and authorised routing changes. */
+export function RoutePanel({ c, r }: { c: CardCtx; r: Request }) {
+  const w = c.world;
+  const stages = routeOf(w, r);
+  const ps = participants(w, r);
+  const live = r.state === 'UNDER_REVIEW';
+  const [org, setOrg] = useState('');
+  const mayRoute = holds(w, c.actor, 'MANAGE_REQUEST_ROUTING', r.org);
+  const assigned = (s: Stage) => (s.kind !== 'HIERARCHY' && s.kind !== 'ADDED' ? true : w.people.some((p) => p.perms.includes(s.perm) && p.scope.includes(s.org!)));
+  const rec = r.number + ' · ' + orgName(r.org) + ' · «' + orgName(org) + '»';
+  const change = (op: RouteChange['op'], label: string, consequence: string) => (
+    <Act key={op} c={c} a={{ t: 'ROUTE_CHANGE', req: r.id, op, org, reason: '' }} label={label} kind="auth" dialog={{ title: label, record: rec, consequence, kind: 'auth', confirm: 'تسجيل التغيير' }} />
+  );
+  return (
+    <div className="md-block md-route" data-testid="route">
+      <b className="md-k">
+        مسار الاعتماد ({stages.length} مراحل) — مشتق من الهيكل ونوع الطلب ومسار «{w.route.reference}»{r.state === 'DRAFT' ? ' (يُثبَّت عند الإرسال)' : ''}
+      </b>
+      <ol className="md-stages">
+        {stages.map((s, i) => (
+          <li key={s.key} className={(s.mark ?? '').toLowerCase() + (live && i === r.cursor ? ' current' : '')} data-kind={s.kind} data-stage={s.key} data-mark={s.mark ?? ''}>
+            <span className="md-mark">{s.mark === 'APPROVED' ? '✓' : s.mark === 'CARRIED' ? '↷' : s.mark === 'INVALIDATED' ? '⟲' : live && i === r.cursor ? '●' : '○'}</span>
+            <span>
+              <b>
+                {s.name} <em className="md-kind">{KIND_LABEL[s.kind]}</em>
+              </b>
+              <small>
+                {s.why} · يعتمد على: {s.dependsOn.map((f) => FACT_LABEL[f]).join('، ')}
+                {s.mark === 'APPROVED' && ' · ' + who(w, s.by)}
+                {s.mark === 'CARRIED' && ' · قرار سابق محمول: لم يتغير ما يعتمد عليه'}
+                {s.mark === 'INVALIDATED' && ' · أُبطل لتغيّر ما يعتمد عليه؛ يُعاد'}
+                {!assigned(s) && ' · لا معتمد مُسند لهذه الجهة'}
+              </small>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <details open={r.state === 'DRAFT' || mayRoute} data-testid="participants">
+        <summary className="md-k">الجهات المشاركة ({ps.length}) — يحددها النظام من الهيكل والنطاق ومسار الطلب، لا من الخريطة</summary>
+        <ul className="md-list">
+          {ps.map((p, i) => (
+            <li key={i} data-role={p.role} data-source={p.source}>
+              <span className={'md-badge ' + (p.source === 'CHANGE' ? 'temp' : 'perm')}>{ROLE_LABEL[p.role]}</span>
+              <span>
+                <b>{p.label}</b>
+                <small>
+                  {p.why}
+                  {p.source === 'CHANGE' ? ' · تغيير مُدقَّق' : ''}
+                </small>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </details>
+      {mayRoute ? (
+        <div className="md-binding" data-testid="route-change">
+          <b className="md-k">تعديل المسار والمستلمين — بصلاحية MANAGE_REQUEST_ROUTING، بسبب إلزامي وتدقيق</b>
+          <label className="md-field">
+            الجهة
+            <select value={org} onChange={(e) => setOrg(e.target.value)} data-testid="route-org">
+              <option value="">—</option>
+              {ORGS.filter((o) => o.parentId).map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="ux-actions">
+            {change('ADD_APPROVER', 'إضافة معتمد قبل القرار النهائي', 'تُضاف مرحلة موافقة يقررها المعتمد المُسند للجهة، قبل القرار النهائي. لا تُحذف مراحل الهيكل المشتقة.')}
+            {change('ADD_RECIPIENT', 'إضافة مستلم إشعار', 'يُشعَر بالطلب وقراراته؛ لا يقرر.')}
+            {change('REMOVE_RECIPIENT', 'حذف مستلم إشعار', 'يُحذف من الإشعارات فقط. مراحل الاعتماد لا تُحذف.')}
+          </div>
+        </div>
+      ) : (
+        <small className="md-note-route" data-testid="route-locked">
+          تعديل ما يحدده النظام من المسار أو المستلمين يتطلب صلاحية MANAGE_REQUEST_ROUTING، وكل تغيير مُدقَّق.
+        </small>
+      )}
+      {r.routeChanges.length > 0 && (
+        <ul className="md-list" data-testid="route-changes">
+          {r.routeChanges.map((x, i) => (
+            <li key={i}>
+              <small>
+                {when(x.at)} · {who(w, x.by)} · {{ ADD_APPROVER: 'إضافة معتمد', ADD_RECIPIENT: 'إضافة مستلم', REMOVE_RECIPIENT: 'حذف مستلم' }[x.op]} «{orgName(x.org)}» · {x.reason}
+              </small>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -410,7 +576,7 @@ export function RequestCard({ c, id }: { c: CardCtx; id: string }) {
   const scs = w.startCancellations.filter((e) => e.request === r.id);
   const units = unitsOf(w, r);
   const stage = r.stages[r.cursor];
-  const reviewing = ['SUBMITTED', 'UNDER_REVIEW_PRIMARY', 'UNDER_REVIEW_ALTERNATIVE'].includes(r.state);
+  const reviewing = r.state === 'UNDER_REVIEW';
   const temps = units.map((u) => w.stationings.find((s) => s.org === u && s.requestId === r.id && s.kind === 'TEMPORARY' && !s.extendsId)).filter(Boolean) as Stationing[];
   // includes the supersession of a temporary stationing recorded under the temporary request (A1)
   const events = w.events.filter((e) => e.ref === r.number || e.data?.permanentRequest === r.number || ext.some((x) => x.number === e.ref)).slice().reverse();
@@ -421,23 +587,20 @@ export function RequestCard({ c, id }: { c: CardCtx; id: string }) {
   // the authorised end: the approved one, or an activated extension's (never changed by a held start)
   const authEnd = Math.max(r.duration.end ?? 0, ...w.stationings.filter((s) => s.requestId === r.id && s.kind === 'TEMPORARY' && (s.state === 'ACTIVE' || s.state === 'SCHEDULED')).map((s) => s.plannedEnd ?? 0));
   const lateStart = temps.find((t) => t.startRef);
+  const pair = r.proposal.areas;
+  const hasPair = !!(pair?.PRIMARY_AREA && pair?.ALTERNATIVE_AREA);
+  const areaNote = hasPair ? ' تُسجَّل منطقتا الانتشار المعتمدتان لهذا التمركز.' : ' لا تُنشأ منطقتا انتشار: لم تُرسما في الطلب، وتُسجَّلان لاحقاً بإجراء مستقل.';
+  const attached = w.areas.filter((a) => a.provenance.kind === 'IN_APP_REQUEST' && a.provenance.request === r.number);
 
   const plain: ReactNode[] = [];
   const binding: ReactNode[] = [];
   if (reviewing && stage) {
-    plain.push(<Act key="ap" c={c} a={{ t: 'APPROVE_STAGE', req: r.id }} label={stage.final ? 'اعتماد نهائي للمرشح ' + roleName(r.active) : 'اعتماد مرحلة «' + stage.name + '»'} kind="primary" />);
+    plain.push(<Act key="ap" c={c} a={{ t: 'APPROVE_STAGE', req: r.id }} label={stage.final ? 'اعتماد نهائي' : 'اعتماد «' + stage.name + '»'} kind="primary" />);
     plain.push(
-      <Act key="na" c={c} a={{ t: 'NOT_ACCEPT', req: r.id, reason: '' }} label={'لم يُقبل المرشح ' + roleName(r.active)} dialog={{ title: 'المرشح ' + roleName(r.active) + ' لم يُقبل', record: rec + ' · المرشح ' + roleName(r.active), consequence: r.active === 'PRIMARY' ? 'يصير الطلب «الرئيسي لم يُقبل» وينتظر تبديلاً مخوّلاً إلى البديل أو رفضاً. لا يُستبدل أي مرشح تلقائياً.' : 'يُرفض الطلب ما لم يُعد فتح الرئيسي.', kind: 'normal', confirm: 'تسجيل «لم يُقبل»' }} />,
+      <Act key="rt" c={c} a={{ t: 'RETURN', req: r.id, reason: '' }} label="إرجاع للتعديل" dialog={{ title: 'إرجاع الطلب لمقدمه', record: rec + ' · ' + stage.name, consequence: 'يُعاد للتعديل. عند إعادة الإرسال تُبطل فقط القرارات التي تغيّرت حقائقها، وتُحمل غيرها.', kind: 'normal', confirm: 'إرجاع' }} />,
     );
-    plain.push(<Act key="rt" c={c} a={{ t: 'RETURN', req: r.id, reason: '' }} label="إرجاع للتعديل" dialog={{ title: 'إرجاع الطلب لمقدمه', record: rec, consequence: 'يُعاد للتعديل؛ المرشح النشط لا يتغير. عند إعادة الإرسال تُبطل فقط القرارات التي تغيّرت حقائقها.', kind: 'normal', confirm: 'إرجاع' }} />);
-  }
-  if ((r.state === 'PRIMARY_NOT_ACCEPTED' || r.state === 'UNDER_REVIEW_ALTERNATIVE') && r.candidates.PRIMARY.status === 'NOT_ACCEPTED') {
-    if (r.state === 'PRIMARY_NOT_ACCEPTED')
-      binding.push(
-        <Act key="sw" c={c} a={{ t: 'SWITCH', req: r.id, reason: '' }} label="تبديل المرشح النشط إلى البديل" kind="auth" dialog={{ title: 'تبديل المرشح النشط', record: rec + ' · من الرئيسي إلى البديل', consequence: 'تبدأ مراجعة البديل من «دراسة الموقع والإتاحة». تبقى القرارات التي لا تعتمد على الموقع، وتُعاد مراحل الموقع للبديل. لا تُمس هندسة الرئيسي.', kind: 'auth', confirm: 'تبديل المرشح' }} />,
-      );
     binding.push(
-      <Act key="ro" c={c} a={{ t: 'REOPEN', req: r.id, role: 'PRIMARY', reason: '' }} label="إعادة فتح الرئيسي للمراجعة" kind="auth" dialog={{ title: 'إعادة فتح المرشح الرئيسي', record: rec + ' · الرئيسي (لم يُقبل، غير نهائي)', consequence: 'يصير الرئيسي المرشح النشط وتُعاد مراحل الموقع له؛ يعود البديل احتياطياً إن لم يُبت فيه.', kind: 'auth', confirm: 'إعادة الفتح' }} />,
+      <Act key="rj" c={c} a={{ t: 'REJECT', req: r.id, reason: '' }} label="رفض الطلب" kind="destructive" dialog={{ title: 'رفض طلب إعادة التمركز', record: rec + ' · ' + stage.name, consequence: 'يُغلق الطلب «مرفوضاً». التمركز الحالي لا يتغير. أي محاولة لاحقة بطلب جديد.', kind: 'destructive', confirm: 'رفض' }} />,
     );
   }
   if (r.state === 'APPROVED_NOT_ACTIVATED' || r.state === 'CANCELLATION_PENDING') {
@@ -450,12 +613,13 @@ export function RequestCard({ c, id }: { c: CardCtx; id: string }) {
         label={atomic ? 'تفعيل: إنهاء المؤقت وتفعيل الدائم ذرياً' : r.duration.type === 'PERMANENT' ? 'تفعيل إعادة التمركز' : 'تفعيل التمركز المؤقت'}
         dialog={{
           title: atomic ? 'تفعيل ذري: إنهاء المؤقت وتفعيل الدائم' : 'تفعيل إعادة التمركز',
-          record: rec + ' · المرشح المعتمد: ' + roleName(r.active) + ' «' + r.candidates[r.active].name + '»',
-          consequence: atomic
-            ? 'في عملية واحدة: ينتهي التمركز المؤقت لـ' + endingTemps.length + ' وحدة (سبب: حلّ محله الدائم المعتمد)، ويُنهى الدائم السابق ومنطقتاه وتبقى في التاريخ، ويُفتح الدائم الجديد. يسقط أي تمديد غير مفعَّل. المسؤولية عن المرافق لا تتغير.'
-            : r.duration.type === 'PERMANENT'
-              ? 'يُنهى التمركز الدائم السابق ومنطقتاه (يبقيان في التاريخ ولا تمنعان بعد الآن)، ويُفتح الدائم الجديد. المسؤولية عن المرافق لا تتغير.'
-              : 'تُفتح طبقة مؤقتة فوق الدائم، نافذة من بدايتها المعتمدة. الدائم ومنطقتاه باقية.',
+          record: rec + ' · الموقع المعتمد: «' + r.proposal.name + '»',
+          consequence:
+            (atomic
+              ? 'في عملية واحدة: ينتهي التمركز المؤقت لـ' + endingTemps.length + ' وحدة (سبب: حلّ محله الدائم المعتمد)، ويُنهى الدائم السابق ومنطقتاه وتبقى في التاريخ، ويُفتح الدائم الجديد. يسقط أي تمديد غير مفعَّل. المسؤولية عن المرافق لا تتغير.'
+              : r.duration.type === 'PERMANENT'
+                ? 'يُنهى التمركز الدائم السابق ومنطقتاه (يبقيان في التاريخ ولا تمنعان بعد الآن)، ويُفتح الدائم الجديد. المسؤولية عن المرافق لا تتغير.'
+                : 'تُفتح طبقة مؤقتة فوق الدائم، نافذة من بدايتها المعتمدة. الدائم ومنطقتاه باقية.') + areaNote,
           kind: 'auth',
           confirm: 'تفعيل',
         }}
@@ -465,7 +629,7 @@ export function RequestCard({ c, id }: { c: CardCtx; id: string }) {
       plain.push(<Act key="rc" c={c} a={{ t: 'REQUEST_CANCEL', req: r.id, reason: '' }} label="طلب إلغاء قبل التفعيل" dialog={{ title: 'طلب إلغاء قبل التفعيل', record: rec, consequence: 'يصير الطلب «طلب إلغاء قيد القرار» ويُمنع التفعيل حتى يقرر طرف مستقل.', kind: 'normal', confirm: 'تقديم الطلب' }} />);
     if (r.state === 'CANCELLATION_PENDING') {
       binding.push(
-        <Act key="ca" c={c} a={{ t: 'DECIDE_CANCEL', req: r.id, approve: true, reason: '' }} label="قبول الإلغاء" kind="destructive" dialog={{ title: 'قبول الإلغاء قبل التفعيل', record: rec + ' · المرشح النشط ' + roleName(r.active), consequence: 'يصير الطلب «ملغى قبل التفعيل» ويستحيل تفعيله. التمركز الحالي لا يتغير، والمرشحان والقرارات تبقى في التاريخ.', kind: 'destructive', confirm: 'قبول الإلغاء' }} />,
+        <Act key="ca" c={c} a={{ t: 'DECIDE_CANCEL', req: r.id, approve: true, reason: '' }} label="قبول الإلغاء" kind="destructive" dialog={{ title: 'قبول الإلغاء قبل التفعيل', record: rec, consequence: 'يصير الطلب «ملغى قبل التفعيل» ويستحيل تفعيله. التمركز الحالي لا يتغير، والطلب وقراراته تبقى في التاريخ.', kind: 'destructive', confirm: 'قبول الإلغاء' }} />,
       );
       binding.push(
         <Act key="cr" c={c} a={{ t: 'DECIDE_CANCEL', req: r.id, approve: false, reason: '' }} label="رفض الإلغاء" kind="auth" dialog={{ title: 'رفض طلب الإلغاء', record: rec, consequence: 'يعود الطلب «معتمد — لم يُفعَّل» ويصير التفعيل متاحاً مجدداً.', kind: 'auth', confirm: 'رفض الإلغاء' }} />,
@@ -487,13 +651,14 @@ export function RequestCard({ c, id }: { c: CardCtx; id: string }) {
         <span className="md-tagline">{r.duration.type === 'PERMANENT' ? 'دائم' : 'مؤقت'}</span>
         <span className="md-tagline">{r.scope.whole ? 'الجهة كاملة (' + units.length + ' وحدة)' : 'جزء: ' + units.map(orgName).join('، ')}</span>
         <StateChip state={r.state} label={STATE_LABEL[r.state]} />
+        <PolicyBadge w={w} req={requirementOf(w, r)} pinned={!!r.policy} />
       </div>
       {r.duration.type === 'TEMPORARY' && (
         <p className="md-v small">
           الفترة المعتمدة: {day(r.duration.start)} ← {day(r.duration.end!)}
           {r.activation && ' · ' + r.activation.ref}
-          {r.state === 'TEMPORARY_SCHEDULED' && ' · مُفعَّل ولم يبدأ: التمركز الفعلي هو الدائم حتى البداية'}
-          {r.state === 'ACTIVE_TEMPORARY' && ' · ساري: الدائم ومنطقتاه باقية تحته'}
+          {r.state === 'TEMPORARY_SCHEDULED' && ' · مُفعَّل ولم يبدأ: التمركز الفعلي هو الأصلي حتى البداية'}
+          {r.state === 'ACTIVE_TEMPORARY' && ' · ساري: التمركز الأصلي ومنطقتاه محفوظة تحته، ويعود النطاق إليه عند النهاية'}
           {r.state === 'TEMPORARY_CANCELLED_BEFORE_START' && ' · أُلغي قبل بدء النفاذ: لم يصبح نافذاً، والدائم هو المعتمد'}
           {r.state === 'TEMPORARY_WINDOW_EXPIRED_WITHOUT_START' && ' · انقضت نافذته والبدء موقوف: لم يصبح نافذاً قط، والدائم هو المعتمد'}
         </p>
@@ -526,8 +691,33 @@ export function RequestCard({ c, id }: { c: CardCtx; id: string }) {
           طلب إلغاء قبل التفعيل قيد القرار — التفعيل ممنوع في الانتقال نفسه، لا بتعطيل الزر فقط.
         </div>
       )}
+      {r.state === 'ACTIVATED_PERMANENT' && (
+        <div className="md-alert info" data-testid="permanent-done">
+          فُعّل في {r.activation ? when(r.activation.at) : '—'}: صار «{r.proposal.name}» التمركز الحالي، والسابق في التاريخ. انتهى أثر هذا الطلب؛ لا عودة تلقائية، وأي نقل لاحق يحتاج
+          طلب إعادة تمركز جديداً.
+        </div>
+      )}
+      {r.rejection && (
+        <div className="md-alert warn" data-testid="rejected">
+          رُفض في {when(r.rejection.at)} من {who(w, r.rejection.by)}: {r.rejection.reason}. التمركز الحالي لم يتغير.
+        </div>
+      )}
 
       <CompareTable w={w} r={r} />
+
+      {r.activation && (
+        <div className="md-block" data-testid="request-areas">
+          <b className="md-k">منطقتا الانتشار من هذا الطلب</b>
+          {attached.length ? (
+            <small>
+              {attached.map((a) => AREA_LABEL[a.role] + (a.status === 'ACTIVE' ? ' (نشطة)' : ' (انتهت مع تمركزها)')).join(' · ')} — سُجِّلتا عند التفعيل لتمركز «
+              {orgName(attached[0].org)}»، ومصدرهما هذا الطلب.
+            </small>
+          ) : (
+            <small>لم تُرسم منطقتا انتشار في هذا الطلب، فلم يُنشأ أي سجل. تُسجَّلان لاحقاً للتمركز بإجراء مخوّل مستقل.</small>
+          )}
+        </div>
+      )}
 
       {r.cancellation && (
         <div className="md-block">
@@ -535,7 +725,6 @@ export function RequestCard({ c, id }: { c: CardCtx; id: string }) {
           <small>
             طلبه {who(w, r.cancellation.by)} · السبب: {r.cancellation.reason}
             {r.cancellation.decidedBy && ' · القرار: ' + (r.cancellation.state === 'APPROVED' ? 'مقبول' : 'مرفوض') + ' من ' + who(w, r.cancellation.decidedBy) + ' — ' + r.cancellation.decision}
-            {' · المرشح النشط: ' + roleName(r.active)}
           </small>
         </div>
       )}
@@ -637,27 +826,7 @@ export function RequestCard({ c, id }: { c: CardCtx; id: string }) {
         </div>
       ))}
 
-      <details className="md-block" open={reviewing || r.state === 'PRIMARY_NOT_ACCEPTED'}>
-        <summary className="md-k">مراحل الاعتماد وما يعتمد عليه كل قرار</summary>
-        <ol className="md-stages">
-          {r.stages.map((s, i) => (
-            <li key={s.key} className={(s.mark ?? '').toLowerCase() + (i === r.cursor && reviewing ? ' current' : '')}>
-              <span className="md-mark">
-                {s.mark === 'APPROVED' ? '✓' : s.mark === 'CARRIED' ? '↷' : s.mark === 'INVALIDATED' ? '⟲' : i === r.cursor && (reviewing || r.state === 'PRIMARY_NOT_ACCEPTED') ? '●' : '○'}
-              </span>
-              <span>
-                <b>{s.name}</b>
-                <small>
-                  يعتمد على: {s.dependsOn.map((f) => FACT_LABEL[f]).join('، ')}
-                  {s.mark === 'APPROVED' && ' · ' + who(w, s.by) + (s.candidate ? ' · للمرشح ' + roleName(s.candidate) : '')}
-                  {s.mark === 'CARRIED' && ' · قرار سابق محمول: لا يعتمد على الموقع'}
-                  {s.mark === 'INVALIDATED' && ' · أُبطل لتغيّر المرشح؛ يُعاد للبديل'}
-                </small>
-              </span>
-            </li>
-          ))}
-        </ol>
-      </details>
+      <RoutePanel c={c} r={r} />
 
       <Actions plain={plain} binding={binding} />
 
