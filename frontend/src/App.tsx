@@ -41,7 +41,10 @@ function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: b
   if (view === 'org') return !(can('VIEW') || can('MANAGE_ACCESS') || can('MANAGE_FACILITIES') || can('CONFIGURE'));
   if (['stationing', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
   if (view === 'stationingPolicy') return !can('CONFIGURE');
-  if (view === 'restationing') return !(can('VIEW') || can('CREATE_RESTATIONING') || can('APPROVE') || can('ACTIVATE_STATIONING') || can('APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION'));
+  // the lifecycle rights (ADR-034) open the page too: their holders decide the requests they act on
+  if (view === 'restationing')
+    return !(['VIEW', 'CREATE_RESTATIONING', 'APPROVE', 'ACTIVATE_STATIONING', 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION', 'DECIDE_PRE_ACTIVATION_CANCELLATION',
+      'ACTIVATE_TEMPORARY_EXTENSION', 'DECIDE_EARLY_RETURN', 'DECIDE_BEFORE_START_CANCELLATION'] as Permission[]).some((p) => can(p));
   if (summaryOnly) return true;
   if (view === 'review') return !can('REVIEW');
   if (view === 'audit') return !can('AUDIT');
