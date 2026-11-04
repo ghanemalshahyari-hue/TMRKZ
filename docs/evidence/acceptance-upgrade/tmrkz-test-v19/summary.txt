@@ -1,0 +1,53 @@
+V19 acceptance migration of tmrkz-test (owner approval D1/D2 of 4 Nov 2026, docs/audit/stationing-v3-production/V19_ACCEPTANCE_PLAN.md)
+
+Scope: tmrkz-test only (fictional acceptance data). Schema only: no terrain load, no Stationing policy, no development
+seed, no web image change.
+
+Release
+  commits (local, not pushed)  685d902 V18 acceptance evidence (C1); 7152d53 re-stationing workflow V19 (C2)
+  image                        mover/backend:rel-7152d53
+  image id                     sha256:b4a8f1c3db6e8e3607f5107c8239aa20b699fc9689c42d492194c3c4ff6a8bfd (local image)
+  built from                   git archive of 7152d531dea8f850b58d87d71f17bf049ae57bd1 (backend/pom.xml, backend/src,
+                               backend/Dockerfile, map-packages), 2026-11-04T06:51:42Z, revision label set; the
+                               uncommitted A8 prototype and enterprise-audit folders are outside the archive
+  V19 checksum                 sha256 dfb474245396a5be6c2e647b337768790b6307052f59d63210ad114c8dac4ddf in the image =
+                               commit C2 = clean path = the approved value; Flyway checksum 1414336776
+  gate before application      full backend suite on C2: 195/195 green; frontend 93/93, build OK
+
+Before
+  target identity              tmrkz-test-db-1 (7bd37f0b7418), comment "ACCEPTANCE / V18 …" (checked by the tool)
+  schema version               18; pg_dump sha256 91b29962…0e5d; normalised 35b72929…6dcf (equal to the V18
+                               after-state recorded at the V18 application)
+  V18 rows                     the 6,432 rows of the V18 after-state: 0 changed or missing (46 added since)
+  health / journey             health 200; journey on V18: first attempt refused its final approval because its
+                               random dates collided with an ACTIVE reservation of an earlier run on the same
+                               resource (conflict prevention working; journey-before-attempt1-date-collision.txt);
+                               second attempt PASSED (journey-before.txt)
+  rows fingerprinted           6,552
+  plan                         exactly [19]
+  backup                       backups/tmrkz-test-20261104T065313Z (git-ignored), manifest schema 18
+  backup verification          PASS: manifest checksums, readable dumps, restore into a throw-away PostGIS with
+                               table counts, schema 18 and 6,552 rows equal to the live fingerprint
+
+Migration
+  Flyway                       "Successfully applied 1 migration … now at version v19" (0.044 s); history 19
+                               "restationing request" success
+
+After
+  schema                       V19 change identical to the clean path (333 lines added, 0 removed, delta sha256
+                               16b827b2…16b6); normalised schema-after 58295546…9ef9
+  V19-after.sql                tables=4 rows=0 sequence=1 request_fk=1 v18_rows=0 mismatches=0
+  earlier rows                 upgrade-check PASS: all 6,552 present and unchanged; the 6,432 V18 rows unchanged
+  V18 Stationing tables        still 0 rows (policy versions, stationing, links, outbox, terrain)
+  journey                      PASSED on V19
+  health                       {"status":"UP"}
+  OpenFGA                      held model = docs/authz/model.fga (7 types, 357 relations, the three new actions
+                               present); sync 412/412, no error
+  outbound                     TMRKZ_STATIONING_OUTBOUND_URL not set; outbox 0 rows
+  Oracle                       HR source ORACLE disabled; internal network only (tmrkz-test_internal internal=true)
+  terrain / policy / requests  0 datasets, 0 tiles; 0 policy versions; 0 re-stationing requests
+  page                         web image unchanged (mover/web:1.0.0 sha256:0a01bc21…6f55); the served bundle holds no
+                               trace of the page (owner D3)
+  rollback                     not needed
+
+Final state: ACCEPTANCE / V19 (database comment set after every check passed).

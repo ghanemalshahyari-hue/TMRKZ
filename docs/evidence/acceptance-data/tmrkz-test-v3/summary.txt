@@ -1,0 +1,52 @@
+Stationing V3 fictional ACCEPTANCE data on tmrkz-test (owner decision D4, 4 Nov 2026) — after V19 (ACCEPTANCE / V19)
+
+Provisioning path: ops/test-env/provision-acceptance-v3.sh + ops/test-env/acceptance-v3-provision.sql
+  (refuses a database not labelled ACCEPTANCE or below V19; plan mode rolls back; idempotent; publishes no policy;
+  never loads terrain; written by the acceptance file, not copied from the development seed)
+  plan       provision-plan.txt   (rolled back)
+  apply      provision-apply.txt  hr_levels_set=8 roles_created=4 seats_granted=8 boundaries_added=1 stationing_recorded=10
+  re-run     provision-rerun.txt  all 0 (idempotent)
+  audit      one ACCEPTANCE_DATA_PROVISIONED system entry with the counts
+
+1. HR levels (published snapshot; hierarchy metadata only)
+   HR-T-ORG L6; HR-T-GA, HR-T-IT, HR-T-PM, HR-T-SS L7; HR-T-PM-1 L8; HR-T-PM-1-1 L9; HR-T-PM-1-1-1 L10.
+   T-SS-1 and T-SS-2 are LOCAL units with no HR record (no level; a route walks past them).
+   Which levels approve, and the final level, belong to the policy and are NOT set (policy on hold).
+
+2. Roles (each holds exactly one action, marked «بيانات قبول وهمية»; no VIEW added)
+   ACC_V3_RESTATIONING_REQUESTER  CREATE_RESTATIONING                     ORGANIZATION
+   ACC_V3_UNIT_APPROVER           APPROVE (the seat is the unit itself)   ORGANIZATION
+   ACC_V3_DISTANCE_EXCEPTION      APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION   ALL
+   ACC_V3_STATIONING_ACTIVATOR    ACTIVATE_STATIONING                     ORGANIZATION
+
+3. Explicitly selected fictional users (memberships titled «بيانات قبول وهمية — إعادة التمركز (Stationing V3)»)
+   t.requester   requester  at HR-T-SS        t.manager     seat at HR-T-SS
+   t.requester2  requester  at HR-T-IT        t.manager.it  seat at HR-T-IT
+   t.approver    seat at HR-T-ORG             t.manager.ga  seat at HR-T-PM
+   t.approver2   distance exception (ALL)     t.facilities  activator at HR-T-ORG
+   Checked through the real Keycloak/LDAP sign-in on :8088 (signin-permissions.txt): 8/8 hold their action.
+   OpenFGA sync applied 431/431, no error.
+
+4. Starting authoritative stationing (origin CORRECTION, reference ACCEPTANCE-V3, reason «تمركز أولي — بيانات قبول
+   وهمية»; no outbound event written for provisioning)
+   HR-T-ORG 00 · HR-T-GA 01 · HR-T-SS 02 · T-SS-1 05 · T-SS-2 08 · HR-T-PM 03 · HR-T-PM-1 03 · HR-T-PM-1-1 10 ·
+   HR-T-PM-1-1-1 10 · HR-T-IT 06
+
+5. Site boundaries
+   Added only where a used site had none: site 10 «مستودع اللوازم الشمالي», Polygon 58,925 m², source «حدود قبول
+   وهمية (Stationing V3)», checked to touch no current boundary. Existing records were not replaced: sites 00, 03, 06
+   and 08 are point records and 05 a multipolygon. They block ground as they are; «copy the current boundary» needs a
+   polygon (sites 01, 02, 10), elsewhere the requester draws the shape.
+
+6. Terrain (separate operation, after V19, never in Flyway or up.sh)
+   ops/terrain/load-slope.sh tmrkz-test-db-1 2026.11: plan (terrain-plan.txt), then load (terrain-load.txt)
+   copernicus-glo30 2026.11, DSM, product sha256 9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682
+   6,300 rows; 362,880,000 cells, 362,779,204 with a value (equal to the package record); 453 MB; 106 s
+
+Not done (owner hold)
+   No Stationing policy published: 0 policy versions; /stationing/policy reports none in force, so a submission is
+   refused with «لا توجد سياسة تمركز نافذة» until the owner supplies the terrain allowance values.
+   No re-stationing request created (0). The V3 page stays hidden: the web image is unchanged
+   (mover/web:1.0.0 sha256:0a01bc21…6f55).
+
+Regression: the facility acceptance journey PASSED after provisioning (journey-after-provisioning.txt).

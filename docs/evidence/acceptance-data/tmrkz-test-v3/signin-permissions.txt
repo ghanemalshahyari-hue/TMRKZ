@@ -1,0 +1,9 @@
+PASS  t.requester holds CREATE_RESTATIONING after sign-in
+PASS  t.requester2 holds CREATE_RESTATIONING after sign-in
+PASS  t.manager holds APPROVE after sign-in
+PASS  t.manager.it holds APPROVE after sign-in
+PASS  t.manager.ga holds APPROVE after sign-in
+PASS  t.approver holds APPROVE after sign-in
+PASS  t.approver2 holds APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION after sign-in
+PASS  t.facilities holds ACTIVATE_STATIONING after sign-in
+PASS  no Stationing policy in force (submission stays refused: «لا توجد سياسة تمركز نافذة»)

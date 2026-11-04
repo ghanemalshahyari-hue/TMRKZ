@@ -1,0 +1,2 @@
+[upgrade-check] after: 6552 rows fingerprinted → backups/upgrade-tmrkz-test-after.txt
+[upgrade-check] PASS: all 6552 earlier rows are present and unchanged

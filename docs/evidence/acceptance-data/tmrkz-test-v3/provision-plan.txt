@@ -1,0 +1,8 @@
+[acceptance-v3] target tmrkz-test-db-1, database comment: ACCEPTANCE / V19 — fictional acceptance data only; V19 applied 2026-11-04 by ops/test-env/upgrade-backend.sh from mover/backend:rel-7152d53 (commit 7152d53, evidence docs/evidence/acceptance-upgrade/tmrkz-test-v19)
+boundaries_added=1
+hr_levels_set=8
+roles_created=4
+seats_granted=8
+stationing_recorded=10
+policy_versions=0
+[acceptance-v3] plan only (rolled back): set CONFIRM_TARGET=tmrkz-test to write

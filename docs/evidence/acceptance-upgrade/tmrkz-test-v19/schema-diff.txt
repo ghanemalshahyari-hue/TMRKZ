@@ -1,0 +1,414 @@
+--- docs/evidence/acceptance-upgrade/tmrkz-test-v19/schema-before.sql	2026-11-04 10:53:11.169442600 +0400
++++ docs/evidence/acceptance-upgrade/tmrkz-test-v19/schema-after.sql	2026-11-04 10:53:47.429720800 +0400
+@@ -2,7 +2,7 @@
+ -- PostgreSQL database dump
+ --
+ 
+-\restrict lftMxzWtcvv9iznPdbeoZsWxmhXSwBmLkYbvjGneXQlgeDlxys0dOzBmYmzaeaG
++\restrict xolMR5B49pmDUydCtrewiFPLA25sq4bi84TImIy2Xnr88MT4RIuTMrgQmGP0XqT
+ 
+ -- Dumped from database version 17.11
+ -- Dumped by pg_dump version 17.11
+@@ -1562,6 +1562,27 @@
+ 
+ 
+ --
++-- Name: deployment_area; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.deployment_area (
++    id uuid NOT NULL,
++    request_id uuid NOT NULL,
++    site_id uuid NOT NULL,
++    role text NOT NULL,
++    geom public.geometry(Polygon,4326) NOT NULL,
++    state text NOT NULL,
++    valid_from timestamp with time zone NOT NULL,
++    valid_to timestamp with time zone,
++    created_at timestamp with time zone DEFAULT now() NOT NULL,
++    CONSTRAINT deployment_area_check CHECK (((valid_to IS NULL) OR (valid_to >= valid_from))),
++    CONSTRAINT deployment_area_check1 CHECK (((state = 'RETIRED'::text) = (valid_to IS NOT NULL))),
++    CONSTRAINT deployment_area_role_check CHECK ((role = ANY (ARRAY['PRIMARY'::text, 'ALTERNATIVE'::text]))),
++    CONSTRAINT deployment_area_state_check CHECK ((state = ANY (ARRAY['ACTIVE'::text, 'RETIRED'::text])))
++);
++
++
++--
+ -- Name: execution_task; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -2611,6 +2632,105 @@
+ 
+ 
+ --
++-- Name: restationing_request; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.restationing_request (
++    id uuid NOT NULL,
++    number text NOT NULL,
++    requester_id uuid NOT NULL,
++    requesting_unit_id uuid NOT NULL,
++    state text NOT NULL,
++    kind text NOT NULL,
++    start_at timestamp with time zone NOT NULL,
++    end_at timestamp with time zone,
++    reason text DEFAULT ''::text NOT NULL,
++    content jsonb NOT NULL,
++    policy_version integer,
++    route_no integer DEFAULT 0 NOT NULL,
++    route_path uuid[],
++    hierarchy_snapshot jsonb,
++    returned jsonb,
++    paused jsonb,
++    final_approver_id uuid,
++    activated_by uuid,
++    activated_at timestamp with time zone,
++    site_id uuid,
++    created_at timestamp with time zone NOT NULL,
++    updated_at timestamp with time zone NOT NULL,
++    version integer DEFAULT 0 NOT NULL,
++    CONSTRAINT restationing_request_check CHECK (((end_at IS NULL) OR (end_at > start_at))),
++    CONSTRAINT restationing_request_check1 CHECK (((state = 'DRAFT'::text) OR ((policy_version IS NOT NULL) AND (route_path IS NOT NULL) AND (hierarchy_snapshot IS NOT NULL)))),
++    CONSTRAINT restationing_request_check2 CHECK ((((activated_at IS NULL) = (activated_by IS NULL)) AND ((activated_at IS NULL) = (site_id IS NULL)))),
++    CONSTRAINT restationing_request_check3 CHECK (((state <> ALL (ARRAY['ACTIVATED_PERMANENT'::text, 'TEMPORARY_SCHEDULED'::text, 'ACTIVE_TEMPORARY'::text, 'TEMPORARY_RETURNED'::text])) OR (activated_at IS NOT NULL))),
++    CONSTRAINT restationing_request_kind_check CHECK ((kind = ANY (ARRAY['PERMANENT'::text, 'TEMPORARY'::text]))),
++    CONSTRAINT restationing_request_state_check CHECK ((state = ANY (ARRAY['DRAFT'::text, 'UNDER_REVIEW'::text, 'RETURNED_FOR_CHANGES'::text, 'PAUSED_HIERARCHY_CHANGED'::text, 'REJECTED'::text, 'APPROVED_NOT_ACTIVATED'::text, 'ACTIVATED_PERMANENT'::text, 'TEMPORARY_SCHEDULED'::text, 'ACTIVE_TEMPORARY'::text, 'TEMPORARY_RETURNED'::text, 'TEMPORARY_CANCELLED_BEFORE_START'::text])))
++);
++
++
++--
++-- Name: restationing_request_no; Type: SEQUENCE; Schema: public; Owner: -
++--
++
++CREATE SEQUENCE public.restationing_request_no
++    START WITH 1
++    INCREMENT BY 1
++    NO MINVALUE
++    NO MAXVALUE
++    CACHE 1;
++
++
++--
++-- Name: restationing_revision; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.restationing_revision (
++    request_id uuid NOT NULL,
++    n integer NOT NULL,
++    submitted_by uuid NOT NULL,
++    submitted_at timestamp with time zone NOT NULL,
++    content jsonb NOT NULL,
++    changed text[] NOT NULL,
++    reason text,
++    invalidated jsonb NOT NULL,
++    carried text[] NOT NULL,
++    route_no integer NOT NULL,
++    policy_version integer NOT NULL,
++    checks jsonb NOT NULL,
++    CONSTRAINT restationing_revision_n_check CHECK ((n > 0))
++);
++
++
++--
++-- Name: restationing_stage; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.restationing_stage (
++    id uuid NOT NULL,
++    request_id uuid NOT NULL,
++    route_no integer NOT NULL,
++    "position" integer NOT NULL,
++    stage_key text NOT NULL,
++    kind text NOT NULL,
++    unit_id uuid,
++    permission text NOT NULL,
++    label text NOT NULL,
++    satisfies jsonb NOT NULL,
++    depends_on text[] NOT NULL,
++    final_stage boolean NOT NULL,
++    independent_of text,
++    mark text,
++    decided_by uuid,
++    via_delegation uuid,
++    decided_at timestamp with time zone,
++    CONSTRAINT restationing_stage_check CHECK (((kind = 'EXCEPTION'::text) = (unit_id IS NULL))),
++    CONSTRAINT restationing_stage_check1 CHECK ((((mark IS NULL) = (decided_by IS NULL)) AND ((decided_by IS NULL) = (decided_at IS NULL)))),
++    CONSTRAINT restationing_stage_kind_check CHECK ((kind = ANY (ARRAY['HIERARCHY'::text, 'CROSS_BRANCH'::text, 'EXCEPTION'::text]))),
++    CONSTRAINT restationing_stage_mark_check CHECK ((mark = ANY (ARRAY['APPROVED'::text, 'CARRIED'::text])))
++);
++
++
++--
+ -- Name: role_def; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -3562,6 +3682,22 @@
+ 
+ 
+ --
++-- Name: deployment_area deployment_area_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.deployment_area
++    ADD CONSTRAINT deployment_area_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: deployment_area deployment_area_request_id_role_key; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.deployment_area
++    ADD CONSTRAINT deployment_area_request_id_role_key UNIQUE (request_id, role);
++
++
++--
+ -- Name: execution_task execution_task_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -4066,6 +4202,54 @@
+ 
+ 
+ --
++-- Name: restationing_request restationing_request_number_key; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_request
++    ADD CONSTRAINT restationing_request_number_key UNIQUE (number);
++
++
++--
++-- Name: restationing_request restationing_request_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_request
++    ADD CONSTRAINT restationing_request_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: restationing_revision restationing_revision_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_revision
++    ADD CONSTRAINT restationing_revision_pkey PRIMARY KEY (request_id, n);
++
++
++--
++-- Name: restationing_stage restationing_stage_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_stage
++    ADD CONSTRAINT restationing_stage_pkey PRIMARY KEY (id);
++
++
++--
++-- Name: restationing_stage restationing_stage_request_id_route_no_position_key; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_stage
++    ADD CONSTRAINT restationing_stage_request_id_route_no_position_key UNIQUE (request_id, route_no, "position");
++
++
++--
++-- Name: restationing_stage restationing_stage_request_id_route_no_stage_key_key; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_stage
++    ADD CONSTRAINT restationing_stage_request_id_route_no_stage_key_key UNIQUE (request_id, route_no, stage_key);
++
++
++--
+ -- Name: role_def role_def_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -5298,6 +5482,13 @@
+ 
+ 
+ --
++-- Name: deployment_area_geom_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX deployment_area_geom_idx ON public.deployment_area USING gist (geom) WHERE (state = 'ACTIVE'::text);
++
++
++--
+ -- Name: execution_task_request_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -5599,6 +5790,20 @@
+ 
+ 
+ --
++-- Name: restationing_request_due_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX restationing_request_due_idx ON public.restationing_request USING btree (state, start_at, end_at) WHERE (state = ANY (ARRAY['TEMPORARY_SCHEDULED'::text, 'ACTIVE_TEMPORARY'::text]));
++
++
++--
++-- Name: restationing_request_unit_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX restationing_request_unit_idx ON public.restationing_request USING btree (requesting_unit_id, state);
++
++
++--
+ -- Name: signing_job_once; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+@@ -6576,6 +6781,22 @@
+ 
+ 
+ --
++-- Name: deployment_area deployment_area_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.deployment_area
++    ADD CONSTRAINT deployment_area_request_id_fkey FOREIGN KEY (request_id) REFERENCES public.restationing_request(id);
++
++
++--
++-- Name: deployment_area deployment_area_site_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.deployment_area
++    ADD CONSTRAINT deployment_area_site_id_fkey FOREIGN KEY (site_id) REFERENCES public.site(id);
++
++
++--
+ -- Name: execution_task execution_task_assigned_person_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -6960,6 +7181,14 @@
+ 
+ 
+ --
++-- Name: org_stationing org_stationing_request_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.org_stationing
++    ADD CONSTRAINT org_stationing_request_fk FOREIGN KEY (request_id) REFERENCES public.restationing_request(id);
++
++
++--
+ -- Name: org_stationing org_stationing_site_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -7328,6 +7557,110 @@
+ 
+ 
+ --
++-- Name: restationing_request restationing_request_activated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_request
++    ADD CONSTRAINT restationing_request_activated_by_fkey FOREIGN KEY (activated_by) REFERENCES public.person(id);
++
++
++--
++-- Name: restationing_request restationing_request_final_approver_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_request
++    ADD CONSTRAINT restationing_request_final_approver_id_fkey FOREIGN KEY (final_approver_id) REFERENCES public.person(id);
++
++
++--
++-- Name: restationing_request restationing_request_policy_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_request
++    ADD CONSTRAINT restationing_request_policy_version_fkey FOREIGN KEY (policy_version) REFERENCES public.stationing_policy_version(version);
++
++
++--
++-- Name: restationing_request restationing_request_requester_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_request
++    ADD CONSTRAINT restationing_request_requester_id_fkey FOREIGN KEY (requester_id) REFERENCES public.person(id);
++
++
++--
++-- Name: restationing_request restationing_request_requesting_unit_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_request
++    ADD CONSTRAINT restationing_request_requesting_unit_id_fkey FOREIGN KEY (requesting_unit_id) REFERENCES public.organization(id);
++
++
++--
++-- Name: restationing_request restationing_request_site_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_request
++    ADD CONSTRAINT restationing_request_site_id_fkey FOREIGN KEY (site_id) REFERENCES public.site(id);
++
++
++--
++-- Name: restationing_revision restationing_revision_policy_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_revision
++    ADD CONSTRAINT restationing_revision_policy_version_fkey FOREIGN KEY (policy_version) REFERENCES public.stationing_policy_version(version);
++
++
++--
++-- Name: restationing_revision restationing_revision_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_revision
++    ADD CONSTRAINT restationing_revision_request_id_fkey FOREIGN KEY (request_id) REFERENCES public.restationing_request(id);
++
++
++--
++-- Name: restationing_revision restationing_revision_submitted_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_revision
++    ADD CONSTRAINT restationing_revision_submitted_by_fkey FOREIGN KEY (submitted_by) REFERENCES public.person(id);
++
++
++--
++-- Name: restationing_stage restationing_stage_decided_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_stage
++    ADD CONSTRAINT restationing_stage_decided_by_fkey FOREIGN KEY (decided_by) REFERENCES public.person(id);
++
++
++--
++-- Name: restationing_stage restationing_stage_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_stage
++    ADD CONSTRAINT restationing_stage_request_id_fkey FOREIGN KEY (request_id) REFERENCES public.restationing_request(id);
++
++
++--
++-- Name: restationing_stage restationing_stage_unit_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_stage
++    ADD CONSTRAINT restationing_stage_unit_id_fkey FOREIGN KEY (unit_id) REFERENCES public.organization(id);
++
++
++--
++-- Name: restationing_stage restationing_stage_via_delegation_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_stage
++    ADD CONSTRAINT restationing_stage_via_delegation_fkey FOREIGN KEY (via_delegation) REFERENCES public.delegation(id);
++
++
++--
+ -- Name: signature_evidence signature_evidence_signing_job_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -7627,5 +7960,5 @@
+ -- PostgreSQL database dump complete
+ --
+ 
+-\unrestrict lftMxzWtcvv9iznPdbeoZsWxmhXSwBmLkYbvjGneXQlgeDlxys0dOzBmYmzaeaG
++\unrestrict xolMR5B49pmDUydCtrewiFPLA25sq4bi84TImIy2Xnr88MT4RIuTMrgQmGP0XqT
+ 

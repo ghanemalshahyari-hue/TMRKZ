@@ -1175,6 +1175,17 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   - `tests/acceptance/restationing-journey.mjs` 15/15 against `tmrkz-v3dev` through the real Keycloak/LDAP sign-in.
   - The page checked headless in Edge, with no console errors.
   - Full backend suite on a disposable database: 195/195 (185 before + 10 new).
-- **Not done.** Extensions, early return, cancellation before start; V19 on `tmrkz-test` (needs the owner's approval of
-  a plan like V18's); production build of the page and packaging of the map data; the full §4 journey; real Oracle
+- **Applied to the acceptance database (owner D1/D2, 4 Nov 2026).**
+  - Commits: local commits `685d902` and `7152d53` (no push).
+  - Gate before application: full suite on C2 195/195; frontend 93/93.
+  - Release image `mover/backend:rel-7152d53` (`sha256:b4a8f1c3…a8bfd`), with V19 `dfb47424…4ddf`.
+  - Procedure: plan [19]; backup verified by restore; V19 in 44 ms.
+  - Invariants: 6,552 rows unchanged; schema change identical to the clean path; 4 tables, 0 rows, sequence and
+    foreign key; journey PASS; OpenFGA 357 relations; no side effects. Result: `ACCEPTANCE / V19`.
+  - **D4 fictional acceptance data, no policy** (`ops/test-env/provision-acceptance-v3.sh`): levels, single-action roles
+    and seats for selected fictional users, starting stationing, the one missing boundary; the GLO-30 dataset loaded
+    separately. The page stays hidden there (D3). Submissions stay refused until the owner supplies the terrain
+    allowance values.
+- **Not done.** Extensions, early return, cancellation before start; the acceptance policy (allowance values from the
+  owner); production build of the page and packaging of the map data; the full §4 journey; real Oracle
   and touch (release gates).

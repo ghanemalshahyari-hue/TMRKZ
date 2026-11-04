@@ -199,9 +199,20 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     real sign-in; frontend 93/93, build OK.
   - **Owner decision O-17 (4 Nov, option B):** a distance exception is allowed only when enabled in the policy, up to
     `exception.maxExtra`, with a written reason and a separate stage decided by its permission holder, audited.
-  - **V19 clean path PASS** (`docs/evidence/migration-path/v19/`). The plan for `tmrkz-test`,
-    `docs/audit/stationing-v3-production/V19_ACCEPTANCE_PLAN.md`, awaits the owner. Without acceptance data and a policy,
-    V19 there is schema only.
+  - **V19 on `tmrkz-test` (owner D1/D2, 4 Nov): `ACCEPTANCE / V19`.**
+    - Commits and image: local commits `685d902` (V18 evidence) and `7152d53` (workflow); release image
+      `mover/backend:rel-7152d53`; full suite on C2 195/195.
+    - Procedure: plan [19]; backup verified by restore; V19 in 44 ms.
+    - Data: 6,552 earlier rows unchanged; schema change identical to the clean path; 4 tables, 0 rows, mismatches=0.
+    - Health and access: journey PASS; OpenFGA 357 relations equal to the model.
+    - Side effects: no outbound, Oracle, terrain, policy or request. Evidence:
+      `docs/evidence/acceptance-upgrade/tmrkz-test-v19/`.
+  - **D4 acceptance data (fictional, no policy):** `ops/test-env/provision-acceptance-v3.sh`.
+    - 8 HR levels, 4 single-action roles, 8 seats for explicitly selected fictional users;
+    - 10 starting stationing records, 1 missing boundary (site 10);
+    - the full GLO-30 2026.11 terrain loaded separately (6,300 rows, all cell counts equal, 453 MB, 106 s).
+    - **No policy published:** submissions stay refused until the owner supplies the allowances.
+    - **The page stays hidden** on `tmrkz-test` (D3). Evidence: `docs/evidence/acceptance-data/tmrkz-test-v3/`.
   - **Not yet:** extensions, early return, cancellation before start, vertex editing, production packaging of the page
     and map data, V19 on `tmrkz-test` (owner approval).
 

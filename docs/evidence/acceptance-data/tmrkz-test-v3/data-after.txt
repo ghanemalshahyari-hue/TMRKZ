@@ -1,0 +1,44 @@
+-- HR levels (published snapshot)
+HR-T-ORG | المؤسسة | 6
+HR-T-GA | الإدارة العامة | 7
+HR-T-IT | إدارة التقنية | 7
+HR-T-PM | إدارة المشاريع | 7
+HR-T-SS | الخدمات المشتركة | 7
+HR-T-PM-1 | قسم مشاريع المباني | 8
+HR-T-PM-1-1 | وحدة الصيانة الإدارية | 9
+HR-T-PM-1-1-1 | فريق مرافق الشمال | 10
+-- acceptance roles
+ACC_V3_DISTANCE_EXCEPTION | معتمد استثناء مسافة الانتشار (بيانات قبول وهمية) | APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION | ALL
+ACC_V3_RESTATIONING_REQUESTER | مقدم طلب إعادة تمركز (بيانات قبول وهمية) | CREATE_RESTATIONING | ORGANIZATION
+ACC_V3_STATIONING_ACTIVATOR | مفعّل التمركز (بيانات قبول وهمية) | ACTIVATE_STATIONING | ORGANIZATION
+ACC_V3_UNIT_APPROVER | معتمد إعادة التمركز في الوحدة (بيانات قبول وهمية) | APPROVE | ORGANIZATION
+-- seats and permissions for fictional users
+t.approver2 | HR-T-ORG | ACC_V3_DISTANCE_EXCEPTION | بيانات قبول وهمية — إعادة التمركز (Stationing V3)
+t.requester | HR-T-SS | ACC_V3_RESTATIONING_REQUESTER | بيانات قبول وهمية — إعادة التمركز (Stationing V3)
+t.requester2 | HR-T-IT | ACC_V3_RESTATIONING_REQUESTER | بيانات قبول وهمية — إعادة التمركز (Stationing V3)
+t.facilities | HR-T-ORG | ACC_V3_STATIONING_ACTIVATOR | بيانات قبول وهمية — إعادة التمركز (Stationing V3)
+t.approver | HR-T-ORG | ACC_V3_UNIT_APPROVER | بيانات قبول وهمية — إعادة التمركز (Stationing V3)
+t.manager | HR-T-SS | ACC_V3_UNIT_APPROVER | بيانات قبول وهمية — إعادة التمركز (Stationing V3)
+t.manager.ga | HR-T-PM | ACC_V3_UNIT_APPROVER | بيانات قبول وهمية — إعادة التمركز (Stationing V3)
+t.manager.it | HR-T-IT | ACC_V3_UNIT_APPROVER | بيانات قبول وهمية — إعادة التمركز (Stationing V3)
+-- starting stationing
+HR-T-GA | الإدارة العامة | 01 | المقر الإداري | ACCEPTANCE-V3
+HR-T-IT | إدارة التقنية | 06 | مكتب التقنية | ACCEPTANCE-V3
+HR-T-ORG | المؤسسة | 00 | مجمع المؤسسة | ACCEPTANCE-V3
+HR-T-PM | إدارة المشاريع | 03 | مجمع الأعمال الشرقي | ACCEPTANCE-V3
+HR-T-PM-1 | قسم مشاريع المباني | 03 | مجمع الأعمال الشرقي | ACCEPTANCE-V3
+HR-T-PM-1-1 | وحدة الصيانة الإدارية | 10 | مستودع اللوازم الشمالي | ACCEPTANCE-V3
+HR-T-PM-1-1-1 | فريق مرافق الشمال | 10 | مستودع اللوازم الشمالي | ACCEPTANCE-V3
+HR-T-SS | الخدمات المشتركة | 02 | مركز الخدمات | ACCEPTANCE-V3
+T-SS-1 | قسم الخدمات العامة | 05 | مركز التدريب الإداري | ACCEPTANCE-V3
+T-SS-2 | قسم النقل والحركة الإدارية | 08 | مبنى الخدمات الغربية | ACCEPTANCE-V3
+-- boundaries added
+10 | مستودع اللوازم الشمالي | Polygon | 58925 | حدود قبول وهمية (Stationing V3)
+-- terrain
+copernicus-glo30 | 2026.11 | DSM | 9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682 | 6300 | 453 MB
+-- unchanged
+policy_versions=0
+restationing_requests=0
+outbox=0
+authz sync applied 431 of 431, error=none
+audit ACCEPTANCE_DATA_PROVISIONED {"hr_levels_set": 8, "roles_created": 4, "seats_granted": 8, "boundaries_added": 1, "stationing_recorded": 10}

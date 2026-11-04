@@ -1,0 +1,8 @@
+[verify-backup] 1. manifest checksums: 7 files match
+[verify-backup] 2. db.dump readable (908 catalogue lines)
+[verify-backup] 2. keycloak.dump readable (535 catalogue lines)
+[verify-backup] 2. openfga.dump readable (39 catalogue lines)
+[verify-backup] 3. db.dump restored; table counts equal fingerprint.txt (20 tables)
+[verify-backup]    restored schema version 18 equals the manifest
+[verify-backup] 4. restored rows equal the live fingerprint (6552 rows)
+[verify-backup] PASS: backups/tmrkz-test-20261104T065313Z

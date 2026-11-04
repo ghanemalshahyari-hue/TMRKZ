@@ -15,6 +15,16 @@ release image instead: `EXPECT_PENDING="17" AFTER_SQL=ops/sql/checks/V17-after.s
 <image> <label>` (the database must be labelled ACCEPTANCE; plan, backup verified by `ops/verify-backup.sh`, fingerprints
 before and after; evidence in `docs/evidence/acceptance-upgrade/`).
 
+**Stationing V3 acceptance data (4 Nov 2026, owner D4).** `sh ops/test-env/provision-acceptance-v3.sh` (plan, rolled
+back) then `CONFIRM_TARGET=tmrkz-test sh ops/test-env/provision-acceptance-v3.sh` writes the fictional acceptance data
+the workflow needs on an `ACCEPTANCE` database at V19 or later:
+- HR levels;
+- single-action roles and seats for selected fictional users;
+- starting stationing;
+- a missing boundary.
+
+It is idempotent and publishes no policy. Terrain is loaded separately with `ops/terrain/load-slope.sh`.
+
 **Stationing V3 development environment (4 Nov 2026).** `sh ops/test-env/dev-v3.sh build|up|seed|down` runs the
 disposable project `tmrkz-v3dev` on :8097. It has the same fictional directory and data, the backend built from the
 working tree (never a release), memory caps, and illustrative development values for Stationing V3

@@ -1,0 +1,43 @@
+PASS  web entry point serves the application
+PASS  CSP allows only same-origin resources  — default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' da
+PASS  index.html references only local assets
+PASS  bundled code contains no fetchable external URLs
+PASS  Arabic font served locally
+PASS  no local password or demo sign-in exists
+PASS  identity provider configured and reachable
+PASS  provider sign-in page carries the TMRKZ theme with local assets
+PASS  directory password accepted; TMRKZ session opened
+PASS  wrong password refused by the directory; no session
+PASS  directory account without an HR record is refused and queued  — /#auth-error=IDENTITY_NOT_LINKED&reason=NO_MATCH
+PASS  manual sign-in offered on the sign-in page
+PASS  manual sign-in: directory password accepted
+PASS  manual sign-in: wrong password refused, no session
+PASS  manual sign-in: directory-only account refused and queued
+PASS  logout returns to the sign-in page with the signed-out message
+PASS  requester sees «مركز الخدمات» on the map directory
+PASS  map layer lists the facility with local coverage
+PASS  draft created from the map  — MV-2026-0332
+PASS  attachment stored with checksum and scan result  — 26966955c5cb
+PASS  submitted for review
+PASS  no reservation exists while the request is under review (orange)
+PASS  facilities reviewer has the first task
+PASS  manager has nothing before the first stage completes (sequential)
+PASS  return without a reason is refused
+PASS  returned to the requester with a reason
+PASS  resubmitted as revision 2
+PASS  descriptive change keeps the earlier facilities approval (change policy)
+PASS  approval document hashed; attestation not labelled as PKI
+PASS  final approval recorded
+PASS  reservation created atomically with the approval
+PASS  replayed approval returns the same result (idempotent)
+PASS  availability preview reports the conflict (preview only)
+PASS  info recipient organisation notified through the outbox
+PASS  the requester holds no closing right
+PASS  cannot close before execution tasks are done
+PASS  handover completed with evidence
+PASS  receipt confirmed by the requesting body
+PASS  administrative file closed
+PASS  closing the file does not release the reservation
+PASS  history kept  — 16 events
+
+Journey PASSED
