@@ -1,0 +1,180 @@
+{
+  "ranAt": "2026-11-04T08:38:07.855Z",
+  "base": "http://localhost:8088",
+  "only": [
+    "R"
+  ],
+  "policy": {
+    "version": 1,
+    "reference": "ACCEPTANCE-V3-POLICY-1"
+  },
+  "results": [
+    {
+      "id": "R8a",
+      "label": "request from L8: the route climbs the HR ancestry to L6 final (3 stages, no unrelated unit)",
+      "result": "PASS",
+      "extra": "3 stages: اعتماد المستوى L8 — قسم مشاريع المباني [قسم مشاريع المباني] ← اعتماد المستوى L7 — إدارة المشاريع [إدارة المشاريع] ← اعتماد المستوى L6 — المؤسسة [المؤسسة]"
+    },
+    {
+      "id": "R8b",
+      "label": "decided by the 3 seat holders",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED"
+    },
+    {
+      "id": "R9a",
+      "label": "request from L9: the route climbs the HR ancestry to L6 final (4 stages, no unrelated unit)",
+      "result": "PASS",
+      "extra": "4 stages: اعتماد المستوى L9 — وحدة الصيانة الإدارية [وحدة الصيانة الإدارية] ← اعتماد المستوى L8 — قسم مشاريع المباني [قسم مشاريع المباني] ← اعتماد المستوى L7 — إدارة المشاريع [إدارة المشاريع] ← اعتماد المستوى L6 — المؤسسة [المؤسسة]"
+    },
+    {
+      "id": "R9b",
+      "label": "decided by the 4 seat holders",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED"
+    },
+    {
+      "id": "R10a",
+      "label": "request from L10: the route climbs the HR ancestry to L6 final (5 stages, no unrelated unit)",
+      "result": "FAIL",
+      "extra": "undefined stages: ; checks: حدّد معالجة الوحدة من فرع آخر: وحدة الصيانة الإدارية"
+    },
+    {
+      "id": "R10b",
+      "label": "the five stages decided on the real page, each by its own seat holder (five different people)",
+      "result": "FAIL",
+      "extra": "DRAFT; "
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the real page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors on the real page",
+      "result": "PASS",
+      "extra": ""
+    }
+  ],
+  "requests": [
+    {
+      "journey": "R-L8",
+      "id": "b713d852-e93d-4080-a535-5edb7b94c7d7",
+      "number": "RS-2026-0017",
+      "requester": "t.requester.pm"
+    },
+    {
+      "journey": "R-L9",
+      "id": "e7c840f9-0474-4aba-9c3a-5ab0498214ac",
+      "number": "RS-2026-0018",
+      "requester": "t.requester.pm"
+    },
+    {
+      "journey": "R-L10",
+      "id": "f1333295-88fd-44c3-890e-0fb497b729f9",
+      "number": "RS-2026-0019",
+      "requester": "t.requester.pm"
+    }
+  ],
+  "routes": [
+    {
+      "journey": "R-L8",
+      "number": "RS-2026-0017",
+      "requestingUnit": "HR-T-PM-1",
+      "stages": 3,
+      "route": [
+        {
+          "key": "H:851a18e6-ae51-fc9c-f94f-10739ddd4038",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L8 — قسم مشاريع المباني",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:373032ba-3812-3f3c-a4cf-1517dbc0fcea",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — إدارة المشاريع",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    },
+    {
+      "journey": "R-L9",
+      "number": "RS-2026-0018",
+      "requestingUnit": "HR-T-PM-1-1",
+      "stages": 4,
+      "route": [
+        {
+          "key": "H:fc82871d-55c8-c4c7-d0f0-8a7da87fcbf9",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L9 — وحدة الصيانة الإدارية",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:851a18e6-ae51-fc9c-f94f-10739ddd4038",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L8 — قسم مشاريع المباني",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:373032ba-3812-3f3c-a4cf-1517dbc0fcea",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — إدارة المشاريع",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    },
+    {
+      "journey": "R-L10",
+      "route": []
+    }
+  ]
+}

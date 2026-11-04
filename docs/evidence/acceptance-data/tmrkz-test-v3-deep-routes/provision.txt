@@ -1,0 +1,15 @@
+[deep-routes] target tmrkz-test-db-1: ACCEPTANCE / V19 — fictional acceptance data only; V19 applied 2026-11-04 from mover/backend:rel-7152d53 (commit 7152d53); backend now mover/backend:rel-99c7ede (commit 99c7ede, no migration) and web mover/web:rel-cea09c7-v3 (commit cea09c7, Stationing V3 page, acceptance only); Stationing acceptance policy version 1 (ACCEPTANCE-V3-POLICY-1, not a production default) published 2026-11-04 in the studio; evidence docs/evidence/acceptance-upgrade/ and docs/evidence/acceptance-journeys/stationing-v3/
+affiliations_added=4
+hr_people_added=4
+people_added=4
+seats_and_roles_added=4
+t.requester.pm → ACC_V3_RESTATIONING_REQUESTER @ HR-T-PM-1
+t.seat.l10 → ACC_V3_UNIT_APPROVER @ HR-T-PM-1-1-1
+t.seat.l8 → ACC_V3_UNIT_APPROVER @ HR-T-PM-1
+t.seat.l9 → ACC_V3_UNIT_APPROVER @ HR-T-PM-1-1
+adding new entry "uid=t.requester.pm,ou=people,dc=tmrkz,dc=test"
+adding new entry "uid=t.seat.l8,ou=people,dc=tmrkz,dc=test"
+adding new entry "uid=t.seat.l9,ou=people,dc=tmrkz,dc=test"
+adding new entry "uid=t.seat.l10,ou=people,dc=tmrkz,dc=test"
+[deep-routes] directory accounts present: 4 of 4
+[deep-routes] written

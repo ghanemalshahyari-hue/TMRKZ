@@ -1,0 +1,220 @@
+{
+  "ranAt": "2026-11-04T08:53:55.808Z",
+  "base": "http://localhost:8088",
+  "only": [
+    "A",
+    "U",
+    "R"
+  ],
+  "policy": {
+    "version": 1,
+    "reference": "ACCEPTANCE-V3-POLICY-1"
+  },
+  "results": [
+    {
+      "id": "A1",
+      "label": "permanent draft passes the server checks, no exception needed",
+      "result": "PASS",
+      "extra": "منطقة الانتشار الرئيسية: 6003 m, OK, allowed 5000–8000 (exception to 10000), FLAT +0 | منطقة الانتشار البديلة: 3995 m, OK, allowed 3000–5000 (exception to 7000), FLAT +0"
+    },
+    {
+      "id": "A2",
+      "label": "submitted on the page; policy version locked",
+      "result": "PASS",
+      "extra": "UNDER_REVIEW, policy 1, 2 stages: اعتماد المستوى L7 ← اعتماد المستوى L6"
+    },
+    {
+      "id": "A3",
+      "label": "ancestry route from the L7 requesting unit: its own approver, then L6 final (no unrelated unit)",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "A3b",
+      "label": "stage labels are the fixed level labels; the unit of each stage is shown as a separate line",
+      "result": "PASS",
+      "extra": "«اعتماد المستوى L7» / الخدمات المشتركة ← «اعتماد المستوى L6» / المؤسسة"
+    },
+    {
+      "id": "MAP1",
+      "label": "the map draws (basemap, current site, proposed site, both deployment areas, guidance rings) and the legend names them",
+      "result": "PASS",
+      "extra": "413 colours in the middle of the map; legend: الموقع الحالي الموقع المقترح الانتشار الرئيسية الانتشار البديلة النطاق المسموح (إرشاد)"
+    },
+    {
+      "id": "MAP2",
+      "label": "terrain mode draws (GLO-30 notice) and back to street mode keeps the request selected",
+      "result": "PASS",
+      "extra": "479 colours; طبيعة الأرض: Copernicus GLO-30 — نموذج سطح DSM وليس تضاريس رسمية (للعرض فقط)"
+    },
+    {
+      "id": "A4",
+      "label": "each stage approved on the page by its own seat holder",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED; اعتماد المستوى L7 [APPROVED] ← اعتماد المستوى L6 [APPROVED]; final approver صاحب الاعتماد التجريبي"
+    },
+    {
+      "id": "A5",
+      "label": "activated on the page by an independent activator",
+      "result": "PASS",
+      "extra": "ACTIVATED_PERMANENT, by مراجع المرافق التجريبي, site موقع RS-2026-0022"
+    },
+    {
+      "id": "A6",
+      "label": "new authoritative stationing in the read contract",
+      "result": "PASS",
+      "extra": "موقع RS-2026-0022 PERMANENT REQUEST"
+    },
+    {
+      "id": "A7",
+      "label": "site links unchanged by the activation (O-14)",
+      "result": "PASS",
+      "extra": "0 links before and after"
+    },
+    {
+      "id": "R10o",
+      "label": "explicit decision for a co-located unit outside the requesting branch (O-03)",
+      "result": "NOTE",
+      "extra": "وحدة الصيانة الإدارية at مستودع اللوازم الشمالي: EXCLUDED (stays)"
+    },
+    {
+      "id": "R10a",
+      "label": "request from L10: the route climbs the HR ancestry to L6 final (5 stages, no unrelated unit)",
+      "result": "PASS",
+      "extra": "5 stages: اعتماد المستوى L10 [فريق مرافق الشمال] ← اعتماد المستوى L9 [وحدة الصيانة الإدارية] ← اعتماد المستوى L8 [قسم مشاريع المباني] ← اعتماد المستوى L7 [إدارة المشاريع] ← اعتماد المستوى L6 [المؤسسة]"
+    },
+    {
+      "id": "R10b",
+      "label": "the five stages decided on the real page, each by its own seat holder (five different people)",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED; معتمد المستوى L10 — فريق مرافق الشمال (بيانات قبول وهمية) ← معتمد المستوى L9 — وحدة الصيانة الإدارية (بيانات قبول وهمية) ← معتمد المستوى L8 — قسم مشاريع المباني (بيانات قبول وهمية) ← مدير الإدارة العامة ← صاحب الاعتماد التجريبي"
+    },
+    {
+      "id": "U1",
+      "label": "the editor offers exactly the units where the requester may request (no general view right), and the branch of the chosen one",
+      "result": "PASS",
+      "extra": "units: قسم مشاريع المباني، وحدة الصيانة الإدارية، فريق مرافق الشمال; moving: وحدة الصيانة الإدارية، فريق مرافق الشمال"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the real page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors on the real page",
+      "result": "PASS",
+      "extra": ""
+    }
+  ],
+  "requests": [
+    {
+      "journey": "A",
+      "id": "fdad995b-a7cb-4cd8-b934-81c8ea376fe3",
+      "number": "RS-2026-0022",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "R-L10",
+      "id": "17ba4892-ff97-46f7-bb27-ba8a6034be06",
+      "number": "RS-2026-0023",
+      "requester": "t.requester.pm"
+    }
+  ],
+  "routes": [
+    {
+      "journey": "A",
+      "number": "RS-2026-0022",
+      "requestingUnit": "HR-T-SS",
+      "stages": 2,
+      "route": [
+        {
+          "key": "H:3af418c5-fb73-869c-da16-7411f739b156",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    },
+    {
+      "journey": "R-L10",
+      "number": "RS-2026-0023",
+      "requestingUnit": "HR-T-PM-1-1-1",
+      "stages": 5,
+      "route": [
+        {
+          "key": "H:b1c8dcc0-416f-a9c3-3824-2f89618bf0c5",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L10",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:fc82871d-55c8-c4c7-d0f0-8a7da87fcbf9",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L9",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:851a18e6-ae51-fc9c-f94f-10739ddd4038",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L8",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:373032ba-3812-3f3c-a4cf-1517dbc0fcea",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    }
+  ]
+}

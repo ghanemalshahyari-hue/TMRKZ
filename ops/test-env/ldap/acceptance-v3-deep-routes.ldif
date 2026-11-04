@@ -1,0 +1,37 @@
+# FICTIONAL ACCEPTANCE accounts for Stationing V3 routes from L8, L9 and L10 (owner, 4 Nov 2026). Applied only by
+# ops/test-env/provision-acceptance-v3-deep-routes.sh to an ACCEPTANCE directory; never part of a production directory.
+dn: uid=t.requester.pm,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.requester.pm
+cn: Test Requester Building Projects
+sn: Requester
+givenName: Test
+employeeNumber: T-0012
+userPassword: __PASSWORD__
+
+dn: uid=t.seat.l8,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.seat.l8
+cn: Test Approver L8
+sn: Approver
+givenName: Test
+employeeNumber: T-0013
+userPassword: __PASSWORD__
+
+dn: uid=t.seat.l9,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.seat.l9
+cn: Test Approver L9
+sn: Approver
+givenName: Test
+employeeNumber: T-0014
+userPassword: __PASSWORD__
+
+dn: uid=t.seat.l10,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.seat.l10
+cn: Test Approver L10
+sn: Approver
+givenName: Test
+employeeNumber: T-0015
+userPassword: __PASSWORD__

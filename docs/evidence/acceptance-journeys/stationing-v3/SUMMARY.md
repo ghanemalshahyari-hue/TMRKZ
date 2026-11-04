@@ -84,6 +84,9 @@ covered by the backend tests:
 
 Neither L9 nor a full five-stage route is exercised anywhere yet.
 
+**Update (same day, after the owner's decision):** routes from L8, L9 and L10 were then provisioned and pass on
+this environment, the five-stage one decided on the page by five different people (`ROUTES-L8-L10.md`).
+
 **A — permanent**
 
 - Draft checks pass, with no exception needed.

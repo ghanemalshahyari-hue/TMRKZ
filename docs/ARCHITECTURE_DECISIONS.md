@@ -1225,6 +1225,44 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
     - the web image served MapLibre's `.mjs` worker with a non-JavaScript type, so the map was blank;
     - the misleading copy fallback.
   - Evidence: `docs/evidence/acceptance-journeys/stationing-v3/SUMMARY.md`.
+- **Owner confirmations after the acceptance (4 Nov 2026).** The verdict: functionally accepted, NOT production
+  ready.
+  - **Commit history:** `cea09c7` stays as a separate commit; no history rewrite.
+  - **Stage facts:**
+    - L7–L10 rest on scope, classification, duration, site and deployment;
+    - L6 (final) rests on the same facts plus the completion of every earlier requirement (hierarchy, cross-branch,
+      distance exception);
+    - a deployment-only change re-takes the hierarchy stages that rest on it, and the cross-branch decision stays
+      CARRIED.
+  - **Stage labels:** «اعتماد المستوى Lx» is accepted. The unit and the approver are shown as separate data, never
+    inside the fixed stage label.
+  - **G and Oracle:** journey G through the application's HR sync is accepted for now; real non-production Oracle
+    stays a release gate.
+  - **Geometry:** MultiPolygon target unchanged (grouped copy-and-move, the draw fallback is temporary). Point: no
+    invented footprint.
+  - **Before production readiness:** fix the label overlap and the policy audit gap (stable identity, role,
+    organisation, time, version/reference). Test routes below L7 in the real application.
+  - **Accepted for now:** a controlled terrain-tie scenario before final closure is preferred but not blocking. The
+    six acceptance-test drafts are accepted, with no delete feature.
+- **Batch after the confirmations (4 Nov 2026): local commit `57d7820`, deployed to `tmrkz-test` and re-checked.**
+  - **Stage label:** a hierarchy stage's label is the level's configured label alone. The page shows «الجهة: …» and
+    the decider as separate lines, and the list shows the current stage with its unit.
+  - **Policy audit:** `STATIONING_POLICY_PUBLISHED` records the publisher's role and organisation (the CONFIGURE grant
+    that allowed it), the stable person ID, employee number and username, the time, version and reference. The audit
+    API also returns the actor's person ID.
+  - **Map labels:** they no longer overlap. Collision avoidance with variable anchors, priority proposed site >
+    primary > alternative > current site; a label that cannot fit waits for a closer zoom. A MultiPolygon current site
+    is drawn with every part.
+  - **Single-action users:** `GET /restationing-requests/units` lists exactly where «طلب إعادة التمركز» acts, so a
+    requester without a view right can choose units. The app shell asks for sites, request types and the organisation
+    tree only with a right their endpoints accept. The general tree stays a view right.
+  - **Deeper routes:** fictional L8–L10 accounts and seats (`ops/test-env/provision-acceptance-v3-deep-routes.sh`).
+    Routes of 3, 4 and 5 stages pass in the real application; the five-stage one was decided on the page by five
+    different people (`docs/evidence/acceptance-journeys/stationing-v3/ROUTES-L8-L10.md`).
+  - **Deployment:** backend `mover/backend:rel-57d7820`, no migration, 6,841 rows unchanged; web
+    `mover/web:rel-57d7820-v3`.
+  - **Re-check on the real page:** 15/15 and 0 console errors.
+  - **Still to fix:** a long mixed Arabic/Latin site label wraps and splits the request number.
 - **Not done.** Extensions, early return, cancellation before start; grouped MultiPolygon copy-and-move; vertex
-  editing; production build of the page and packaging of the map data; routes from L8–L10 on the acceptance
-  environment (no fictional requesters or seats there); real non-production Oracle and touch (release gates).
+  editing; production build of the page and packaging of the map data; a controlled terrain-tie acceptance scenario;
+  real non-production Oracle and touch (release gates).

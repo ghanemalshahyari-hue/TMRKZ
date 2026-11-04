@@ -5,7 +5,7 @@
 //   A permanent (decisions and activation pressed on the real page) + map checks, X distance exception (normal, within
 //   maxExtra, too far), C occupied deployment, D terrain on real GLO-30 cells, E cross-branch with F return and
 //   selective re-approval, S security refusals by direct API calls, K boundary cases in the real editor, B temporary
-//   with the real scheduler. G (hierarchy change) is NOT run here: the acceptance environment has no HR source attached
+//   with the real scheduler, R routes from L8, L9 and L10 (3–5 stages). G (hierarchy change) is NOT run here: the acceptance environment has no HR source attached
 //   and the owner requires the HR synchronisation path, never direct SQL — see RestationingHrSyncIT.
 // Usage: MOVER_URL=http://localhost:8088 node tests/acceptance/restationing-acceptance.mjs   (headless Edge)
 //        ONLY=A,X,C,…  runs a subset
@@ -103,7 +103,11 @@ if (!policy) {
 const pv = policy.values;
 console.log(`policy version ${policy.version} (${policy.reference}): primary ${pv.primary.minM}–${pv.primary.maxM} m, alternative ${pv.alternative.minM}–${pv.alternative.maxM} m, deployment ${pv.deploymentRequirement}, exception ${pv.exception.allowed ? '+' + pv.exception.maxExtraM + ' m' : 'off'}`);
 // the fictional approver seats of the acceptance provisioning: unit code → persona
-const SEAT = { 'HR-T-SS': 't.manager', 'HR-T-IT': 't.manager.it', 'HR-T-PM': 't.manager.ga', 'HR-T-ORG': 't.approver' };
+const SEAT = {
+  'HR-T-SS': 't.manager', 'HR-T-IT': 't.manager.it', 'HR-T-PM': 't.manager.ga', 'HR-T-ORG': 't.approver',
+  // routes from L8–L10 (provision-acceptance-v3-deep-routes.sh)
+  'HR-T-PM-1': 't.seat.l8', 'HR-T-PM-1-1': 't.seat.l9', 'HR-T-PM-1-1-1': 't.seat.l10',
+};
 const deciderFor = (stage) => (stage.kind === 'EXCEPTION' ? 't.approver2' : SEAT[stage.unit?.code]);
 const SS = org('HR-T-SS'), IT = org('HR-T-IT'), PM = org('HR-T-PM');
 const routeText = (route) => (route ?? []).map((s) => `${s.label}${s.mark ? ' [' + s.mark + ']' : ''}`).join(' ← ');
@@ -239,6 +243,11 @@ try {
     ok(v.state === 'UNDER_REVIEW' && v.policyVersion === policy.version, 'A2', 'submitted on the page; policy version locked', `${v.state}, policy ${v.policyVersion}, ${v.route.length} stages: ${routeText(v.route)}`);
     ok(v.route.length === 2 && v.route[0].unit?.code === 'HR-T-SS' && v.route.at(-1).final && v.route.at(-1).unit?.code === 'HR-T-ORG', 'A3', 'ancestry route from the L7 requesting unit: its own approver, then L6 final (no unrelated unit)');
     await page.screenshot({ path: shot('A-submitted.png') });
+    // the stage label is the level's fixed label; the unit is shown apart (owner, 4 Nov 2026)
+    const routePanel = await page.locator('.rs-route').textContent();
+    const fixed = pv.routing.levels.map((l) => l.label);
+    ok(v.route.every((s) => s.kind !== 'HIERARCHY' || fixed.includes(s.label)) && routePanel.includes('الجهة: الخدمات المشتركة') && routePanel.includes('الجهة: المؤسسة'), 'A3b',
+      'stage labels are the fixed level labels; the unit of each stage is shown as a separate line', v.route.map((s) => `«${s.label}» / ${s.unit?.name}`).join(' ← '));
     // the map on the real page while the request is under review
     const legend = await page.locator('.rs-legend').textContent();
     await page.waitForTimeout(3000);
@@ -405,7 +414,7 @@ try {
     const rev = re.body.revisions?.at(-1);
     ok(re.status === 200 && rev?.changed?.length === 1 && rev.changed[0] === 'DEPLOYMENT', 'F2', 'resubmitted: only the deployment changed', `changed ${rev?.changed}`);
     const levels = pv.routing.levels;
-    const restsOnDeployment = (s) => s.kind === 'HIERARCHY' && (levels.find((x) => s.label.startsWith(x.label + ' — '))?.dependsOn ?? []).includes('DEPLOYMENT');
+    const restsOnDeployment = (s) => s.kind === 'HIERARCHY' && (levels.find((x) => s.label === x.label || s.label.startsWith(x.label + ' — '))?.dependsOn ?? []).includes('DEPLOYMENT');
     const expected = v.route.filter((s) => !s.final && restsOnDeployment(s)).map((s) => s.key).sort();
     const carriedExpected = v.route.filter((s) => !s.final && !restsOnDeployment(s)).map((s) => s.key).sort();
     ok(JSON.stringify(rev.invalidated.map((x) => x.stage).sort()) === JSON.stringify(expected) && JSON.stringify([...rev.carried].sort()) === JSON.stringify(carriedExpected), 'F3',
@@ -481,6 +490,68 @@ try {
       if (draft) requests.push({ journey: `K-${type}: ACCEPTANCE-TEST DRAFT (boundary copy), not a business request`, id: draft.id, number: draft.number, requester: user });
       ok(toast.includes(expect) && (type === 'Polygon' || drawButton === 'رسم حدود جديدة'), 'K-' + type, `«نسخ حدود الموقع الحالي» on a ${type} current site (moving unit ${movingName})`, `${toast.trim().slice(0, 150)}; draw button «${drawButton}»; draft ${draft?.number ?? 'none'}`);
     }
+  }
+
+  // ---- R: routes from L8, L9 and L10 (owner, 4 Nov 2026); the five-stage one decided on the real page ------------
+  if (run('R')) {
+    const chain = ['HR-T-PM-1-1-1', 'HR-T-PM-1-1', 'HR-T-PM-1', 'HR-T-PM', 'HR-T-ORG'];
+    for (const [i, level] of (process.env.R_LEVELS ?? '8,9,10').split(',').map(Number).entries()) {
+      const code = chain[10 - level];
+      const unit = org(code);
+      const at = east(P0[0], P0[1], 16000 + 9000 * i);
+      const reason = `قبول R: مسار من المستوى L${level} (بيانات قبول وهمية)`;
+      const r = await create('t.requester.pm', unit, content([unit], layout(at), reason), `R-L${level}`);
+      let c = await checks(r.id, 't.requester.pm');
+      // a unit outside the requesting unit's branch that shares the vacated site, where that branch is responsible for
+      // the site, needs the requester's explicit decision (O-03): here it stays
+      const stays = (c.otherBranch ?? []).filter((o) => o.decisionRequired);
+      if (stays.length) {
+        await (await as('t.requester.pm')).put(`/restationing-requests/${r.id}/content`, content([unit], layout(at), reason, { occupants: Object.fromEntries(stays.map((o) => [o.unit, 'EXCLUDED'])) }));
+        c = await checks(r.id, 't.requester.pm');
+        note(`R${level}o`, 'explicit decision for a co-located unit outside the requesting branch (O-03)', stays.map((o) => `${o.name} at ${o.siteName}: EXCLUDED (stays)`).join(', '));
+      }
+      const sub = await (await as('t.requester.pm')).post(`/restationing-requests/${r.id}/submit`, {});
+      recordRoute(`R-L${level}`, sub.body);
+      const expected = chain.slice(10 - level);
+      const units = (sub.body.route ?? []).map((s) => s.unit?.code);
+      ok(c.ok && sub.status === 200 && JSON.stringify(units) === JSON.stringify(expected) && sub.body.route.at(-1).final && sub.body.route.filter((s) => s.final).length === 1,
+        `R${level}a`, `request from L${level}: the route climbs the HR ancestry to L6 final (${expected.length} stages, no unrelated unit)`,
+        `${sub.body.route?.length} stages: ${(sub.body.route ?? []).map((s) => `${s.label}${s.unit ? ' [' + s.unit.name + ']' : ''}`).join(' ← ')}${c.ok ? '' : '; checks: ' + c.problems.join(' | ')}`);
+      if (level === 10) {
+        for (let k = 0; k < 6; k++) {
+          const v = await view(r.id);
+          const cur = v.route.find((s) => s.current);
+          if (!cur) break;
+          const p = await pageAs(deciderFor(cur));
+          await openRequest(p, r.id);
+          await press(p, 'اعتماد المرحلة');
+          if (k === 0) await p.screenshot({ path: shot('R-L10-route.png'), fullPage: true });
+          await p.context().close();
+        }
+        const v = await view(r.id);
+        ok(v.state === 'APPROVED_NOT_ACTIVATED' && v.route.every((s) => s.mark === 'APPROVED') && new Set(v.route.map((s) => s.decidedBy?.id)).size === 5, 'R10b',
+          'the five stages decided on the real page, each by its own seat holder (five different people)', `${v.state}; ${v.route.map((s) => s.decidedBy?.name).join(' ← ')}`);
+      } else {
+        const stop = await approveAll(r.id);
+        ok(stop === 'APPROVED_NOT_ACTIVATED', `R${level}b`, `decided by the ${expected.length} seat holders`, stop);
+      }
+    }
+  }
+
+  // ---- U: a requester holding only «طلب إعادة التمركز» chooses units in the real editor (owner, 4 Nov 2026) ------
+  if (run('U')) {
+    const page = await pageAs('t.requester.pm');
+    await page.goto(`${BASE}/#restationing`);
+    await page.waitForSelector('.rs-list');
+    await page.getByRole('button', { name: '＋ طلب إعادة تمركز' }).click();
+    await page.waitForTimeout(2000);
+    const options = (await page.locator('.rs-form select').first().locator('option').allTextContents()).map((o) => o.trim()).filter((o) => o && !o.startsWith('—'));
+    await page.locator('.rs-form select').first().selectOption({ label: 'وحدة الصيانة الإدارية' });
+    const moving = (await page.locator('.rs-check').allTextContents()).map((o) => o.trim());
+    await page.screenshot({ path: shot('U-editor-units.png') });
+    await page.context().close();
+    ok(JSON.stringify(options) === JSON.stringify(['قسم مشاريع المباني', 'وحدة الصيانة الإدارية', 'فريق مرافق الشمال']) && JSON.stringify(moving) === JSON.stringify(['وحدة الصيانة الإدارية', 'فريق مرافق الشمال']), 'U1',
+      'the editor offers exactly the units where the requester may request (no general view right), and the branch of the chosen one', `units: ${options.join('، ')}; moving: ${moving.join('، ')}`);
   }
 
   // ---- G: hierarchy change — not on this environment ----------------------------------------------------------------

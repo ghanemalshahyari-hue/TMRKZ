@@ -1,0 +1,116 @@
+{
+  "ranAt": "2026-11-04T08:38:55.706Z",
+  "base": "http://localhost:8088",
+  "only": [
+    "R"
+  ],
+  "policy": {
+    "version": 1,
+    "reference": "ACCEPTANCE-V3-POLICY-1"
+  },
+  "results": [
+    {
+      "id": "R10o",
+      "label": "explicit decision for a co-located unit outside the requesting branch (O-03)",
+      "result": "NOTE",
+      "extra": "وحدة الصيانة الإدارية at مستودع اللوازم الشمالي: EXCLUDED (stays)"
+    },
+    {
+      "id": "R10a",
+      "label": "request from L10: the route climbs the HR ancestry to L6 final (5 stages, no unrelated unit)",
+      "result": "PASS",
+      "extra": "5 stages: اعتماد المستوى L10 — فريق مرافق الشمال [فريق مرافق الشمال] ← اعتماد المستوى L9 — وحدة الصيانة الإدارية [وحدة الصيانة الإدارية] ← اعتماد المستوى L8 — قسم مشاريع المباني [قسم مشاريع المباني] ← اعتماد المستوى L7 — إدارة المشاريع [إدارة المشاريع] ← اعتماد المستوى L6 — المؤسسة [المؤسسة]"
+    },
+    {
+      "id": "R10b",
+      "label": "the five stages decided on the real page, each by its own seat holder (five different people)",
+      "result": "PASS",
+      "extra": "APPROVED_NOT_ACTIVATED; معتمد المستوى L10 — فريق مرافق الشمال (بيانات قبول وهمية) ← معتمد المستوى L9 — وحدة الصيانة الإدارية (بيانات قبول وهمية) ← معتمد المستوى L8 — قسم مشاريع المباني (بيانات قبول وهمية) ← مدير الإدارة العامة ← صاحب الاعتماد التجريبي"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the real page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors on the real page",
+      "result": "FAIL",
+      "extra": "t.seat.l10: Failed to load resource: the server responded with a status of 403 () | t.seat.l10: Failed to load resource: the server responded with a status of 403 () | t.seat.l10: Failed to load resource: the server responded with a status of 403 () | t.seat.l9: Failed to load resource: the server responded with a status of 403 () | t.seat.l9: Failed to load resource: the server responded with a status of 403 () | t.seat.l9: Failed to load resource: the server responded with a status of 403 () | t.seat.l8: Failed to load resource: the server responded with a status of 403 () | t.seat.l8: Failed to load resource: the server responded with a status of 403 ()"
+    }
+  ],
+  "requests": [
+    {
+      "journey": "R-L10",
+      "id": "d9d129f2-0233-4b28-9c34-8dba3c214135",
+      "number": "RS-2026-0020",
+      "requester": "t.requester.pm"
+    }
+  ],
+  "routes": [
+    {
+      "journey": "R-L10",
+      "number": "RS-2026-0020",
+      "requestingUnit": "HR-T-PM-1-1-1",
+      "stages": 5,
+      "route": [
+        {
+          "key": "H:b1c8dcc0-416f-a9c3-3824-2f89618bf0c5",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L10 — فريق مرافق الشمال",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:fc82871d-55c8-c4c7-d0f0-8a7da87fcbf9",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L9 — وحدة الصيانة الإدارية",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:851a18e6-ae51-fc9c-f94f-10739ddd4038",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L8 — قسم مشاريع المباني",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:373032ba-3812-3f3c-a4cf-1517dbc0fcea",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7 — إدارة المشاريع",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6 — المؤسسة",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    }
+  ]
+}

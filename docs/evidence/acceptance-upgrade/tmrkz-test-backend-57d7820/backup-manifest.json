@@ -1,0 +1,15 @@
+{
+  "project": "tmrkz-test",
+  "createdAt": "20261104T084926Z",
+  "application": "mover-backend 1.0.0",
+  "schemaVersion": "19",
+  "files": {
+    "db.dump": "056d8487f3f8ea4e8c5fff50cd668e43a211fa4b17630f3d4f11aa7f8663a88f",
+    "keycloak.dump": "e3c1e143f746d0b4cf88786d4cc1e4bde53a691844ca81876f8126bbfa415262",
+    "openfga.dump": "305b198e35ad33f8df16d4d42f2c0aec6afaf3a86c4b5af010b88344b77e589b",
+    "identity-fingerprint.txt": "dd3561f54e64963446fd54ca4942878829c4225f815cb5c083d279945401a2dc",
+    "files.tgz": "875a2d5007784ec57c03d884b87e0a2c7408f08e68ad3434713d183b3a778b1b",
+    "map-packages.tgz": "7ea04e8859bb4e0e798c1d671c3bf6e07de06f25ccfe923cec8740f722948378",
+    "fingerprint.txt": "5a0375fd1aff1d53f909d45888f22223b7e75087ff7279cd2838657c5d3b991d"
+  }
+}

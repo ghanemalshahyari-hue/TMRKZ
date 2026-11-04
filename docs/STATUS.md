@@ -265,8 +265,33 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
       Six acceptance-test drafts are recorded: RS-2026-0008/0009/0010 and 0014/0015/0016.
     - **Not exercised on `tmrkz-test`:** routes from L8–L10 (no fictional requesters or seats below L7); a terrain tie
       on real cells; a second account of the same human (backend evidence accepted by the owner).
-  - **Not yet:** extensions, early return, cancellation before start, vertex editing, grouped MultiPolygon copy and
-    move, production packaging of the page and map data, real non-production Oracle, real touch.
+  - **Owner verdict (4 Nov): functionally accepted, NOT production ready.** Owner confirmations are recorded in the
+    ADR-033 amendment: stage facts, stage labels, G via HR sync, MultiPolygon target, the audit and label-overlap items
+    before production.
+  - **Batch after the verdict — local commit `57d7820` (owner-approved), deployed to `tmrkz-test` and re-checked:**
+    - the stage label is the level label alone, with the unit and the decider shown apart;
+    - the policy publication audit records stable identity, role, organisation, time, version and reference;
+    - map labels never overlap, and a MultiPolygon current site is drawn whole;
+    - `GET /restationing-requests/units` serves single-action requesters; the shell asks only for lists its rights
+      allow.
+
+    Tests: backend 198/198, frontend 94/94, build OK. Deployment: backend `mover/backend:rel-57d7820` (no migration,
+    6,841 rows unchanged), web `mover/web:rel-57d7820-v3`. Re-check on the real page: 15/15, 0 console errors (fixed
+    labels with the unit apart, the five-stage route by seat-only approvers, the single-action requester's units,
+    labels apart on the map). Remaining visual item: a long mixed Arabic/Latin site label wraps and splits the
+    request number.
+  - **Routes from L8–L10 in the real application** (fictional accounts and seats, owner decision): 3, 4 and 5 stages
+    pass; the five-stage one was decided on the page by five different people. Requests RS-2026-0017/0018/0020;
+    RS-2026-0019 is a DRAFT stopped correctly by O-03. Evidence:
+    `docs/evidence/acceptance-journeys/stationing-v3/ROUTES-L8-L10.md`.
+  - **Before production readiness (owner list):**
+    - extensions, early return, cancellation before start;
+    - grouped MultiPolygon copy and move;
+    - corner/vertex editing;
+    - the long mixed-label wrap on the map;
+    - production packaging of the page and map data;
+    - a controlled terrain-tie scenario (preferred);
+    - real non-production Oracle, real touch.
 
 - **Stationing V3 after the stop gate (4 Nov 2026, owner decisions 1–6): foundation built and tested, NOT active —
   no page uses it.** Report `docs/audit/stationing-v3-production/CONTINUATION_REPORT.md`; ADR-031, ADR-032, ADR-028
