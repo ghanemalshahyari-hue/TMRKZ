@@ -1,0 +1,15 @@
+{
+  "project": "tmrkz-migpath",
+  "createdAt": "20261104T031228Z",
+  "application": "mover-backend 1.0.0",
+  "schemaVersion": "17",
+  "files": {
+    "db.dump": "d3bc313bbabb73c152103c28bc76342e1ee569228adf7f94b40ca5abe55c8360",
+    "keycloak.dump": "0b69294b222e0b5cef356e9873baf13cc8520fdf4be861347dbeb888e9d0c9e8",
+    "openfga.dump": "96ce8ccebb15b8116067a23a6039cc073544c4fbce987cee55029dbf28252c84",
+    "identity-fingerprint.txt": "75c9fae8dc74e96bbf65cdee145cce80ae4fffc0021edd046cdf737bd700f4b7",
+    "files.tgz": "7cd00f47790665fac075d3f68e250024bba05c587e6d0b2b59aedf18d85e17ec",
+    "map-packages.tgz": "4a171dab87943a5eb02e3c020346a9d50a8fd4e08e5ff4b69cd98754ffff1099",
+    "fingerprint.txt": "6ebfb65b9cb04594a225ee4b5e18a2d22e3aecfc12b4f2e9e0fddca3b107c49b"
+  }
+}

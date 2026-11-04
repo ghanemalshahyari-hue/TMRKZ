@@ -445,3 +445,35 @@ Report: `docs/audit/stationing-v3-production/STOP_GATE_REPORT.md`. Run with
 | Policy validation | `StationingPolicy.problems` | policy (2) | Pass |
 | UI inactive | `frontend/src/lib/stationingV3.ts` | `stationingV3.test.ts` (4) | Pass (flag off; not routed) |
 
+
+## Stationing V3 foundation (2026-11-04, ADR-031/ADR-032, migration V18; owner stop-gate decisions 1–6)
+
+Report: `docs/audit/stationing-v3-production/CONTINUATION_REPORT.md`. Run with
+`sh ops/test-backend.sh StationingRulesTest,StationingFoundationIT,StationingAdaptersIT,AuthorizationIT`,
+`python -m pytest ops/terrain`, `node tests/acceptance/maplibre-labels.mjs`.
+
+| Owner decision / requirement | Production code | Test | Status |
+|---|---|---|---|
+| D1 V17 clean path through the release mechanism (schema, backup/plan, migration, history, schema after, integrity, ADR-028, compatibility) | `ops/verify-migration-path.sh`, `ops/sql/checks/V17-after.sql`, `ops/backup.sh` (numeric schema version), `ops/sql/upgrade-rows.sql` (+execution steps) | `docs/evidence/migration-path/v17/`; `ExecutionIntegrityIT` 5, `ExecutionInFlightIT` 5, `V17MigrationIT` 1 | Pass |
+| D1 acceptance DB brought to V17 (owner, 4 Nov), labelled ACCEPTANCE / V17 | `ops/test-env/upgrade-backend.sh` | `docs/evidence/acceptance-upgrade/tmrkz-test-v17/` (6,340 rows unchanged, journey PASS) | Done (acceptance only) |
+| D1 check migration gates before `up.sh` | `ops/test-env/migration-gate.sh` (sourced by `up.sh`, `up-offline.sh`) | dry check: refuses [18] with exit 3, allows only `TMRKZ_APPLY_MIGRATIONS="18"` | Pass |
+| Next gate (owner, 4 Nov): V18 not applied to `tmrkz-test` until section 9 of the report is reviewed | (no change to `tmrkz-test`) | — | Held |
+| Minimum schema, next valid number (V18) | `V18__stationing_foundation.sql` (5 tables + raster extension) | clean V18 path `docs/evidence/migration-path/v18/` (133/133 unchanged, journey PASS) | Pass (disposable); acceptance DB waits for review |
+| Versioned policy with author, reason, reference, effective date, previous/new values; pinned version | `StationingPolicyStore`, `stationing_policy_version` (append-only trigger) | `StationingFoundationIT.schema`, `.policyVersions`, `.terrainClasses` (pinned v1) | Pass |
+| D2 slope percent from the DEM, FAO initial classes, half-open bands, thresholds as policy | `StationingPolicy.SlopeClassification`, `StationingPolicyDefaults`, `TerrainClassifier.classOf` | `StationingRulesTest` slope bands (4); `StationingFoundationIT.terrainClasses` | Pass |
+| Next gate: ROLLING shows the provisional label «تضاريس متدرجة»; code and thresholds unchanged | `StationingPolicyDefaults.FAO_SLOPE_CLASSES` | `StationingRulesTest`, `StationingFoundationIT` | Pass |
+| D2 class ≠ allowance; allowance maximum only; no invented allowance | `StationingPolicy.terrainAllowancesM`, `problems()` | slope bands; `minAndMaxIsNeverPublishableTheMinimumStays` | Pass |
+| D2 largest share, priority tie, block without priority; full audit fields | `TerrainClassifier.assess` → `TerrainRule` | `StationingFoundationIT.terrainClasses` | Pass |
+| D3 GLO-30 reused from MOVER with provenance, sea cells, DSM limitation, derived products separate | `ops/terrain/*`, `map-packages/terrain-glo30-2026.11/manifest.json` | `pytest ops/terrain` 13; `ops/terrain/verify-postgis.sh` (pixel centre exact, refusal exit 4, 167 ms) | Pass |
+| Next gate: Copernicus licence notices (raw 6(a), derived 6(b), no liability 6(c), no endorsement 6(d)); dataset/product id, source tiles, original and derived checksums, processing version, licence reference and date | `ops/terrain/make_manifest.py` → `manifest.json` `licence`, `LICENSE-NOTICE.txt`; `offlineStyle.ts` `TERRAIN_ATTRIBUTION` | official licence PDF sha256 `9cd37d37…51bd` checked 2026-11-04; `maplibre-labels.mjs` M-7 (attribution shown) | Pass |
+| Next gate: terrain load separate from V18, restartable, idempotent, validated by row and cell counts, provenance-aware, removable and rebuildable without touching business records | `ops/terrain/load-slope.sh`, `ops/terrain/slope_plan.py`, `ops/terrain/unload-slope.sh` | `docs/evidence/terrain-load/loader-checks-2026-11-04.txt` (12 steps); `test_load_plan_counts_cells_and_refuses_a_manifest_that_disagrees` | Pass (disposable, two-tile subset) |
+| D3 real data reaches the business rule | `terrain_slope` + `TerrainClassifier` | `StationingFoundationIT.terrainOnRealFixture` (6,400 cells as expected) | Pass |
+| Authoritative stationing by data correction; history kept | `StationingRegister.correct`, `org_stationing` (exclusion) | `StationingFoundationIT.correctionAndReadContract` | Pass |
+| O-15 link ≠ stationing/occupancy | `StationingRegister.link/endLink`, `site_link` | `StationingFoundationIT.linksAreNotStationing` | Pass |
+| O-01 outbox in the same transaction; sender test transport; sequence per unit; replay audited | `StationingOutbox`, `HttpStationingDestination`, `StationingOutboxProcessor` | `StationingFoundationIT.outboundDelivery` | Pass (no consumer connected) |
+| O-01 read API filtered by VIEW scope, OpenFGA-confirmed | `StationingController` `/stationing/current`, `/organizations/{id}/history`, `/site-links` | `StationingFoundationIT` (other branch sees nothing / 404) | Pass |
+| OpenFGA: CORRECT_STATIONING, MANAGE_SITE_LINKS, REPLAY_STATIONING_EVENTS | `Permission`, generated `AuthzModel`, `docs/authz/model.fga` | `AuthorizationIT.modelPublished` | Pass |
+| D5 MapLibre, built-in Arabic shaping, offline fonts, street/terrain, zero egress | `frontend/src/components/map/maplibre/` (not wired) | `tests/acceptance/maplibre-labels.mjs` 21 PASS, 0 external requests; `offlineStyle.test.ts` 6 | Pass |
+| Next gate: brackets fixed locally, no global page-direction change | `glyphDirection.ts` `drawGlyphsLeftToRight`, called by `OfflineMapLibre` | `maplibre-labels.mjs` G-8a PASS on `<html dir="rtl">`, G-8b cross-check, G-8c control (defect without the fix); `glyphDirection.test.ts` 3 | Pass |
+| D4 real non-production Oracle | — | — | Release gate (not available) |
+| D6 real touch device | — | — | Release gate (not available) |

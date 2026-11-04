@@ -1,10 +1,10 @@
 /**
- * Stationing Model V3 (docs/STATIONING_MODEL_V3_AR.md) — production domain logic prepared before its schema.
+ * Stationing Model V3 (docs/STATIONING_MODEL_V3_AR.md) — domain logic and its foundation persistence (ADR-031, V18).
  *
- * <p>Four concepts stay separate: the Oracle hierarchy ({@link ae.mover.stationing.OrgHierarchy}), the site ↔ unit link,
- * authoritative stationing and facility responsibility (the existing {@code site_responsibility}); occupancy is its own
- * concept ({@link ae.mover.stationing.OccupancyRule}). The link, stationing, occupancy, deployment-area, policy-version
- * and outbox tables are proposed in the stop-gate report and are created only after ADR-028/V17 is deployed with the
- * owner's approval. Nothing in this package is wired into a user-visible path yet.
+ * <p>Four concepts stay separate: the Oracle hierarchy ({@link ae.mover.stationing.OrgHierarchy}), the site ↔ unit link
+ * ({@code site_link}), authoritative stationing ({@code org_stationing}) and facility responsibility (the existing
+ * {@code site_responsibility}); occupancy is its own concept ({@link ae.mover.stationing.OccupancyRule}). V18 holds the
+ * versioned policy, stationing, links, the outbound outbox and the terrain slope dataset; re-stationing requests,
+ * deployment areas and their routes follow with the request workflow. No page uses this package yet.
  */
 package ae.mover.stationing;

@@ -1,0 +1,33 @@
+Terrain load safeguards — ops/terrain/load-slope.sh and ops/terrain/unload-slope.sh (owner next-gate decision, 4 Nov 2026)
+
+Target: disposable container tmrkz-terrain-check (postgis/postgis:17-3.5-alpine, --memory 1g, no published port), created
+for this run and removed afterwards. Schema: migration V18 applied with psql -1 over stub person/organization/site/
+audit_event tables and btree_gist. Data: a two-tile subset of the real GLO-30 2026.11 analysis product
+(slope_pct_x100_N24E052.tif sha256 47a21340…56e6, slope_pct_x100_N24E055.tif sha256 3cdf14c7…bd37), its own SHA256SUMS
+(product sha256 43b8e9cf5d415a4fe9c3ce3c5c403561cf89d4e6e420a5c3d9f5e70e7888e9f1) and a manifest filtered to the two
+files. Fictional business rows: one person, organisation, site, outbox event and audit row.
+
+ 1 plan (dry run)                         rows to insert 450 tiles of 256x256; cells 25920000, of which 25919999
+                                          with a value; exit 3
+ 2 load into tmrkz-mover                  "refused: tmrkz-mover is the owner-retained production project"; exit 2
+ 3 load, manifest nodata off by 7         ERROR: terrain load: 25919999 cells with a value, expected 25919992;
+                                          "load failed and was rolled back; nothing was kept"; exit 1;
+                                          terrain_dataset 0 rows, terrain_slope 0 rows
+ 4 load                                   NOTICE: terrain check: 450 rows, 25920000 cells, 25919999 with a value;
+                                          copernicus-glo30 | 2026.11 | 43b8e9cf…e9f1 | 450 | 58 MB; 8 s; exit 0
+ 5 same product again                     NOTICE: terrain check: 450 rows, 25920000 cells, 25919999 with a value;
+                                          "same product already loaded and checked; nothing to do"; exit 0
+ 6 one tile deleted, same product again   ERROR: terrain load: 449 rows, expected 450; "loaded but fails the checks;
+                                          remove it (unload-slope.sh) and load again"; exit 5
+   policy version 1, in force, names copernicus-glo30 2026.11
+ 7 unload                                 "refused: policy version(s) 1 use this dataset"; exit 4
+ 8 unload plan, ALLOW_POLICY_REFERENCE=1  "dry run: set CONFIRM_TARGET=… to remove"; exit 3
+ 9 unload from tmrkz-mover                refused; exit 2
+10 unload, ALLOW_POLICY_REFERENCE=1       "removed copernicus-glo30 2026.11; business tables unchanged"; exit 0;
+                                          policy versions/outbox/audit 1/1/1 before and 1/1/1 after;
+                                          terrain_dataset 0, terrain_slope 0
+11 reload (rebuild)                       NOTICE: terrain check: 450 rows, 25920000 cells, 25919999 with a value;
+                                          same product sha256; 9 s; exit 0
+12 unload of version 2099.01              "not loaded; nothing to do"; exit 0
+
+python -m pytest ops/terrain: 13 passed.

@@ -1,0 +1,100 @@
+{
+  "source": "Copernicus GLO-30 slope analysis product, tile N24E055, rows 3200-3359, cols 2780-2939",
+  "encoding": "SLOPE_PERCENT_X100_FLOOR_U16 (uint16 = min(65534, floor(slope_percent*100)), nodata 65535)",
+  "bbox": [
+    55.772083333333335,
+    24.066805555555554,
+    55.81652777777778,
+    24.11125
+  ],
+  "srid": 4326,
+  "size": [
+    160,
+    160
+  ],
+  "tile": 64,
+  "tiles": 9,
+  "files": {
+    "slope-fixture-N24E055.tif": "414844af707eb05211a766f7cc967c7ab2de6f9eb84dc7f6c9f10362b4064324",
+    "slope-fixture.hexwkb": "097eb042092a60fdc172c0f7f10ae436e36a7727ee78c7d59504589d9588be0e"
+  },
+  "testPolygon": {
+    "type": "Polygon",
+    "coordinates": [
+      [
+        [
+          55.7750694444,
+          24.0860416667
+        ],
+        [
+          55.7972916667,
+          24.0860416667
+        ],
+        [
+          55.7972916667,
+          24.1082638889
+        ],
+        [
+          55.7750694444,
+          24.1082638889
+        ],
+        [
+          55.7750694444,
+          24.0860416667
+        ]
+      ]
+    ]
+  },
+  "classes": [
+    {
+      "code": "FLAT",
+      "min": 0,
+      "max": 200
+    },
+    {
+      "code": "UNDULATING",
+      "min": 200,
+      "max": 1000
+    },
+    {
+      "code": "ROLLING",
+      "min": 1000,
+      "max": 1500
+    },
+    {
+      "code": "HILLY",
+      "min": 1500,
+      "max": 3000
+    },
+    {
+      "code": "MOUNTAINOUS",
+      "min": 3000,
+      "max": null
+    }
+  ],
+  "expectedCellsPixelCentre": {
+    "FLAT": 2737,
+    "UNDULATING": 2261,
+    "ROLLING": 177,
+    "HILLY": 484,
+    "MOUNTAINOUS": 741
+  },
+  "expectedCellsTotalPixelCentre": 6400,
+  "expectedCellsAllTouched": {
+    "FLAT": 2790,
+    "UNDULATING": 2297,
+    "ROLLING": 190,
+    "HILLY": 505,
+    "MOUNTAINOUS": 779
+  },
+  "expectedCellsTotalAllTouched": 6561,
+  "allFixtureCells": {
+    "FLAT": 13115,
+    "UNDULATING": 6452,
+    "ROLLING": 488,
+    "HILLY": 1267,
+    "MOUNTAINOUS": 4278
+  },
+  "attribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+  "limitation": "DSM, not bare-earth terrain. Test data only."
+}

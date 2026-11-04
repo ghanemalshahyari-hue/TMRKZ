@@ -1,0 +1,271 @@
+{
+  "ranAt": "2026-11-04T05:18:44.542Z",
+  "browser": "Microsoft Edge (headless, playwright-core)",
+  "harness": "http://127.0.0.1:5197",
+  "hillshade": "map-data/terrain/glo30/visualization/hillshade.pmtiles",
+  "summary": {
+    "passed": 21,
+    "failed": 0,
+    "knownDefects": [
+      "G-8c"
+    ],
+    "changed": []
+  },
+  "external": 0,
+  "checks": [
+    {
+      "id": "G-0",
+      "title": "MapLibre 6.15.0: no right-to-left plugin configured or loaded",
+      "result": "PASS",
+      "detail": "deprecated plugin API status: requested; no rtl-text script requested"
+    },
+    {
+      "id": "G-1",
+      "title": "Arabic labels joined and ordered right to left (both document setups)",
+      "result": "PASS",
+      "detail": "rtl document: ar-1 match=0.922 margin=0.661 aspect=0.005; ar-2 match=0.948 margin=0.743 aspect=0.014; ar-3 match=0.96 margin=0.729 aspect=0.013; ar-4 match=0.957 margin=0.726 aspect=0.02 || ltr document, rtl body: ar-1 match=0.922 margin=0.661 aspect=0.005; ar-2 match=0.948 margin=0.743 aspect=0.014; ar-3 match=0.96 margin=0.729 aspect=0.013; ar-4 match=0.957 margin=0.726 aspect=0.02"
+    },
+    {
+      "id": "G-2",
+      "title": "English labels (both document setups)",
+      "result": "PASS",
+      "detail": "rtl document: en-1 match=0.978 aspect=0.031; en-2 match=0.877 aspect=0.006 || ltr document, rtl body: en-1 match=0.978 aspect=0.031; en-2 match=0.877 aspect=0.006"
+    },
+    {
+      "id": "G-3",
+      "title": "mixed Arabic + Latin labels in bidirectional order (both document setups)",
+      "result": "PASS",
+      "detail": "rtl document: mix-1 match=0.962 margin=0.726 aspect=0.023; mix-2 match=0.988 margin=0.54 aspect=0.027 || ltr document, rtl body: mix-1 match=0.962 margin=0.726 aspect=0.023; mix-2 match=0.988 margin=0.54 aspect=0.027"
+    },
+    {
+      "id": "G-4",
+      "title": "route numbers (both document setups)",
+      "result": "PASS",
+      "detail": "rtl document: route-1 match=0.935 aspect=0.019; route-2 match=0.962 aspect=0.043 || ltr document, rtl body: route-1 match=0.935 aspect=0.019; route-2 match=0.962 aspect=0.043"
+    },
+    {
+      "id": "G-5",
+      "title": "punctuation (brackets, Arabic comma, guillemets, question mark) (both document setups)",
+      "result": "PASS",
+      "detail": "rtl document: punct-1 match=0.985 margin=0.617 aspect=0.027; punct-2 match=0.971 margin=0.673 aspect=0.007 || ltr document, rtl body: punct-1 match=0.985 margin=0.617 aspect=0.027; punct-2 match=0.971 margin=0.673 aspect=0.007"
+    },
+    {
+      "id": "G-6",
+      "title": "Arabic-Indic and Western numerals (both document setups)",
+      "result": "PASS",
+      "detail": "rtl document: num-ar match=0.988 margin=0.712 aspect=0; num-west match=0.946 margin=0.724 aspect=0.004 || ltr document, rtl body: num-ar match=0.988 margin=0.712 aspect=0; num-west match=0.946 margin=0.724 aspect=0.004"
+    },
+    {
+      "id": "G-7",
+      "title": "the score rejects deliberately broken text (isolated letters, reversed order, no shaping and no bidi)",
+      "result": "PASS",
+      "detail": "broken-isolated match=0.277 margin=-0.653 aspect=0.249; broken-reversed match=0.223 margin=0.054 aspect=0; broken-no-shaping-no-bidi match=0.051 margin=-0.949 aspect=0.135"
+    },
+    {
+      "id": "G-8a",
+      "title": "bracket and guillemet mirroring on the application RTL document (<html dir=\"rtl\">) with the module fix (left-to-right glyph canvases)",
+      "result": "PASS",
+      "detail": "mirror-1 match=0.932 margin=0.274 aspect=0.004"
+    },
+    {
+      "id": "G-8b",
+      "title": "bracket and guillemet mirroring on <html dir=\"ltr\">, <body dir=\"rtl\"> (cross-check: the same result)",
+      "result": "PASS",
+      "detail": "mirror-1 match=0.932 margin=0.274 aspect=0.004"
+    },
+    {
+      "id": "G-8c",
+      "title": "control: the same RTL document without the fix (MapLibre/TinySDF upstream behaviour)",
+      "result": "KNOWN-DEFECT",
+      "detail": "double mirror reproduced without the fix — brackets point outwards: mirror-1 match=0.648 margin=-0.336 aspect=0.004"
+    },
+    {
+      "id": "M-1",
+      "title": "Arabic road names drawn on the basemap (Dubai, z14)",
+      "result": "PASS",
+      "detail": "62 Arabic of 67 road labels; e.g. 24a شارع | 20a شارع | 14d شارع | 28b شارع"
+    },
+    {
+      "id": "M-2",
+      "title": "route numbers drawn as shields",
+      "result": "PASS",
+      "detail": "17 route labels: D90, D71, D92, D86, E11, D72"
+    },
+    {
+      "id": "M-3",
+      "title": "English road names (label language English)",
+      "result": "PASS",
+      "detail": "53 English road labels; e.g. 20a Street | 14d Street | 28b Street | 79th Street"
+    },
+    {
+      "id": "M-4",
+      "title": "collision handling: no overlapping placed labels (z16, Dubai)",
+      "result": "PASS",
+      "detail": {
+        "boxes": 22,
+        "circles": 114,
+        "placedFeatures": 37,
+        "overlaps": 0,
+        "sample": []
+      }
+    },
+    {
+      "id": "M-5",
+      "title": "zoom transitions 8→17→9: idle at every step, labels present, no map errors",
+      "result": "PASS",
+      "detail": {
+        "steps": [
+          {
+            "zoom": 8,
+            "labels": 44
+          },
+          {
+            "zoom": 10,
+            "labels": 57
+          },
+          {
+            "zoom": 12,
+            "labels": 107
+          },
+          {
+            "zoom": 13,
+            "labels": 77
+          },
+          {
+            "zoom": 14,
+            "labels": 90
+          },
+          {
+            "zoom": 15,
+            "labels": 43
+          },
+          {
+            "zoom": 16,
+            "labels": 22
+          },
+          {
+            "zoom": 17,
+            "labels": 2
+          },
+          {
+            "zoom": 15,
+            "labels": 43
+          },
+          {
+            "zoom": 12,
+            "labels": 107
+          },
+          {
+            "zoom": 9,
+            "labels": 64
+          }
+        ],
+        "errors": []
+      }
+    },
+    {
+      "id": "M-6",
+      "title": "street mode: OSM notice and attribution shown, overlay drawn",
+      "result": "PASS",
+      "detail": {
+        "camera": {
+          "lng": 56.13,
+          "lat": 24.81,
+          "zoom": 12,
+          "bearing": 0,
+          "pitch": 0
+        },
+        "overlay": [
+          "visible",
+          "visible",
+          "visible"
+        ],
+        "selected": true,
+        "street": "visible",
+        "terrain": "none",
+        "labels": "visible",
+        "notice": "أسماء الطرق من OpenStreetMap وليست أسماء رسمية",
+        "attribution": "© OpenStreetMap contributors (ODbL) · Protomaps — أسماء الطرق من OpenStreetMap وليست أسماء رسمية",
+        "lumaStd": 13.74
+      }
+    },
+    {
+      "id": "M-7",
+      "title": "terrain mode: GLO-30 hillshade drawn, DSM notice and Copernicus attribution, overlay/selection/camera unchanged",
+      "result": "PASS",
+      "detail": {
+        "hillshade": "map-data/terrain/glo30/visualization/hillshade.pmtiles",
+        "camera": {
+          "lng": 56.13,
+          "lat": 24.81,
+          "zoom": 12,
+          "bearing": 0,
+          "pitch": 0
+        },
+        "overlay": [
+          "visible",
+          "visible",
+          "visible"
+        ],
+        "selected": true,
+        "street": "none",
+        "terrain": "visible",
+        "labels": "visible",
+        "notice": "طبيعة الأرض: Copernicus GLO-30 — نموذج سطح DSM وليس تضاريس رسمية (للعرض فقط)",
+        "attribution": "© OpenStreetMap contributors (ODbL) · Protomaps — أسماء الطرق من OpenStreetMap وليست أسماء رسمية | produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+        "lumaStd": 33.01
+      }
+    },
+    {
+      "id": "M-8",
+      "title": "back to street mode: same camera, overlay and selection; terrain hidden",
+      "result": "PASS",
+      "detail": {
+        "camera": {
+          "lng": 56.13,
+          "lat": 24.81,
+          "zoom": 12,
+          "bearing": 0,
+          "pitch": 0
+        },
+        "overlay": [
+          "visible",
+          "visible",
+          "visible"
+        ],
+        "selected": true,
+        "street": "visible",
+        "terrain": "none",
+        "labels": "visible",
+        "notice": "أسماء الطرق من OpenStreetMap وليست أسماء رسمية",
+        "attribution": "© OpenStreetMap contributors (ODbL) · Protomaps — أسماء الطرق من OpenStreetMap وليست أسماء رسمية",
+        "lumaStd": 13.74
+      }
+    },
+    {
+      "id": "F-1",
+      "title": "every character of every drawn label is covered by the packaged Noto Sans Arabic file",
+      "result": "PASS",
+      "detail": "328 distinct labels; missing: none"
+    },
+    {
+      "id": "A-1",
+      "title": "air-gapped run: zero requests outside the harness",
+      "result": "PASS",
+      "detail": {
+        "external": 0,
+        "sample": [],
+        "localRequests": 315,
+        "fontRequests": [
+          "/fonts/NotoSansArabic.ttf"
+        ]
+      }
+    },
+    {
+      "id": "A-2",
+      "title": "no console or page errors",
+      "result": "PASS",
+      "detail": []
+    }
+  ]
+}

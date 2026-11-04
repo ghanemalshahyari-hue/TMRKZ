@@ -38,6 +38,12 @@ type system
     define view_source_identifiers_any: [grant#holder]
     define close: [grant#holder]
     define close_any: [grant#holder]
+    define correct_stationing: [grant#holder]
+    define correct_stationing_any: [grant#holder]
+    define manage_site_links: [grant#holder]
+    define manage_site_links_any: [grant#holder]
+    define replay_stationing_events: [grant#holder]
+    define replay_stationing_events_any: [grant#holder]
 
 type organization
   relations
@@ -100,6 +106,18 @@ type organization
     define close_tree: [grant#holder]
     define close_inh: close_tree or close_inh from parent
     define close: close_here or close_inh or close from system
+    define correct_stationing_here: [grant#holder]
+    define correct_stationing_tree: [grant#holder]
+    define correct_stationing_inh: correct_stationing_tree or correct_stationing_inh from parent
+    define correct_stationing: correct_stationing_here or correct_stationing_inh or correct_stationing from system
+    define manage_site_links_here: [grant#holder]
+    define manage_site_links_tree: [grant#holder]
+    define manage_site_links_inh: manage_site_links_tree or manage_site_links_inh from parent
+    define manage_site_links: manage_site_links_here or manage_site_links_inh or manage_site_links from system
+    define replay_stationing_events_here: [grant#holder]
+    define replay_stationing_events_tree: [grant#holder]
+    define replay_stationing_events_inh: replay_stationing_events_tree or replay_stationing_events_inh from parent
+    define replay_stationing_events: replay_stationing_events_here or replay_stationing_events_inh or replay_stationing_events from system
 
 type site
   relations
@@ -204,6 +222,27 @@ type site
     define close_direct: close_here or close_inh
     define close_req: close_direct or close from responsible
     define close: close_req or close_contains or close from system
+    define correct_stationing_here: [grant#holder]
+    define correct_stationing_tree: [grant#holder]
+    define correct_stationing_contains: [grant#holder]
+    define correct_stationing_inh: correct_stationing_tree or correct_stationing_inh from parent
+    define correct_stationing_direct: correct_stationing_here or correct_stationing_inh
+    define correct_stationing_req: correct_stationing_direct or correct_stationing from responsible
+    define correct_stationing: correct_stationing_req or correct_stationing_contains or correct_stationing from system
+    define manage_site_links_here: [grant#holder]
+    define manage_site_links_tree: [grant#holder]
+    define manage_site_links_contains: [grant#holder]
+    define manage_site_links_inh: manage_site_links_tree or manage_site_links_inh from parent
+    define manage_site_links_direct: manage_site_links_here or manage_site_links_inh
+    define manage_site_links_req: manage_site_links_direct or manage_site_links from responsible
+    define manage_site_links: manage_site_links_req or manage_site_links_contains or manage_site_links from system
+    define replay_stationing_events_here: [grant#holder]
+    define replay_stationing_events_tree: [grant#holder]
+    define replay_stationing_events_contains: [grant#holder]
+    define replay_stationing_events_inh: replay_stationing_events_tree or replay_stationing_events_inh from parent
+    define replay_stationing_events_direct: replay_stationing_events_here or replay_stationing_events_inh
+    define replay_stationing_events_req: replay_stationing_events_direct or replay_stationing_events from responsible
+    define replay_stationing_events: replay_stationing_events_req or replay_stationing_events_contains or replay_stationing_events from system
 
 type resource
   relations
@@ -236,6 +275,12 @@ type resource
     define view_source_identifiers: view_source_identifiers_here or view_source_identifiers from system
     define close_here: [grant#holder]
     define close: close_here or close from system
+    define correct_stationing_here: [grant#holder]
+    define correct_stationing: correct_stationing_here or correct_stationing from system
+    define manage_site_links_here: [grant#holder]
+    define manage_site_links: manage_site_links_here or manage_site_links from system
+    define replay_stationing_events_here: [grant#holder]
+    define replay_stationing_events: replay_stationing_events_here or replay_stationing_events from system
 
 type request
   relations
@@ -273,6 +318,12 @@ type request
     define view_source_identifiers_task: view_source_identifiers from related_org or view_source_identifiers_direct from site or view_source_identifiers from resource or view_source_identifiers from system
     define close: close from related_org or close_req from site or close from resource or close from system
     define close_task: close from related_org or close_direct from site or close from resource or close from system
+    define correct_stationing: correct_stationing from related_org or correct_stationing_req from site or correct_stationing from resource or correct_stationing from system
+    define correct_stationing_task: correct_stationing from related_org or correct_stationing_direct from site or correct_stationing from resource or correct_stationing from system
+    define manage_site_links: manage_site_links from related_org or manage_site_links_req from site or manage_site_links from resource or manage_site_links from system
+    define manage_site_links_task: manage_site_links from related_org or manage_site_links_direct from site or manage_site_links from resource or manage_site_links from system
+    define replay_stationing_events: replay_stationing_events from related_org or replay_stationing_events_req from site or replay_stationing_events from resource or replay_stationing_events from system
+    define replay_stationing_events_task: replay_stationing_events from related_org or replay_stationing_events_direct from site or replay_stationing_events from resource or replay_stationing_events from system
     define view_full: creator or view
     define view_any: view_full or view_summary
     define info_view: info_member from info_org

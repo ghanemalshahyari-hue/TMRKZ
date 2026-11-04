@@ -891,3 +891,164 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   `/docs/` on port 8088); a `Dockerfile.dockerignore` entry would make this permanent — not changed, outside this
   approval. The live feedback/placement difference for touching boundaries is left to the owner. The isolated
   prototype keeps its own `svgBasemap.ts`.
+
+## ADR-031 Stationing V3 foundation: versioned policy with slope classification, authoritative stationing, links, outbound outbox, terrain slope dataset — Accepted for acceptance development (2026-11-04)
+
+- **Context.** Owner stop-gate decisions of 4 Nov 2026 (`docs/STATIONING_MODEL_V3_AR.md`, stop-gate report
+  `docs/audit/stationing-v3-production/STOP_GATE_REPORT.md`): V17 approved for the non-production path; terrain classes
+  from SLOPE PERCENT of the approved DEM with the FAO gradients as the initial versioned policy; Copernicus GLO-30 (a
+  DSM) as the fallback production terrain source; MapLibre as the renderer; real Oracle and real touch remain release
+  gates. "Prefer the minimum schema that supports the approved model; every persisted field maps to an owner-approved
+  requirement."
+- **Schema review of the stop-gate proposal S1–S6.**
+  - Kept: S3 `stationing_policy_version`; S2 `org_stationing` and `site_link`; S5 `terrain_dataset` + `terrain_slope`;
+    S6 `stationing_outbox`.
+  - Deferred (no behaviour writes them yet): S4 re-stationing request tables and S5 `deployment_area` — with the request
+    workflow, so their shape follows the implemented lifecycle; S1 `site.source_system/external_id/source_version` —
+    until a site-system adapter exists (events carry `siteExternalId` null meanwhile); S1 `organization.level` — the
+    hierarchy reads the level from the PUBLISHED HR snapshot (`OrganizationHierarchy`).
+  - Dropped: S2 `site_occupancy` — approved use is already recorded as reservations, so occupancy is the query
+    "stationing that stays ∪ active reservations"; S6 `stationing_outbox_audit` — replays go to `audit_event`.
+  - Not reused: `outbox_event` (its processor treats every pending row as an in-app notification and would mark an
+    external delivery DONE); `policy_version` (global settings without effective date, reason or reference).
+- **Decision — policy.** One complete value set per version (`StationingPolicy`), append-only (trigger), with author,
+  reason, reference, effective time (never backdated) and the previous version; the version in force is the newest
+  whose effective time has come, so a newer version also supersedes an older scheduled one. Publishing needs CONFIGURE
+  over every organisation and is audited with the previous and new value of every changed key.
+  `terrain_slope_classification` = the approved dataset (code, version) + contiguous half-open bands [from, to) from 0
+  with an open last band, labels in Arabic, thresholds with at most two decimals below 655.34 %; initial values
+  `StationingPolicyDefaults.FAO_SLOPE_CLASSES` (FLAT 0–2, UNDULATING 2–10, ROLLING 10–15, HILLY 15–30, MOUNTAINOUS 30+).
+  Allowances are a separate map; every class needs an explicit value (0 is explicit; none is assumed). MIN_AND_MAX is
+  never publishable (the minimum stays, O-06). A dataset change is a new policy version.
+- **Decision — terrain.** The analysis product is slope percent on the native 1″ grid (Horn, latitude-correct
+  spacing; ops/terrain), stored as uint16 floor(% × 100), 65535 = no data, in `terrain_slope` (PostGIS raster, 256×256
+  tiles). Classification happens at query time: `ST_ValueCount(ST_Clip(rast, polygon))` (pixel-centre rule) per value,
+  each value into one band compared in hundredths of a percent, the class with the most cells governs, a tie goes to
+  `terrain_class_priority` or blocks (TerrainRule), no-data cells are not counted and are reported. The assessment
+  returns everything the audit keeps: dataset, surface model, encoding, processing version, method, policy version,
+  classification, shares, covered and estimated cells, controlling class, tie, tied, resolved, priority, allowance and
+  the effective ranges of both legs. Hillshade and contours are display-only.
+- **Decision — stationing and links.** `org_stationing` (PERMANENT/TEMPORARY with base, validity, planned end,
+  origin CORRECTION/REQUEST, reason, reference, end reason; GiST exclusion: one permanent and at most one temporary per
+  unit at any time) and `site_link` (never stationing or occupancy). In this foundation a stationing is written only by
+  a data correction (CORRECT_STATIONING in the unit's scope; the open record ends CORRECTED, history kept); request
+  activation comes with the workflow.
+- **Decision — outbound.** `stationing_outbox` row in the same transaction as the change (`tmrkz.stationing.v1`,
+  event id derived from the change, `orgCode` added so a local unit without an Oracle id is identifiable); delivery in
+  sequence per unit (a unit's next event waits behind an undelivered one, failed included), back-off, FAILED after 10
+  attempts or at once on a permanent refusal, replay only by REPLAY_STATIONING_EVENTS over every organisation from a
+  non-delegated grant, with a reason, audited. HTTP destination configured by `TMRKZ_STATIONING_OUTBOUND_URL` (+ optional
+  token from the environment); without it nothing is sent and events stay PENDING (metric
+  `tmrkz_stationing_outbox_pending`). No consumer is connected.
+- **Decision — permissions / OpenFGA.** New actions CORRECT_STATIONING, MANAGE_SITE_LINKS, REPLAY_STATIONING_EVENTS;
+  the generated OpenFGA model gains their relations (docs/authz/model.fga regenerated). Policy publication reuses
+  CONFIGURE (ALL); reads reuse VIEW (scope-filtered and OpenFGA-confirmed). Activation, extension, early return,
+  cancellation-before-start and distance-exception actions come with the request workflow.
+- **API.** `GET /stationing/policy`, `GET|POST /stationing/policy/versions`, `POST /stationing/terrain/assess`,
+  `GET /terrain/datasets`, `GET /stationing/current`, `GET /stationing/organizations/{id}/history`,
+  `POST /stationing/corrections`, `GET|POST /site-links`, `POST /site-links/{id}/end`, `GET /stationing/outbox`,
+  `POST /stationing/outbox/{eventId}/replay`.
+- **Verified.**
+  - Clean V18 path (`ops/verify-migration-path.sh`, disposable `tmrkz-migpath`): `mover/backend:rel-6186016` (V17) →
+    `mover/backend:v18-wip-20261104` (working tree): journey on V17 (42 checks) → plan exactly [18] → backup (schema
+    17) → `upgrade-check before` (133 rows) → V18 applied in 283 ms → `upgrade-check after` PASS (133/133 unchanged) →
+    6 tables, 0 rows, `postgis_raster` 3.5.7, append-only trigger, overlap exclusion, V14/V15 rows unchanged,
+    0 mismatches → journey on V18 PASS. Evidence `docs/evidence/migration-path/v18/`.
+  - Backend on a disposable PostgreSQL 17 + PostGIS with OpenFGA in the loop: `StationingFoundationIT` 7/7 (append-only
+    history; policy validation, effective dating, audit of previous/new values; terrain on a synthetic raster — 1.99 %
+    FLAT, 2.00 % UNDULATING, no-data excluded, tie blocked without priority, resolved with priority, pinned version
+    unchanged; terrain on the real GLO-30 fixture N24E055 — FLAT 2737, UNDULATING 2261, ROLLING 177, HILLY 484,
+    MOUNTAINOUS 741 of 6,400 cells, exactly the pipeline's pixel-centre counts; correction with scope, history and
+    same-transaction event; links never stationing; read contract by VIEW scope; HTTP test transport with idempotency
+    key and sequence per unit, retry, parking, audited replay), `StationingRulesTest` 32/32 (4 new for slope bands),
+    `StationingAdaptersIT` 2/2, `AuthorizationIT` 10/10 (regenerated `docs/authz/model.fga` equals the generator),
+    focused run 62/62 with the ADR-028 classes; full suite 185/185 (174 before + 11 new).
+  - Terrain data (`docs/audit/stationing-v3-production/TERRAIN_PIPELINE.md`): 28 GLO-30 tiles equal MOVER's recorded
+    SHA-256 and copied byte-identical; N25E053 and N26E052 confirmed open sea; slope product 317 MB, manifest SHA-256
+    `9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682`, rebuild byte-identical; PostGIS on a disposable
+    container: default `ST_Clip` is pixel-centre (fixture counts exact; all-touched 6,561), loader refuses another
+    product under an existing version (exit 4), full load 6,300 tiles in 96 s / 453 MB, a 2,754-cell share query in
+    167 ms; `python -m pytest ops/terrain` 12/12.
+  - Frontend (new permission names) 90/90 tests, build OK.
+- **Not done.** Request workflow (S4, deployment areas, activation, temporary lifecycle, drift pause, the remaining
+  actions), the production page, real Oracle, real touch. The acceptance database is at V17; V18 waits for the owner's
+  review of the plan (`docs/audit/stationing-v3-production/CONTINUATION_REPORT.md`). Copernicus licence text to be
+  checked against the current licence before the package is redistributed.
+- **Amended 2026-11-04 (owner next-gate decision).**
+  - **V18 and the acceptance database.** V18 stays unapplied to `tmrkz-test` until the owner has reviewed section 9 of
+    the continuation report itself; `up.sh` keeps refusing [18]. V18 is schema only.
+  - **Terrain load.** Loading is a separate, explicit operation after the migration. `ops/terrain/load-slope.sh`:
+    - checks the rows, all cells and the cells with a value against the manifest's per-file build counts before it
+      commits; a failed load exits 1 with nothing kept;
+    - re-checks an existing load of the same product (exit 5 if damaged);
+    - refuses `tmrkz-mover`.
+  - **Terrain removal.** New `ops/terrain/unload-slope.sh` removes a dataset in one repeatable-read transaction. It
+    proves that policy versions, stationing, links, outbox and audit are unchanged, and is refused while the policy
+    version in force, or a scheduled one, names the dataset.
+  - **Copernicus.** Approved as the current source. The licence was checked against the official document
+    (COP-DEM-GLO-30-F, Article 6). Its notices are recorded word for word, with the licence reference and date, in the
+    manifest and in `terrain_dataset.manifest`: raw 6(a), derived 6(b), no liability 6(c), no endorsement 6(d). The
+    MapLibre terrain attribution is the 6(b) notice. GLO-30 is recorded as a DSM, not a bare-earth DTM; no FGIC data.
+  - **ROLLING label.** It shows the owner's provisional UI label «تضاريس متدرجة» (previously «متموّج بشدة»). The code
+    `ROLLING` and the thresholds are unchanged.
+  - **First policy.** Not published: allowances remain administrator configuration.
+  - **Verified.**
+    - Disposable PostGIS with V18 and a two-tile real subset: 12 load and removal steps, evidence
+      `docs/evidence/terrain-load/loader-checks-2026-11-04.txt`.
+    - `python -m pytest ops/terrain`: 13/13.
+
+## ADR-032 Offline MapLibre map for Stationing V3, Arabic labels without a right-to-left plugin — Accepted, module not yet wired (2026-11-04)
+
+- **Context.** Owner stop-gate decision 5 (4 Nov 2026): MapLibre for the production Stationing V3 map (vector roads,
+  labels, offline PMTiles, styling, layers, terrain, polygons, zoom), no switch of the main map to a Leaflet canvas, no
+  RTL plugin unless a reproducible test proves the installed version cannot render the Arabic labels, fully offline
+  fonts, no CDN. TMRKZ had no MapLibre (MOVER vendors 4.7.1 and draws road labels as HTML chips, so MapLibre's own
+  Arabic rendering had not been proven there).
+- **Decision.**
+  1. `maplibre-gl` 6.15.0 and `pmtiles` 4.5.0, exact pins (newest stable at least two weeks old on 4 Nov 2026), loaded
+     only by the Stationing V3 map (`frontend/src/components/map/maplibre/`, not referenced by any route yet).
+  2. No right-to-left or shaping plugin: 6.15.0 shapes Arabic and orders bidirectional text itself (`src/index.ts:92-94`
+     deprecates `setRTLTextPlugin`; `symbol/arabic_shaping.ts`, `symbol/bidi.ts` via `bidi-js` 1.1.0, MIT).
+  3. Fonts: the style's `font-faces` names the packaged `NotoSansArabic.ttf` (OFL; Arabic, presentation forms, Latin,
+     both digit systems); no glyph server, glyph PBFs or sprite.
+  4. Data: basemap (`uae.pmtiles`, Protomaps schema, OSM/ODbL, copied from MOVER with its SHA-256) and the GLO-30
+     hillshade (`hillshade.pmtiles`, display only) read with range requests from the application origin (`pmtiles://`);
+     the MapLibre worker URL is set explicitly from the packaged worker file. Large data stays in git-ignored
+     `map-data/`.
+  5. Street and terrain modes are two layer groups of one style; switching changes only their visibility, so overlays,
+     selection and camera stay (measured).
+  6. Attribution: OSM/ODbL with «أسماء الطرق من OpenStreetMap وليست أسماء رسمية»; Copernicus GLO-30 with «نموذج سطح DSM
+     وليس تضاريس رسمية». OSM names are never presented as official names.
+- **Verified** (`tests/acceptance/maplibre-labels.mjs`, headless Edge, evidence `docs/evidence/maplibre-labels/`): 20
+  PASS, 0 FAIL, 0 external requests, no console error. Shaping/order checked objectively against the browser's own
+  rendering in the same font (Arabic r = 0.92–0.96, English 0.88/0.98, mixed 0.96/0.99, route numbers 0.94/0.96,
+  punctuation 0.87–0.99, numerals 0.95/0.99; three deliberately broken inputs rejected at r = 0.05–0.28); on the real
+  basemap 62/67 Dubai road labels Arabic, 53 English in English mode, 17 route shields, no overlap among 37 placed
+  labels at z16, zoom 8→17→9 without errors; terrain mode on the GLO-30 hillshade with the DSM notice; frontend
+  90/90 tests, build OK, app bundle unchanged by MapLibre (not imported yet).
+- **Open finding G-8a (integration decision).** On `<html dir="rtl">` (today's `frontend/index.html`) mirrored
+  characters — brackets and «» — are mirrored twice: MapLibre mirrors them (correct), then TinySDF rasterises each
+  glyph on a canvas that inherits the document direction. «شارع (١٩)» shows as «شارع )١٩(». Verified workaround:
+  `<html dir="ltr">` + `<body dir="rtl">` (G-8b passes). Not applied: it changes the whole application's document
+  direction and needs a visual check; alternatives are an upstream fix or glyph PBFs for mirrored punctuation only.
+- **Consequences / not done.** About 1 MB more JavaScript for the Stationing page (load on demand) plus a 519 kB
+  worker; the dev server needs `optimizeDeps.exclude: ['maplibre-gl']`. OSM tags dry wadi beds like tidal creeks
+  (drawn fainter; telling them apart needs licensed official layers). `docs/sbom/frontend-production-packages.txt`
+  not regenerated (MapLibre is not in the production bundle yet). Real touch hardware and the owner's manual check
+  remain release gates.
+- **Amended 2026-11-04 (owner next-gate decision): G-8a fixed in the map module, page direction unchanged.**
+  - **Owner decision.** Do not change the whole application's direction to fix brackets. Isolate the problem to the
+    component and fix it locally; a global change needs a full visual regression first and is not approved.
+  - **Isolated.** The label layout is correct. The defect is only in MapLibre's glyph rasteriser: the TinySDF canvas is
+    created without a direction, and Chromium resolves "inherit" from the document element.
+  - **Fix.** `drawGlyphsLeftToRight(map)` (`glyphDirection.ts`) wraps the map's own
+    `Style.glyphManager.createRasterizer` so each glyph canvas draws left to right. It is re-applied on `styledata`
+    for a new style, and `OfflineMapLibre` applies it. `<html dir="rtl">` stays.
+  - **Verified** (headless Edge):
+    - G-8a passes on `<html dir="rtl">` (r 0.932), identical to the left-to-right-document cross-check G-8b;
+    - the G-8c control without the fix still reproduces the defect (r 0.648);
+    - 21 PASS, 0 FAIL, 0 external requests; 3 unit tests.
+  - **Dependency.** The fix relies on an internal of maplibre-gl 6.15.0 (`createRasterizer`). On an upgrade the label
+    test shows any change: G-8a fails, or G-8c reports CHANGED once upstream sets the direction itself and the fix can
+    be retired.
+  - **Not done.** No RTL plugin was added.

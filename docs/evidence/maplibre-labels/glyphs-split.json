@@ -1,0 +1,320 @@
+{
+  "thresholds": {
+    "match": 0.8,
+    "margin": 0.08,
+    "aspect": 0.15
+  },
+  "documentDir": "ltr",
+  "bodyDir": "rtl",
+  "glyphFix": true,
+  "results": [
+    {
+      "id": "ar-1",
+      "kind": "arabic",
+      "text": "شارع الشيخ زايد",
+      "drawn": "شارع الشيخ زايد",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.922,
+      "brokenRefs": {
+        "isolated": 0.262,
+        "ltrIsolated": 0.16,
+        "reversed": 0.094
+      },
+      "margin": 0.661,
+      "aspectDiff": 0.005,
+      "ok": true
+    },
+    {
+      "id": "ar-2",
+      "kind": "arabic",
+      "text": "طريق الخيل",
+      "drawn": "طريق الخيل",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.948,
+      "brokenRefs": {
+        "isolated": 0.106,
+        "ltrIsolated": 0.076,
+        "reversed": 0.205
+      },
+      "margin": 0.743,
+      "aspectDiff": 0.014,
+      "ok": true
+    },
+    {
+      "id": "ar-3",
+      "kind": "arabic",
+      "text": "شارع الاتحاد",
+      "drawn": "شارع الاتحاد",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.96,
+      "brokenRefs": {
+        "isolated": 0.23,
+        "ltrIsolated": 0.097,
+        "reversed": 0.005
+      },
+      "margin": 0.729,
+      "aspectDiff": 0.013,
+      "ok": true
+    },
+    {
+      "id": "ar-4",
+      "kind": "arabic",
+      "text": "جسر القرهود",
+      "drawn": "جسر القرهود",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.957,
+      "brokenRefs": {
+        "isolated": 0.223,
+        "ltrIsolated": 0.231,
+        "reversed": 0.13
+      },
+      "margin": 0.726,
+      "aspectDiff": 0.02,
+      "ok": true
+    },
+    {
+      "id": "en-1",
+      "kind": "english",
+      "text": "Sheikh Zayed Road",
+      "drawn": "Sheikh Zayed Road",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "ltr",
+      "match": 0.978,
+      "brokenRefs": null,
+      "margin": null,
+      "aspectDiff": 0.031,
+      "ok": true
+    },
+    {
+      "id": "en-2",
+      "kind": "english",
+      "text": "Al Khail Rd",
+      "drawn": "Al Khail Rd",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "ltr",
+      "match": 0.877,
+      "brokenRefs": null,
+      "margin": null,
+      "aspectDiff": 0.006,
+      "ok": true
+    },
+    {
+      "id": "mix-1",
+      "kind": "mixed",
+      "text": "طريق الإمارات E611",
+      "drawn": "طريق الإمارات E611",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.962,
+      "brokenRefs": {
+        "isolated": 0.236,
+        "ltrIsolated": -0.035,
+        "reversed": 0.104
+      },
+      "margin": 0.726,
+      "aspectDiff": 0.023,
+      "ok": true
+    },
+    {
+      "id": "mix-2",
+      "kind": "mixed",
+      "text": "Al Khail Rd - شارع الخيل",
+      "drawn": "Al Khail Rd - شارع الخيل",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "ltr",
+      "match": 0.988,
+      "brokenRefs": {
+        "isolated": 0.274,
+        "ltrIsolated": 0.219,
+        "reversed": 0.447
+      },
+      "margin": 0.54,
+      "aspectDiff": 0.027,
+      "ok": true
+    },
+    {
+      "id": "route-1",
+      "kind": "route",
+      "text": "E 11",
+      "drawn": "E 11",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "ltr",
+      "match": 0.935,
+      "brokenRefs": null,
+      "margin": null,
+      "aspectDiff": 0.019,
+      "ok": true
+    },
+    {
+      "id": "route-2",
+      "kind": "route",
+      "text": "D 94",
+      "drawn": "D 94",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "ltr",
+      "match": 0.962,
+      "brokenRefs": null,
+      "margin": null,
+      "aspectDiff": 0.043,
+      "ok": true
+    },
+    {
+      "id": "punct-1",
+      "kind": "punctuation",
+      "text": "شارع (١٩)، دبي!",
+      "drawn": "شارع (١٩)، دبي!",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.985,
+      "brokenRefs": {
+        "isolated": 0.368,
+        "ltrIsolated": 0.096,
+        "reversed": -0.015
+      },
+      "margin": 0.617,
+      "aspectDiff": 0.027,
+      "ok": true
+    },
+    {
+      "id": "punct-2",
+      "kind": "punctuation",
+      "text": "«الجميرا» - مخرج ٤٢؟",
+      "drawn": "«الجميرا» - مخرج ٤٢؟",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.971,
+      "brokenRefs": {
+        "isolated": 0.297,
+        "ltrIsolated": 0.198,
+        "reversed": 0.172
+      },
+      "margin": 0.673,
+      "aspectDiff": 0.007,
+      "ok": true
+    },
+    {
+      "id": "num-ar",
+      "kind": "numerals",
+      "text": "شارع ٢٠٢٦ / ٣١١",
+      "drawn": "شارع ٢٠٢٦ / ٣١١",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.988,
+      "brokenRefs": {
+        "isolated": 0.276,
+        "ltrIsolated": -0.041,
+        "reversed": -0.015
+      },
+      "margin": 0.712,
+      "aspectDiff": 0,
+      "ok": true
+    },
+    {
+      "id": "num-west",
+      "kind": "numerals",
+      "text": "شارع 2026 / 311",
+      "drawn": "شارع 2026 / 311",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.946,
+      "brokenRefs": {
+        "isolated": 0.223,
+        "ltrIsolated": -0.013,
+        "reversed": -0.024
+      },
+      "margin": 0.724,
+      "aspectDiff": 0.004,
+      "ok": true
+    },
+    {
+      "id": "mirror-1",
+      "kind": "mirroring",
+      "text": "ط (١) «ب» [٢] {٣}",
+      "drawn": "ط (١) «ب» [٢] {٣}",
+      "source": "maplibre",
+      "broken": false,
+      "direction": "rtl",
+      "match": 0.932,
+      "brokenRefs": {
+        "doubleMirrored": 0.658
+      },
+      "margin": 0.274,
+      "aspectDiff": 0.004,
+      "ok": true
+    },
+    {
+      "id": "broken-isolated",
+      "kind": "broken",
+      "text": "شارع الشيخ زايد",
+      "drawn": "ش‌ا‌ر‌ع ا‌ل‌ش‌ي‌خ ز‌ا‌ي‌د",
+      "source": "maplibre",
+      "broken": true,
+      "direction": "rtl",
+      "match": 0.277,
+      "brokenRefs": {
+        "isolated": 0.93,
+        "ltrIsolated": 0.353,
+        "reversed": 0.062
+      },
+      "margin": -0.653,
+      "aspectDiff": 0.249,
+      "ok": false
+    },
+    {
+      "id": "broken-reversed",
+      "kind": "broken",
+      "text": "شارع الاتحاد",
+      "drawn": "‭شارع الاتحاد‬",
+      "source": "maplibre",
+      "broken": true,
+      "direction": "rtl",
+      "match": 0.223,
+      "brokenRefs": {
+        "isolated": 0.086,
+        "ltrIsolated": 0.169,
+        "reversed": 0.051
+      },
+      "margin": 0.054,
+      "aspectDiff": 0,
+      "ok": false
+    },
+    {
+      "id": "broken-no-shaping-no-bidi",
+      "kind": "broken",
+      "text": "طريق الخيل",
+      "drawn": "‭ط‌ر‌ي‌ق ا‌ل‌خ‌ي‌ل‬",
+      "source": "canvas",
+      "broken": true,
+      "direction": "rtl",
+      "match": 0.051,
+      "brokenRefs": {
+        "isolated": 0.042,
+        "ltrIsolated": 1,
+        "reversed": 0.186
+      },
+      "margin": -0.949,
+      "aspectDiff": 0.135,
+      "ok": false
+    }
+  ],
+  "version": "6.15.0",
+  "rtlPluginStatus": "requested"
+}

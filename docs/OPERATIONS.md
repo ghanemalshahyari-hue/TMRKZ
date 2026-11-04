@@ -46,6 +46,22 @@ Last run (28 Oct 2026): 20/20 tables identical, 2/2 attachments identical — PA
 the extension first. Existing point records stay points (no area is assumed for them); sites show «حدود الموقع غير
 مسجلة» until a boundary is imported or drawn. On a new, empty volume the image also creates its own optional
 extensions (topology, tiger geocoder) in the `mover` database; TMRKZ does not use them.
+**Upgrading to V17 and V18 (ADR-028, ADR-031).** Verify every migration path first on a disposable environment:
+`EXPECT_PENDING="17" AFTER_SQL=ops/sql/checks/V17-after.sql sh ops/verify-migration-path.sh <old image> <new image> v17`
+(the plan must list exactly the expected versions, otherwise nothing is applied; evidence in
+`docs/evidence/migration-path/<label>/`). TMRKZ's migration log is Flyway's `flyway_schema_history` (MOVER's
+`release_migration_log` has no counterpart here); the backup manifest records the numeric schema version. V18 runs
+`create extension postgis_raster` (schema owner or superuser; with separated roles a DBA creates it first), creates the
+Stationing foundation tables empty and changes no existing row. The terrain slope data is not part of a migration:
+load the approved package as a separate operation with `CONFIRM_TARGET=<project> sh ops/terrain/load-slope.sh <project>
+<version>` (about 96 s and 453 MB for GLO-30; the load is one transaction checked by row and cell counts, and the same
+product again only re-checks it). Remove it, for a rebuild or a replacement, with `ops/terrain/unload-slope.sh` (same
+arguments; it changes no business record). After loading, publish a Stationing policy version that names it. Outbound stationing events are
+delivered only when `TMRKZ_STATIONING_OUTBOUND_URL` (and, if the consumer needs one, `TMRKZ_STATIONING_OUTBOUND_TOKEN`
+from the secret store) is set; otherwise they wait as PENDING (`tmrkz_stationing_outbox_pending`). The acceptance
+environment is upgraded with `EXPECT_PENDING=… sh ops/test-env/upgrade-backend.sh <release image> <label>`, never by
+`up.sh`; `up.sh` and `up-offline.sh` refuse a rebuild that would apply migrations unless `TMRKZ_APPLY_MIGRATIONS`
+names them.
 4. **Rollback:** stop the stack, restore the pre-upgrade backup into a clean project (`ops/restore.sh`) with the
    previous image tags. Do not run an older image against a newer schema.
 

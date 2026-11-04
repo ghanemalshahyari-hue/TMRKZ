@@ -21,7 +21,6 @@ import ae.mover.stationing.StationingPolicy.Routing;
 import ae.mover.stationing.StationingPolicy.RoutingLevel;
 import ae.mover.stationing.StationingPolicy.StartAt;
 import ae.mover.stationing.StationingPolicy.TerrainAppliesTo;
-import ae.mover.stationing.StationingPolicy.TerrainClass;
 
 /**
  * Test fixtures for Stationing V3, shaped exactly like the read-only HR mapping (external_unit_id,
@@ -95,9 +94,9 @@ final class StationingFixtures {
                 DeploymentRequirement.REQUIRED,
                 new Leg(5000, 8000, true),
                 new Leg(3000, 5000, true),
-                List.of(new TerrainClass("FLAT", "أرض مستوية", 0), new TerrainClass("ROLLING", "أرض متموجة", 1000),
-                        new TerrainClass("RUGGED", "أرض وعرة", 2000)),
-                List.of("ROLLING", "FLAT", "RUGGED"),
+                StationingPolicyDefaults.slopeClassification("TEST_TERRAIN", "1"),
+                allowances(),
+                List.of("ROLLING", "FLAT", "HILLY"),
                 TerrainAppliesTo.MAX_ONLY,
                 new DistanceException(true, 1000),
                 new CrossBranch(false, List.of(CrossAuthority.OTHER_UNIT), false),
@@ -107,6 +106,17 @@ final class StationingFixtures {
                         new RoutingLevel(8, true, "معتمد القسم", false, EnumSet.of(Fact.SCOPE, Fact.CLASSIFICATION, Fact.DURATION)),
                         new RoutingLevel(7, true, "معتمد وسيط — الإدارة", false, EnumSet.of(Fact.SCOPE, Fact.SITE, Fact.DEPLOYMENT, Fact.AVAILABILITY)),
                         new RoutingLevel(6, true, "المعتمد النهائي", true, Set.of()))));
+    }
+
+    /** Allowances of the test policy only (in production every value is the administrator's; none is assumed). */
+    static Map<String, Double> allowances() {
+        Map<String, Double> m = new LinkedHashMap<>();
+        m.put("FLAT", 0.0);
+        m.put("UNDULATING", 500.0);
+        m.put("ROLLING", 1000.0);
+        m.put("HILLY", 2000.0);
+        m.put("MOUNTAINOUS", 3000.0);
+        return m;
     }
 
     /** A grant with VIEW whose resolved organisation scope is {@code orgScope} (descendants already resolved). */

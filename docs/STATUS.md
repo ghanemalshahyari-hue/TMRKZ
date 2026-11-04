@@ -178,6 +178,38 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   - **Do not deploy this revision to data you keep, or rebuild the test environment's backend from it, until the owner
     approves.** Either would apply V17.
 
+- **Stationing V3 after the stop gate (4 Nov 2026, owner decisions 1–6): foundation built and tested, NOT active —
+  no page uses it.** Report `docs/audit/stationing-v3-production/CONTINUATION_REPORT.md`; ADR-031, ADR-032, ADR-028
+  amendment.
+  - **V17:** clean migration path verified on a disposable environment through the release tooling (plan [17], backup,
+    133/133 rows unchanged, backfill 0 mismatches, journey PASS); `tmrkz-test` on this machine (found at V16, not V17)
+    upgraded to V17 by `ops/test-env/upgrade-backend.sh` (6,340 rows unchanged, journey PASS) and labelled
+    `ACCEPTANCE / V17`. The `tmrkz-mover` volume on this machine is owner-retained and untouched. `up.sh` /
+    `up-offline.sh` now refuse a rebuild that would apply migrations unless they are named.
+  - **V18 `stationing_foundation`:** policy versions, authoritative stationing, site links, outbound outbox, terrain
+    slope dataset (+`postgis_raster`). Clean V18 path PASS on a disposable environment. **Not applied to `tmrkz-test`**:
+    by the owner's next-gate decision it waits until the owner has reviewed section 9 of the report itself. V18 is
+    schema only, and the first production policy is not published (allowances are administrator configuration).
+  - **Backend:** versioned policy with `terrain_slope_classification` (FAO initial bands) and separate allowances,
+    terrain assessment from the slope raster, data correction of stationing, links, read API, outbox with HTTP sender
+    (no consumer connected), three new permissions in the OpenFGA model. Full backend suite 185/185.
+  - **Terrain:** GLO-30 copied from MOVER with verified hashes, slope product built (Horn, native grid), hillshade
+    PMTiles (display only), loader and PostGIS checks pass. DSM, not bare earth; FGIC not used.
+    - GLO-30 is approved by the owner as the current source. The licence was checked against the official document
+      (COP-DEM-GLO-30-F, Article 6); its raw, derived, no-liability and no-endorsement notices are recorded word for
+      word, with the licence reference and date.
+    - Loading stays a separate operation after the migration. The loader now checks rows and cells before it commits
+      and re-checks an existing load.
+    - New `ops/terrain/unload-slope.sh` removes a dataset without touching business records; tested on a disposable
+      database.
+    - The ROLLING class shows the provisional label «تضاريس متدرجة».
+  - **Map:** MapLibre 6.15.0 module with built-in Arabic shaping, packaged font, offline PMTiles, street/terrain modes.
+    - Finding G-8a (brackets mirrored twice on `<html dir="rtl">`) is fixed inside the map module: its glyph canvases
+      draw left to right. The page direction is unchanged, as the owner decided.
+    - 21/21 label checks, 0 external requests; a control run without the fix still shows the upstream defect.
+  - **Not built yet:** the re-stationing request workflow (requests, deployment areas, activation, temporary lifecycle,
+    drift pause) and the production Stationing page. **Release gates:** real non-production Oracle, real touch device.
+
 - **Stationing V3 production phases P0–P3 (3 Nov 2026): stop gate reached, NOT active.**
   - **Report:** `docs/audit/stationing-v3-production/STOP_GATE_REPORT.md`.
   - **P0 finding:** the acceptance test database `tmrkz-test` is at **V17**. It was migrated at 13:01:50 UTC when this

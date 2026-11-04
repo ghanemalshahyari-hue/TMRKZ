@@ -10,12 +10,14 @@ import java.util.UUID;
  * The outbound integration contract (owner decision O-01): one authoritative stationing or site-link change, for
  * consumers of the read API or event feed. Written with the change in the same transaction (outbox) and delivered
  * asynchronously; TMRKZ never writes the Oracle hierarchy. The event id is derived from the change itself, so the same
- * change always carries the same id (idempotent delivery).
+ * change always carries the same id (idempotent delivery). The unit is identified by its Oracle id and its code; a unit
+ * created locally in TMRKZ (no Oracle id) is identified by its code alone. {@code seq} is the delivery sequence.
  */
 public record StationingEvent(
         UUID eventId,
         Type type,
         String orgExternalId,
+        String orgCode,
         UUID siteId,
         String siteExternalId,
         Instant effectiveAt,
@@ -38,14 +40,16 @@ public record StationingEvent(
         SITE_LINK_ENDED
     }
 
-    public static StationingEvent of(Type type, String orgExternalId, UUID siteId, String siteExternalId, Instant effectiveAt,
-                                     Instant recordedAt, String sourceVersion, String auditRef) {
-        if (orgExternalId == null || orgExternalId.isBlank() || siteId == null || effectiveAt == null || auditRef == null) {
-            throw new IllegalArgumentException("a stationing event needs the Oracle unit id, the site, the effective time and an audit reference");
+    public static StationingEvent of(Type type, String orgExternalId, String orgCode, UUID siteId, String siteExternalId,
+                                     Instant effectiveAt, Instant recordedAt, String sourceVersion, String auditRef) {
+        boolean oracle = orgExternalId != null && !orgExternalId.isBlank();
+        if (!oracle && (orgCode == null || orgCode.isBlank()) || siteId == null || effectiveAt == null || auditRef == null) {
+            throw new IllegalArgumentException("a stationing event needs the unit (Oracle id or code), the site, the effective time and an audit reference");
         }
-        String key = String.join("|", SCHEMA, type.name(), auditRef, orgExternalId, siteId.toString(), effectiveAt.toString());
-        return new StationingEvent(UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)), type, orgExternalId, siteId,
-                siteExternalId, effectiveAt, recordedAt, sourceVersion, auditRef);
+        String unit = oracle ? orgExternalId : "code:" + orgCode;
+        String key = String.join("|", SCHEMA, type.name(), auditRef, unit, siteId.toString(), effectiveAt.toString());
+        return new StationingEvent(UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8)), type, oracle ? orgExternalId : null,
+                orgCode, siteId, siteExternalId, effectiveAt, recordedAt, sourceVersion, auditRef);
     }
 
     /** The published payload (field names are the contract). */
@@ -56,6 +60,7 @@ public record StationingEvent(
         m.put("source", SOURCE);
         m.put("type", type.name());
         m.put("orgExternalId", orgExternalId);
+        m.put("orgCode", orgCode);
         m.put("siteId", siteId.toString());
         m.put("siteExternalId", siteExternalId);
         m.put("effectiveAt", effectiveAt.toString());

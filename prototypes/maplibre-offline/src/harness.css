@@ -1,0 +1,45 @@
+@font-face {
+  font-family: Arabic;
+  src: url(/fonts/NotoSansArabic.ttf) format('truetype');
+  font-weight: 100 900;
+}
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  font-family: Arabic, system-ui, sans-serif;
+  background: #fff;
+}
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid #ddd;
+}
+.bar button {
+  font: inherit;
+  padding: 4px 12px;
+  border: 1px solid #888;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+.bar button[aria-pressed='true'] {
+  background: #1c3b57;
+  color: #fff;
+}
+.bar .note {
+  color: #666;
+  font-size: 12px;
+}
+.map {
+  flex: 1;
+  position: relative;
+}

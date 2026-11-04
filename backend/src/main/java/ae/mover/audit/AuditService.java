@@ -122,5 +122,10 @@ public class AuditService {
             Map.entry("MAP_IMPORT_PUBLISHED", "نشر حدود مستوردة"),
             Map.entry("MAP_IMPORT_CANCELLED", "إلغاء استيراد حدود"),
             Map.entry("MAP_BOUNDARIES_EXPORTED", "تصدير حدود المواقع"),
-            Map.entry("DEMO_DATA_SEEDED", "تهيئة بيانات تجريبية"));
+            Map.entry("DEMO_DATA_SEEDED", "تهيئة بيانات تجريبية"),
+            Map.entry("STATIONING_POLICY_PUBLISHED", "نشر نسخة من سياسة التمركز"),
+            Map.entry("STATIONING_CORRECTED", "تصحيح تمركز وحدة"),
+            Map.entry("SITE_LINK_CREATED", "ربط موقع بوحدة"),
+            Map.entry("SITE_LINK_ENDED", "إنهاء ربط موقع بوحدة"),
+            Map.entry("STATIONING_EVENT_REPLAYED", "إعادة إرسال حدث تمركز صادر"));
 }

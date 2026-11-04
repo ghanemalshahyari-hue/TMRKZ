@@ -34,6 +34,9 @@ export const PERMISSIONS: Permission[] = [
   'AUDIT',
   'VIEW_SOURCE_IDENTIFIERS',
   'CLOSE',
+  'CORRECT_STATIONING',
+  'MANAGE_SITE_LINKS',
+  'REPLAY_STATIONING_EVENTS',
 ];
 export const PERMISSION_NAMES: Record<Permission, string> = {
   VIEW: 'عرض',
@@ -50,6 +53,9 @@ export const PERMISSION_NAMES: Record<Permission, string> = {
   AUDIT: 'تدقيق',
   VIEW_SOURCE_IDENTIFIERS: 'معرفات المصدر',
   CLOSE: 'الإنجاز الإداري والإغلاق',
+  CORRECT_STATIONING: 'تصحيح التمركز',
+  MANAGE_SITE_LINKS: 'إدارة روابط المواقع',
+  REPLAY_STATIONING_EVENTS: 'إعادة إرسال أحداث التمركز',
 };
 
 export const SCOPES: [Scope, string][] = [

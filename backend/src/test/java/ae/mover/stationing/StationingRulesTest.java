@@ -175,9 +175,9 @@ class StationingRulesTest {
 
         @Test
         void theLargestAreaGovernsAndTheAllowanceExtendsTheMaximumOnly() {
-            TerrainDecision t = TerrainRule.decide(List.of(new TerrainShare("FLAT", 400_000), new TerrainShare("RUGGED", 700_000)), policy);
+            TerrainDecision t = TerrainRule.decide(List.of(new TerrainShare("FLAT", 400_000), new TerrainShare("HILLY", 700_000)), policy);
             assertThat(t.tie()).isFalse();
-            assertThat(t.controlling().code()).isEqualTo("RUGGED");
+            assertThat(t.controlling().code()).isEqualTo("HILLY");
             var leg = DeploymentRules.leg(policy.primary(), policy, 9300.0, t);
             assertThat(leg.effectiveMinM()).isEqualTo(5000);
             assertThat(leg.effectiveMaxM()).isEqualTo(10_000); // 5–8 + 2 = 5–10
@@ -187,38 +187,39 @@ class StationingRulesTest {
 
         @Test
         void aTieIsDecidedByTheConfiguredPriorityNotByTheAllowance() {
-            var shares = List.of(new TerrainShare("RUGGED", 500_000), new TerrainShare("FLAT", 500_000));
-            TerrainDecision t = TerrainRule.decide(shares, policy); // priority ROLLING > FLAT > RUGGED
+            var shares = List.of(new TerrainShare("HILLY", 500_000), new TerrainShare("FLAT", 500_000));
+            TerrainDecision t = TerrainRule.decide(shares, policy); // priority ROLLING > FLAT > HILLY
             assertThat(t.tie()).isTrue();
             assertThat(t.resolved()).isTrue();
-            assertThat(t.tied()).containsExactlyInAnyOrder("FLAT", "RUGGED");
+            assertThat(t.tied()).containsExactlyInAnyOrder("FLAT", "HILLY");
             assertThat(t.controlling().code()).isEqualTo("FLAT");
             assertThat(DeploymentRules.leg(policy.primary(), policy, 7000.0, t).effectiveMaxM()).isEqualTo(8000);
             var reversed = new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
-                    policy.alternative(), policy.terrainClasses(), List.of("RUGGED", "FLAT", "ROLLING"), policy.terrainAppliesTo(),
+                    policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), List.of("HILLY", "FLAT", "ROLLING"), policy.terrainAppliesTo(),
                     policy.exception(), policy.crossBranch(), policy.routing());
-            assertThat(TerrainRule.decide(shares, reversed).controlling().code()).isEqualTo("RUGGED");
+            assertThat(TerrainRule.decide(shares, reversed).controlling().code()).isEqualTo("HILLY");
         }
 
         @Test
         void tiedClassesWithoutAValidPriorityBlock() {
             var partial = new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
-                    policy.alternative(), policy.terrainClasses(), List.of("ROLLING", "FLAT"), policy.terrainAppliesTo(),
+                    policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), List.of("ROLLING", "FLAT"), policy.terrainAppliesTo(),
                     policy.exception(), policy.crossBranch(), policy.routing());
-            TerrainDecision t = TerrainRule.decide(List.of(new TerrainShare("RUGGED", 500_000), new TerrainShare("FLAT", 500_000)), partial);
+            TerrainDecision t = TerrainRule.decide(List.of(new TerrainShare("HILLY", 500_000), new TerrainShare("FLAT", 500_000)), partial);
             assertThat(t.resolved()).isFalse();
             assertThat(DeploymentRules.leg(partial.primary(), partial, 6000.0, t).status()).isEqualTo(LegStatus.TERRAIN_TIE_UNRESOLVED);
         }
 
         @Test
-        void minAndMaxIsAnExplicitAlternativeConfiguration() {
+        void minAndMaxIsNeverPublishableTheMinimumStays() {
             var mm = new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
-                    policy.alternative(), policy.terrainClasses(), policy.terrainClassPriority(), TerrainAppliesTo.MIN_AND_MAX,
+                    policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), policy.terrainClassPriority(), TerrainAppliesTo.MIN_AND_MAX,
                     policy.exception(), policy.crossBranch(), policy.routing());
-            var t = TerrainRule.decide(List.of(new TerrainShare("RUGGED", 1)), mm);
+            var t = TerrainRule.decide(List.of(new TerrainShare("HILLY", 1)), mm);
             var leg = DeploymentRules.leg(mm.primary(), mm, 6000.0, t);
             assertThat(leg.effectiveMinM()).isEqualTo(7000);
             assertThat(leg.effectiveMaxM()).isEqualTo(10_000);
+            assertThat(mm.problems()).containsExactly("إضافة الأرض تمد الحد الأقصى فقط، والحد الأدنى لا يتغير (O-06)");
         }
     }
 
@@ -273,7 +274,7 @@ class StationingRulesTest {
         final UUID site = UUID.randomUUID();
 
         StationingEvent event(StationingEvent.Type type) {
-            return StationingEvent.of(type, "800", site, "FMS-117", T0, T0, "policy-1/rev-1", "RS-2026-0101");
+            return StationingEvent.of(type, "800", "SS-TS", site, "FMS-117", T0, T0, "policy-1/rev-1", "RS-2026-0101");
         }
 
         @Test
@@ -285,7 +286,7 @@ class StationingRulesTest {
                     .containsEntry("orgExternalId", "800");
             assertThat(event(StationingEvent.Type.STATIONING_ACTIVATED).eventId()).isEqualTo(e.eventId());
             assertThat(event(StationingEvent.Type.TEMPORARY_STATIONING_ENDED).eventId()).isNotEqualTo(e.eventId());
-            assertThatThrownBy(() -> StationingEvent.of(StationingEvent.Type.SITE_LINK_CREATED, "", site, null, T0, T0, "v", "ref"))
+            assertThatThrownBy(() -> StationingEvent.of(StationingEvent.Type.SITE_LINK_CREATED, "", " ", site, null, T0, T0, "v", "ref"))
                     .isInstanceOf(IllegalArgumentException.class);
         }
 
@@ -385,6 +386,74 @@ class StationingRulesTest {
     }
 
     @Nested
+    @DisplayName("slope classification (owner stop-gate decision 2)")
+    class SlopeBands {
+
+        final List<StationingPolicy.SlopeClass> fao = StationingPolicyDefaults.FAO_SLOPE_CLASSES;
+
+        @Test
+        void halfOpenBandsInTheEncodingsUnitsPutEachCellInOneClass() {
+            Map<Integer, String> expected = new LinkedHashMap<>();
+            expected.put(0, "FLAT");
+            expected.put(199, "FLAT");
+            expected.put(200, "UNDULATING");
+            expected.put(999, "UNDULATING");
+            expected.put(1000, "ROLLING");
+            expected.put(1499, "ROLLING");
+            expected.put(1500, "HILLY");
+            expected.put(2999, "HILLY");
+            expected.put(3000, "MOUNTAINOUS");
+            expected.put(65534, "MOUNTAINOUS");
+            expected.forEach((v, code) -> assertThat(TerrainClassifier.classOf(fao, v).code()).as(v + "").isEqualTo(code));
+            assertThat(policy.terrainSlopeClassification().classify(1.99).code()).isEqualTo("FLAT");
+            assertThat(policy.terrainSlopeClassification().classify(2.0).code()).isEqualTo("UNDULATING");
+            assertThat(policy.terrainSlopeClassification().classify(30.0).code()).isEqualTo("MOUNTAINOUS");
+        }
+
+        @Test
+        void theInitialValuesAreTheDocumentedFaoGradientsWithoutAllowances() {
+            assertThat(fao).extracting(StationingPolicy.SlopeClass::code)
+                    .containsExactly("FLAT", "UNDULATING", "ROLLING", "HILLY", "MOUNTAINOUS");
+            assertThat(fao).extracting(StationingPolicy.SlopeClass::toPct).containsExactly(2.0, 10.0, 15.0, 30.0, null);
+            var none = withClassification(policy.terrainSlopeClassification(), Map.of());
+            assertThat(none.problems()).hasSize(5).allMatch(p -> p.contains("لم تُهيأ إضافة فئة الأرض"));
+        }
+
+        @Test
+        void thresholdsMustBeContiguousFromZeroOpenEndedAndEncodable() {
+            List<StationingPolicy.SlopeClass> bad = List.of(
+                    new StationingPolicy.SlopeClass("FLAT", "مستوٍ", 0.5, 2.0),
+                    new StationingPolicy.SlopeClass("UNDULATING", "متموّج", 2.5, 10.0),
+                    new StationingPolicy.SlopeClass("ROLLING", "تضاريس متدرجة", 10, 10.125),
+                    new StationingPolicy.SlopeClass("HILLY", "تلال", 10.125, 700.0),
+                    new StationingPolicy.SlopeClass("MOUNTAINOUS", "جبلي", 700, 800.0));
+            var p = withClassification(new StationingPolicy.SlopeClassification("TEST_TERRAIN", "1", bad), StationingFixtures.allowances());
+            assertThat(p.problems()).anyMatch(m -> m.contains("تبدأ من 0"))
+                    .anyMatch(m -> m.contains("غير متصلة"))
+                    .anyMatch(m -> m.contains("بخانتين عشريتين"))
+                    .anyMatch(m -> m.contains("مفتوحة الحد الأعلى"));
+            var extra = new LinkedHashMap<>(StationingFixtures.allowances());
+            extra.put("ROCKY", 100.0);
+            assertThat(withClassification(policy.terrainSlopeClassification(), extra).problems())
+                    .containsExactly("إضافة لفئة غير موجودة في تصنيف الميل: ROCKY");
+        }
+
+        @Test
+        void aCellAreaIsGeodesicOnTheEllipsoid() {
+            // one arc-second at 24° N: about 30.8 m north–south by 28.3 m east–west
+            assertThat(TerrainClassifier.pixelAreaM2(24, 1.0 / 3600, 1.0 / 3600)).isBetween(865.0, 880.0);
+            // at the equator 30.92 m (normal radius) by 30.72 m (meridian radius)
+            assertThat(TerrainClassifier.pixelAreaM2(0, 1.0 / 3600, 1.0 / 3600)).isBetween(949.0, 951.0);
+        }
+
+        StationingPolicy withClassification(StationingPolicy.SlopeClassification sc, Map<String, Double> allowances) {
+            return new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
+                    policy.alternative(), sc, allowances, List.of(), policy.terrainAppliesTo(), policy.exception(),
+                    policy.crossBranch(), policy.routing());
+        }
+    }
+
+    @Nested
     @DisplayName("policy validation")
     class PolicyValidation {
 
@@ -396,7 +465,7 @@ class StationingRulesTest {
         @Test
         void invalidValuesAreRefused() {
             var bad = new StationingPolicy(0, DeploymentRequirement.OPTIONAL, new StationingPolicy.Leg(8000, 5000, true),
-                    policy.alternative(), policy.terrainClasses(), List.of("FLAT", "FLAT", "UNKNOWN"), TerrainAppliesTo.MAX_ONLY,
+                    policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), List.of("FLAT", "FLAT", "UNKNOWN"), TerrainAppliesTo.MAX_ONLY,
                     new StationingPolicy.DistanceException(true, 0), new CrossBranch(true, List.of(), false),
                     new Routing(StartAt.SELF, policy.routing().levels().stream().filter(l -> !l.finalStage()).toList()));
             assertThat(bad.problems()).hasSize(7);

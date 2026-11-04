@@ -1,0 +1,8 @@
+# Terrain build (ops/terrain). Versions used for the 2026.11 package; rasterio wheels bundle GDAL 3.12.2.
+numpy==2.3.3
+rasterio==1.5.2
+pmtiles==3.8.1
+pillow==12.3.0
+# tests and evidence only
+pytest==9.0.3
+pyproj==3.8.0

@@ -1,0 +1,587 @@
+{
+  "code": "terrain-glo30",
+  "name": "طبيعة الأرض — Copernicus GLO-30 (نموذج سطح DSM)",
+  "version": "2026.11",
+  "kind": "TERRAIN",
+  "status": "Approved fallback production terrain source (owner decision 3, 4 Nov 2026)",
+  "source": {
+    "product": "Copernicus DEM GLO-30",
+    "instance": "COP-DEM-GLO-30-F",
+    "dataset": "Copernicus_DSM_COG_10 Cloud Optimized GeoTIFF tiles (AWS Open Data bucket copernicus-dem-30m)",
+    "publisher": "ESA / Copernicus programme (AWS Open Data, copernicus-dem-30m)",
+    "surfaceModel": "DSM",
+    "release": "not stated in the tile metadata; tiles retrieved 2026-10-04 by MOVER (see tiles[].retrievedAt)",
+    "resolution": "1 arc-second (1/3600 degree, about 30 m)",
+    "crs": "EPSG:4326",
+    "heights": "Cloud Optimized GeoTIFF float32, 1 arcsec (30 m), EPSG:4326, metres (EGM2008 heights)",
+    "gridConvention": "AREA_OR_POINT=Point: each value is the sample at the cell centre",
+    "reusedFrom": "MOVER dataset, verified against C:/Users/ADMIN/Desktop/MOVER_1 - Copy/map-library/sources/provenance.json",
+    "fgic": "FGIC data is not used. A future FGIC dataset would be a separate, versioned terrain dataset."
+  },
+  "limitation": "Copernicus GLO-30 is a Digital Surface Model (DSM), not bare-earth DTM; it may include buildings, infrastructure and vegetation. It is not official UAE bare-earth terrain.",
+  "licence": {
+    "title": "Licence for Copernicus DEM instance COP-DEM-GLO-30-F Global 30m Full, Free & Open — Licence for the use of the Copernicus WorldDEM-30",
+    "instance": "COP-DEM-GLO-30-F",
+    "url": "https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
+    "documentSha256": "9cd37d37ea654bbcaf0a2e059e6a3a5b5f76072824d8dd860ccf274ada8951bd",
+    "documentDate": "2020-10-29 (PDF creation and modification date)",
+    "checkedOn": "2026-11-04",
+    "grants": "Article 4: reproduction, distribution, communication to the general public, adaptation, modification and combination; Article 5: free of charge",
+    "requiredAttribution": "© DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "requiredAttributionUse": "Article 6(a): distributing or communicating the source tiles unmodified",
+    "modifiedDataAttribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "modifiedDataAttributionUse": "Article 6(b): the derived products of this package (slope analysis, hillshade) and anything computed from them, including the map attribution",
+    "noLiability": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30",
+    "noLiabilityUse": "Article 6(c): in every licence or notice that covers distributing the data, modified or not",
+    "noEndorsement": "Article 6(d): nothing may suggest that the Copernicus programme, the licensor or the provider (Airbus Defence and Space GmbH) endorses this system",
+    "moverRecordedTerms": "Copernicus DEM licence: free for any use incl. commercial, with required attribution '(c) DLR e.V. 2010-2014 and (c) Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved'. Public S3 bucket, no auth. Verify current terms in the Copernicus DEM product handbook."
+  },
+  "coverage": {
+    "tiles": "N22-N26 x E051-E056",
+    "present": 28,
+    "absent": [
+      "N25E053",
+      "N26E052"
+    ]
+  },
+  "absentCells": [
+    {
+      "cell": "N25E053",
+      "verdict": "OPEN_SEA",
+      "glo30_neighbour_edges": [
+        {
+          "tile": "Copernicus_DSM_COG_10_N24_00_E053_00_DEM.tif",
+          "side": "north",
+          "samples": 3600,
+          "min_m": 0.0,
+          "max_m": 0.0,
+          "share_exactly_0": 1.0,
+          "share_above_2m": 0.0
+        },
+        {
+          "tile": "Copernicus_DSM_COG_10_N26_00_E053_00_DEM.tif",
+          "side": "south",
+          "samples": 3600,
+          "min_m": 0.0,
+          "max_m": 0.0,
+          "share_exactly_0": 1.0,
+          "share_above_2m": 0.0
+        },
+        {
+          "tile": "Copernicus_DSM_COG_10_N25_00_E052_00_DEM.tif",
+          "side": "east",
+          "samples": 3600,
+          "min_m": 0.0,
+          "max_m": 0.0,
+          "share_exactly_0": 1.0,
+          "share_above_2m": 0.0
+        },
+        {
+          "tile": "Copernicus_DSM_COG_10_N25_00_E054_00_DEM.tif",
+          "side": "west",
+          "samples": 3600,
+          "min_m": 0.0,
+          "max_m": 0.0,
+          "share_exactly_0": 1.0,
+          "share_above_2m": 0.0
+        }
+      ],
+      "srtm": {
+        "file": "N25E053.hgt.gz",
+        "size": 3601,
+        "min_m": -79,
+        "max_m": -11,
+        "samples_above_0m": 0,
+        "voids": 0
+      }
+    },
+    {
+      "cell": "N26E052",
+      "verdict": "OPEN_SEA",
+      "glo30_neighbour_edges": [
+        {
+          "tile": "Copernicus_DSM_COG_10_N25_00_E052_00_DEM.tif",
+          "side": "north",
+          "samples": 3600,
+          "min_m": 0.0,
+          "max_m": 0.0,
+          "share_exactly_0": 1.0,
+          "share_above_2m": 0.0
+        },
+        {
+          "tile": "Copernicus_DSM_COG_10_N26_00_E051_00_DEM.tif",
+          "side": "east",
+          "samples": 3600,
+          "min_m": 0.0,
+          "max_m": 0.0,
+          "share_exactly_0": 1.0,
+          "share_above_2m": 0.0
+        },
+        {
+          "tile": "Copernicus_DSM_COG_10_N26_00_E053_00_DEM.tif",
+          "side": "west",
+          "samples": 3600,
+          "min_m": 0.0,
+          "max_m": 0.0,
+          "share_exactly_0": 1.0,
+          "share_above_2m": 0.0
+        }
+      ],
+      "srtm": {
+        "file": "N26E052.hgt.gz",
+        "size": 3601,
+        "min_m": -87,
+        "max_m": -9,
+        "samples_above_0m": 0,
+        "voids": 0
+      }
+    }
+  ],
+  "tiles": [
+    {
+      "name": "Copernicus_DSM_COG_10_N22_00_E051_00_DEM.tif",
+      "code": "N22E051",
+      "bytes": 45650188,
+      "sha256": "2ba7014e80b32d761b21581a6682d0c4af223037db5d44038aa252fcb9800716",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N22_00_E052_00_DEM.tif",
+      "code": "N22E052",
+      "bytes": 48348835,
+      "sha256": "fda289a942c62afabdab107a9457435c1314ef3ac1dbf4de79161cb2a37b530d",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N22_00_E053_00_DEM.tif",
+      "code": "N22E053",
+      "bytes": 49450340,
+      "sha256": "7c26fc16425d639c5a06fadf5126211d786a0f97da179884c3e70aa983bb0faf",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N22_00_E054_00_DEM.tif",
+      "code": "N22E054",
+      "bytes": 48277338,
+      "sha256": "a33e0813eb483f685034c491b78af126bb7736d64c29da0249e6eb68d679b882",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N22_00_E055_00_DEM.tif",
+      "code": "N22E055",
+      "bytes": 42890050,
+      "sha256": "eea9c91614bff5053b22462635120b481bbddcdb846d8ba06ac2a5db3815d306",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N22_00_E056_00_DEM.tif",
+      "code": "N22E056",
+      "bytes": 40836407,
+      "sha256": "aa00f2e3d13a0930225960b5c0ce9fa47a4b464062462b90278125a70a4d95c3",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N23_00_E051_00_DEM.tif",
+      "code": "N23E051",
+      "bytes": 46900427,
+      "sha256": "59875875d47ba8cbb15384191fbd7944467ca7333973cce90856a92fe8da3703",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N23_00_E052_00_DEM.tif",
+      "code": "N23E052",
+      "bytes": 47811306,
+      "sha256": "de32b083017370d53ecbebf22fc87722605fc14ac7b153b4afa5711d4b6e7576",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N23_00_E053_00_DEM.tif",
+      "code": "N23E053",
+      "bytes": 48561117,
+      "sha256": "1b6bb95ecf03a2e89d0f10cae5cd125ffdfd49994f0dbe6ba6c3242bde699a96",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N23_00_E054_00_DEM.tif",
+      "code": "N23E054",
+      "bytes": 48740943,
+      "sha256": "bb613ea45fc3242aee28ba307478d936fc62cd0e090795ea200ec71c3c3ce841",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N23_00_E055_00_DEM.tif",
+      "code": "N23E055",
+      "bytes": 43138750,
+      "sha256": "31fe2c52db8c4ac03b73c5c496478e493b3466dec4c5c01e92eccef965960a43",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N23_00_E056_00_DEM.tif",
+      "code": "N23E056",
+      "bytes": 42970043,
+      "sha256": "6795a35f7a7b980acc88692689a170246fd1914d65ffaa504d0b244423890870",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N24_00_E051_00_DEM.tif",
+      "code": "N24E051",
+      "bytes": 26885216,
+      "sha256": "24dd2af0ff4cd73e88eaab8d8aa0c3a8e248cdc733e30cb98333ec6d22cad9f2",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N24_00_E052_00_DEM.tif",
+      "code": "N24E052",
+      "bytes": 5283343,
+      "sha256": "b174a0654b34f9933c4851655b79802bda24d17a0ad9f22435749af574afeb69",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N24_00_E053_00_DEM.tif",
+      "code": "N24E053",
+      "bytes": 7322975,
+      "sha256": "03a887d778a994352ffbe690824ac47fca9ad2b4cbca5a481daea519dcfefef9",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N24_00_E054_00_DEM.tif",
+      "code": "N24E054",
+      "bytes": 28282630,
+      "sha256": "aa3b6d63c48d46242ef313c5c7be098867d2a5459d43d4f1a71b04510c428793",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N24_00_E055_00_DEM.tif",
+      "code": "N24E055",
+      "bytes": 43713741,
+      "sha256": "bb98178567b880aa6b66fcf48ec11bade94c13236ae63ec8e8c0e894b54225b3",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N24_00_E056_00_DEM.tif",
+      "code": "N24E056",
+      "bytes": 30873705,
+      "sha256": "bfe784101727ab7d641a243b6bf7cbfc92e6d9195b92170b4e649aa1c17c125d",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N25_00_E051_00_DEM.tif",
+      "code": "N25E051",
+      "bytes": 27243413,
+      "sha256": "4c8c0c82e870c071a5f9f373f6526914382edf99b00dfac72805b09b8ecc2f8c",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N25_00_E052_00_DEM.tif",
+      "code": "N25E052",
+      "bytes": 135237,
+      "sha256": "96c5de4844bf437d87419981cad429780f304c6426e77ce8815b7492f5bbe62b",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N25_00_E054_00_DEM.tif",
+      "code": "N25E054",
+      "bytes": 313530,
+      "sha256": "72c65f62b0fdf017562bd58b23c5330eb5589725ca02f0b4cd601f909a61cd54",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N25_00_E055_00_DEM.tif",
+      "code": "N25E055",
+      "bytes": 22291663,
+      "sha256": "eef300a92e416071e8cf9fdba8018126de8a7af1fae7b0068a1b360f9ff522fd",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N25_00_E056_00_DEM.tif",
+      "code": "N25E056",
+      "bytes": 17482544,
+      "sha256": "41efa33154e8d90d2273577c454f247fca8ad35a5ff4b14fed2b29c5de499909",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N26_00_E051_00_DEM.tif",
+      "code": "N26E051",
+      "bytes": 2078581,
+      "sha256": "92b668a43e8e9930b4896f353b87f1ee9c5429e5583f9871f0edada77018f239",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N26_00_E053_00_DEM.tif",
+      "code": "N26E053",
+      "bytes": 7440659,
+      "sha256": "6e9060f1ad321ac5c0b144bc73b5945da50ca2d90a368fab6a2b14fa4fbf8a9f",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N26_00_E054_00_DEM.tif",
+      "code": "N26E054",
+      "bytes": 19175086,
+      "sha256": "6e0da9ee706bea763c1e410f6da6ce188c3269de1de97d5496961f4b67fd7fff",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N26_00_E055_00_DEM.tif",
+      "code": "N26E055",
+      "bytes": 14203836,
+      "sha256": "6a1a7b403fb2e0fdda7ee12ac5b2ddb85051b79547ec85ab7149962d6adc687f",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    },
+    {
+      "name": "Copernicus_DSM_COG_10_N26_00_E056_00_DEM.tif",
+      "code": "N26E056",
+      "bytes": 6775419,
+      "sha256": "084a330741202377007347bffaae7fdbd09eb1c369af0e4c0ce789afeae16ca2",
+      "provenanceMatch": true,
+      "retrievedAt": "2026-10-04T12:26:48Z"
+    }
+  ],
+  "processing": {
+    "version": "tmrkz-terrain-1.0.0",
+    "tool": "ops/terrain/build_terrain.py (Python, rasterio/GDAL, numpy; ops/terrain/requirements.txt)",
+    "mosaic": "VRT of all source tiles; borders read the real neighbouring samples",
+    "slope": {
+      "algorithm": "Horn 3x3 gradient on the native grid, no resampling",
+      "spacing": "per output row from the WGS 84 ellipsoid: dx = dλ·N(φ)·cosφ, dy = dφ·M(φ), φ = row centre",
+      "unit": "percent (100·|∇z|)",
+      "encoding": "SLOPE_PERCENT_X100_FLOOR_U16",
+      "value": "min(65534, floor(slope_percent × 100)) as uint16",
+      "nodata": "65535 where any of the nine samples is missing (outer mosaic border, cells next to the absent open-sea tiles); nothing is extrapolated",
+      "classes": "none baked in: the half-open class thresholds are versioned System Administrator policy (terrain_slope_classification) applied by the backend at query time"
+    },
+    "hillshade": {
+      "azimuthDeg": 315.0,
+      "altitudeDeg": 45.0,
+      "zFactor": 1,
+      "use": "display only; never an input to a business rule"
+    }
+  },
+  "products": {
+    "analysis": {
+      "use": "business rule input (slope classification of deployment areas)",
+      "directory": "map-data/terrain/glo30/analysis",
+      "format": "GeoTIFF uint16, EPSG:4326, tiled 256, deflate + predictor 2, one file per source tile",
+      "files": [
+        {
+          "name": "slope_pct_x100_N22E051.tif",
+          "sha256": "3e299945655cd35fdc0ac9a0f783afddbb7a516849e70850cd3f864c22e7160d",
+          "pixels": 12960000,
+          "nodata": 7199
+        },
+        {
+          "name": "slope_pct_x100_N22E052.tif",
+          "sha256": "597a00d255bf17506ec3db07329ef2b10d55a6ca997e7e8574fc7bb9e1c5fa96",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N22E053.tif",
+          "sha256": "1ab223e602004c9a245b0afebca2c3b62e880a9f24506f8f528f14ff7a1d7f5b",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N22E054.tif",
+          "sha256": "44918b93409fab65f10b8862939cf99b63c8a054b569374efacc62a104ff549e",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N22E055.tif",
+          "sha256": "27f021f269b9df339cf30538be69dc4ccd9c592a18dfacd779fec01ce5ba922e",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N22E056.tif",
+          "sha256": "18a7d30cb29666fa638ca2b97fb4689cd8141577d62518a413c95897b59f0272",
+          "pixels": 12960000,
+          "nodata": 7199
+        },
+        {
+          "name": "slope_pct_x100_N23E051.tif",
+          "sha256": "8b127a3fa982a0f6c036bc91ab659cb64da6e03ef30d1cb891c79b9093e7e37f",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N23E052.tif",
+          "sha256": "5be45dfaa204438985f91a7298882c554e1d7dfa9bb9c863f6b9655204f1b68d",
+          "pixels": 12960000,
+          "nodata": 0
+        },
+        {
+          "name": "slope_pct_x100_N23E053.tif",
+          "sha256": "bab95725abbdd07a0a233f0dcb157db05a67af6b2664cd867569eec338d8eea7",
+          "pixels": 12960000,
+          "nodata": 0
+        },
+        {
+          "name": "slope_pct_x100_N23E054.tif",
+          "sha256": "38e7d2d45d11924bef1eaa1dfbf512a654d21a0982ac27686824e778fe95cf4d",
+          "pixels": 12960000,
+          "nodata": 0
+        },
+        {
+          "name": "slope_pct_x100_N23E055.tif",
+          "sha256": "4e3bfa862e597d84a82235be9db067b25f4404829d74de4c7d319d2c6d08c38c",
+          "pixels": 12960000,
+          "nodata": 0
+        },
+        {
+          "name": "slope_pct_x100_N23E056.tif",
+          "sha256": "5e4c96e5c1f467022cde594ebce0529f2246eede5bb6c69955348ad374c08dec",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N24E051.tif",
+          "sha256": "43f617cbae86af552d87f16643f1734e5747ff9eaaa2b1b9d6251538863c6a4c",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N24E052.tif",
+          "sha256": "47a2134093a47a6ad86c870470689d8e37e75f481382df682d810b8111b656e6",
+          "pixels": 12960000,
+          "nodata": 1
+        },
+        {
+          "name": "slope_pct_x100_N24E053.tif",
+          "sha256": "9a05181a0102961cbe143b2c74362b56aea0a9d56ee7d3c3d365bbce39c372b9",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N24E054.tif",
+          "sha256": "21c1ab2f4365c6de0f74d6c42b19f296d51b6bd0e533e99a883b52856225e046",
+          "pixels": 12960000,
+          "nodata": 1
+        },
+        {
+          "name": "slope_pct_x100_N24E055.tif",
+          "sha256": "3cdf14c79ebbe79d12f63c993177e714b16566156fd6be38d5611244e489bd37",
+          "pixels": 12960000,
+          "nodata": 0
+        },
+        {
+          "name": "slope_pct_x100_N24E056.tif",
+          "sha256": "de653bbdf544fba775b30ba53110f5a9da48b34380bffffadedab468a4e8e329",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N25E051.tif",
+          "sha256": "ed95b2f2d0e7ddd83af6d32b9fd53aa54b98a2815ef1853dac08d38b2b90f3b2",
+          "pixels": 12960000,
+          "nodata": 3601
+        },
+        {
+          "name": "slope_pct_x100_N25E052.tif",
+          "sha256": "6d0183e2ff3d93d6638eee193abb2677fcdb1a9c665d02194798c258e15cfc61",
+          "pixels": 12960000,
+          "nodata": 7199
+        },
+        {
+          "name": "slope_pct_x100_N25E054.tif",
+          "sha256": "64464eda7bb67c9efc5c17a26c2bb76412adbb92cc9f4702c735cfc3bb24e100",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N25E055.tif",
+          "sha256": "f5525c2ee4d78285c30449424eec883e320b14a62dd04dd302649bd94cf7b450",
+          "pixels": 12960000,
+          "nodata": 0
+        },
+        {
+          "name": "slope_pct_x100_N25E056.tif",
+          "sha256": "8ba452634852fe8570f07a1bea0f22e67108a813df0b1ddac6e888fedc823e68",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N26E051.tif",
+          "sha256": "346728aeb4efaf25d71ba0999deca4f262a770bb6362682ad17d93a78a656d30",
+          "pixels": 12960000,
+          "nodata": 10798
+        },
+        {
+          "name": "slope_pct_x100_N26E053.tif",
+          "sha256": "7455f238516318f265869226839ac24aaa59fed082dec181ff6e0606efc8f80e",
+          "pixels": 12960000,
+          "nodata": 10798
+        },
+        {
+          "name": "slope_pct_x100_N26E054.tif",
+          "sha256": "04abe43fb84e01bf4159485466ef5d60fdddd8e858f99c63e3d5b86bd299c08b",
+          "pixels": 12960000,
+          "nodata": 3601
+        },
+        {
+          "name": "slope_pct_x100_N26E055.tif",
+          "sha256": "5582b5f29192903779e25754213beca01eb1b87304b817c97e19d1e79beb7cc2",
+          "pixels": 12960000,
+          "nodata": 3600
+        },
+        {
+          "name": "slope_pct_x100_N26E056.tif",
+          "sha256": "00f9e9661ccc119532a4f218b51c3c99e9411ee4607e65fb6028de28907df745",
+          "pixels": 12960000,
+          "nodata": 7199
+        }
+      ],
+      "cells": {
+        "total": 362880000,
+        "nodata": 100796,
+        "definition": "the loader checks these counts in PostGIS before it commits"
+      },
+      "sha256sums": "SHA256SUMS",
+      "slopeSha256": "9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682",
+      "slopeSha256Definition": "sha256 of the analysis SHA256SUMS file (sorted 'sha256  name' lines); the loader stores it in terrain_dataset.slope_sha256"
+    },
+    "visualization": {
+      "use": "display only (MapLibre raster source); never an input to a business rule",
+      "directory": "map-data/terrain/glo30/visualization",
+      "files": [
+        {
+          "name": "hillshade.pmtiles",
+          "format": "PMTiles v3, PNG (grey + alpha) 256 px, Web Mercator",
+          "minzoom": 6,
+          "maxzoom": 12,
+          "tiles": 5598,
+          "bytes": 128653915,
+          "sha256": "a033c2487a3474078fff8fa11412c087bea700c11ebe6895127eb315c8f9e84f"
+        }
+      ],
+      "contours": "not produced"
+    }
+  }
+}

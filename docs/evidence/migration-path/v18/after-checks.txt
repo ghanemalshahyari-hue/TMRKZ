@@ -1,0 +1,7 @@
+tables=6
+rows=0
+postgis_raster=3.5.7
+append_only_trigger=1
+overlap_exclusion=1
+legacy_relocation_rows_unchanged=0/0
+mismatches=0

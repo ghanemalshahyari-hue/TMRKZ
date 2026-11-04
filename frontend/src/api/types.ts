@@ -14,7 +14,10 @@ export type Permission =
   | 'MANAGE_ACCESS'
   | 'CONFIGURE'
   | 'AUDIT'
-  | 'VIEW_SOURCE_IDENTIFIERS';
+  | 'VIEW_SOURCE_IDENTIFIERS'
+  | 'CORRECT_STATIONING'
+  | 'MANAGE_SITE_LINKS'
+  | 'REPLAY_STATIONING_EVENTS';
 export type Scope = 'ALL' | 'ORGANIZATION' | 'SITE' | 'ORGANIZATION_AND_SITE';
 export type Ref = { id: string; name: string; code?: string };
 export type Period = { start: string; end: string | null };

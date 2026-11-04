@@ -68,6 +68,9 @@ services:
       # Authorisation decisions are confirmed by TMRKZ's own OpenFGA (ADR-018); without it sensitive actions are refused.
       TMRKZ_OPENFGA_API_URL: http://openfga:8080
       TMRKZ_OPENFGA_API_TOKEN: ${TMRKZ_OPENFGA_API_TOKEN:?set TMRKZ_OPENFGA_API_TOKEN in .env; run ops/init-env.sh}
+      # Outbound stationing events (ADR-031): a consumer endpoint inside the isolated network; empty = keep them PENDING.
+      TMRKZ_STATIONING_OUTBOUND_URL: ${TMRKZ_STATIONING_OUTBOUND_URL:-}
+      TMRKZ_STATIONING_OUTBOUND_TOKEN: ${TMRKZ_STATIONING_OUTBOUND_TOKEN:-}
     volumes:
       - files:/var/lib/mover
       - ${TMRKZ_TRUSTSTORE_DIR:-./ops/keycloak/truststores}:/etc/tmrkz/ldap-ca:ro

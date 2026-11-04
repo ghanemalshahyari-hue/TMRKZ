@@ -1,0 +1,2 @@
+[upgrade-check] after: 133 rows fingerprinted → backups/upgrade-tmrkz-migpath-after.txt
+[upgrade-check] PASS: all 133 earlier rows are present and unchanged

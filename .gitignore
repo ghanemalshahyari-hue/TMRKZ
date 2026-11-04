@@ -31,3 +31,5 @@ offline-bundle/
 .vscode/
 # Acceptance test environment: generated test CA, keys and passwords
 ops/test-env/.generated/
+# Large terrain/map data (raw DEM, derived rasters, PMTiles): packaged with checksums, never in git
+map-data/
