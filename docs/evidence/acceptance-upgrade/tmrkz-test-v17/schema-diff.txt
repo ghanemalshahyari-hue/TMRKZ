@@ -1,0 +1,27 @@
+--- docs/evidence/acceptance-upgrade/tmrkz-test-v17/schema-before.sql	2026-11-04 07:19:45.626699200 +0400
++++ docs/evidence/acceptance-upgrade/tmrkz-test-v17/schema-after.sql	2026-11-04 07:20:01.262774700 +0400
+@@ -2,7 +2,7 @@
+ -- PostgreSQL database dump
+ --
+ 
+-\restrict drealdkGmeqYNp3Fm9q8GJK8p9YPcUaROjh4OY8nH83W3c3chhkvp44JU8Au5ou
++\restrict 79kTSPQeguc9vAKNnPBeD8v5AtdT3tEvSid9eZ4sILbyV59y9E7JgwM6Ao6R422
+ 
+ -- Dumped from database version 17.11
+ -- Dumped by pg_dump version 17.11
+@@ -1557,6 +1557,8 @@
+     created_at timestamp with time zone DEFAULT now() NOT NULL,
+     assigned_person_id uuid,
+     awaiting_assignment boolean DEFAULT false NOT NULL,
++    purpose text DEFAULT 'TASK'::text NOT NULL,
++    CONSTRAINT execution_task_purpose_check CHECK ((purpose = ANY (ARRAY['HANDOVER'::text, 'RECEIPT'::text, 'ACKNOWLEDGEMENT'::text, 'TASK'::text]))),
+     CONSTRAINT execution_task_status_check CHECK ((status = ANY (ARRAY['OPEN'::text, 'DONE'::text])))
+ );
+ 
+@@ -7173,5 +7175,5 @@
+ -- PostgreSQL database dump complete
+ --
+ 
+-\unrestrict drealdkGmeqYNp3Fm9q8GJK8p9YPcUaROjh4OY8nH83W3c3chhkvp44JU8Au5ou
++\unrestrict 79kTSPQeguc9vAKNnPBeD8v5AtdT3tEvSid9eZ4sILbyV59y9E7JgwM6Ao6R422
+ 

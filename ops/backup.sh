@@ -34,7 +34,8 @@ echo "[backup] fingerprints"
 dc exec -T db psql -U mover -d mover -At -f - < ops/sql/fingerprint.sql > "$OUT/fingerprint.txt"
 
 sha() { (sha256sum "$1" 2>/dev/null || shasum -a 256 "$1") | cut -d' ' -f1; }
-SCHEMA="$(dc exec -T db psql -U mover -d mover -Atc "select max(version) from flyway_schema_history where success")"
+# numeric order: versions are text, and max('9', '17') would report 9
+SCHEMA="$(dc exec -T db psql -U mover -d mover -Atc "select max(version::int) from flyway_schema_history where success and version is not null")"
 cat > "$OUT/manifest.json" <<EOF
 {
   "project": "$PROJECT",

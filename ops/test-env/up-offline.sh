@@ -6,6 +6,7 @@ set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
 . ops/test-env/prepare.sh
+P=tmrkz-test . ops/test-env/migration-gate.sh
 FILES="-f docker-compose.yml -f ops/test-env/compose.directory.yml -f ops/test-env/compose.data.yml -f ops/test-env/compose.offline.yml"
 docker compose -p tmrkz-test $FILES down
 docker compose -p tmrkz-test $FILES up -d --build "$@"

@@ -15,6 +15,9 @@ union all select 'request_resource|' || request_id || ':' || resource_id || '|' 
 union all select 'request_revision|' || id || '|' || md5(t::text) from request_revision t
 union all select 'decision|' || id || '|' || md5(t::text) from decision t
 union all select 'approval_document|' || id || '|' || md5(t::text) from approval_document t
+union all select 'execution_task|' || id || '|' || md5(t::text)
+  from (select id, request_id, key, name, role_code, target_org_id, due_at, evidence_required, status, completed_by,
+               completed_at, note, evidence_attachment_id, overdue_notified, created_at, assigned_person_id from execution_task) t
 union all select 'reservation|' || id || '|' || md5(t::text) from reservation t
 union all select 'reservation_lock|' || id || '|' || md5(t::text) from reservation_lock t
 union all select 'reservation_change|' || id || '|' || md5(t::text) from reservation_change t

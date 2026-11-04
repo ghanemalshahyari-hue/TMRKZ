@@ -6,5 +6,6 @@ set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
 . ops/test-env/prepare.sh
+P=tmrkz-test . ops/test-env/migration-gate.sh
 docker compose -p tmrkz-test -f docker-compose.yml -f ops/test-env/compose.directory.yml -f ops/test-env/compose.data.yml up -d --build "$@"
 echo "Test environment up. Fictional users and the shared password: ops/test-env/README.md and $G/user-password"

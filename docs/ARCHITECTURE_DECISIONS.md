@@ -695,7 +695,7 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   backend suite 133/133; browser: SoD and assignment screen 12/12, journey passed, map 21/22 (MAP-19 order-dependent),
   access studio 5/6 (stale STUDIO-03); P0 exploit re-runs all FIXED; load tool smoke workflow passed.
 
-## ADR-028 Execution integrity: handover, receipt, acknowledgement and closing — Proposed; tested on a disposable database, not deployed (2026-11-03)
+## ADR-028 Execution integrity: handover, receipt, acknowledgement and closing — Accepted for the non-production path; V17 verified on a clean path and applied to the acceptance database, not to any retained database (2026-11-03, amended 2026-11-04)
 
 - **Context.** Owner decisions of 2 Nov 2026 on the steps after approval, completing ADR-027 ("Not changed": execution
   tasks and closing were outside separation of duties).
@@ -750,6 +750,39 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
     and no other database was touched.
   - **Not decided:** keeping the acceptance database at V17, or restoring it to V15 by rebuilding the fictional
     environment, is the owner's decision.
+- *Amended 2026-11-04 (owner stop-gate decision 1: V17 approved for the non-production / acceptance path).*
+  - **Which machine.** The amendment above describes the clone that made commit `6186016`. On the machine where this
+    amendment was written, `tmrkz-test` was still at **V16** (no `execution_task.purpose`, no `up.sh` run on 3 Nov), and
+    a database volume of the production compose project `tmrkz-mover` exists (created 28 Oct, last run 29 Oct). The
+    owner decided: bring this `tmrkz-test` to V17 by the documented sequence; treat `tmrkz-mover` as retained (never
+    touched).
+  - **Clean migration path (disposable `tmrkz-migpath`, `ops/verify-migration-path.sh`):** pre-V17 release image
+    `mover/backend:1.0.0` (V1–V16) → `mover/backend:rel-6186016` (built from commit `6186016`, V1–V17). Fictional seed
+    plus the full journey on the old release (42 checks) → schema dump → plan exactly [17] → backup with SHA-256
+    manifest (schema 16) → `upgrade-check before` (133 rows) → start of the new release, Flyway "Successfully applied 1
+    migration … now at version v17" (9 ms) → `flyway_schema_history` 17 successful → schema diff only the `purpose`
+    column and its CHECK → `upgrade-check after` PASS (133/133 unchanged) → data: handover → HANDOVER ×1, receipt →
+    RECEIPT ×1, 0 mismatches → journey on V17 PASS. Evidence `docs/evidence/migration-path/v17/`. TMRKZ's migration log
+    is `flyway_schema_history` (MOVER's `release_migration_log` has no counterpart here).
+  - **ADR-028 tests:** `ExecutionIntegrityIT` 5/5, `ExecutionInFlightIT` 5/5, `V17MigrationIT` 1/1 (disposable database).
+  - **Acceptance database:** `tmrkz-test` upgraded with `ops/test-env/upgrade-backend.sh` (plan [17], backup
+    `backups/tmrkz-test-20261104T031947Z`, 6,340 rows fingerprinted and unchanged, V17 in 16 ms, HANDOVER ×169,
+    RECEIPT ×169, ACKNOWLEDGEMENT ×1, 0 mismatches, journey PASS) and labelled `ACCEPTANCE / V17` (database comment).
+    This is acceptance evidence, not production migration evidence. Evidence `docs/evidence/acceptance-upgrade/tmrkz-test-v17/`.
+  - **Tooling found and fixed on the way:** `ops/backup.sh` recorded the schema version as text maximum ("9" for a V16
+    database), now numeric; `ops/sql/upgrade-rows.sql` now fingerprints execution steps (columns before V17).
+  - **Backup verified before any migration (added for the V18 acceptance approval).** `ops/verify-backup.sh`:
+    - checks every file against its manifest SHA-256 and that every dump is readable;
+    - restores the business database, as `ops/restore.sh` does, into a throw-away PostGIS container;
+    - requires table counts equal to the backup's fingerprint, the manifest's schema version, and rows equal to the
+      live fingerprint taken right after the backup.
+
+    `upgrade-backend.sh` runs it after the backup and refuses to swap the image when it fails. It also refuses a
+    database whose comment does not say ACCEPTANCE, and it logs the image revision label and the schema fingerprint.
+    Proven on the V16 backup `tmrkz-test-20261104T031947Z`: PASS, 6,340 restored rows equal. A changed file and a
+    differing live fingerprint are both refused.
+  - **Still not authorised:** applying V17 to a real retained or production database without backup, plan, the release
+    tooling and verification.
 
 ## ADR-029 One GIS workspace: «مساحة التمركز» replaces «الخريطة والمرافق» — Accepted (2026-11-02)
 

@@ -1,0 +1,4 @@
+purpose handover=HANDOVER x1
+purpose receipt=RECEIPT x1
+purpose mismatches=0
+purpose column=text nullable=NO default='TASK'::text

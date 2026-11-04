@@ -1,0 +1,27 @@
+--- docs/evidence/migration-path/v17/schema-before.sql	2026-11-04 06:57:30.822584800 +0400
++++ docs/evidence/migration-path/v17/schema-after.sql	2026-11-04 06:57:48.909146200 +0400
+@@ -2,7 +2,7 @@
+ -- PostgreSQL database dump
+ --
+ 
+-\restrict fgH9Pm6p2vhUmqNMvVcVdVxAKSFtQkJlm7amIaeKE9LVAYVOrlR0E2jHavyKFgk
++\restrict rITDbXT4yw6soR2aaVNPYIWi4oDlWvrGdmWanubcnFjN0JWgaCTPPrPZyuA3Sxe
+ 
+ -- Dumped from database version 17.11
+ -- Dumped by pg_dump version 17.11
+@@ -1599,6 +1599,8 @@
+     created_at timestamp with time zone DEFAULT now() NOT NULL,
+     assigned_person_id uuid,
+     awaiting_assignment boolean DEFAULT false NOT NULL,
++    purpose text DEFAULT 'TASK'::text NOT NULL,
++    CONSTRAINT execution_task_purpose_check CHECK ((purpose = ANY (ARRAY['HANDOVER'::text, 'RECEIPT'::text, 'ACKNOWLEDGEMENT'::text, 'TASK'::text]))),
+     CONSTRAINT execution_task_status_check CHECK ((status = ANY (ARRAY['OPEN'::text, 'DONE'::text])))
+ );
+ 
+@@ -7215,5 +7217,5 @@
+ -- PostgreSQL database dump complete
+ --
+ 
+-\unrestrict fgH9Pm6p2vhUmqNMvVcVdVxAKSFtQkJlm7amIaeKE9LVAYVOrlR0E2jHavyKFgk
++\unrestrict rITDbXT4yw6soR2aaVNPYIWi4oDlWvrGdmWanubcnFjN0JWgaCTPPrPZyuA3Sxe
+ 

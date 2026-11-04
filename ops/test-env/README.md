@@ -8,6 +8,13 @@ sh ops/test-env/up.sh                 # builds and starts TMRKZ + Keycloak + a f
 cat ops/test-env/.generated/user-password
 ```
 
+**Migration gate (4 Nov 2026).** `up.sh` and `up-offline.sh` rebuild the backend from the working tree, and the backend
+applies pending migrations on start. They now refuse when the migrations in the tree are ahead of this environment's
+Flyway history, unless `TMRKZ_APPLY_MIGRATIONS` names exactly the pending versions. Upgrade the environment with a
+release image instead: `EXPECT_PENDING="17" AFTER_SQL=ops/sql/checks/V17-after.sql sh ops/test-env/upgrade-backend.sh
+<image> <label>` (the database must be labelled ACCEPTANCE; plan, backup verified by `ops/verify-backup.sh`, fingerprints
+before and after; evidence in `docs/evidence/acceptance-upgrade/`).
+
 Open `http://localhost:8088` and choose either **الدخول الآلي بالحساب المؤسسي** (Keycloak) or **إدخال اسم المستخدم
 وكلمة المرور يدوياً** (checked by the directory). Keycloak shows the TMRKZ sign-in page. The
 directory (OpenLDAP, StartTLS with a test CA that only this environment trusts) verifies the password, and TMRKZ links

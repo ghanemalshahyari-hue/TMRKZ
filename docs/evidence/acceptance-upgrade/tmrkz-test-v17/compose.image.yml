@@ -1,0 +1,3 @@
+services:
+  backend:
+    image: ${TMRKZ_BACKEND_IMAGE}
