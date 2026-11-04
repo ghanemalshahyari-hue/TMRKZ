@@ -26,7 +26,7 @@ the workflow needs on an `ACCEPTANCE` database at V19 or later:
 It is idempotent and publishes no policy. Terrain is loaded separately with `ops/terrain/load-slope.sh`.
 
 **Stationing V3 page on the acceptance environment.**
-- **Web image:** built with `VITE_STATIONING_V3=true` and swapped with `sh ops/test-env/upgrade-web.sh <image> <label>`.
+- **Web image:** built with `--build-arg STATIONING_V3=true` (the unit tests still run with the flag off) and swapped with `sh ops/test-env/upgrade-web.sh <image> <label>`.
 - **Map files:** mounts the offline map packages read-only under `/map-data/` (`compose.v3-maps.yml`).
 - **Recovery:** `MAPS=0 sh ops/test-env/upgrade-web.sh mover/web:1.0.0 <label>`.
 - **Policy:** import `acceptance-v3-policy-template.json` in «سياسة التمركز», set the routing levels and the deployment

@@ -1203,7 +1203,7 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
     (`POST /stationing/policy/validate`, a dry run) and lists the levels Oracle sends
     (`GET /stationing/hierarchy-levels`). Publishing remains the versioned, audited API.
   - **On `tmrkz-test`** (owner approval of the sequence): a backend release without migrations, the web image built
-    with `VITE_STATIONING_V3=true` (build argument, off by default), and the offline map packages mounted read-only
+    with `--build-arg STATIONING_V3=true` (sets `VITE_STATIONING_V3` for the bundle only; off by default), and the offline map packages mounted read-only
     under `/map-data/` (`ops/test-env/compose.v3-maps.yml`). The earlier images are kept for recovery.
 - **Not done.** Extensions, early return, cancellation before start; publication of the acceptance policy (by the
   owner in the studio); production build of the page and packaging of the map data; the full §4 journey; real Oracle
