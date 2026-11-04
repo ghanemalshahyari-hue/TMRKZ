@@ -25,3 +25,26 @@ export function guidanceBand(centre: LatLng, effectiveMinM: number, effectiveMax
 export function simpleArea(centre: LatLng, radiusM: number, steps = 32): Ring {
   return Array.from({ length: steps }, (_, i) => destination(centre, (i / steps) * 360, radiusM));
 }
+
+/** The draw action the editor offers when nothing can be copied (owner wording, 4 Nov 2026). */
+export const DRAW_NEW_BOUNDARY = 'رسم حدود جديدة';
+
+type CurrentSite = { site: { id: string; name: string }; geometry: { type: string; coordinates: unknown } | null };
+
+/**
+ * What «نسخ حدود الموقع الحالي» can copy from the chosen units' current sites. Only a Polygon is copied today. A
+ * MultiPolygon is copied whole and moved as one group in the owner's target behaviour, which is not built yet, so it is
+ * never reduced to one part, merged or hulled: the editor falls back to drawing and says so. A Point has no footprint
+ * to copy and nothing is synthesised around it.
+ */
+export function copyableBoundary<T extends CurrentSite>(sites: T[]): { copy: T | null; message: string } {
+  const polygon = sites.find((s) => s.geometry?.type === 'Polygon');
+  if (polygon) return { copy: polygon, message: 'نُسخت حدود «' + polygon.site.name + '» — انقر على الخريطة حيث تريد نقلها' };
+  const multi = sites.find((s) => s.geometry?.type === 'MultiPolygon');
+  if (multi) {
+    return { copy: null, message: 'حدود «' + multi.site.name + '» متعددة الأجزاء؛ نسخها مجموعةً واحدة لم يُنفَّذ بعد — استخدم «' + DRAW_NEW_BOUNDARY + '»' };
+  }
+  const point = sites.find((s) => s.geometry?.type === 'Point');
+  if (point) return { copy: null, message: '«' + point.site.name + '» مسجل نقطةً بلا حدود، فلا شيء يُنسخ — استخدم «' + DRAW_NEW_BOUNDARY + '»' };
+  return { copy: null, message: 'لا حدود مسجلة للموقع الحالي لهذه الوحدات — استخدم «' + DRAW_NEW_BOUNDARY + '»' };
+}

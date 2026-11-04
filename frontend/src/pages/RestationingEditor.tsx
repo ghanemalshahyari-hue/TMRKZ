@@ -3,6 +3,7 @@ import type { MapMouseEvent } from 'maplibre-gl';
 import { api } from '../api/client';
 import type { GeoPolygon, RestationingChecks, RestationingContent, RestationingRequest } from '../api/types';
 import { useApp, type FlatOrg } from '../lib/app';
+import { DRAW_NEW_BOUNDARY, copyableBoundary } from '../lib/stationingV3';
 import { RequestMap } from './RestationingPage';
 
 type Placing = 'site' | 'primary' | 'alternative' | null;
@@ -127,11 +128,11 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
       r = await api.restationingRequest(saved);
       setLoaded(r);
     }
-    const cur = r.currentSites.find((s) => s.geometry?.type === 'Polygon');
-    if (!cur) return app.toast('لا حدود مسجلة للموقع الحالي لهذه الوحدات؛ ارسم موقعاً جديداً بالنقر');
+    const { copy: cur, message } = copyableBoundary(r.currentSites);
+    if (!cur) return app.toast(message);
     set({ site: { geometry: cur.geometry as GeoPolygon, copiedFrom: cur.site.id, shape: 'COPY' } });
     setPlacing('site');
-    app.toast('نُسخت حدود «' + cur.site.name + '» — انقر على الخريطة حيث تريد نقلها');
+    app.toast(message);
   };
 
   const preview: RestationingRequest = {
@@ -182,7 +183,7 @@ export function RestationingEditor({ requestId, onClose }: { requestId: string |
           <div className="rs-tools">
             <button className="button" onClick={copyCurrent}>نسخ حدود الموقع الحالي</button>
             <button className={'button' + (placing === 'site' ? ' primary' : '')} onClick={() => setPlacing(placing === 'site' ? null : 'site')}>
-              {content.site ? 'نقل الموقع المقترح' : 'رسم موقع جديد'}
+              {content.site ? 'نقل الموقع المقترح' : DRAW_NEW_BOUNDARY}
             </button>
             <button className={'button' + (placing === 'primary' ? ' primary' : '')} onClick={() => setPlacing(placing === 'primary' ? null : 'primary')}>
               منطقة الانتشار الرئيسية

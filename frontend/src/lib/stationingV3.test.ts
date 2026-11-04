@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { areaM2, centroid } from './footprint';
 import { distanceM } from './geo';
-import { HIERARCHY_CHANGED, STATIONING_V3_ENABLED, guidanceBand, simpleArea } from './stationingV3';
+import { DRAW_NEW_BOUNDARY, HIERARCHY_CHANGED, STATIONING_V3_ENABLED, copyableBoundary, guidanceBand, simpleArea } from './stationingV3';
 
 describe('Stationing V3 preparation', () => {
   it('is inactive unless explicitly enabled at build time', () => {
@@ -25,5 +25,22 @@ describe('Stationing V3 preparation', () => {
     expect(ring).toHaveLength(32);
     expect(distanceM(centroid(ring), c)).toBeLessThan(1);
     expect(Math.abs(areaM2(ring) - Math.PI * 600 * 600) / (Math.PI * 600 * 600)).toBeLessThan(0.01);
+  });
+
+  it('copies only a Polygon; a MultiPolygon and a Point fall back to drawing, saying why, never reduced or synthesised', () => {
+    const at = (type: string, name: string) => ({ site: { id: name, name }, geometry: { type, coordinates: [] } });
+    const multi = at('MultiPolygon', 'الموقع 05');
+    const point = at('Point', 'الموقع 06');
+    const poly = at('Polygon', 'الموقع 02');
+    expect(copyableBoundary([multi, poly]).copy).toBe(poly);
+    const m = copyableBoundary([multi]);
+    expect(m.copy).toBeNull();
+    expect(m.message).toContain('متعددة الأجزاء');
+    expect(m.message).toContain(DRAW_NEW_BOUNDARY);
+    const p = copyableBoundary([point]);
+    expect(p.copy).toBeNull();
+    expect(p.message).toContain('نقطةً بلا حدود');
+    expect(copyableBoundary([]).message).toContain('لا حدود مسجلة');
+    expect(DRAW_NEW_BOUNDARY).toBe('رسم حدود جديدة');
   });
 });
