@@ -284,8 +284,17 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     pass; the five-stage one was decided on the page by five different people. Requests RS-2026-0017/0018/0020;
     RS-2026-0019 is a DRAFT stopped correctly by O-03. Evidence:
     `docs/evidence/acceptance-journeys/stationing-v3/ROUTES-L8-L10.md`.
+  - **Lifecycle (ADR-034, 4 Nov) — local commits `86a58db` and `d05a7c2`; V20 on `tmrkz-test` (`ACCEPTANCE / V20`):**
+    - cancellation before activation, cancellation before start (with the held start, the refusal after the start and
+      the window expiry), early return, and extension with its separate activation and lapse;
+    - V20 applied with the guarded procedure: 6,878 rows unchanged, schema identical to the clean path, OpenFGA 425
+      relations;
+    - four fictional single-action accounts;
+    - all six real-page journeys pass with the real scheduler (`LIFECYCLE.md`);
+    - tests: `RestationingLifecycleIT` 8/8, backend 206/206, frontend 94/94.
+
+    Open: D11 reminders; the time of the effective end in the panel.
   - **Before production readiness (owner list):**
-    - extensions, early return, cancellation before start;
     - grouped MultiPolygon copy and move;
     - corner/vertex editing;
     - the long mixed-label wrap on the map;

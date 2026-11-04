@@ -1,0 +1,184 @@
+--- docs/evidence/migration-path/v20/schema-before.sql	2026-11-04 13:23:22.484746800 +0400
++++ docs/evidence/migration-path/v20/schema-after.sql	2026-11-04 13:23:41.823922800 +0400
+@@ -2,7 +2,7 @@
+ -- PostgreSQL database dump
+ --
+ 
+-\restrict UfZKogAKe7bib1cO17qwF45cgyZfcrNuxTh5mAo5Qp8ldFA79fs4fbC4v1WyEFN
++\restrict OqQNVJp0dcyUp4SaDTUxzy1wCo6h0yXHKcNTFpmh4TNhUhb3P31f7xUvw090zeo
+ 
+ -- Dumped from database version 17.11
+ -- Dumped by pg_dump version 17.11
+@@ -2249,11 +2249,13 @@
+     end_reason text,
+     ended_by uuid,
+     ended_at timestamp with time zone,
++    start_held_at timestamp with time zone,
+     CONSTRAINT org_stationing_check CHECK (((valid_to IS NULL) OR (valid_to >= valid_from))),
+     CONSTRAINT org_stationing_check1 CHECK (((valid_to IS NULL) = (end_reason IS NULL))),
+     CONSTRAINT org_stationing_check2 CHECK ((((kind = 'PERMANENT'::text) AND (base_id IS NULL) AND (planned_end IS NULL)) OR ((kind = 'TEMPORARY'::text) AND (base_id IS NOT NULL) AND (planned_end IS NOT NULL) AND (planned_end > valid_from)))),
+     CONSTRAINT org_stationing_check3 CHECK (((origin = 'CORRECTION'::text) OR (request_id IS NOT NULL))),
+-    CONSTRAINT org_stationing_end_reason_check CHECK ((end_reason = ANY (ARRAY['SUPERSEDED'::text, 'CORRECTED'::text, 'RETURNED'::text, 'CANCELLED'::text, 'ENDED_EARLY'::text]))),
++    CONSTRAINT org_stationing_end_reason_check CHECK ((end_reason = ANY (ARRAY['SUPERSEDED'::text, 'CORRECTED'::text, 'RETURNED'::text, 'CANCELLED'::text, 'ENDED_EARLY'::text, 'WINDOW_EXPIRED'::text]))),
++    CONSTRAINT org_stationing_held_check CHECK (((start_held_at IS NULL) OR (kind = 'TEMPORARY'::text))),
+     CONSTRAINT org_stationing_kind_check CHECK ((kind = ANY (ARRAY['PERMANENT'::text, 'TEMPORARY'::text]))),
+     CONSTRAINT org_stationing_origin_check CHECK ((origin = ANY (ARRAY['CORRECTION'::text, 'REQUEST'::text]))),
+     CONSTRAINT org_stationing_reason_check CHECK ((length(btrim(reason)) >= 5))
+@@ -2674,6 +2676,35 @@
+ 
+ 
+ --
++-- Name: restationing_action; Type: TABLE; Schema: public; Owner: -
++--
++
++CREATE TABLE public.restationing_action (
++    id uuid NOT NULL,
++    request_id uuid NOT NULL,
++    kind text NOT NULL,
++    state text NOT NULL,
++    requested_by uuid NOT NULL,
++    requested_at timestamp with time zone NOT NULL,
++    reason text NOT NULL,
++    resume_state text,
++    decided_by uuid,
++    decided_at timestamp with time zone,
++    decision_reason text,
++    via_delegation uuid,
++    held_at timestamp with time zone,
++    closed_at timestamp with time zone,
++    close_reason text,
++    CONSTRAINT restationing_action_check CHECK (((state = ANY (ARRAY['APPROVED'::text, 'REJECTED'::text])) = ((decided_by IS NOT NULL) AND (decided_at IS NOT NULL)))),
++    CONSTRAINT restationing_action_check1 CHECK (((state = ANY (ARRAY['NO_LONGER_ACTIONABLE'::text, 'SUPERSEDED'::text])) = ((closed_at IS NOT NULL) AND (close_reason IS NOT NULL)))),
++    CONSTRAINT restationing_action_decision_reason_check CHECK (((decision_reason IS NULL) OR (length(btrim(decision_reason)) >= 5))),
++    CONSTRAINT restationing_action_kind_check CHECK ((kind = ANY (ARRAY['PRE_ACTIVATION_CANCELLATION'::text, 'BEFORE_START_CANCELLATION'::text, 'EARLY_RETURN'::text]))),
++    CONSTRAINT restationing_action_reason_check CHECK ((length(btrim(reason)) >= 5)),
++    CONSTRAINT restationing_action_state_check CHECK ((state = ANY (ARRAY['REQUESTED'::text, 'APPROVED'::text, 'REJECTED'::text, 'NO_LONGER_ACTIONABLE'::text, 'SUPERSEDED'::text])))
++);
++
++
++--
+ -- Name: restationing_request; Type: TABLE; Schema: public; Owner: -
+ --
+ 
+@@ -2701,12 +2732,17 @@
+     created_at timestamp with time zone NOT NULL,
+     updated_at timestamp with time zone NOT NULL,
+     version integer DEFAULT 0 NOT NULL,
++    parent_request_id uuid,
++    lapsed_at timestamp with time zone,
++    lapse_reason text,
++    CONSTRAINT restationing_request_activated_check CHECK (((state <> ALL (ARRAY['ACTIVATED_PERMANENT'::text, 'TEMPORARY_SCHEDULED'::text, 'START_HELD_PENDING_CANCELLATION'::text, 'ACTIVE_TEMPORARY'::text, 'TEMPORARY_RETURNED'::text, 'TEMPORARY_CANCELLED_BEFORE_START'::text, 'TEMPORARY_WINDOW_EXPIRED_WITHOUT_START'::text, 'EXTENSION_ACTIVATED'::text])) OR (activated_at IS NOT NULL))),
+     CONSTRAINT restationing_request_check CHECK (((end_at IS NULL) OR (end_at > start_at))),
+     CONSTRAINT restationing_request_check1 CHECK (((state = 'DRAFT'::text) OR ((policy_version IS NOT NULL) AND (route_path IS NOT NULL) AND (hierarchy_snapshot IS NOT NULL)))),
+     CONSTRAINT restationing_request_check2 CHECK ((((activated_at IS NULL) = (activated_by IS NULL)) AND ((activated_at IS NULL) = (site_id IS NULL)))),
+-    CONSTRAINT restationing_request_check3 CHECK (((state <> ALL (ARRAY['ACTIVATED_PERMANENT'::text, 'TEMPORARY_SCHEDULED'::text, 'ACTIVE_TEMPORARY'::text, 'TEMPORARY_RETURNED'::text])) OR (activated_at IS NOT NULL))),
+-    CONSTRAINT restationing_request_kind_check CHECK ((kind = ANY (ARRAY['PERMANENT'::text, 'TEMPORARY'::text]))),
+-    CONSTRAINT restationing_request_state_check CHECK ((state = ANY (ARRAY['DRAFT'::text, 'UNDER_REVIEW'::text, 'RETURNED_FOR_CHANGES'::text, 'PAUSED_HIERARCHY_CHANGED'::text, 'REJECTED'::text, 'APPROVED_NOT_ACTIVATED'::text, 'ACTIVATED_PERMANENT'::text, 'TEMPORARY_SCHEDULED'::text, 'ACTIVE_TEMPORARY'::text, 'TEMPORARY_RETURNED'::text, 'TEMPORARY_CANCELLED_BEFORE_START'::text])))
++    CONSTRAINT restationing_request_kind_check CHECK ((kind = ANY (ARRAY['PERMANENT'::text, 'TEMPORARY'::text, 'EXTENSION'::text]))),
++    CONSTRAINT restationing_request_lapse_check CHECK (((state = 'LAPSED_NOT_ACTIVATED'::text) = ((lapsed_at IS NOT NULL) AND (lapse_reason IS NOT NULL)))),
++    CONSTRAINT restationing_request_parent_check CHECK (((kind = 'EXTENSION'::text) = (parent_request_id IS NOT NULL))),
++    CONSTRAINT restationing_request_state_check CHECK ((state = ANY (ARRAY['DRAFT'::text, 'UNDER_REVIEW'::text, 'RETURNED_FOR_CHANGES'::text, 'PAUSED_HIERARCHY_CHANGED'::text, 'REJECTED'::text, 'APPROVED_NOT_ACTIVATED'::text, 'CANCELLATION_PENDING'::text, 'CANCELLED_BEFORE_ACTIVATION'::text, 'ACTIVATED_PERMANENT'::text, 'TEMPORARY_SCHEDULED'::text, 'START_HELD_PENDING_CANCELLATION'::text, 'ACTIVE_TEMPORARY'::text, 'TEMPORARY_RETURNED'::text, 'TEMPORARY_CANCELLED_BEFORE_START'::text, 'TEMPORARY_WINDOW_EXPIRED_WITHOUT_START'::text, 'EXTENSION_ACTIVATED'::text, 'LAPSED_NOT_ACTIVATED'::text])))
+ );
+ 
+ 
+@@ -4244,6 +4280,14 @@
+ 
+ 
+ --
++-- Name: restationing_action restationing_action_pkey; Type: CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_action
++    ADD CONSTRAINT restationing_action_pkey PRIMARY KEY (id);
++
++
++--
+ -- Name: restationing_request restationing_request_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -5832,10 +5876,31 @@
+ 
+ 
+ --
++-- Name: restationing_action_open_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE UNIQUE INDEX restationing_action_open_idx ON public.restationing_action USING btree (request_id) WHERE (state = 'REQUESTED'::text);
++
++
++--
++-- Name: restationing_action_request_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX restationing_action_request_idx ON public.restationing_action USING btree (request_id, requested_at);
++
++
++--
+ -- Name: restationing_request_due_idx; Type: INDEX; Schema: public; Owner: -
+ --
+ 
+-CREATE INDEX restationing_request_due_idx ON public.restationing_request USING btree (state, start_at, end_at) WHERE (state = ANY (ARRAY['TEMPORARY_SCHEDULED'::text, 'ACTIVE_TEMPORARY'::text]));
++CREATE INDEX restationing_request_due_idx ON public.restationing_request USING btree (state, start_at, end_at) WHERE (state = ANY (ARRAY['TEMPORARY_SCHEDULED'::text, 'START_HELD_PENDING_CANCELLATION'::text, 'ACTIVE_TEMPORARY'::text]));
++
++
++--
++-- Name: restationing_request_parent_idx; Type: INDEX; Schema: public; Owner: -
++--
++
++CREATE INDEX restationing_request_parent_idx ON public.restationing_request USING btree (parent_request_id) WHERE (parent_request_id IS NOT NULL);
+ 
+ 
+ --
+@@ -7599,6 +7664,30 @@
+ 
+ 
+ --
++-- Name: restationing_action restationing_action_decided_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_action
++    ADD CONSTRAINT restationing_action_decided_by_fkey FOREIGN KEY (decided_by) REFERENCES public.person(id);
++
++
++--
++-- Name: restationing_action restationing_action_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_action
++    ADD CONSTRAINT restationing_action_request_id_fkey FOREIGN KEY (request_id) REFERENCES public.restationing_request(id);
++
++
++--
++-- Name: restationing_action restationing_action_requested_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_action
++    ADD CONSTRAINT restationing_action_requested_by_fkey FOREIGN KEY (requested_by) REFERENCES public.person(id);
++
++
++--
+ -- Name: restationing_request restationing_request_activated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -7615,6 +7704,14 @@
+ 
+ 
+ --
++-- Name: restationing_request restationing_request_parent_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
++--
++
++ALTER TABLE ONLY public.restationing_request
++    ADD CONSTRAINT restationing_request_parent_request_id_fkey FOREIGN KEY (parent_request_id) REFERENCES public.restationing_request(id);
++
++
++--
+ -- Name: restationing_request restationing_request_policy_version_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+ --
+ 
+@@ -8002,5 +8099,5 @@
+ -- PostgreSQL database dump complete
+ --
+ 
+-\unrestrict UfZKogAKe7bib1cO17qwF45cgyZfcrNuxTh5mAo5Qp8ldFA79fs4fbC4v1WyEFN
++\unrestrict OqQNVJp0dcyUp4SaDTUxzy1wCo6h0yXHKcNTFpmh4TNhUhb3P31f7xUvw090zeo
+ 

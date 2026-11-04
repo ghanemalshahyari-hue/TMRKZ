@@ -1,0 +1,8 @@
+[backup] database → backups/tmrkz-migpath-20261104T092324Z/db.dump
+[backup] identity database → backups/tmrkz-migpath-20261104T092324Z/keycloak.dump
+[backup] authorisation database → backups/tmrkz-migpath-20261104T092324Z/openfga.dump
+[backup] files volume → backups/tmrkz-migpath-20261104T092324Z/files.tgz
+[backup] map packages → backups/tmrkz-migpath-20261104T092324Z/map-packages.tgz
+[backup] fingerprints
+[backup] done: backups/tmrkz-migpath-20261104T092324Z
+backups/tmrkz-migpath-20261104T092324Z

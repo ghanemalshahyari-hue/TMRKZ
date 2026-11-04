@@ -1,0 +1,7 @@
+action_table=1
+action_rows=0
+new_columns=4
+named_constraints=7
+old_activation_check=0
+lifecycle_values_on_earlier_rows=0
+mismatches=0

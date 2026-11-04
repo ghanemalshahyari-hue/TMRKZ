@@ -1266,3 +1266,75 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
 - **Not done.** Extensions, early return, cancellation before start; grouped MultiPolygon copy-and-move; vertex
   editing; production build of the page and packaging of the map data; a controlled terrain-tie acceptance scenario;
   real non-production Oracle and touch (release gates).
+
+## ADR-034 Stationing V3 lifecycle: cancellation before activation, cancellation before start, early return, extension — Accepted on the acceptance database (V20, 2026-11-04)
+
+**Context.** The owner's acceptance verdict (functionally accepted, not production ready) puts the missing lifecycle
+first. The rules are the owner-approved model kept by V3 (`docs/STATIONING_DOMAIN_MODEL_V2_AR.md` §4.6–4.7: D9, D10,
+D12, D16, A4, A5, A6). Plan: `docs/audit/stationing-v3-production/LIFECYCLE_PLAN.md`.
+
+**Decision.**
+- **Migration V20 (schema only):**
+  - a request kind EXTENSION, with `parent_request_id`;
+  - the states CANCELLATION_PENDING, CANCELLED_BEFORE_ACTIVATION, START_HELD_PENDING_CANCELLATION,
+    TEMPORARY_WINDOW_EXPIRED_WITHOUT_START, EXTENSION_ACTIVATED and LAPSED_NOT_ACTIVATED (with the lapse time and
+    reason);
+  - the table `restationing_action`, with at most one open action per request;
+  - `org_stationing.start_held_at`, and the end reason WINDOW_EXPIRED.
+- **Four separate rights, granted to no existing role:** DECIDE_PRE_ACTIVATION_CANCELLATION,
+  ACTIVATE_TEMPORARY_EXTENSION, DECIDE_EARLY_RETURN, DECIDE_BEFORE_START_CANCELLATION.
+  - The last is the model's DECIDE_TEMPORARY_BEFORE_START_CANCELLATION, shortened because OpenFGA limits a relation
+    name to 50 bytes: the generated `…_contains` relation would have 51.
+  - The OpenFGA model is regenerated; its longest relation is 46 bytes.
+- **Who asks and who decides:**
+  - asking needs the requester (the same human) or «طلب إعادة التمركز» for the requesting unit;
+  - the decider is another human (PersonKeys; a delegation counts for its delegator) holding the action's right over
+    every moving unit;
+  - holders of these rights see the requests they act on.
+- **Cancellation before activation:** from review, return, pause or approval. It blocks decisions and activation. Once
+  approved it becomes CANCELLED_BEFORE_ACTIVATION; if rejected, the recorded state resumes.
+- **Cancellation before start:**
+  - Approved: the records keep their dates with an empty window (CANCELLED); the scheduler never starts the temporary.
+  - Still pending at the start: the scheduler holds the start (START_HELD_PENDING_CANCELLATION, `start_held_at`). A
+    held record is out of "in force" (read contract, current sites, occupancy, other-branch units).
+  - Refused after the start: the temporary takes effect from the decision, not backdated, and the end does not move.
+  - Window ended first: TEMPORARY_WINDOW_EXPIRED_WITHOUT_START, and the action is NO_LONGER_ACTIONABLE.
+- **Early return:**
+  - Approved: in one transaction, ENDED_EARLY now, with the planned and actual end recorded, and the deployment areas
+    retired.
+  - Not from a temporary that has not started.
+  - A natural end overtakes a pending early return (SUPERSEDED).
+- **Extension:**
+  - Its own request: it is submitted with the route derived from the requesting unit, and its checks cover the new end
+    and the reason.
+  - Its own activation, never by its requester or final approver.
+  - On activation, the open record closes at the current effective end (SUPERSEDED) and a following record runs to the
+    new end; earlier dates are never edited.
+  - An extension not activated when the stationing ends, is cancelled or never starts becomes LAPSED_NOT_ACTIVATED.
+- **The page** offers only what the server's `can` allows: asking each action, deciding the pending one, the extension
+  draft, and the history of actions and extensions.
+
+**Verified.**
+- `RestationingLifecycleIT` 8/8 on PostgreSQL + PostGIS with OpenFGA. It covers every transition, the separation by
+  human, the wrong right, the held start, the refusal after the start, the window expiry, the early return, the
+  extension and the lapse.
+- Full backend suite 206/206; `AuthorizationIT` with the regenerated model; frontend 94/94; build OK.
+
+**On the acceptance database (owner approval, 4 Nov 2026).**
+- **Commits:** local commit `86a58db` (functional), then `d05a7c2`. The latter fixes a defect found while preparing the
+  run: the page's access rule did not list the four rights.
+- **Migration:** V20 applied with the guarded procedure:
+  - plan [20], backup verified by restore, 51 ms;
+  - 6,878 earlier rows unchanged; the Stationing fingerprint equal on 7 tables;
+  - schema change identical to the clean path; OpenFGA 425 relations.
+
+  Result: `ACCEPTANCE / V20` (`docs/evidence/acceptance-upgrade/tmrkz-test-v20/`).
+- **Fictional accounts:** four single-action accounts hold the rights
+  (`ops/test-env/provision-acceptance-v3-lifecycle.sh`).
+- **Journeys on the real page with the real scheduler:** extension, early return, cancellation before start, held
+  start refused after the start, window expiry and cancellation before activation all pass
+  (`docs/evidence/acceptance-journeys/stationing-v3/LIFECYCLE.md`).
+
+**Not done.**
+- D11 end-of-temporary reminders.
+- Showing the time of the effective end in the lifecycle panel.

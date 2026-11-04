@@ -1,0 +1,88 @@
+{
+  "ranAt": "2026-11-04T09:44:10.211Z",
+  "base": "http://localhost:8088",
+  "only": [
+    "L"
+  ],
+  "policy": {
+    "version": 1,
+    "reference": "ACCEPTANCE-V3-POLICY-1"
+  },
+  "results": [
+    {
+      "id": "L6",
+      "label": "cancellation before activation: pending blocks activation, the asker cannot decide, «قرار الإلغاء قبل التفعيل» decides on the page",
+      "result": "PASS",
+      "extra": "RS-2026-0028: CANCELLATION_PENDING → CANCELLED_BEFORE_ACTIVATION; activation while pending 400, after 400; asker 403"
+    },
+    {
+      "id": "L2a",
+      "label": "early return: the temporary is in force",
+      "result": "PASS",
+      "extra": "RS-2026-0029"
+    },
+    {
+      "id": "L2b",
+      "label": "early return decided on the page by «قرار العودة المبكرة» (not the asker): the temporary ends at the decision",
+      "result": "PASS",
+      "extra": "asker 403; TEMPORARY_RETURNED; record 2026-11-04T09:41:58.341Z → 2026-11-04T09:42:12.589858Z (ENDED_EARLY), planned end 2026-11-04T10:00:58.341Z"
+    },
+    {
+      "id": "L4a",
+      "label": "the start is held by the pending cancellation: the permanent stationing stays the authoritative one",
+      "result": "PASS",
+      "extra": "RS-2026-0031: START_HELD_PENDING_CANCELLATION; in force PERMANENT"
+    },
+    {
+      "id": "L4b",
+      "label": "refused after the approved start: in force from the decision (not backdated), the approved end unchanged",
+      "result": "PASS",
+      "extra": "ACTIVE_TEMPORARY; planned start 2026-11-04T09:42:13.341Z, in force from 2026-11-04T09:43:13.611122Z, planned end 2026-11-04T10:00:58.341Z"
+    },
+    {
+      "id": "L5",
+      "label": "the window ends with the cancellation still pending: never started, the cancellation no longer actionable",
+      "result": "PASS",
+      "extra": "RS-2026-0030: TEMPORARY_WINDOW_EXPIRED_WITHOUT_START; action NO_LONGER_ACTIONABLE; late decision 400 انقضت نافذة النفاذ دون بدء؛ لم يعد القرار ممكناً.; record 2026-11-04T09:41:58.342Z → 2026-11-04T09:41:58.342Z (WINDOW_EXPIRED)"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the real page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors on the real page",
+      "result": "PASS",
+      "extra": ""
+    }
+  ],
+  "requests": [
+    {
+      "journey": "L-إلغاء قبل التفعيل",
+      "id": "9c55627f-ec62-4f1f-9562-10ede8b66c20",
+      "number": "RS-2026-0028",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "L-عودة مبكرة",
+      "id": "1d0f0c07-9441-4f00-8c25-cb299901c67a",
+      "number": "RS-2026-0029",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "L-نافذة تنقضي",
+      "id": "08253944-308a-4f11-bc4c-9b9e52113852",
+      "number": "RS-2026-0030",
+      "requester": "t.requester.pm"
+    },
+    {
+      "journey": "L-بدء موقوف ثم رفض",
+      "id": "c29735d7-4347-4558-a04e-ebe1c2bd97cd",
+      "number": "RS-2026-0031",
+      "requester": "t.requester.pm"
+    }
+  ],
+  "routes": []
+}

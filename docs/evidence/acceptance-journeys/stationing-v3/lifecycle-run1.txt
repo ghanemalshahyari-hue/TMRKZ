@@ -1,0 +1,15 @@
+policy version 1 (ACCEPTANCE-V3-POLICY-1): primary 5000–8000 m, alternative 3000–5000 m, deployment REQUIRED, exception +2000 m
+PASS  L3  cancellation before start decided on the page; «قرار العودة المبكرة» cannot decide it; the record never takes effect  — RS-2026-0024: TEMPORARY_CANCELLED_BEFORE_START; record 2026-11-04T09:47:21.939Z → 2026-11-04T09:47:21.939Z (CANCELLED); early-return right 403
+PASS  L1a  extension: the temporary is in force (real scheduler)  — RS-2026-0025
+PASS  L1b  extension: its own request and approval; «تفعيل التمركز» and its requester cannot activate it; «تفعيل تمديد التمركز المؤقت» does  — RS-2026-0027: 2 stages, APPROVED_NOT_ACTIVATED; activator 403, requester 403, t.lc.ext EXTENSION_ACTIVATED
+PASS  L1c  past the original end the stationing stays in force on the extension  — ACTIVE_TEMPORARY; in force PERMANENT, TEMPORARY
+PASS  L1d  and returns at the extended end  — TEMPORARY_RETURNED; records 2026-11-04T09:33:51.938Z → 2026-11-04T09:36:21.938Z (SUPERSEDED) | 2026-11-04T09:36:21.938Z → 2026-11-04T09:39:21.938Z (RETURNED)
+FAIL  L2!  lifecycle journey did not complete  — Cannot read properties of null (reading 'startsWith')
+FAIL  L4!  lifecycle journey did not complete  — Cannot read properties of null (reading 'startsWith')
+FAIL  L5!  lifecycle journey did not complete  — Cannot read properties of null (reading 'startsWith')
+FAIL  L6!  lifecycle journey did not complete  — Cannot read properties of null (reading 'startsWith')
+PASS  NET  zero external requests from the real page
+PASS  CONSOLE  no console or page errors on the real page
+
+4 check(s) FAILED (7 pass, 0 notes)
+exit=1

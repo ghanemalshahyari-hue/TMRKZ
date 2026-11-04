@@ -1,0 +1,37 @@
+# FICTIONAL ACCEPTANCE accounts holding the Stationing V3 lifecycle rights (owner, 4 Nov 2026; ADR-034). Applied only by
+# ops/test-env/provision-acceptance-v3-lifecycle.sh to an ACCEPTANCE directory; never part of a production directory.
+dn: uid=t.lc.cancel,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.lc.cancel
+cn: Test Lifecycle Cancellation
+sn: Lifecycle
+givenName: Test
+employeeNumber: T-0016
+userPassword: __PASSWORD__
+
+dn: uid=t.lc.start,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.lc.start
+cn: Test Lifecycle Before Start
+sn: Lifecycle
+givenName: Test
+employeeNumber: T-0017
+userPassword: __PASSWORD__
+
+dn: uid=t.lc.return,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.lc.return
+cn: Test Lifecycle Early Return
+sn: Lifecycle
+givenName: Test
+employeeNumber: T-0018
+userPassword: __PASSWORD__
+
+dn: uid=t.lc.ext,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: t.lc.ext
+cn: Test Lifecycle Extension
+sn: Lifecycle
+givenName: Test
+employeeNumber: T-0019
+userPassword: __PASSWORD__

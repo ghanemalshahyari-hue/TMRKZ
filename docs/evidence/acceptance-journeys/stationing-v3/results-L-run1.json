@@ -1,0 +1,137 @@
+{
+  "ranAt": "2026-11-04T09:40:02.454Z",
+  "base": "http://localhost:8088",
+  "only": [
+    "L"
+  ],
+  "policy": {
+    "version": 1,
+    "reference": "ACCEPTANCE-V3-POLICY-1"
+  },
+  "results": [
+    {
+      "id": "L3",
+      "label": "cancellation before start decided on the page; «قرار العودة المبكرة» cannot decide it; the record never takes effect",
+      "result": "PASS",
+      "extra": "RS-2026-0024: TEMPORARY_CANCELLED_BEFORE_START; record 2026-11-04T09:47:21.939Z → 2026-11-04T09:47:21.939Z (CANCELLED); early-return right 403"
+    },
+    {
+      "id": "L1a",
+      "label": "extension: the temporary is in force (real scheduler)",
+      "result": "PASS",
+      "extra": "RS-2026-0025"
+    },
+    {
+      "id": "L1b",
+      "label": "extension: its own request and approval; «تفعيل التمركز» and its requester cannot activate it; «تفعيل تمديد التمركز المؤقت» does",
+      "result": "PASS",
+      "extra": "RS-2026-0027: 2 stages, APPROVED_NOT_ACTIVATED; activator 403, requester 403, t.lc.ext EXTENSION_ACTIVATED"
+    },
+    {
+      "id": "L1c",
+      "label": "past the original end the stationing stays in force on the extension",
+      "result": "PASS",
+      "extra": "ACTIVE_TEMPORARY; in force PERMANENT, TEMPORARY"
+    },
+    {
+      "id": "L1d",
+      "label": "and returns at the extended end",
+      "result": "PASS",
+      "extra": "TEMPORARY_RETURNED; records 2026-11-04T09:33:51.938Z → 2026-11-04T09:36:21.938Z (SUPERSEDED) | 2026-11-04T09:36:21.938Z → 2026-11-04T09:39:21.938Z (RETURNED)"
+    },
+    {
+      "id": "L2!",
+      "label": "lifecycle journey did not complete",
+      "result": "FAIL",
+      "extra": "Cannot read properties of null (reading 'startsWith')"
+    },
+    {
+      "id": "L4!",
+      "label": "lifecycle journey did not complete",
+      "result": "FAIL",
+      "extra": "Cannot read properties of null (reading 'startsWith')"
+    },
+    {
+      "id": "L5!",
+      "label": "lifecycle journey did not complete",
+      "result": "FAIL",
+      "extra": "Cannot read properties of null (reading 'startsWith')"
+    },
+    {
+      "id": "L6!",
+      "label": "lifecycle journey did not complete",
+      "result": "FAIL",
+      "extra": "Cannot read properties of null (reading 'startsWith')"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the real page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors on the real page",
+      "result": "PASS",
+      "extra": ""
+    }
+  ],
+  "requests": [
+    {
+      "journey": "L-تمديد",
+      "id": "d7331cd2-85e9-4bd6-809f-4d1cc77fcbe3",
+      "number": "RS-2026-0025",
+      "requester": "t.requester2"
+    },
+    {
+      "journey": "L-إلغاء قبل البدء",
+      "id": "b3b4f0f8-1b5b-4f53-a720-455cb86b5477",
+      "number": "RS-2026-0024",
+      "requester": "t.requester.pm"
+    },
+    {
+      "journey": "L-عودة مبكرة",
+      "id": "06418ce5-59e4-4734-91bc-e5c0f767333e",
+      "number": "RS-2026-0026",
+      "requester": "t.requester"
+    },
+    {
+      "journey": "L1 extension",
+      "id": "af08e587-76d1-42b0-ac18-6ee7888c60c0",
+      "number": "RS-2026-0027",
+      "requester": "t.requester2"
+    }
+  ],
+  "routes": [
+    {
+      "journey": "L1 extension",
+      "number": "RS-2026-0027",
+      "requestingUnit": "HR-T-IT",
+      "stages": 2,
+      "route": [
+        {
+          "key": "H:eb32f24f-78da-d5f2-0655-4a94ace028e0",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L7",
+          "final": false,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        },
+        {
+          "key": "H:5a38b67a-4376-935f-c8cb-01c66004d33c",
+          "kind": "HIERARCHY",
+          "label": "اعتماد المستوى L6",
+          "final": true,
+          "satisfies": [
+            "اعتماد هرمي"
+          ],
+          "mark": null,
+          "decidedBy": null
+        }
+      ]
+    }
+  ]
+}

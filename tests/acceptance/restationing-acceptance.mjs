@@ -5,7 +5,9 @@
 //   A permanent (decisions and activation pressed on the real page) + map checks, X distance exception (normal, within
 //   maxExtra, too far), C occupied deployment, D terrain on real GLO-30 cells, E cross-branch with F return and
 //   selective re-approval, S security refusals by direct API calls, K boundary cases in the real editor, B temporary
-//   with the real scheduler, R routes from L8, L9 and L10 (3–5 stages). G (hierarchy change) is NOT run here: the acceptance environment has no HR source attached
+//   with the real scheduler, R routes from L8, L9 and L10 (3–5 stages), U the single-action requester's units, L the
+//   lifecycle (ADR-034: extension, early return, cancellation before start, held start, window expiry, cancellation
+//   before activation) with the real scheduler. G (hierarchy change) is NOT run here: the acceptance environment has no HR source attached
 //   and the owner requires the HR synchronisation path, never direct SQL — see RestationingHrSyncIT.
 // Usage: MOVER_URL=http://localhost:8088 node tests/acceptance/restationing-acceptance.mjs   (headless Edge)
 //        ONLY=A,X,C,…  runs a subset
@@ -53,8 +55,12 @@ class Jar {
   header() { return [...this.cookies].map(([k, v]) => `${k}=${v}`).join('; '); }
 }
 const sessions = new Map();
-async function as(username) {
-  if (sessions.has(username)) return sessions.get(username);
+/** One sign-in per persona, shared by concurrent callers (two parallel Keycloak flows for one account do not both finish). */
+function as(username) {
+  if (!sessions.has(username)) sessions.set(username, signIn(username).catch((e) => { sessions.delete(username); throw e; }));
+  return sessions.get(username);
+}
+async function signIn(username) {
   const jar = new Jar();
   const go = async (url, init = {}) => {
     const res = await fetch(url.startsWith('http') ? url : BASE + url, { redirect: 'manual', ...init, headers: { ...(init.headers ?? {}), Cookie: jar.header() } });
@@ -78,9 +84,7 @@ async function as(username) {
     const type = r.headers.get('content-type') ?? '';
     return { status: r.status, body: type.includes('json') ? await r.json() : await r.text() };
   };
-  const s = { cookie, get: (p) => call('GET', p), post: (p, b) => call('POST', p, b ?? {}), put: (p, b) => call('PUT', p, b) };
-  sessions.set(username, s);
-  return s;
+  return { cookie, get: (p) => call('GET', p), post: (p, b) => call('POST', p, b ?? {}), put: (p, b) => call('PUT', p, b) };
 }
 
 // ---- fixtures from the server -----------------------------------------------------------------------------------
@@ -552,6 +556,154 @@ try {
     await page.context().close();
     ok(JSON.stringify(options) === JSON.stringify(['قسم مشاريع المباني', 'وحدة الصيانة الإدارية', 'فريق مرافق الشمال']) && JSON.stringify(moving) === JSON.stringify(['وحدة الصيانة الإدارية', 'فريق مرافق الشمال']), 'U1',
       'the editor offers exactly the units where the requester may request (no general view right), and the branch of the chosen one', `units: ${options.join('، ')}; moving: ${moving.join('، ')}`);
+  }
+
+  // ---- L: the lifecycle (ADR-034) with the real scheduler; decisions pressed on the page by the lifecycle accounts ---
+  if (run('L')) {
+    const waitState = async (id, states, ms) => {
+      const until = Date.now() + ms;
+      for (;;) {
+        const st = (await view(id)).state;
+        if (states.includes(st) || Date.now() > until) return st;
+        await sleep(10_000);
+      }
+    };
+    const stationing = async (unit) => (await auditor.get(`/stationing/current?orgId=${unit}`)).body.map((x) => x.kind).sort();
+    const history = async (unit, id) => (await auditor.get(`/stationing/organizations/${unit}/history`)).body.filter((x) => x.kind === 'TEMPORARY' && x.requestId === id);
+    const pendingAction = async (id) => (await view(id)).actions?.find((a) => a.state === 'REQUESTED')?.id;
+    const decideOnPage = async (user, id, approve, reason, name) => {
+      const pg = await pageAs(user);
+      await openRequest(pg, id);
+      const panel = pg.locator('.rs-lifecycle');
+      if (reason) await panel.locator('textarea').fill(reason);
+      await panel.getByRole('button', { name: approve ? /^قبول/ : /^رفض$/ }).click();
+      await pg.waitForTimeout(3000);
+      await pg.screenshot({ path: shot(`L-${name}.png`) });
+      await pg.context().close();
+    };
+    /** A temporary request, approved through its route and activated by the activator. */
+    const activatedTemporary = async (user, unitCode, at, startIn, endIn, label) => {
+      const unit = org(unitCode);
+      const start = new Date(Date.now() + startIn).toISOString();
+      const end = new Date(Date.now() + endIn).toISOString();
+      const reason = `قبول L: ${label} (بيانات قبول وهمية)`;
+      const r = await create(user, unit, { ...content([unit], layout(at), reason), kind: 'TEMPORARY', start, end }, `L-${label}`);
+      const c = await checks(r.id, user);
+      const stays = (c.otherBranch ?? []).filter((o) => o.decisionRequired);
+      if (stays.length) {
+        await (await as(user)).put(`/restationing-requests/${r.id}/content`,
+          { ...content([unit], layout(at), reason, { occupants: Object.fromEntries(stays.map((o) => [o.unit, 'EXCLUDED'])) }), kind: 'TEMPORARY', start, end });
+      }
+      const sub = await (await as(user)).post(`/restationing-requests/${r.id}/submit`, {});
+      if (sub.status !== 200) throw new Error(`${label}: submit ${sub.status} ${sub.body.message}`);
+      const stop = await approveAll(r.id);
+      if (stop !== 'APPROVED_NOT_ACTIVATED') throw new Error(`${label}: ${stop}`);
+      const act = await (await as('t.facilities')).post(`/restationing-requests/${r.id}/activate`, {});
+      if (act.status !== 200) throw new Error(`${label}: activate ${act.status} ${act.body.message}`);
+      return { id: r.id, number: r.number, unit, start, end, state: act.body.state };
+    };
+
+    const L1 = async () => {
+      const t = await activatedTemporary('t.requester2', 'HR-T-IT', south(P0[0], P0[1], 3000), 90_000, 240_000, 'تمديد');
+      ok(await waitState(t.id, ['ACTIVE_TEMPORARY'], 240_000) === 'ACTIVE_TEMPORARY', 'L1a', 'extension: the temporary is in force (real scheduler)', t.number);
+      const newEnd = new Date(Date.parse(t.end) + 180_000).toISOString();
+      const ext = await (await as('t.requester2')).post(`/restationing-requests/${t.id}/extensions`, { end: newEnd, reason: 'امتد العمل ثلاث دقائق (بيانات قبول وهمية)' });
+      requests.push({ journey: 'L1 extension', id: ext.body.id, number: ext.body.number, requester: 't.requester2' });
+      const sub = await (await as('t.requester2')).post(`/restationing-requests/${ext.body.id}/submit`, {});
+      recordRoute('L1 extension', sub.body);
+      const stop = await approveAll(ext.body.id);
+      const wrong = await (await as('t.facilities')).post(`/restationing-requests/${ext.body.id}/activate`, {});
+      const self = await (await as('t.requester2')).post(`/restationing-requests/${ext.body.id}/activate`, {});
+      const act = await (await as('t.lc.ext')).post(`/restationing-requests/${ext.body.id}/activate`, {});
+      ok(ext.status === 200 && ext.body.requestKind === 'EXTENSION' && stop === 'APPROVED_NOT_ACTIVATED' && wrong.status === 403 && self.status === 403 && act.body.state === 'EXTENSION_ACTIVATED', 'L1b',
+        'extension: its own request and approval; «تفعيل التمركز» and its requester cannot activate it; «تفعيل تمديد التمركز المؤقت» does',
+        `${ext.body.number}: ${sub.body.route?.length} stages, ${stop}; activator ${wrong.status}, requester ${self.status}, t.lc.ext ${act.body.state}`);
+      await sleep(Math.max(0, Date.parse(t.end) - Date.now()) + 80_000);
+      const midState = (await view(t.id)).state;
+      const mid = await stationing(t.unit);
+      ok(midState === 'ACTIVE_TEMPORARY' && mid.includes('TEMPORARY'), 'L1c', 'past the original end the stationing stays in force on the extension', `${midState}; in force ${mid.join(', ')}`);
+      const final = await waitState(t.id, ['TEMPORARY_RETURNED'], Math.max(0, Date.parse(newEnd) - Date.now()) + 150_000);
+      const recs = await history(t.unit, t.id).then(async (a) => [...a, ...(await history(t.unit, ext.body.id))]);
+      ok(final === 'TEMPORARY_RETURNED' && JSON.stringify(await stationing(t.unit)) === JSON.stringify(['PERMANENT']), 'L1d', 'and returns at the extended end',
+        `${final}; records ${recs.map((x) => `${x.validFrom} → ${x.validTo} (${x.endReason})`).join(' | ')}`);
+    };
+
+    const L2 = async () => {
+      const t = await activatedTemporary('t.requester', 'HR-T-SS', south(P0[0], P0[1], 9000), 60_000, 1_200_000, 'عودة مبكرة');
+      ok(await waitState(t.id, ['ACTIVE_TEMPORARY'], 240_000) === 'ACTIVE_TEMPORARY', 'L2a', 'early return: the temporary is in force', t.number);
+      await (await as('t.requester')).post(`/restationing-requests/${t.id}/early-return`, { reason: 'انتهى العمل قبل موعده (بيانات قبول وهمية)' });
+      const self = await (await as('t.requester')).post(`/restationing-requests/${t.id}/actions/${await pendingAction(t.id)}/decision`, { decision: 'APPROVE' });
+      await decideOnPage('t.lc.return', t.id, true, null, 'early-return');
+      const v = await view(t.id);
+      const rec = (await history(t.unit, t.id))[0];
+      ok(self.status === 403 && v.state === 'TEMPORARY_RETURNED' && rec?.endReason === 'ENDED_EARLY' && JSON.stringify(await stationing(t.unit)) === JSON.stringify(['PERMANENT']), 'L2b',
+        'early return decided on the page by «قرار العودة المبكرة» (not the asker): the temporary ends at the decision',
+        `asker ${self.status}; ${v.state}; record ${rec?.validFrom} → ${rec?.validTo} (${rec?.endReason}), planned end ${t.end}`);
+    };
+
+    const L3 = async () => {
+      const t = await activatedTemporary('t.requester.pm', 'HR-T-PM-1-1', east(P0[0], P0[1], 15000), 900_000, 1_800_000, 'إلغاء قبل البدء');
+      await (await as('t.requester.pm')).post(`/restationing-requests/${t.id}/start-cancellation`, { reason: 'أُلغي النشاط المؤقت (بيانات قبول وهمية)' });
+      const wrong = await (await as('t.lc.return')).post(`/restationing-requests/${t.id}/actions/${await pendingAction(t.id)}/decision`, { decision: 'APPROVE' });
+      await decideOnPage('t.lc.start', t.id, true, null, 'before-start');
+      const v = await view(t.id);
+      const rec = (await history(t.unit, t.id))[0];
+      ok(t.state === 'TEMPORARY_SCHEDULED' && wrong.status === 403 && v.state === 'TEMPORARY_CANCELLED_BEFORE_START' && rec?.endReason === 'CANCELLED' && rec.validFrom === rec.validTo, 'L3',
+        'cancellation before start decided on the page; «قرار العودة المبكرة» cannot decide it; the record never takes effect',
+        `${t.number}: ${v.state}; record ${rec?.validFrom} → ${rec?.validTo} (${rec?.endReason}); early-return right ${wrong.status}`);
+    };
+
+    const L4 = async () => {
+      const t = await activatedTemporary('t.requester.pm', 'HR-T-PM-1', east(P0[0], P0[1], 24000), 75_000, 1_200_000, 'بدء موقوف ثم رفض');
+      await (await as('t.requester.pm')).post(`/restationing-requests/${t.id}/start-cancellation`, { reason: 'قد يُلغى النشاط (بيانات قبول وهمية)' });
+      const held = await waitState(t.id, ['START_HELD_PENDING_CANCELLATION'], 240_000);
+      const during = await stationing(t.unit);
+      ok(held === 'START_HELD_PENDING_CANCELLATION' && JSON.stringify(during) === JSON.stringify(['PERMANENT']), 'L4a',
+        'the start is held by the pending cancellation: the permanent stationing stays the authoritative one', `${t.number}: ${held}; in force ${during.join(', ')}`);
+      const decided = Date.now();
+      await decideOnPage('t.lc.start', t.id, false, 'يستمر النشاط المؤقت (بيانات قبول وهمية)', 'held-refused');
+      const v = await view(t.id);
+      const rec = (await history(t.unit, t.id))[0];
+      ok(v.state === 'ACTIVE_TEMPORARY' && !!rec && Date.parse(rec.validFrom) >= decided - 5000 && Date.parse(rec.validFrom) > Date.parse(t.start) && Date.parse(rec.plannedEnd) === Date.parse(t.end), 'L4b',
+        'refused after the approved start: in force from the decision (not backdated), the approved end unchanged',
+        `${v.state}; planned start ${t.start}, in force from ${rec?.validFrom}, planned end ${rec?.plannedEnd}`);
+    };
+
+    const L5 = async () => {
+      const t = await activatedTemporary('t.requester.pm', 'HR-T-PM-1-1-1', east(P0[0], P0[1], 33000), 60_000, 170_000, 'نافذة تنقضي');
+      await (await as('t.requester.pm')).post(`/restationing-requests/${t.id}/start-cancellation`, { reason: 'قد يُلغى النشاط (بيانات قبول وهمية)' });
+      const action = await pendingAction(t.id);
+      const held = await waitState(t.id, ['START_HELD_PENDING_CANCELLATION'], 240_000);
+      const final = await waitState(t.id, ['TEMPORARY_WINDOW_EXPIRED_WITHOUT_START'], Math.max(0, Date.parse(t.end) - Date.now()) + 150_000);
+      const v = await view(t.id);
+      const late = await (await as('t.lc.start')).post(`/restationing-requests/${t.id}/actions/${action}/decision`, { decision: 'APPROVE' });
+      const rec = (await history(t.unit, t.id))[0];
+      ok(held === 'START_HELD_PENDING_CANCELLATION' && final === 'TEMPORARY_WINDOW_EXPIRED_WITHOUT_START' && v.actions.find((a) => a.id === action)?.state === 'NO_LONGER_ACTIONABLE'
+        && late.status === 400 && rec?.endReason === 'WINDOW_EXPIRED' && rec.validFrom === rec.validTo, 'L5',
+        'the window ends with the cancellation still pending: never started, the cancellation no longer actionable',
+        `${t.number}: ${final}; action ${v.actions.find((a) => a.id === action)?.state}; late decision ${late.status} ${late.body.message ?? ''}; record ${rec?.validFrom} → ${rec?.validTo} (${rec?.endReason})`);
+    };
+
+    const L6 = async () => {
+      const r = await create('t.requester', SS, content([SS], layout(south(P0[0], P0[1], 15000)), 'قبول L: إلغاء قبل التفعيل (بيانات قبول وهمية)'), 'L-إلغاء قبل التفعيل');
+      await (await as('t.requester')).post(`/restationing-requests/${r.id}/submit`, {});
+      const stop = await approveAll(r.id);
+      await (await as('t.requester')).post(`/restationing-requests/${r.id}/cancellation`, { reason: 'لم تعد الحاجة قائمة (بيانات قبول وهمية)' });
+      const pendingState = (await view(r.id)).state;
+      const blocked = await (await as('t.facilities')).post(`/restationing-requests/${r.id}/activate`, {});
+      const self = await (await as('t.requester')).post(`/restationing-requests/${r.id}/actions/${await pendingAction(r.id)}/decision`, { decision: 'APPROVE' });
+      await decideOnPage('t.lc.cancel', r.id, true, null, 'pre-activation');
+      const v = await view(r.id);
+      const after = await (await as('t.facilities')).post(`/restationing-requests/${r.id}/activate`, {});
+      ok(stop === 'APPROVED_NOT_ACTIVATED' && pendingState === 'CANCELLATION_PENDING' && blocked.status === 400 && self.status === 403 && v.state === 'CANCELLED_BEFORE_ACTIVATION' && after.status === 400, 'L6',
+        'cancellation before activation: pending blocks activation, the asker cannot decide, «قرار الإلغاء قبل التفعيل» decides on the page',
+        `${r.number}: ${pendingState} → ${v.state}; activation while pending ${blocked.status}, after ${after.status}; asker ${self.status}`);
+    };
+
+    const all = { 1: L1, 2: L2, 3: L3, 4: L4, 5: L5, 6: L6 };
+    const chosen = (process.env.L_CASES ?? '1,2,3,4,5,6').split(',');
+    const outcomes = await Promise.allSettled(chosen.map((k) => all[k]()));
+    outcomes.forEach((o, i) => { if (o.status === 'rejected') ok(false, `L${chosen[i]}!`, 'lifecycle journey did not complete', String(o.reason?.message ?? o.reason)); });
   }
 
   // ---- G: hierarchy change — not on this environment ----------------------------------------------------------------

@@ -1,0 +1,1 @@
+schema change identical to the clean path: 107 changed lines on both (pg_dump's random \restrict keys excluded)

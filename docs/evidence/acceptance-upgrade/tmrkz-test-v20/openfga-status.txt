@@ -1,0 +1,3 @@
+OpenFGA after V20 (backend rel-86a58db), 4 Nov 2026:
+{"configured":true,"reachable":true,"storeId":"01M63D2R031857HF87B8XY8TFK","modelId":"01M6JY3P8BG97YEQCCWSA75BQD","modelHash":"198b7fdc66d7a26d0851cbf5f615f7f6e193ad8cdbe6ce1f6a455bb4fc9a8c6e","appliedSeq":469,"latestSeq":469,"pendingChanges":0,"tuples":204,"lastSuccessAt":"2026-11-04T09:26:44.309603Z","lastDurationMs":139,"lastError":null,"lastErrorAt":null}
+relations in docs/authz/model.fga: 425 (generated model; AuthorizationIT asserts the published model equals the generator and this copy)

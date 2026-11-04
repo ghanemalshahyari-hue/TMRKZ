@@ -1,0 +1,12 @@
+policy version 1 (ACCEPTANCE-V3-POLICY-1): primary 5000–8000 m, alternative 3000–5000 m, deployment REQUIRED, exception +2000 m
+PASS  L6  cancellation before activation: pending blocks activation, the asker cannot decide, «قرار الإلغاء قبل التفعيل» decides on the page  — RS-2026-0028: CANCELLATION_PENDING → CANCELLED_BEFORE_ACTIVATION; activation while pending 400, after 400; asker 403
+PASS  L2a  early return: the temporary is in force  — RS-2026-0029
+PASS  L2b  early return decided on the page by «قرار العودة المبكرة» (not the asker): the temporary ends at the decision  — asker 403; TEMPORARY_RETURNED; record 2026-11-04T09:41:58.341Z → 2026-11-04T09:42:12.589858Z (ENDED_EARLY), planned end 2026-11-04T10:00:58.341Z
+PASS  L4a  the start is held by the pending cancellation: the permanent stationing stays the authoritative one  — RS-2026-0031: START_HELD_PENDING_CANCELLATION; in force PERMANENT
+PASS  L4b  refused after the approved start: in force from the decision (not backdated), the approved end unchanged  — ACTIVE_TEMPORARY; planned start 2026-11-04T09:42:13.341Z, in force from 2026-11-04T09:43:13.611122Z, planned end 2026-11-04T10:00:58.341Z
+PASS  L5  the window ends with the cancellation still pending: never started, the cancellation no longer actionable  — RS-2026-0030: TEMPORARY_WINDOW_EXPIRED_WITHOUT_START; action NO_LONGER_ACTIONABLE; late decision 400 انقضت نافذة النفاذ دون بدء؛ لم يعد القرار ممكناً.; record 2026-11-04T09:41:58.342Z → 2026-11-04T09:41:58.342Z (WINDOW_EXPIRED)
+PASS  NET  zero external requests from the real page
+PASS  CONSOLE  no console or page errors on the real page
+
+Stationing V3 acceptance PASSED (8 pass, 0 notes)
+exit=0

@@ -1,0 +1,3 @@
+services:
+  web:
+    image: ${TMRKZ_WEB_IMAGE}

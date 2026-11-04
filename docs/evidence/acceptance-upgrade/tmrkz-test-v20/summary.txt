@@ -1,0 +1,34 @@
+V20 acceptance migration of tmrkz-test (owner approval of 4 Nov 2026: "Apply V20"), Stationing V3 lifecycle (ADR-034)
+
+Scope: tmrkz-test only (fictional acceptance data). Schema only. tmrkz-mover and MOVER UAT untouched.
+
+Release
+  commit (local, not pushed)   86a58db Stationing V3 lifecycle (ADR-034)
+  backend image                mover/backend:rel-86a58db  sha256:e34f751465cbac2d9b8512029f992ae23e0d3716d602fe09d1120600cc912c0d
+                               built from git archive of 86a58dbc6a6c376125c61583c4e859e364fd3314 (backend/pom.xml, backend/src,
+                               backend/Dockerfile, map-packages), OCI revision label set
+  web image                    mover/web:rel-86a58db-v3 (sha256:0b333a2a…ef38), then mover/web:rel-d05a7c2-v3 (sha256:25a0253f…693a,
+                               commit d05a7c2: the lifecycle rights open the page) — ../tmrkz-test-web-v3-86a58db/, ../tmrkz-test-web-v3-d05a7c2/
+  previous images (rollback)   backend mover/backend:rel-57d7820 (sha256:b9c53f7e…c167), web mover/web:rel-57d7820-v3
+  gate before application      full backend suite on 86a58db 206/206 (RestationingLifecycleIT 8/8); frontend 94/94, build OK
+
+Clean migration path (disposable project tmrkz-migpath, ../../migration-path/v20/)
+  from rel-57d7820 (V19) to rel-86a58db: plan [20] = expected [20]; V20 in 24 ms; 133 earlier rows unchanged;
+  business journey PASS before and after.
+
+Application (ops/test-env/upgrade-backend.sh, EXPECT_PENDING="20", AFTER_SQL=ops/sql/checks/V20-after.sql)
+  target identity              tmrkz-test-db-1, comment "ACCEPTANCE / V19 …" (checked by the tool)
+  plan                         pending [20]
+  backup                       backups/tmrkz-test-20261104T092439Z, verified by restore (6 checks PASS)
+  migration                    V20 applied in 51 ms; backend healthy on rel-86a58db
+  earlier rows                 ops/upgrade-check.sh: all 6,878 earlier rows present and unchanged
+  Stationing tables            ops/sql/checks/stationing-fingerprint.sql before = after on all 7 tables (policy versions, org_stationing,
+                               site links, requests, stages, revisions, deployment areas) — stationing-fingerprint-compare.txt
+  after checks                 action_table=1 action_rows=0 new_columns=4 named_constraints=7 old_activation_check=0
+                               lifecycle_values_on_earlier_rows=0 mismatches=0
+  schema change                identical to the clean path: 107 changed lines on both (pg_dump's random \restrict keys excluded) — schema-compare.txt
+  OpenFGA                      reachable, new model, 0 pending changes, no error; 425 relations (357 + 68 for the four rights) — openfga-status.txt
+  label                        database comment now "ACCEPTANCE / V20 …"
+
+Side effects: no outbound delivery change, no Oracle access, no terrain or policy change. The fictional lifecycle accounts
+were provisioned afterwards as a separate step (../../acceptance-data/tmrkz-test-v3-lifecycle/).

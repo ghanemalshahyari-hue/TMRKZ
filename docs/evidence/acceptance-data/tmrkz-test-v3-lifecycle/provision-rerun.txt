@@ -1,0 +1,20 @@
+[lifecycle] target tmrkz-test-db-1: ACCEPTANCE / V20 — fictional acceptance data only; V20 applied 2026-11-04 from mover/backend:rel-86a58db (commit 86a58db; V19 earlier from rel-7152d53); web mover/web:rel-86a58db-v3 (Stationing V3 page, acceptance only); Stationing acceptance policy version 1 (ACCEPTANCE-V3-POLICY-1, not a production default); fictional L8–L10 and lifecycle accounts provisioned 2026-11-04; evidence docs/evidence/acceptance-upgrade/, docs/evidence/acceptance-data/ and docs/evidence/acceptance-journeys/stationing-v3/
+affiliations_added=0
+hr_people_added=0
+lifecycle_roles_granted=0
+people_added=0
+roles_created=0
+t.lc.cancel → ACC_V3_DECIDE_PRE_ACTIVATION_CANCELLATION @ HR-T-ORG
+t.lc.ext → ACC_V3_ACTIVATE_TEMPORARY_EXTENSION @ HR-T-ORG
+t.lc.return → ACC_V3_DECIDE_EARLY_RETURN @ HR-T-ORG
+t.lc.start → ACC_V3_DECIDE_BEFORE_START_CANCELLATION @ HR-T-ORG
+ldap_add: Already exists (68)
+ldap_add: Already exists (68)
+ldap_add: Already exists (68)
+ldap_add: Already exists (68)
+adding new entry "uid=t.lc.cancel,ou=people,dc=tmrkz,dc=test"
+adding new entry "uid=t.lc.start,ou=people,dc=tmrkz,dc=test"
+adding new entry "uid=t.lc.return,ou=people,dc=tmrkz,dc=test"
+adding new entry "uid=t.lc.ext,ou=people,dc=tmrkz,dc=test"
+[lifecycle] directory accounts present: 4 of 4
+[lifecycle] written
