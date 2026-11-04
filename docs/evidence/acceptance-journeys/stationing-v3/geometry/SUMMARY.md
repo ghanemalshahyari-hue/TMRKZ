@@ -1,5 +1,11 @@
 # Stationing V3 — geometry editing (owner gate «GEOMETRY EDITING PHASE — GO», 4 Nov 2026)
 
+> **Superseded by the acceptance on `tmrkz-test`** (`tmrkz-test/SUMMARY.md`, 33/33, 4 Nov 2026). Two measurements on
+> this page were corrected there:
+> - **"0 long tasks":** the observer was never shown to work in this run. The acceptance run verifies it first.
+> - **0.07 m inter-part figure:** it came from a planar centroid computed on absolute coordinates, which loses up to
+>   about 1 m to cancellation. PostGIS shows the move is rigid to the millimetre.
+
 **Scope:** grouped MultiPolygon copy and move, Polygon and MultiPolygon vertex editing, and the real-page acceptance of
 both. **Status:** committed as `58423ce` and pushed at the owner's request (4 Nov 2026); NOT on `tmrkz-test`. No schema change: the V19/V20 request
 content, the revisions and the site geometry versions already hold a Polygon or a MultiPolygon.

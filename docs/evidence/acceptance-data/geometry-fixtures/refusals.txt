@@ -1,0 +1,8 @@
+## wrapper aimed at the owner-retained project
+refused: tmrkz-mover is the owner-retained production project
+exit=2
+
+## the SQL alone on an unlabelled throwaway PostGIS database
+psql:<stdin>:71: ERROR:  refused: the database is not labelled ACCEPTANCE
+CONTEXT:  PL/pgSQL function inline_code_block line 5 at RAISE
+exit=3

@@ -1,0 +1,60 @@
+Geometry editing release on tmrkz-test (owner gate «GEOMETRY IMPLEMENTATION → tmrkz-test ACCEPTANCE GO», 4 Nov 2026)
+
+Scope: tmrkz-test only (fictional acceptance data). Backend and web images only. No migration, no V21, no policy
+republication, no terrain reload, no Oracle change. tmrkz-mover and MOVER UAT untouched.
+
+Release
+  C6 (functional)              58423ce8a469f461b58e870aa6e1cd321fa9e0ca  Stationing V3 geometry editing (ADR-035)
+                               (with 81b692783b9fa3dc0c346f1fe2f82fde2ac172dc: tooling, development seed, ADR-035);
+                               both already on origin/main at the owner's earlier request
+  backend image                mover/backend:rel-58423ce  sha256:203c81ca91d09dd2e4c4c941c9ae30d1828fe160a6d7cfc61b6c6f4cb6798331
+                               built 2026-11-04T11:19:42Z from git archive of 58423ce (backend/pom.xml, backend/src,
+                               backend/Dockerfile, map-packages); OCI revision label 58423ce…; highest migration in the image V20
+  web image (first)            mover/web:rel-58423ce-v3  sha256:a57010e12e7dcaff4fa28f5f67cce8023e9363b105bdd35d9fa5ec796c0005bd
+                               built 2026-11-04T11:20:00Z from git archive of 58423ce, STATIONING_V3=true
+  product defect               APPROVER-3 on the real page: the request summary did not state the proposed site's type,
+                               part count or submission. Fixed in a separate functional commit
+                               9e02088878cd7e468020f43ed9e0787f75238672 (frontend/src/pages/RestationingPage.tsx only)
+  web image (accepted)         mover/web:rel-9e02088-v3  sha256:f56a0753e5542224747ceb4b71c5d2dd674b35491f27eb7d804916448ec0fda0
+                               built 2026-11-04T11:36:59Z from git archive of 9e02088, STATIONING_V3=true
+                               the backend image inputs are identical between 58423ce and 9e02088, so the backend stays rel-58423ce
+  previous images (rollback)   backend mover/backend:rel-86a58db (sha256:e34f7514…0c2d), web mover/web:rel-d05a7c2-v3 (sha256:25a0253f…693a)
+  build log                    build.txt
+  repository at build time     main = origin/main = 11a7bfb, clean except the unpushed enterprise-audit folders;
+                               C6 code in backend/ and frontend/ identical to 11a7bfb (git diff 58423ce..11a7bfb empty)
+
+Gate before deployment (from the exact C6 revision)
+  backend, git archive of 58423ce: 209 run, 1 failure — RestationingWorkflowIT.permanentJourney: its alternative
+    deployment area landed on ground occupied by another test's fixture (each test placed its fixtures at a random point
+    of one shared box since 86a58db). Test defect, not product: fixed in RestationingTestBase (each test in a cell of its
+    own; test code only). Re-run with the fix: 209/209 (RestationingWorkflowIT 15/15, RestationingLifecycleIT 8/8,
+    parity included). An earlier partial extract (backend/frontend/ops only) also lacked docs/ and map-packages/ and is
+    not counted.
+  frontend: 102/102 (siteGeometry.test.ts 8, parity included); production build OK; again 102/102 and build OK with 9e02088.
+
+Backend swap (ops/test-env/upgrade-backend.sh, EXPECT_PENDING="") — ../tmrkz-test-backend-58423ce/
+  target identity              tmrkz-test-db-1, comment «ACCEPTANCE / V20 …» (checked by the tool)
+  plan                         pending [] (no migration)
+  backup                       backups/tmrkz-test-20261104T112121Z, verified by restore (6 checks PASS)
+  start                        «Schema "public" is up to date. No migration necessary.»; backend healthy
+  earlier rows                 ops/upgrade-check.sh: all 7,001 earlier rows present and unchanged
+  schema                       schema-diff.txt: identical (only pg_dump's random \restrict keys differ)
+
+Web swaps (ops/test-env/upgrade-web.sh) — ../tmrkz-test-web-v3-58423ce/, ../tmrkz-test-web-v3-9e02088/
+  health 200, offline map package 206, flag true, map-data mount present
+
+State around the swap (state-before-swap.txt, state-after-swap.txt, state-swap-compare.txt)
+  identical apart from the two image names: health UP; schema V20 (20 rows); policy v1 ACCEPTANCE-V3-POLICY-1
+  (row md5 5227e4ef…); terrain copernicus-glo30 v2026.11 (sha256 9a91d9af…, 6,300 rasters); Stationing fingerprints of
+  all 7 tables; counts (audit included); the 19 open request ids
+
+Fixtures (../../acceptance-data/geometry-fixtures/): ACC-GEO-MP4 (4-part MultiPolygon), ACC-GEO-DENSE (1,500 vertices);
+  10 rows on the first run, 0 on the second and third
+
+State around the final journey run (state-before-final-run.txt, state-after-final-run.txt, state-final-run-compare.txt)
+  unchanged: schema V20, policy v1, terrain, site links (0), organisations, responsibilities
+  changed only by the journeys: 11 new requests (9 drafts, RS-2026-0048 activated, RS-2026-0051 approved and refused at
+  activation), their stages, revisions and audit; the site and geometry version that activation registered; T-SS-1's
+  new stationing; RS-2026-0048's two deployment areas
+
+Database comment updated to name the running images and the fixtures; it still begins «ACCEPTANCE / V20».

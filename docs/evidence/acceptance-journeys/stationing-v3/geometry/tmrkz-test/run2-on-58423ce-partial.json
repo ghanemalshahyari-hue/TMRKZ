@@ -1,0 +1,121 @@
+{
+  "ranAt": "2026-11-04T11:36:14.742Z",
+  "base": "http://localhost:8088",
+  "profile": "acceptance",
+  "results": [
+    {
+      "id": "INSTRUMENT",
+      "label": "the long-task observer records a deliberate 120 ms task (so \"0 long tasks\" is a measurement)",
+      "result": "PASS",
+      "extra": "recorded 120, 105 ms"
+    },
+    {
+      "id": "PTR1",
+      "label": "released over the map attribution: the drag ends there, the move is committed and saved where the pointer was released",
+      "result": "PASS",
+      "extra": "moved 744 m; 1.09 m from the release point"
+    },
+    {
+      "id": "PTR2",
+      "label": "released over another map control (the map-source notice): the drag ends there, the move is committed and saved where the pointer was released",
+      "result": "PASS",
+      "extra": "moved 902 m; 1.09 m from the release point"
+    },
+    {
+      "id": "PTR3",
+      "label": "released outside the map canvas: the drag ends there, the move is committed and saved where the pointer was released",
+      "result": "PASS",
+      "extra": "moved 1219 m; 1.09 m from the release point"
+    },
+    {
+      "id": "G3",
+      "label": "MultiPolygon copied whole: every part, in order, same coordinates; «كل أجزاء الموقع ستنتقل معاً»",
+      "result": "PASS",
+      "extra": "نُسخت حدود «مركز التدريب الإداري» كاملة (2 أجزاء) — اسحب أي جزء: كل أجزاء الموقع ستنتقل معاً; 2 parts from «مركز التدريب الإداري»; copy 99 ms"
+    },
+    {
+      "id": "G4a",
+      "label": "two-part MultiPolygon: one drag moved every part together, shapes, areas and spacing kept",
+      "result": "PASS",
+      "extra": "each part moved 379.77 / 379.77 m; largest change of a distance between parts 0.000 m (1 pairs); largest edge change 0.000 m; largest area change 0.0000 % (tolerance 0.5 m, 0.1 %); PostGIS: every vertex moved 380.081 m (spread 4.2 mm), distances between part centroids changed by at most 0.01 mm, area change 0.00002 %; 0 long tasks"
+    },
+    {
+      "id": "G4b",
+      "label": "four-part MultiPolygon (ACC fixture): one drag moved all four parts together, shapes, areas and spacing kept",
+      "result": "PASS",
+      "extra": "each part moved 378.11 / 378.11 / 378.11 / 378.11 m; largest change of a distance between parts 0.000 m (6 pairs); largest edge change 0.000 m; largest area change 0.0000 % (tolerance 0.5 m, 0.1 %); PostGIS: every vertex moved 378.426 m (spread 12.4 mm), distances between part centroids changed by at most 0.05 mm, area change 0.00002 %; 0 long tasks"
+    },
+    {
+      "id": "G5a",
+      "label": "a vertex of part 2 moved; part 1 exactly unchanged; still valid; stored as EDITED",
+      "result": "PASS",
+      "extra": "المساحة: 12,889 م² من حد 500,000 م²الأجزاء: 2الجزء النشط: 2 · الرأس 1الحدود صالحة"
+    },
+    {
+      "id": "G5b",
+      "label": "after reload and reopening, the MultiPolygon is exactly the saved one",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "APPROVER-1",
+      "label": "the edited two-part MultiPolygon with its deployment areas is submitted",
+      "result": "PASS",
+      "extra": "submit 200 UNDER_REVIEW; route اعتماد المستوى L7 ← اعتماد المستوى L6"
+    },
+    {
+      "id": "APPROVER-2",
+      "label": "the approver (t.manager) receives exactly the submitted geometry, held by revision 1",
+      "result": "PASS",
+      "extra": "MultiPolygon, 2 parts; الإرسالات (1); revision 1 in the database holds the same geometry: true"
+    },
+    {
+      "id": "APPROVER-3",
+      "label": "the request page states the proposed site's type, part count and revision to the approver",
+      "result": "FAIL",
+      "extra": "الوحدات المنتقلةقسم الخدمات العامةمنمركز التدريب الإداريالنفاذعند التفعيل المستقلنسخة السياسة1مقدم الطلبمقدم طلب تجريبي"
+    },
+    {
+      "id": "RETURN",
+      "label": "returned for changes by the approver",
+      "result": "PASS",
+      "extra": "200 RETURNED_FOR_CHANGES"
+    },
+    {
+      "id": "RESUBMIT",
+      "label": "resubmitted: revision 2 holds the moved MultiPolygon and revision 1 still holds the first submitted one",
+      "result": "PASS",
+      "extra": "revisions #1 MultiPolygon 2 parts, #2 MultiPolygon 2 parts; changed SITE,AVAILABILITY; moved 112 m"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors",
+      "result": "PASS",
+      "extra": ""
+    }
+  ],
+  "perf": [],
+  "requests": [
+    {
+      "scenario": "PTR إفلات المؤشر",
+      "id": "b5dfa3db-b74a-422c-a8a4-746d91b21e4b",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "G3 متعدد الأجزاء",
+      "id": "516b77e5-3952-48b0-b019-65cc9444f043",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "G4 أربعة أجزاء",
+      "id": "741ff432-2e12-43c9-8b75-206641945cd3",
+      "user": "t.requester.pm"
+    }
+  ]
+}

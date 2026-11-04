@@ -1,0 +1,480 @@
+{
+  "ranAt": "2026-11-04T11:39:58.525Z",
+  "base": "http://localhost:8088",
+  "profile": "acceptance",
+  "results": [
+    {
+      "id": "INSTRUMENT",
+      "label": "the long-task observer records a deliberate 120 ms task (so \"0 long tasks\" is a measurement)",
+      "result": "PASS",
+      "extra": "recorded 120 ms"
+    },
+    {
+      "id": "G1a",
+      "label": "Polygon copied exactly (saved by the server)",
+      "result": "PASS",
+      "extra": "نُسخت حدود «موقع RS-2026-0022» — اسحب الموقع لنقله بشكله; 4 vertices; shape COPY, copied from «موقع RS-2026-0022»"
+    },
+    {
+      "id": "G1b",
+      "label": "grouped drag: shape and area kept; the server accepts the saved geometry",
+      "result": "PASS",
+      "extra": "moved 363 m; area Δ 0.0000 %; max edge Δ 0.000 m; server site area 89938 m²; 0 long tasks"
+    },
+    {
+      "id": "G1c",
+      "label": "after reload and reopening, the moved Polygon is exactly the saved one (saved again unchanged)",
+      "result": "PASS",
+      "extra": "المساحة: 89,938 م² من حد 500,000 م²الأجزاء: 1الحدود صالحة"
+    },
+    {
+      "id": "G2a",
+      "label": "one vertex moved; area and validity update live; the page and the server agree on the area; stored as EDITED",
+      "result": "PASS",
+      "extra": "readout: المساحة: 111,134 م² من حد 500,000 م²الأجزاء: 1الجزء النشط: 1 · الرأس 2الحدود صالحة; server area 111134 m²"
+    },
+    {
+      "id": "G2b",
+      "label": "after reload and reopening, the editor holds exactly the saved geometry (saved again unchanged)",
+      "result": "PASS",
+      "extra": "المساحة: 111,134 م² من حد 500,000 م²الأجزاء: 1الحدود صالحة"
+    },
+    {
+      "id": "G6",
+      "label": "a self-crossing edit: immediate warning, the page blocks submission, the server refuses it, the request stays a draft",
+      "result": "PASS",
+      "extra": "الحدود غير صالحة: حدود متقاطعة ذاتياً; server: حدود الموقع المقترح: متقاطعة أو غير صالحة (Self-intersection[55.3189046293925 24.2008488553807]).; submit 400; state DRAFT"
+    },
+    {
+      "id": "G7",
+      "label": "beyond the configured maximum footprint: shown immediately and refused by the server (hard block)",
+      "result": "PASS",
+      "extra": "المساحة: 792,077 م² من حد 500,000 م²الأجزاء: 1الجزء النشط: 1 · الرأس 3الحدود غير صالحة: المساحة تتجاوز الحد الأقصى المعتمد; server: مساحة الموقع المقترح (792088 م²) تتجاوز الحد الأقصى المعتمد (500000 م²).; submit 400; state DRAFT; vertex landed 0 m from the aimed point"
+    },
+    {
+      "id": "G9",
+      "label": "«رسم حدود جديدة»: declined, the copy stays; chosen, the copy is discarded with a message and a new shape is drawn",
+      "result": "PASS",
+      "extra": "أُلغيت الحدود السابقة بطلبك — انقر على الخريطة لرسم الحدود الجديدة; copy COPY → kept COPY → DRAWN"
+    },
+    {
+      "id": "PTR1",
+      "label": "released over the map attribution: the drag ends there, the move is committed and saved where the pointer was released",
+      "result": "PASS",
+      "extra": "moved 744 m; 1.09 m from the release point"
+    },
+    {
+      "id": "PTR2",
+      "label": "released over another map control (the map-source notice): the drag ends there, the move is committed and saved where the pointer was released",
+      "result": "PASS",
+      "extra": "moved 902 m; 1.09 m from the release point"
+    },
+    {
+      "id": "PTR3",
+      "label": "released outside the map canvas: the drag ends there, the move is committed and saved where the pointer was released",
+      "result": "PASS",
+      "extra": "moved 1219 m; 1.09 m from the release point"
+    },
+    {
+      "id": "G3",
+      "label": "MultiPolygon copied whole: every part, in order, same coordinates; «كل أجزاء الموقع ستنتقل معاً»",
+      "result": "PASS",
+      "extra": "نُسخت حدود «مركز التدريب الإداري» كاملة (2 أجزاء) — اسحب أي جزء: كل أجزاء الموقع ستنتقل معاً; 2 parts from «مركز التدريب الإداري»; copy 86 ms"
+    },
+    {
+      "id": "G4a",
+      "label": "two-part MultiPolygon: one drag moved every part together, shapes, areas and spacing kept",
+      "result": "PASS",
+      "extra": "each part moved 379.77 / 379.77 m; largest change of a distance between parts 0.000 m (1 pairs); largest edge change 0.000 m; largest area change 0.0000 % (tolerance 0.5 m, 0.1 %); PostGIS: every vertex moved 380.081 m (spread 4.2 mm), distances between part centroids changed by at most 0.01 mm, area change 0.00002 %; 0 long tasks"
+    },
+    {
+      "id": "G4b",
+      "label": "four-part MultiPolygon (ACC fixture): one drag moved all four parts together, shapes, areas and spacing kept",
+      "result": "PASS",
+      "extra": "each part moved 378.11 / 378.11 / 378.11 / 378.11 m; largest change of a distance between parts 0.000 m (6 pairs); largest edge change 0.000 m; largest area change 0.0000 % (tolerance 0.5 m, 0.1 %); PostGIS: every vertex moved 378.426 m (spread 12.4 mm), distances between part centroids changed by at most 0.05 mm, area change 0.00002 %; 0 long tasks"
+    },
+    {
+      "id": "G5a",
+      "label": "a vertex of part 2 moved; part 1 exactly unchanged; still valid; stored as EDITED",
+      "result": "PASS",
+      "extra": "المساحة: 12,889 م² من حد 500,000 م²الأجزاء: 2الجزء النشط: 2 · الرأس 1الحدود صالحة"
+    },
+    {
+      "id": "G5b",
+      "label": "after reload and reopening, the MultiPolygon is exactly the saved one",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "G8",
+      "label": "initial → move → vertex → undo vertex → undo move → redo move → redo vertex → reset → undo: every state exactly as recorded",
+      "result": "PASS",
+      "extra": "undo→moved, undo→initial, redo→moved, redo→edited, reset→initial, undo→edited"
+    },
+    {
+      "id": "APPROVER-1",
+      "label": "the edited two-part MultiPolygon with its deployment areas is submitted",
+      "result": "PASS",
+      "extra": "submit 200 UNDER_REVIEW; route اعتماد المستوى L7 ← اعتماد المستوى L6"
+    },
+    {
+      "id": "APPROVER-2",
+      "label": "the approver (t.manager) receives exactly the submitted geometry, held by revision 1",
+      "result": "PASS",
+      "extra": "MultiPolygon, 2 parts; الإرسالات (1); revision 1 in the database holds the same geometry: true"
+    },
+    {
+      "id": "APPROVER-3",
+      "label": "the request page states the proposed site's type, part count and revision to the approver",
+      "result": "PASS",
+      "extra": "الوحدات المنتقلةقسم الخدمات العامةمنمركز التدريب الإداريالموقع المقترحمضلع متعدد · 2 أجزاء · 12,889 م² · الإرسال #1النفاذعند التفعيل المستقلنسخة السياسة1مقدم الطلبمقدم طلب تجريبي"
+    },
+    {
+      "id": "RETURN",
+      "label": "returned for changes by the approver",
+      "result": "PASS",
+      "extra": "200 RETURNED_FOR_CHANGES"
+    },
+    {
+      "id": "RESUBMIT",
+      "label": "resubmitted: revision 2 holds the moved MultiPolygon and revision 1 still holds the first submitted one",
+      "result": "PASS",
+      "extra": "revisions #1 MultiPolygon 2 parts, #2 MultiPolygon 2 parts; changed SITE,AVAILABILITY; moved 112 m"
+    },
+    {
+      "id": "ACTIVATION-1",
+      "label": "A (the resubmitted request) and B (another section on the same ground) are fully approved",
+      "result": "PASS",
+      "extra": "A APPROVED_NOT_ACTIVATED; B APPROVED_NOT_ACTIVATED"
+    },
+    {
+      "id": "ACTIVATION-2",
+      "label": "activation registers the submitted MultiPolygon exactly (its own type, both parts) and stations the section there",
+      "result": "PASS",
+      "extra": "activate 200; state ACTIVATED_PERMANENT; site «موقع RS-2026-0048»: MultiPolygon, 2 parts, equal to the last revision: true"
+    },
+    {
+      "id": "ACTIVATION-3",
+      "label": "occupancy is checked again at activation: B, approved on ground that is now occupied, is refused and not activated",
+      "result": "PASS",
+      "extra": "400 تغيّر إشغال الأرض منذ الاعتماد: موقع RS-2026-0048 — لا يُفعّل الطلب.; B stays APPROVED_NOT_ACTIVATED"
+    },
+    {
+      "id": "ACTIVATION-4",
+      "label": "site links, responsibilities, the copied site 05 and every other unit's stationing are unchanged by the activation",
+      "result": "PASS",
+      "extra": "site links 0 → 0; site 05 version 23 unchanged: true"
+    },
+    {
+      "id": "PERF-polygon",
+      "label": "Polygon: copied, moved as one with areas kept, vertex edited, an invalid drop caught and undone",
+      "result": "PASS",
+      "extra": "1 part(s), 4 vertices"
+    },
+    {
+      "id": "PERF-multi",
+      "label": "MultiPolygon, 2 parts (site 05): copied, moved as one with areas kept, vertex edited, an invalid drop caught and undone",
+      "result": "PASS",
+      "extra": "2 part(s), 8 vertices"
+    },
+    {
+      "id": "PERF-multi4",
+      "label": "MultiPolygon, 4 parts (ACC-GEO-MP4): copied, moved as one with areas kept, vertex edited, an invalid drop caught and undone",
+      "result": "PASS",
+      "extra": "4 part(s), 15 vertices"
+    },
+    {
+      "id": "PERF-dense",
+      "label": "Polygon, 1,500 vertices (ACC-GEO-DENSE): copied, moved as one with areas kept, vertex edited, an invalid drop caught and undone",
+      "result": "PASS",
+      "extra": "1 part(s), 1500 vertices"
+    },
+    {
+      "id": "NET",
+      "label": "zero external requests from the page",
+      "result": "PASS",
+      "extra": ""
+    },
+    {
+      "id": "CONSOLE",
+      "label": "no console or page errors",
+      "result": "PASS",
+      "extra": ""
+    }
+  ],
+  "perf": [
+    {
+      "site": "Polygon",
+      "step": "copy (click → copied site shown)",
+      "ms": 123
+    },
+    {
+      "site": "Polygon",
+      "step": "grouped drag",
+      "ms": 708,
+      "steps": 30,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "Polygon",
+      "step": "vertex drag",
+      "ms": 462,
+      "steps": 12,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "Polygon",
+      "step": "validation feedback after release (valid)",
+      "ms": 0
+    },
+    {
+      "site": "Polygon",
+      "step": "undo",
+      "ms": 21
+    },
+    {
+      "site": "Polygon",
+      "step": "redo",
+      "ms": 25
+    },
+    {
+      "site": "Polygon",
+      "step": "invalid vertex drop",
+      "ms": 490,
+      "steps": 12,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "Polygon",
+      "step": "validation feedback after release (invalid verdict)",
+      "ms": 1
+    },
+    {
+      "site": "Polygon",
+      "step": "undo of the invalid drop",
+      "ms": 24
+    },
+    {
+      "site": "MultiPolygon, 2 parts (site 05)",
+      "step": "copy (click → copied site shown)",
+      "ms": 89
+    },
+    {
+      "site": "MultiPolygon, 2 parts (site 05)",
+      "step": "grouped drag",
+      "ms": 711,
+      "steps": 30,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "MultiPolygon, 2 parts (site 05)",
+      "step": "vertex drag",
+      "ms": 468,
+      "steps": 12,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "MultiPolygon, 2 parts (site 05)",
+      "step": "validation feedback after release (valid)",
+      "ms": 0
+    },
+    {
+      "site": "MultiPolygon, 2 parts (site 05)",
+      "step": "undo",
+      "ms": 22
+    },
+    {
+      "site": "MultiPolygon, 2 parts (site 05)",
+      "step": "redo",
+      "ms": 26
+    },
+    {
+      "site": "MultiPolygon, 2 parts (site 05)",
+      "step": "invalid vertex drop",
+      "ms": 492,
+      "steps": 12,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "MultiPolygon, 2 parts (site 05)",
+      "step": "validation feedback after release (invalid verdict)",
+      "ms": 1
+    },
+    {
+      "site": "MultiPolygon, 2 parts (site 05)",
+      "step": "undo of the invalid drop",
+      "ms": 24
+    },
+    {
+      "site": "MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "step": "copy (click → copied site shown)",
+      "ms": 82
+    },
+    {
+      "site": "MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "step": "grouped drag",
+      "ms": 720,
+      "steps": 30,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "step": "vertex drag",
+      "ms": 466,
+      "steps": 12,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "step": "validation feedback after release (valid)",
+      "ms": 0
+    },
+    {
+      "site": "MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "step": "undo",
+      "ms": 24
+    },
+    {
+      "site": "MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "step": "redo",
+      "ms": 26
+    },
+    {
+      "site": "MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "step": "invalid vertex drop",
+      "ms": 476,
+      "steps": 12,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "step": "validation feedback after release (invalid verdict)",
+      "ms": 1
+    },
+    {
+      "site": "MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "step": "undo of the invalid drop",
+      "ms": 24
+    },
+    {
+      "site": "Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "step": "copy (click → copied site shown)",
+      "ms": 80
+    },
+    {
+      "site": "Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "step": "grouped drag",
+      "ms": 718,
+      "steps": 30,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "step": "vertex drag",
+      "ms": 480,
+      "steps": 12,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "step": "validation feedback after release (valid)",
+      "ms": 0
+    },
+    {
+      "site": "Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "step": "undo",
+      "ms": 23
+    },
+    {
+      "site": "Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "step": "redo",
+      "ms": 26
+    },
+    {
+      "site": "Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "step": "invalid vertex drop",
+      "ms": 493,
+      "steps": 12,
+      "longest": 0,
+      "longTasks": 0
+    },
+    {
+      "site": "Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "step": "validation feedback after release (invalid verdict)",
+      "ms": 2
+    },
+    {
+      "site": "Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "step": "undo of the invalid drop",
+      "ms": 24
+    }
+  ],
+  "requests": [
+    {
+      "scenario": "G1 مضلع",
+      "id": "5db96c2b-1612-46af-8199-c641a038487d",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "G9 رسم جديد",
+      "id": "32c575ad-33ae-4c3a-af9e-a2da684a212a",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "PTR إفلات المؤشر",
+      "id": "82f46506-a2bb-47a4-895d-a27ae4966ee1",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "G3 متعدد الأجزاء",
+      "id": "677d8373-4bb8-4012-9cfe-16ca7e550238",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "G4 أربعة أجزاء",
+      "id": "c865fd3e-a0c6-4042-836a-ed855db4ce54",
+      "user": "t.requester.pm"
+    },
+    {
+      "scenario": "G8 تراجع وإعادة",
+      "id": "7a2c439e-387c-4c74-8638-7c9262c7fc4a",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "ACTIVATION occupancy re-check (B)",
+      "id": "b5fc7bc3-b3a9-468b-979c-83a6a0786b35",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "أداء Polygon",
+      "id": "7f962c63-52d6-4e89-9cf6-dbc7bc245fbd",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "أداء MultiPolygon, 2 parts (site 05)",
+      "id": "11a287f2-9ec7-4dac-910d-13035f92d504",
+      "user": "t.requester"
+    },
+    {
+      "scenario": "أداء MultiPolygon, 4 parts (ACC-GEO-MP4)",
+      "id": "0a54a3ef-0e28-4e18-aa9c-4b6ce3229727",
+      "user": "t.requester.pm"
+    },
+    {
+      "scenario": "أداء Polygon, 1,500 vertices (ACC-GEO-DENSE)",
+      "id": "3bf2a4dc-39d0-4a44-a72e-78a8bd016fb6",
+      "user": "t.requester.pm"
+    }
+  ]
+}

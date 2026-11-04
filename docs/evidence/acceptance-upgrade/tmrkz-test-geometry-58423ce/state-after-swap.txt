@@ -1,0 +1,60 @@
+== captured 2026-11-04T11:24:11Z
+== containers
+tmrkz-test-backend-1 mover/backend:rel-58423ce Up 55 seconds (healthy)
+tmrkz-test-db-1 postgis/postgis:17-3.5-alpine Up 9 hours (healthy)
+tmrkz-test-keycloak-1 e0c1339aabe9 Up 9 hours (healthy)
+tmrkz-test-openfga-1 openfga/openfga:v1.8.16 Up 9 hours (healthy)
+tmrkz-test-openldap-1 osixia/openldap:1.5.0 Up 9 hours
+tmrkz-test-web-1 mover/web:rel-58423ce-v3 Up 37 seconds (healthy)
+== health
+web / 200
+{"status":"UP"} (200)
+== database identity
+ACCEPTANCE / V20 — fictional acceptance data only; V20 applied 2026-11-04 from mover/backend:rel-86a58db (commit 86a58db; V19 earlier from rel-7152d53); web mover/web:rel-86a58db-v3 (Stationing V3 page, acceptance only); Stationing acceptance policy version 1 (ACCEPTANCE-V3-POLICY-1, not a production default); fictional L8–L10 and lifecycle accounts provisioned 2026-11-04; evidence docs/evidence/acceptance-upgrade/, docs/evidence/acceptance-data/ and docs/evidence/acceptance-journeys/stationing-v3/
+== schema
+flyway max V20, rows 20
+== policy
+policy v1 ACCEPTANCE-V3-POLICY-1 row_md5=5227e4ef5bcf3fc9223c9e84f0553c8a
+== terrain
+terrain copernicus-glo30 v2026.11 sha256=9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682 rasters=6300
+== stationing fingerprint
+stationing_policy_version=1 e15d5dfcb5e103a3b94d2477a9bd2d01
+org_stationing=20 ad75de6e21bd69357ea22df64bc8fe69
+site_link=0 -
+restationing_request=31 6cc6fe4ecb60402b66cc37ca7d49635e
+restationing_stage=61 781eb7f1f1bfe6e0f30723489f955cd2
+restationing_revision=23 96ce33051f77d40bb8a2ab82aa9a8688
+deployment_area=18 5d656c4d1a88904f618adbf3d88f4ed9
+== counts
+sites=21 geometry_versions=162 organizations=10 responsibilities=12 audit=3933
+== requests by state
+ACTIVATED_PERMANENT=3
+APPROVED_NOT_ACTIVATED=8
+CANCELLED_BEFORE_ACTIVATION=1
+DRAFT=9
+EXTENSION_ACTIVATED=1
+REJECTED=1
+TEMPORARY_CANCELLED_BEFORE_START=1
+TEMPORARY_RETURNED=4
+TEMPORARY_WINDOW_EXPIRED_WITHOUT_START=1
+UNDER_REVIEW=2
+== open requests
+RS-2026-0002 APPROVED_NOT_ACTIVATED 689a7564-c15e-4db1-a352-2bc6e354df01
+RS-2026-0003 DRAFT 9d0e095c-22db-4c88-99cc-b727506dfae7
+RS-2026-0004 DRAFT 2417cc62-cfa6-4259-92fc-3b8356679cf0
+RS-2026-0005 APPROVED_NOT_ACTIVATED 48e605da-e29c-49cb-8338-65b102517eec
+RS-2026-0006 APPROVED_NOT_ACTIVATED 09a6fb5d-82cc-4160-b63b-1cb4f4e37d2b
+RS-2026-0008 DRAFT a8c06e2d-ef8f-4ebd-bd12-30a34fe1b34a
+RS-2026-0009 DRAFT 27934ab5-eef2-4327-9c96-c5cad7d37dd4
+RS-2026-0010 DRAFT ce496c2b-17ff-4938-87c7-f922ca537811
+RS-2026-0013 APPROVED_NOT_ACTIVATED 41891940-7e73-45db-b2bb-571af8b0ad5e
+RS-2026-0014 DRAFT 36bdf7c4-c3c7-4881-aecb-775ee371b3d8
+RS-2026-0015 DRAFT 78d37e4a-f740-4c82-ae58-e2e32b7e361f
+RS-2026-0016 DRAFT 17174597-8344-4888-855f-b22aad485f59
+RS-2026-0017 APPROVED_NOT_ACTIVATED b713d852-e93d-4080-a535-5edb7b94c7d7
+RS-2026-0018 APPROVED_NOT_ACTIVATED e7c840f9-0474-4aba-9c3a-5ab0498214ac
+RS-2026-0019 DRAFT f1333295-88fd-44c3-890e-0fb497b729f9
+RS-2026-0020 APPROVED_NOT_ACTIVATED d9d129f2-0233-4b28-9c34-8dba3c214135
+RS-2026-0021 UNDER_REVIEW f79fe693-29f8-4f41-aa4a-a2cacef46288
+RS-2026-0023 APPROVED_NOT_ACTIVATED 17ba4892-ff97-46f7-bb27-ba8a6034be06
+RS-2026-0026 UNDER_REVIEW 06418ce5-59e4-4734-91bc-e5c0f767333e

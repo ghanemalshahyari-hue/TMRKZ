@@ -294,22 +294,34 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     - tests: `RestationingLifecycleIT` 8/8, backend 206/206, frontend 94/94.
 
     Open: D11 reminders; the time of the effective end in the panel.
-  - **Geometry editing (ADR-035, 4 Nov) — commit `58423ce`, pushed at the owner's request; NOT on `tmrkz-test`:**
-    - a MultiPolygon copied whole and moved as one rigid group;
-    - Polygon and MultiPolygon vertex editing (advanced mode);
-    - undo, redo and reset;
-    - server validation of Polygon and MultiPolygon, with the parity cases and spheroid areas;
-    - no migration.
-
-    Real page on the development environment: G1–G9 17/17, 0 long tasks during drags, up to the 1,500-vertex polygon.
-    Tests: frontend 102/102, backend 209/209. Next: deployment to `tmrkz-test` and the journeys there (owner
-    approval).
+  - **Geometry editing (ADR-035, 4 Nov) — accepted on `tmrkz-test`:**
+    - **What it does:**
+      - a MultiPolygon copied whole and moved as one rigid group;
+      - Polygon and MultiPolygon vertex editing (advanced mode);
+      - undo, redo and reset;
+      - server validation of Polygon and MultiPolygon, with the parity cases and spheroid areas;
+      - no migration.
+    - **Commits:** C6 `58423ce` (functional) and `9e02088` (the request page states the proposed site's type, parts,
+      area and submission: a defect found by this acceptance).
+    - **Running on `tmrkz-test`:** backend `rel-58423ce` and web `rel-9e02088-v3`, still V20. The swap left schema,
+      policy, terrain and every Stationing fingerprint unchanged.
+    - **Fixtures:** `ACC-GEO-MP4` and `ACC-GEO-DENSE`, from the acceptance-only, idempotent script.
+    - **Real page, 33/33:**
+      - G1–G9;
+      - pointer release over the attribution, another control and outside the canvas;
+      - approver view with return and resubmission;
+      - activation with the occupancy re-check;
+      - 0 long tasks on all four sites, the 1,500-vertex polygon included.
+    - **Tests:** backend 209/209 (with a test-only fixture-placement fix), frontend 102/102, build OK.
+    - **Evidence:** `docs/evidence/acceptance-journeys/stationing-v3/geometry/tmrkz-test/SUMMARY.md`.
+    - **Not accepted:** real touch.
   - **Before production readiness (owner list):**
-    - geometry editing on `tmrkz-test` (above);
     - the long mixed-label wrap on the map;
     - production packaging of the page and map data;
     - a controlled terrain-tie scenario (preferred);
-    - real non-production Oracle, real touch.
+    - D11 reminders and presentation polish (including the duplicate label of a read-only MultiPolygon);
+    - real non-production Oracle, real physical touch;
+    - the final production-readiness audit.
 
 - **Stationing V3 after the stop gate (4 Nov 2026, owner decisions 1–6): foundation built and tested, NOT active —
   no page uses it.** Report `docs/audit/stationing-v3-production/CONTINUATION_REPORT.md`; ADR-031, ADR-032, ADR-028

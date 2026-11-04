@@ -1,0 +1,38 @@
+## run 1 (apply) 2026-11-04T11:24:22Z
+[geometry-fixtures] target tmrkz-test-db-1: ACCEPTANCE / V20 — fictional acceptance data only; V20 applied 2026-11-04 from mover/backend:rel-86a58db (commit 86a58db; V19 earlier from rel-7152d53); web mover/web:rel-86a58db-v3 (Stationing V3 page, acceptance only); Stationing acceptance policy version 1 (ACCEPTANCE-V3-POLICY-1, not a production default); fictional L8–L10 and lifecycle accounts provisioned 2026-11-04; evidence docs/evidence/acceptance-upgrade/, docs/evidence/acceptance-data/ and docs/evidence/acceptance-journeys/stationing-v3/
+boundaries_added = 2
+responsibilities_added = 2
+sites_added: ACC-GEO-DENSE, ACC-GEO-MP4 = 2
+stationings_added = 2
+units_added: T-PM-1-G1500, T-PM-1-G4 = 2
+total_changes = 10
+ACC-GEO-DENSE Polygon parts=1 vertices=1501 valid=true area_m2=46324 unit=T-PM-1-G1500 stationed=true
+ACC-GEO-MP4 MultiPolygon parts=4 vertices=19 valid=true area_m2=62060 unit=T-PM-1-G4 stationed=true
+[geometry-fixtures] written
+exit=0
+
+## run 2 (plan) 2026-11-04T11:24:22Z
+[geometry-fixtures] target tmrkz-test-db-1: ACCEPTANCE / V20 — fictional acceptance data only; V20 applied 2026-11-04 from mover/backend:rel-86a58db (commit 86a58db; V19 earlier from rel-7152d53); web mover/web:rel-86a58db-v3 (Stationing V3 page, acceptance only); Stationing acceptance policy version 1 (ACCEPTANCE-V3-POLICY-1, not a production default); fictional L8–L10 and lifecycle accounts provisioned 2026-11-04; evidence docs/evidence/acceptance-upgrade/, docs/evidence/acceptance-data/ and docs/evidence/acceptance-journeys/stationing-v3/
+boundaries_added = 0
+responsibilities_added = 0
+sites_added: - = 0
+stationings_added = 0
+units_added: - = 0
+total_changes = 0
+ACC-GEO-DENSE Polygon parts=1 vertices=1501 valid=true area_m2=46324 unit=T-PM-1-G1500 stationed=true
+ACC-GEO-MP4 MultiPolygon parts=4 vertices=19 valid=true area_m2=62060 unit=T-PM-1-G4 stationed=true
+[geometry-fixtures] plan only (rolled back): set CONFIRM_TARGET=tmrkz-test to write
+exit=3
+
+## run 3 (apply again) 2026-11-04T11:24:23Z
+[geometry-fixtures] target tmrkz-test-db-1: ACCEPTANCE / V20 — fictional acceptance data only; V20 applied 2026-11-04 from mover/backend:rel-86a58db (commit 86a58db; V19 earlier from rel-7152d53); web mover/web:rel-86a58db-v3 (Stationing V3 page, acceptance only); Stationing acceptance policy version 1 (ACCEPTANCE-V3-POLICY-1, not a production default); fictional L8–L10 and lifecycle accounts provisioned 2026-11-04; evidence docs/evidence/acceptance-upgrade/, docs/evidence/acceptance-data/ and docs/evidence/acceptance-journeys/stationing-v3/
+boundaries_added = 0
+responsibilities_added = 0
+sites_added: - = 0
+stationings_added = 0
+units_added: - = 0
+total_changes = 0
+ACC-GEO-DENSE Polygon parts=1 vertices=1501 valid=true area_m2=46324 unit=T-PM-1-G1500 stationed=true
+ACC-GEO-MP4 MultiPolygon parts=4 vertices=19 valid=true area_m2=62060 unit=T-PM-1-G4 stationed=true
+[geometry-fixtures] written
+exit=0

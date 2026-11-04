@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +27,9 @@ import ae.mover.IntegrationTest;
  */
 abstract class RestationingTestBase extends IntegrationTest {
 
+    private static final int CELL_START = (int) (Math.random() * 48);
+    private static final AtomicInteger CELLS = new AtomicInteger();
+
     @Autowired
     RestationingService service;
 
@@ -41,9 +45,11 @@ abstract class RestationingTestBase extends IntegrationTest {
         team = hrOrg("TEAM", sec, 10, snapshot);
         other = hrOrg("OTHER", top, 7, snapshot);
         otherSec = hrOrg("OSEC", other, 8, snapshot);
-        // far from every other test's fixtures (they sit near 25.2 N, 55.3 E)
-        lat0 = 22.7 + Math.random() * 0.6;
-        lng0 = 52.2 + Math.random() * 0.6;
+        // far from every other test's fixtures (they sit near 25.2 N, 55.3 E), and each test in a cell of its own: the
+        // shared test database keeps earlier tests' sites and deployment areas, and a layout reaches 12 km east
+        int cell = Math.floorMod(CELL_START + CELLS.getAndIncrement(), 48);
+        lat0 = 21.0 + (cell / 8) * 0.15;
+        lng0 = 52.0 + (cell % 8) * 0.3;
         sSec = siteWithBoundary("SSEC", lat0, lng0, sec);
         sOther = siteWithBoundary("SOTH", lat0, lng0 + 0.02, other);
         person("req", role("RSREQ", "ORGANIZATION", "CREATE_RESTATIONING", "VIEW"), sec);

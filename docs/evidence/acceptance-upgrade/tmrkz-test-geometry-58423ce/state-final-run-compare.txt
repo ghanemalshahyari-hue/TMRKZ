@@ -1,0 +1,47 @@
+2c2
+< tmrkz-test-backend-1 mover/backend:rel-58423ce Up 15 minutes (healthy)
+---
+> tmrkz-test-backend-1 mover/backend:rel-58423ce Up 16 minutes (healthy)
+7c7
+< tmrkz-test-web-1 mover/web:rel-9e02088-v3 Up 42 seconds (healthy)
+---
+> tmrkz-test-web-1 mover/web:rel-9e02088-v3 Up 2 minutes (healthy)
+21c21
+< org_stationing=22 7ae5e77db4f59aafbcf57d02b35039f8
+---
+> org_stationing=23 bc1bb1f84b1a9c82bc2ac23fa4b0f370
+23,26c23,26
+< restationing_request=44 48ab690e5e192bdb6412f82726b7767f
+< restationing_stage=63 4050c26765a428a481c07be266f38052
+< restationing_revision=25 964860a674211d89183d1767e6c5fba0
+< deployment_area=18 5d656c4d1a88904f618adbf3d88f4ed9
+---
+> restationing_request=55 3ccb7cffaf550ac80d71d948372a3fcb
+> restationing_stage=67 86229542be27c4c50da36a1886716995
+> restationing_revision=28 86ddca6f0e7cb888f0a6a5ac84b7898a
+> deployment_area=20 8f8199e40bbb0fd787cbda5501e6bee6
+28c28
+< sites=23 geometry_versions=164 organizations=12 responsibilities=14 audit=4022
+---
+> sites=24 geometry_versions=165 organizations=12 responsibilities=14 audit=4101
+30,31c30,31
+< ACTIVATED_PERMANENT=3
+< APPROVED_NOT_ACTIVATED=8
+---
+> ACTIVATED_PERMANENT=4
+> APPROVED_NOT_ACTIVATED=9
+33c33
+< DRAFT=21
+---
+> DRAFT=30
+72a73,82
+> RS-2026-0045 DRAFT 5db96c2b-1612-46af-8199-c641a038487d
+> RS-2026-0046 DRAFT 32c575ad-33ae-4c3a-af9e-a2da684a212a
+> RS-2026-0047 DRAFT 82f46506-a2bb-47a4-895d-a27ae4966ee1
+> RS-2026-0049 DRAFT c865fd3e-a0c6-4042-836a-ed855db4ce54
+> RS-2026-0050 DRAFT 7a2c439e-387c-4c74-8638-7c9262c7fc4a
+> RS-2026-0051 APPROVED_NOT_ACTIVATED b5fc7bc3-b3a9-468b-979c-83a6a0786b35
+> RS-2026-0052 DRAFT 7f962c63-52d6-4e89-9cf6-dbc7bc245fbd
+> RS-2026-0053 DRAFT 11a287f2-9ec7-4dac-910d-13035f92d504
+> RS-2026-0054 DRAFT 0a54a3ef-0e28-4e18-aa9c-4b6ce3229727
+> RS-2026-0055 DRAFT 3bf2a4dc-39d0-4a44-a72e-78a8bd016fb6

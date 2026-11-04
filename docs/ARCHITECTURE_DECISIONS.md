@@ -1339,7 +1339,7 @@ D12, D16, A4, A5, A6). Plan: `docs/audit/stationing-v3-production/LIFECYCLE_PLAN
 - D11 end-of-temporary reminders.
 - Showing the time of the effective end in the lifecycle panel.
 
-## ADR-035 Stationing V3 geometry editing: a MultiPolygon copied whole and moved as one, vertex editing — Development, not on the acceptance database (2026-11-04)
+## ADR-035 Stationing V3 geometry editing: a MultiPolygon copied whole and moved as one, vertex editing — Accepted on `tmrkz-test` (2026-11-04; see the amendment)
 
 **Context.** Owner gate «GEOMETRY EDITING PHASE — GO»:
 - the final behaviour for a current site of several parts is to copy the complete MultiPolygon and move it as one rigid
@@ -1386,3 +1386,23 @@ D12, D16, A4, A5, A6). Plan: `docs/audit/stationing-v3-production/LIFECYCLE_PLAN
 **Not done.**
 - The journeys on `tmrkz-test` (owner approval). Committed as `58423ce`.
 - Real touch.
+
+**Amendment — accepted on `tmrkz-test` (2026-11-04, owner gate «GEOMETRY IMPLEMENTATION → `tmrkz-test` ACCEPTANCE GO»).**
+- **Release:**
+  - backend `mover/backend:rel-58423ce`, built from C6 `58423ce`, no migration (Flyway V20);
+  - web `mover/web:rel-9e02088-v3`.
+- **Performance fixtures:** a four-part MultiPolygon and a 1,500-vertex polygon, provisioned by the acceptance-only,
+  idempotent `ops/test-env/provision-acceptance-v3-geometry.sh`.
+- **Product defect found and fixed (`9e02088`):** the request summary now states «الموقع المقترح». It gives the type,
+  part count, area and the submission that holds it, so an approver reads them without counting drawn shapes.
+- **Real-page result, 33/33:**
+  - G1–G9;
+  - the pointer released over the attribution, over another map control and outside the canvas;
+  - the approver's view, with return and resubmission: revision 1 keeps the first geometry;
+  - activation registers the submitted MultiPolygon exactly, and a second approved request on the now-occupied ground is
+    refused at activation. Site links, responsibilities, the copied site and other units' stationing are unchanged.
+- **Grouped move:** rigid to millimetres per PostGIS, against the engine's 0.5 m tolerance.
+- **Performance:** 0 long tasks over 50 ms on all four sites, measured with a verified instrument.
+- **Evidence:** `docs/evidence/acceptance-journeys/stationing-v3/geometry/tmrkz-test/SUMMARY.md`.
+- **Still open:** real touch; production map packaging; the final production-readiness audit. Geometry editing is
+  accepted on `tmrkz-test`; Stationing V3 is not production-ready.
