@@ -178,6 +178,33 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   - **Do not deploy this revision to data you keep, or rebuild the test environment's backend from it, until the owner
     approves.** Either would apply V17.
 
+- **Stationing V3 re-stationing request workflow (4 Nov 2026, ADR-033): built and tested on the server; first page behind
+  the V3 flag; NOT on the acceptance database.**
+  - **Migration V19 `restationing_request`:** requests, stages per route generation, revisions and deployment areas.
+    Applied only to disposable and development databases; `tmrkz-test` stays at V18.
+  - **Server:**
+    - submission pins the policy version, takes the hierarchy snapshot and derives the route from the requesting unit;
+    - checks block on occupied ground, footprint, the deployment pair and range (centre to centre, terrain allowance),
+      a missing exception reason, terrain ties, other-branch units and an incomplete route;
+    - decisions go to the stage unit's own seat, with separation of duties by the human;
+    - a return re-takes only the affected decisions; a hierarchy change pauses the request and rebuilds the route;
+    - activation is independent, with an atomic occupancy re-check; the temporary lifecycle is automatic;
+    - outbox events throughout.
+  - **New permissions:** CREATE_RESTATIONING, ACTIVATE_STATIONING, APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION.
+  - **Page «إعادة التمركز»:** request list and detail on the offline MapLibre map, route, checks, decide, activate,
+    submit, and a first editor. Shown only with `VITE_STATIONING_V3=true`.
+  - **Development environment:** `tmrkz-v3dev` on :8097 (`ops/test-env/dev-v3.sh`), fictional data and illustrative
+    development values only.
+  - **Tests:** `RestationingWorkflowIT` 10/10; full backend suite 195/195; `restationing-journey.mjs` 15/15 through the
+    real sign-in; frontend 93/93, build OK.
+  - **Owner decision O-17 (4 Nov, option B):** a distance exception is allowed only when enabled in the policy, up to
+    `exception.maxExtra`, with a written reason and a separate stage decided by its permission holder, audited.
+  - **V19 clean path PASS** (`docs/evidence/migration-path/v19/`). The plan for `tmrkz-test`,
+    `docs/audit/stationing-v3-production/V19_ACCEPTANCE_PLAN.md`, awaits the owner. Without acceptance data and a policy,
+    V19 there is schema only.
+  - **Not yet:** extensions, early return, cancellation before start, vertex editing, production packaging of the page
+    and map data, V19 on `tmrkz-test` (owner approval).
+
 - **Stationing V3 after the stop gate (4 Nov 2026, owner decisions 1–6): foundation built and tested, NOT active —
   no page uses it.** Report `docs/audit/stationing-v3-production/CONTINUATION_REPORT.md`; ADR-031, ADR-032, ADR-028
   amendment.

@@ -37,6 +37,9 @@ export const PERMISSIONS: Permission[] = [
   'CORRECT_STATIONING',
   'MANAGE_SITE_LINKS',
   'REPLAY_STATIONING_EVENTS',
+  'CREATE_RESTATIONING',
+  'ACTIVATE_STATIONING',
+  'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION',
 ];
 export const PERMISSION_NAMES: Record<Permission, string> = {
   VIEW: 'عرض',
@@ -56,6 +59,9 @@ export const PERMISSION_NAMES: Record<Permission, string> = {
   CORRECT_STATIONING: 'تصحيح التمركز',
   MANAGE_SITE_LINKS: 'إدارة روابط المواقع',
   REPLAY_STATIONING_EVENTS: 'إعادة إرسال أحداث التمركز',
+  CREATE_RESTATIONING: 'طلب إعادة التمركز',
+  ACTIVATE_STATIONING: 'تفعيل التمركز',
+  APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION: 'اعتماد استثناء مسافة الانتشار',
 };
 
 export const SCOPES: [Scope, string][] = [

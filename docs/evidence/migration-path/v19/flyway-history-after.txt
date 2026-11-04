@@ -1,0 +1,19 @@
+1|1|core schema|V1__core_schema.sql|387767741|t|2026-11-04 06:40:20.701969
+2|2|independent actions|V2__independent_actions.sql|-98846388|t|2026-11-04 06:40:20.916989
+3|3|hr mirror|V3__hr_mirror.sql|-1768732874|t|2026-11-04 06:40:20.935745
+4|4|enterprise identity|V4__enterprise_identity.sql|834525308|t|2026-11-04 06:40:21.007949
+5|5|directory sign in|V5__directory_sign_in.sql|454384776|t|2026-11-04 06:40:21.027461
+6|6|task assignment|V6__task_assignment.sql|-2050822091|t|2026-11-04 06:40:21.035727
+7|7|bootstrap administrator|V7__bootstrap_administrator.sql|1386924904|t|2026-11-04 06:40:21.049109
+8|8|map workspace|V8__map_workspace.sql|-152680922|t|2026-11-04 06:40:21.059182
+9|9|authorization studio|V9__authorization_studio.sql|-1698058498|t|2026-11-04 06:40:21.098199
+10|10|resource relations|V10__resource_relations.sql|-1638187421|t|2026-11-04 06:40:21.129152
+11|11|certificate signing|V11__certificate_signing.sql|-1781185281|t|2026-11-04 06:40:21.137283
+12|12|unit symbols|V12__unit_symbols.sql|1416821592|t|2026-11-04 06:40:21.156204
+13|13|referral communication completion|V13__referral_communication_completion.sql|324593461|t|2026-11-04 06:40:21.167923
+14|14|relocation request|V14__relocation_request.sql|-407879184|t|2026-11-04 06:40:21.1827
+15|15|stationing proposal|V15__stationing_proposal.sql|-1110325767|t|2026-11-04 06:40:21.194308
+16|16|separation of duties|V16__separation_of_duties.sql|-1285514487|t|2026-11-04 06:40:21.208793
+17|17|execution purpose|V17__execution_purpose.sql|-1238489847|t|2026-11-04 06:40:21.218691
+18|18|stationing foundation|V18__stationing_foundation.sql|1034779267|t|2026-11-04 06:40:21.228096
+19|19|restationing request|V19__restationing_request.sql|1414336776|t|2026-11-04 06:40:48.571372

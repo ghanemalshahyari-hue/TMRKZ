@@ -1,0 +1,6 @@
+services:
+  backend:
+    image: ${TMRKZ_BACKEND_IMAGE}
+    mem_limit: 1536m
+  keycloak:
+    mem_limit: 1g

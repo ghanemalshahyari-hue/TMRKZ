@@ -24,6 +24,7 @@ import javax.sql.DataSource;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -61,6 +62,7 @@ public class HrSyncService {
     static final long LOCK_KEY = 0x544D524B5A4852L;
     private static final int MAX_ISSUES = 500;
 
+    private final ApplicationEventPublisher events;
     private final JdbcClient jdbc;
     private final JdbcTemplate batch;
     private final DataSource dataSource;
@@ -81,7 +83,8 @@ public class HrSyncService {
 
     public HrSyncService(JdbcClient jdbc, JdbcTemplate batch, DataSource dataSource, TransactionTemplate tx, Clock clock,
                          Json json, HrProperties props, HrSettingsCipher cipher, HrSourceAdapter adapter,
-                         HrProjection projection, AuditService audit) {
+                         HrProjection projection, AuditService audit, ApplicationEventPublisher events) {
+        this.events = events;
         this.jdbc = jdbc;
         this.batch = batch;
         this.dataSource = dataSource;
@@ -254,6 +257,7 @@ public class HrSyncService {
                     .param("now", Db.ts(clock.instant())).param("id", sourceId).update();
             finish(runId, trigger, requestedBy, sourceId, mappingId, started, "SUCCEEDED", null, null, counts, overrideReason, snapshot);
             retain();
+            events.publishEvent(new HrSnapshotPublished(snapshot));
         } catch (Rejection r) {
             discard(snapshot);
             finish(runId, trigger, requestedBy, sourceId, mappingId, started, "REJECTED", r.code, r.getMessage(), counts, overrideReason, null);

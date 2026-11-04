@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, onUnauthorized } from './api/client';
 import type {Me, Notification, OrgNode, Permission, RequestType, Settings, Site } from './api/types';
 import { RequestWizard } from './components/RequestWizard';
@@ -19,6 +19,9 @@ import { SettingsPage } from './pages/SettingsPage';
 import { StationingPage } from './pages/StationingPage';
 import { WorkflowStudio } from './pages/WorkflowStudio';
 
+// Stationing V3 (behind VITE_STATIONING_V3): loaded on demand, so the offline map code is a separate chunk
+const RestationingPage = lazy(() => import('./pages/RestationingPage').then((m) => ({ default: m.RestationingPage })));
+
 const POLL_MS = 30_000;
 
 /** The retired «الخريطة والمرافق» route and any unknown one open «مساحة التمركز»; the address shows the real route. */
@@ -36,6 +39,7 @@ function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: b
   if (view === 'permissions') return !can('MANAGE_ACCESS');
   if (view === 'org') return !(can('VIEW') || can('MANAGE_ACCESS') || can('MANAGE_FACILITIES') || can('CONFIGURE'));
   if (['stationing', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
+  if (view === 'restationing') return !(can('VIEW') || can('CREATE_RESTATIONING') || can('APPROVE') || can('ACTIVATE_STATIONING') || can('APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION'));
   if (summaryOnly) return true;
   if (view === 'review') return !can('REVIEW');
   if (view === 'audit') return !can('AUDIT');
@@ -179,6 +183,11 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
 
   const pages: Record<View, () => ReactNode> = {
     stationing: () => <StationingPage />,
+    restationing: () => (
+      <Suspense fallback={<div className="empty">جارٍ تحميل الخريطة…</div>}>
+        <RestationingPage />
+      </Suspense>
+    ),
     requests: () => <RequestsPage />,
     review: () => <ReviewPage />,
     calendar: () => <CalendarPage />,

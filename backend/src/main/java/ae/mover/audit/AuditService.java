@@ -127,5 +127,18 @@ public class AuditService {
             Map.entry("STATIONING_CORRECTED", "تصحيح تمركز وحدة"),
             Map.entry("SITE_LINK_CREATED", "ربط موقع بوحدة"),
             Map.entry("SITE_LINK_ENDED", "إنهاء ربط موقع بوحدة"),
-            Map.entry("STATIONING_EVENT_REPLAYED", "إعادة إرسال حدث تمركز صادر"));
+            Map.entry("STATIONING_EVENT_REPLAYED", "إعادة إرسال حدث تمركز صادر"),
+            Map.entry("RESTATIONING_CREATED", "إنشاء طلب إعادة تمركز"),
+            Map.entry("RESTATIONING_EDITED", "تعديل طلب إعادة تمركز"),
+            Map.entry("RESTATIONING_SUBMITTED", "إرسال طلب إعادة تمركز"),
+            Map.entry("RESTATIONING_RESUBMITTED", "إعادة إرسال طلب إعادة تمركز بعد التعديل"),
+            Map.entry("RESTATIONING_RECONFIRMED", "تأكيد طلب بعد تغيّر الهيكل وإعادة بناء المسار"),
+            Map.entry("RESTATIONING_STAGE_APPROVED", "اعتماد مرحلة في طلب إعادة تمركز"),
+            Map.entry("RESTATIONING_RETURNED", "إرجاع طلب إعادة تمركز للتعديل"),
+            Map.entry("RESTATIONING_REJECTED", "رفض طلب إعادة تمركز"),
+            Map.entry("RESTATIONING_FINAL_APPROVAL", "اعتماد نهائي لطلب إعادة تمركز بانتظار التفعيل"),
+            Map.entry("RESTATIONING_PAUSED", "إيقاف طلب إعادة تمركز لتغيّر الهيكل التنظيمي"),
+            Map.entry("RESTATIONING_ACTIVATED", "تفعيل طلب إعادة تمركز"),
+            Map.entry("RESTATIONING_TEMPORARY_STARTED", "بدء تمركز مؤقت"),
+            Map.entry("RESTATIONING_TEMPORARY_RETURNED", "انتهاء تمركز مؤقت والعودة إلى التمركز الأصلي"));
 }

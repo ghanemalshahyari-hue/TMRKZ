@@ -44,6 +44,12 @@ type system
     define manage_site_links_any: [grant#holder]
     define replay_stationing_events: [grant#holder]
     define replay_stationing_events_any: [grant#holder]
+    define create_restationing: [grant#holder]
+    define create_restationing_any: [grant#holder]
+    define activate_stationing: [grant#holder]
+    define activate_stationing_any: [grant#holder]
+    define approve_deployment_distance_exception: [grant#holder]
+    define approve_deployment_distance_exception_any: [grant#holder]
 
 type organization
   relations
@@ -118,6 +124,18 @@ type organization
     define replay_stationing_events_tree: [grant#holder]
     define replay_stationing_events_inh: replay_stationing_events_tree or replay_stationing_events_inh from parent
     define replay_stationing_events: replay_stationing_events_here or replay_stationing_events_inh or replay_stationing_events from system
+    define create_restationing_here: [grant#holder]
+    define create_restationing_tree: [grant#holder]
+    define create_restationing_inh: create_restationing_tree or create_restationing_inh from parent
+    define create_restationing: create_restationing_here or create_restationing_inh or create_restationing from system
+    define activate_stationing_here: [grant#holder]
+    define activate_stationing_tree: [grant#holder]
+    define activate_stationing_inh: activate_stationing_tree or activate_stationing_inh from parent
+    define activate_stationing: activate_stationing_here or activate_stationing_inh or activate_stationing from system
+    define approve_deployment_distance_exception_here: [grant#holder]
+    define approve_deployment_distance_exception_tree: [grant#holder]
+    define approve_deployment_distance_exception_inh: approve_deployment_distance_exception_tree or approve_deployment_distance_exception_inh from parent
+    define approve_deployment_distance_exception: approve_deployment_distance_exception_here or approve_deployment_distance_exception_inh or approve_deployment_distance_exception from system
 
 type site
   relations
@@ -243,6 +261,27 @@ type site
     define replay_stationing_events_direct: replay_stationing_events_here or replay_stationing_events_inh
     define replay_stationing_events_req: replay_stationing_events_direct or replay_stationing_events from responsible
     define replay_stationing_events: replay_stationing_events_req or replay_stationing_events_contains or replay_stationing_events from system
+    define create_restationing_here: [grant#holder]
+    define create_restationing_tree: [grant#holder]
+    define create_restationing_contains: [grant#holder]
+    define create_restationing_inh: create_restationing_tree or create_restationing_inh from parent
+    define create_restationing_direct: create_restationing_here or create_restationing_inh
+    define create_restationing_req: create_restationing_direct or create_restationing from responsible
+    define create_restationing: create_restationing_req or create_restationing_contains or create_restationing from system
+    define activate_stationing_here: [grant#holder]
+    define activate_stationing_tree: [grant#holder]
+    define activate_stationing_contains: [grant#holder]
+    define activate_stationing_inh: activate_stationing_tree or activate_stationing_inh from parent
+    define activate_stationing_direct: activate_stationing_here or activate_stationing_inh
+    define activate_stationing_req: activate_stationing_direct or activate_stationing from responsible
+    define activate_stationing: activate_stationing_req or activate_stationing_contains or activate_stationing from system
+    define approve_deployment_distance_exception_here: [grant#holder]
+    define approve_deployment_distance_exception_tree: [grant#holder]
+    define approve_deployment_distance_exception_contains: [grant#holder]
+    define approve_deployment_distance_exception_inh: approve_deployment_distance_exception_tree or approve_deployment_distance_exception_inh from parent
+    define approve_deployment_distance_exception_direct: approve_deployment_distance_exception_here or approve_deployment_distance_exception_inh
+    define approve_deployment_distance_exception_req: approve_deployment_distance_exception_direct or approve_deployment_distance_exception from responsible
+    define approve_deployment_distance_exception: approve_deployment_distance_exception_req or approve_deployment_distance_exception_contains or approve_deployment_distance_exception from system
 
 type resource
   relations
@@ -281,6 +320,12 @@ type resource
     define manage_site_links: manage_site_links_here or manage_site_links from system
     define replay_stationing_events_here: [grant#holder]
     define replay_stationing_events: replay_stationing_events_here or replay_stationing_events from system
+    define create_restationing_here: [grant#holder]
+    define create_restationing: create_restationing_here or create_restationing from system
+    define activate_stationing_here: [grant#holder]
+    define activate_stationing: activate_stationing_here or activate_stationing from system
+    define approve_deployment_distance_exception_here: [grant#holder]
+    define approve_deployment_distance_exception: approve_deployment_distance_exception_here or approve_deployment_distance_exception from system
 
 type request
   relations
@@ -324,6 +369,12 @@ type request
     define manage_site_links_task: manage_site_links from related_org or manage_site_links_direct from site or manage_site_links from resource or manage_site_links from system
     define replay_stationing_events: replay_stationing_events from related_org or replay_stationing_events_req from site or replay_stationing_events from resource or replay_stationing_events from system
     define replay_stationing_events_task: replay_stationing_events from related_org or replay_stationing_events_direct from site or replay_stationing_events from resource or replay_stationing_events from system
+    define create_restationing: create_restationing from related_org or create_restationing_req from site or create_restationing from resource or create_restationing from system
+    define create_restationing_task: create_restationing from related_org or create_restationing_direct from site or create_restationing from resource or create_restationing from system
+    define activate_stationing: activate_stationing from related_org or activate_stationing_req from site or activate_stationing from resource or activate_stationing from system
+    define activate_stationing_task: activate_stationing from related_org or activate_stationing_direct from site or activate_stationing from resource or activate_stationing from system
+    define approve_deployment_distance_exception: approve_deployment_distance_exception from related_org or approve_deployment_distance_exception_req from site or approve_deployment_distance_exception from resource or approve_deployment_distance_exception from system
+    define approve_deployment_distance_exception_task: approve_deployment_distance_exception from related_org or approve_deployment_distance_exception_direct from site or approve_deployment_distance_exception from resource or approve_deployment_distance_exception from system
     define view_full: creator or view
     define view_any: view_full or view_summary
     define info_view: info_member from info_org

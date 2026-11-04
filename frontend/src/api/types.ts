@@ -17,7 +17,10 @@ export type Permission =
   | 'VIEW_SOURCE_IDENTIFIERS'
   | 'CORRECT_STATIONING'
   | 'MANAGE_SITE_LINKS'
-  | 'REPLAY_STATIONING_EVENTS';
+  | 'REPLAY_STATIONING_EVENTS'
+  | 'CREATE_RESTATIONING'
+  | 'ACTIVATE_STATIONING'
+  | 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION';
 export type Scope = 'ALL' | 'ORGANIZATION' | 'SITE' | 'ORGANIZATION_AND_SITE';
 export type Ref = { id: string; name: string; code?: string };
 export type Period = { start: string; end: string | null };
@@ -961,3 +964,123 @@ export type AuthzStatus = {
   rebuildMs?: number;
 };
 
+
+// ---- Stationing V3 re-stationing requests (ADR-033) ----------------------------------------------------------------
+
+export type GeoPolygon = { type: 'Polygon'; coordinates: number[][][] };
+export type RestationingState =
+  | 'DRAFT'
+  | 'UNDER_REVIEW'
+  | 'RETURNED_FOR_CHANGES'
+  | 'PAUSED_HIERARCHY_CHANGED'
+  | 'REJECTED'
+  | 'APPROVED_NOT_ACTIVATED'
+  | 'ACTIVATED_PERMANENT'
+  | 'TEMPORARY_SCHEDULED'
+  | 'ACTIVE_TEMPORARY'
+  | 'TEMPORARY_RETURNED'
+  | 'TEMPORARY_CANCELLED_BEFORE_START';
+export type RestationingContent = {
+  kind: 'PERMANENT' | 'TEMPORARY';
+  start?: string | null;
+  end?: string | null;
+  scope: string[];
+  occupants?: Record<string, 'EXCLUDED' | 'INCLUDED' | 'SEPARATE'>;
+  site: { geometry: GeoPolygon; copiedFrom?: string | null; shape?: 'COPY' | 'EDITED' | 'DRAWN' | null } | null;
+  primary: GeoPolygon | null;
+  alternative: GeoPolygon | null;
+  exceptions?: Record<string, string>;
+  reason: string;
+};
+export type RestationingStage = {
+  key: string;
+  kind: 'HIERARCHY' | 'CROSS_BRANCH' | 'EXCEPTION';
+  label: string;
+  unit: Ref | null;
+  satisfies: string[];
+  final: boolean;
+  mark: 'APPROVED' | 'CARRIED' | null;
+  current: boolean;
+  decidedBy: Ref | null;
+  decidedAt: string | null;
+};
+export type RestationingListItem = {
+  id: string;
+  number: string;
+  state: RestationingState;
+  kind: 'PERMANENT' | 'TEMPORARY';
+  requestingUnit: Ref;
+  requester: Ref;
+  units: number;
+  updatedAt: string;
+  currentStage?: string;
+  mine: boolean;
+};
+export type RestationingRevision = {
+  n: number;
+  submittedAt: string;
+  submittedBy: string;
+  changed: string[];
+  reason: string | null;
+  invalidated: { stage: string; label: string }[];
+  carried: string[];
+  routeNo: number;
+  policyVersion: number;
+};
+export type RestationingRequest = {
+  id: string;
+  number: string;
+  state: RestationingState;
+  requestingUnit: Ref;
+  requester: Ref;
+  content: RestationingContent;
+  units: Ref[];
+  currentSites: { unit: string; site: Ref; geometry: { type: string; coordinates: unknown } | null }[];
+  policyVersion: number | null;
+  routeNo: number;
+  route: RestationingStage[];
+  previousRoutes: { routeNo: number; stages: RestationingStage[] }[];
+  revisions: RestationingRevision[];
+  returned: { byName: string; stageLabel: string; reason: string; at: string } | null;
+  paused: { at: string; reason: string; from: string } | null;
+  finalApprover: Ref | null;
+  activation?: { by: Ref; at: string; site: Ref };
+  can: { edit: boolean; submit: boolean; decide: boolean; activate: boolean };
+};
+export type RestationingLeg = {
+  leg: 'primary' | 'alternative';
+  label: string;
+  status: 'NOT_PLACED' | 'OK' | 'NEEDS_EXCEPTION' | 'OUT_OF_RANGE' | 'TERRAIN_TIE_UNRESOLVED';
+  distanceM: number | null;
+  baseMinM: number;
+  baseMaxM: number;
+  effectiveMinM: number;
+  effectiveMaxM: number;
+  exceptionMaxM: number | null;
+  method: string;
+  conflicts: string[];
+  terrain?: {
+    controllingClass: string;
+    controllingLabel: string;
+    shares: { code: string; label: string; cells: number; areaM2: number; percent: number }[];
+    tie: boolean;
+    tied: string[];
+    resolved: boolean;
+    priority: string[];
+    allowanceM: number;
+    dataset: string;
+    surfaceModel: string;
+  };
+};
+export type RestationingChecks = {
+  ok: boolean;
+  problems: string[];
+  policyVersion: number | null;
+  siteAreaM2?: number | null;
+  maxFootprintAreaM2?: number;
+  siteConflicts?: string[];
+  legs?: RestationingLeg[];
+  otherBranch?: { unit: string; name: string; siteName: string; decisionRequired: boolean; decision: string | null }[];
+  route?: { key: string; kind: string; label: string; unit: Ref | null; satisfies: string[]; final: boolean }[];
+  needsDistanceException?: boolean;
+};

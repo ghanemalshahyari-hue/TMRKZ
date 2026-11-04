@@ -15,6 +15,13 @@ release image instead: `EXPECT_PENDING="17" AFTER_SQL=ops/sql/checks/V17-after.s
 <image> <label>` (the database must be labelled ACCEPTANCE; plan, backup verified by `ops/verify-backup.sh`, fingerprints
 before and after; evidence in `docs/evidence/acceptance-upgrade/`).
 
+**Stationing V3 development environment (4 Nov 2026).** `sh ops/test-env/dev-v3.sh build|up|seed|down` runs the
+disposable project `tmrkz-v3dev` on :8097. It has the same fictional directory and data, the backend built from the
+working tree (never a release), memory caps, and illustrative development values for Stationing V3
+(`ops/test-env/dev-v3-seed.sql`). The live frontend runs with `cd frontend && MOVER_API=http://localhost:8097
+VITE_STATIONING_V3=true npx vite --config vite.dev.config.mjs --host 127.0.0.1`, then «إعادة التمركز» at `http://127.0.0.1:5173/#restationing`. It is
+never the acceptance (`tmrkz-test`) or production (`tmrkz-mover`) project.
+
 Open `http://localhost:8088` and choose either **الدخول الآلي بالحساب المؤسسي** (Keycloak) or **إدخال اسم المستخدم
 وكلمة المرور يدوياً** (checked by the directory). Keycloak shows the TMRKZ sign-in page. The
 directory (OpenLDAP, StartTLS with a test CA that only this environment trusts) verifies the password, and TMRKZ links

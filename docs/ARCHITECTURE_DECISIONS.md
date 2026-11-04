@@ -1070,3 +1070,111 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
     test shows any change: G-8a fails, or G-8c reports CHANGED once upstream sets the direction itself and the fix can
     be retired.
   - **Not done.** No RTL plugin was added.
+
+## ADR-033 Stationing V3 re-stationing request workflow on the server; first page behind the V3 flag — Development, not on the acceptance database (2026-11-04)
+
+- **Context.** After V18 reached `tmrkz-test` (ADR-031), the owner directed the next gate: the real re-stationing
+  workflow of Model V3, following the approved rules without reinterpretation (`docs/STATIONING_MODEL_V3_AR.md` §1,
+  §3, §7; the prototype `prototypes/stationing-ux/src/v3/domain.ts` `check`/`perform` is the behavioural reference).
+  The generic request engine was mapped first. It cannot carry this workflow, because it is built around facility
+  reservations:
+  - `request` allows six statuses and needs a form version and a facility;
+  - the stages are frozen per published Flowable process, so a hierarchy walk of variable length cannot be expressed;
+  - the side effects run inside the final decision.
+
+  Its separation-of-duties and access pieces are reused: PersonKeys, SeparationOfDuties, delegated grants,
+  AccessContext with the OpenFGA second decision, and audit.
+- **Decision — own lifecycle tables (V19 `restationing_request`).**
+  - `restationing_request`: the 11 states of §3, the content (units, other-branch decisions, the one proposed site, the
+    deployment areas, written exceptions, reason), the pinned policy version, the route number, the route path, the
+    hierarchy snapshot, returned/paused records, the final approver and the activation.
+  - `restationing_stage`: the stages of every route generation, with satisfied conditions, the facts each rests on, and
+    the decision with any delegation.
+  - `restationing_revision`: one row per submission, with the facts that changed and the decisions invalidated or
+    carried, plus the checks and terrain audit.
+  - `deployment_area`: written on activation.
+  - `org_stationing.request_id` gains its foreign key.
+  - Extension, early return and cancellation before start come with their behaviour (not in V19).
+- **Decision — submission.** Only the requester submits, holding CREATE_RESTATIONING for the requesting unit.
+  - The policy version in force is pinned at the first submission.
+  - Server checks block submission on:
+    - units outside the requesting unit's branch unless explicitly included and the policy allows it;
+    - a footprint over `maxFootprintAreaM2`;
+    - occupied ground under the site or any deployment area (O-08);
+    - an incomplete deployment pair;
+    - a leg out of range (centre to centre, O-04, terrain allowance on the maximum, O-06);
+    - an exception without a written reason, or an unresolved terrain tie (O-05b);
+    - a missing decision for another-branch units at a site the requester's branch is responsible for (O-03);
+    - a reason under 5 characters;
+    - a route without its final stage.
+  - Occupied ground comes from authoritative records only: the effective stationing of units that stay, plus active
+    reservations. A site every unit leaves is free, and a link never occupies (O-15).
+  - The route is `RouteDerivation` from the requesting unit (O-07, O-09, O-03b). A distance-exception stage is added
+    before the final stage when a leg needs it.
+- **Decision — decisions.**
+  - A hierarchy or cross-branch stage is decided through APPROVE held in that unit's own approver seat: a grant anchored
+    at the unit, not an ALL or ancestor grant. The exception stage is decided through
+    APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION acting for the requesting unit. Both are confirmed by OpenFGA.
+  - Never the requester's human, nor a grant delegated by them. One human decides at most one stage of the current
+    route, which also gives O-03b independence.
+  - Return and reject need a reason. A return keeps the request; resubmission needs a reason and takes again only the
+    decisions resting on a changed fact (V2 D18). Later decided stages that are unaffected are CARRIED.
+- **Decision — hierarchy change (O-10, O-10b, O-16).** After every HR publication (`HrSnapshotPublished`), and every
+  minute, a request in review or approved-not-activated whose requesting unit's path differs from its snapshot is paused
+  with the owner's wording.
+  - A decision or an activation on a drifted request pauses it and is refused.
+  - Confirmation, with a reason, rebuilds the route from the same unit as a new route number with every stage
+    undecided. The earlier route stays with its decisions.
+- **Decision — activation.** A separate act: ACTIVATE_STATIONING over every moving unit, by a human who is neither the
+  requester nor the final approver (D1), and not on their delegation.
+  - Activations are serialised (advisory lock), and the site and areas are checked against occupied ground again.
+  - It registers the proposed site (code = request number, boundary version 1, no responsibility).
+  - Permanent: it ends the current stationing (SUPERSEDED), cancels a later scheduled temporary, and writes the new
+    permanent stationing with `STATIONING_ACTIVATED`.
+  - Temporary: it overlays the preserved base, as `TEMPORARY_STATIONING_SCHEDULED` or `STARTED`.
+  - It writes the deployment areas and the outbox in the same transaction. Site links and responsibility are never
+    touched (O-14).
+  - Temporaries start at their start and return at their end automatically: `TEMPORARY_STATIONING_ENDED`, base
+    untouched, areas retired.
+- **Owner decision O-17 (4 Nov 2026, option B): the distance exception.** A deployment leg beyond the final allowed
+  range (policy and terrain allowance) may proceed only by exception:
+  - up to the setting's `exception.maxExtra`; beyond that it is refused;
+  - with a written reason, recorded in the revision and in the submission audit;
+  - through a separate stage before the final stage, decided only by a holder of
+    APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION, with the same separation of duties.
+
+  It stays off unless the System Administrator enables `exception.allowed` in the policy. The question was raised
+  because the model document (§7, §8) and the prototype carried the exception while §13.1 did not list it.
+- **Permissions / OpenFGA.** New actions CREATE_RESTATIONING, ACTIVATE_STATIONING and
+  APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION. The generated model gains their relations (`docs/authz/model.fga` regenerated;
+  additions only).
+- **API.** `GET|POST /restationing-requests`, `GET /restationing-requests/{id}`, `PUT …/{id}/content`, `GET …/{id}/checks`,
+  `POST …/{id}/submit`, `POST …/{id}/decision`, `POST …/{id}/activate` (`docs/api/openapi.json` regenerated: 164
+  operations).
+- **Page (behind `VITE_STATIONING_V3=true`; normal builds unchanged).** «إعادة التمركز»:
+  - the visible requests;
+  - the request on the offline MapLibre map: current sites, the proposed site, both deployment areas, and the allowed
+    distance bands as guidance;
+  - the route with satisfied conditions, earlier routes and revisions;
+  - the server checks with terrain shares and allowance;
+  - decide, activate, submit or resubmit, as the server allows.
+
+  First editor: requesting unit, explicit units, permanent or temporary, a copied boundary moved by clicking (or a new
+  shape), the two areas, the reason, and the server's checks before submitting. Vertex editing and the fuller journey of
+  §4 are not done.
+- **Development environment.** `ops/test-env/dev-v3.sh` runs the disposable project `tmrkz-v3dev` on :8097: fictional
+  data, the backend from the working tree, memory caps. `dev-v3-seed.sql` holds illustrative levels, seats, starting
+  stationing, boundaries and a policy marked as development values; the two GLO-30 tiles over the fictional sites are
+  loaded with the checked loader. It is never the acceptance or production database. The frontend dev server serves
+  `map-data/` locally for development only.
+- **Verified.**
+  - `RestationingWorkflowIT` 10/10 on disposable PostgreSQL with OpenFGA: permanent journey with separation of duties
+    (including a second record of the same human), return with selective re-approval, hierarchy pause and rebuild,
+    activation refused on drift and on ground taken since approval, temporary schedule/start/return, checks,
+    cross-branch inclusion (O-03, O-03b), policy version locking, visibility.
+  - `tests/acceptance/restationing-journey.mjs` 15/15 against `tmrkz-v3dev` through the real Keycloak/LDAP sign-in.
+  - The page checked headless in Edge, with no console errors.
+  - Full backend suite on a disposable database: 195/195 (185 before + 10 new).
+- **Not done.** Extensions, early return, cancellation before start; V19 on `tmrkz-test` (needs the owner's approval of
+  a plan like V18's); production build of the page and packaging of the map data; the full §4 journey; real Oracle
+  and touch (release gates).

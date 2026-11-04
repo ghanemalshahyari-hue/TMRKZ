@@ -1,4 +1,8 @@
 import type {
+  RestationingChecks,
+  RestationingContent,
+  RestationingListItem,
+  RestationingRequest,
   TaskCandidate,
   TaskRouting,
   AccessExplain,
@@ -464,4 +468,16 @@ export const api = {
   createExport: (status: string | undefined, key: string) => post<ExportJob>('/exports', { kind: 'REQUESTS_CSV', filter: status ? { status } : {} }, key),
   notifications: () => get<Notification[]>('/notifications'),
   markRead: (id: string) => post<void>(`/notifications/${id}/read`),
+
+  // Stationing V3 re-stationing requests (ADR-033)
+  restationingRequests: (state?: string) => get<RestationingListItem[]>('/restationing-requests' + query({ state })),
+  restationingRequest: (id: string) => get<RestationingRequest>(`/restationing-requests/${id}`),
+  createRestationing: (requestingUnitId: string, content: RestationingContent) =>
+    post<RestationingRequest>('/restationing-requests', { requestingUnitId, content }),
+  editRestationing: (id: string, content: RestationingContent) => put<RestationingRequest>(`/restationing-requests/${id}/content`, content),
+  restationingChecks: (id: string) => get<RestationingChecks>(`/restationing-requests/${id}/checks`),
+  submitRestationing: (id: string, reason?: string) => post<RestationingRequest>(`/restationing-requests/${id}/submit`, { reason }),
+  decideRestationing: (id: string, decision: 'APPROVE' | 'RETURN' | 'REJECT', reason?: string) =>
+    post<RestationingRequest>(`/restationing-requests/${id}/decision`, { decision, reason }),
+  activateRestationing: (id: string, reason?: string) => post<RestationingRequest>(`/restationing-requests/${id}/activate`, { reason }),
 };

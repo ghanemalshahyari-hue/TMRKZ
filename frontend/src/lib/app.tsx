@@ -1,7 +1,8 @@
 import { createContext, useContext } from 'react';
 import type { Me, OrgNode, Permission, RequestType, Settings, Site } from '../api/types';
+import { STATIONING_V3_ENABLED } from './stationingV3';
 
-export type View = 'stationing' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs';
+export type View = 'stationing' | 'restationing' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs';
 
 /**
  * Same order, icons and labels as the prototype NAV (the last entry replaces «حزمة البناء»). «مساحة التمركز» is the one
@@ -9,6 +10,8 @@ export type View = 'stationing' | 'requests' | 'review' | 'calendar' | 'org' | '
  */
 export const NAV: [View, string, string][] = [
   ['stationing', 'map', 'مساحة التمركز'],
+  // Stationing V3 re-stationing requests (ADR-033): only in builds with VITE_STATIONING_V3=true until accepted
+  ...(STATIONING_V3_ENABLED ? ([['restationing', 'layers', 'إعادة التمركز']] as [View, string, string][]) : []),
   ['requests', 'file', 'الطلبات'],
   ['review', 'check', 'صندوق المراجعة'],
   ['calendar', 'clock', 'الإشغال والحجوزات'],
