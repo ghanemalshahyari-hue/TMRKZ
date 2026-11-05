@@ -1,0 +1,18 @@
+--- docs/evidence/acceptance-upgrade/tmrkz-test-backend-area-default/schema-before.sql	2026-11-05 09:39:11.429400600 +0400
++++ docs/evidence/acceptance-upgrade/tmrkz-test-backend-area-default/schema-after.sql	2026-11-05 09:41:25.020144100 +0400
+@@ -2,7 +2,7 @@
+ -- PostgreSQL database dump
+ --
+ 
+-\restrict Ce7GW8NMq49Smf24RaynMJ51GvsYwuH3n2G6mPN1YEFRpmnDKbeGjbqJ1FFJH4z
++\restrict 5UhU6R7yyibO3Dm9uztKTeSQa6Rx39OsILlTdohiBEJ9ZGouT81uosIiLcjelRl
+ 
+ -- Dumped from database version 17.11
+ -- Dumped by pg_dump version 17.11
+@@ -8057,5 +8057,5 @@
+ -- PostgreSQL database dump complete
+ --
+ 
+-\unrestrict Ce7GW8NMq49Smf24RaynMJ51GvsYwuH3n2G6mPN1YEFRpmnDKbeGjbqJ1FFJH4z
++\unrestrict 5UhU6R7yyibO3Dm9uztKTeSQa6Rx39OsILlTdohiBEJ9ZGouT81uosIiLcjelRl
+ 

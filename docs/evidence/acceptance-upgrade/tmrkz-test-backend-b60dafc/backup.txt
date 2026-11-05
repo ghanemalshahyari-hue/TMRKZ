@@ -1,0 +1,8 @@
+[backup] database → backups/tmrkz-test-20261105T004837Z/db.dump
+[backup] identity database → backups/tmrkz-test-20261105T004837Z/keycloak.dump
+[backup] authorisation database → backups/tmrkz-test-20261105T004837Z/openfga.dump
+[backup] files volume → backups/tmrkz-test-20261105T004837Z/files.tgz
+[backup] map packages → backups/tmrkz-test-20261105T004837Z/map-packages.tgz
+[backup] fingerprints
+[backup] done: backups/tmrkz-test-20261105T004837Z
+backups/tmrkz-test-20261105T004837Z

@@ -1,0 +1,6 @@
+patch sha256 5bb7a2e3f3291803f52c93c6f9dafb76bddcf67e26cef973b8683e2655ad98bb; files: backend/src/main/java/ae/mover/stationing/StationingPolicy.java backend/src/test/java/ae/mover/stationing/StationingFixtures.java backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java backend/src/test/java/ae/mover/stationing/StationingRulesTest.java 
+context backend/src identical to the working tree (line endings aside)
+pom identical
+backend build start 2026-11-05T05:38:30Z (git archive of b60dafc + uncommitted backend change, patch sha256 5bb7a2e3f3291803f52c93c6f9dafb76bddcf67e26cef973b8683e2655ad98bb)
+sha256:12024edb898ae22fb6b7c1793bdad10cdea9c69975b42cb02cc3a3ee65e57005
+exit=0 end 2026-11-05T05:38:44Z

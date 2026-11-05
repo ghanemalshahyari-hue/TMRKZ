@@ -1,0 +1,68 @@
+{
+  "ui": "http://localhost:5180",
+  "at": "2026-11-05T02:26:17.372Z",
+  "sites": {
+    "A": "موقع RS-2026-0022",
+    "B": "موقع RS-2026-0048",
+    "C": "مبنى الخدمات الغربية"
+  },
+  "results": [
+    {
+      "id": "A-COPY",
+      "pass": true,
+      "what": "the single-Polygon current footprint appears at once as the proposed site, identical, ready to drag; the current site stays drawn; no ring",
+      "detail": "«موقع RS-2026-0022»"
+    },
+    {
+      "id": "A-DRAG",
+      "pass": true,
+      "what": "the footprint itself moves under the pointer; the current site stays as reference",
+      "detail": "moved 989 m"
+    },
+    {
+      "id": "B-COPY",
+      "pass": true,
+      "what": "every part of the MultiPolygon is copied, in order, the type kept",
+      "detail": "2 parts"
+    },
+    {
+      "id": "B-GROUP-DRAG",
+      "pass": true,
+      "what": "dragging one part moves all parts by the same vector",
+      "detail": "877 m; parts differ by 0.003 m"
+    },
+    {
+      "id": "C-DRAW",
+      "pass": true,
+      "what": "a marker-only current site opens drawing; four clicks give four numbered vertices with sides and area; a click on the first vertex finishes a DRAWN polygon",
+      "detail": "vertices 4; صالح; shape DRAWN"
+    },
+    {
+      "id": "D-EDIT",
+      "pass": true,
+      "what": "one vertex moved on the map changes the area; undo restores, redo reapplies, reset returns to the starting copy",
+      "detail": "المساحة: 89,938 م² / 500,000 م²الجزء النشط: 1 → المساحة: 96,555 م² / 500,000 م²الجزء النشط: 1 · الرأس 1"
+    },
+    {
+      "id": "NO-DRAFT",
+      "pass": true,
+      "what": "copy, drag, draw and vertex editing created no draft: no write at all",
+      "detail": "writes 0; requests 39 → 39"
+    },
+    {
+      "id": "NET",
+      "pass": true,
+      "what": "no request leaves the application",
+      "detail": ""
+    },
+    {
+      "id": "CONSOLE",
+      "pass": true,
+      "what": "no console error",
+      "detail": ""
+    }
+  ],
+  "writes": [],
+  "external": [],
+  "consoleErrors": []
+}

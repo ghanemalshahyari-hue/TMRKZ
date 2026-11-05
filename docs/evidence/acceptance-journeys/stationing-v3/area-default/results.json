@@ -1,0 +1,50 @@
+{
+  "ui": "http://localhost:5180",
+  "at": "2026-11-05T05:43:54.141Z",
+  "results": [
+    {
+      "id": "UNSET",
+      "pass": true,
+      "what": "without a configured value no size is invented: «تحديد المنطقة على الخريطة» is unavailable, «رسم حدود المنطقة» stays",
+      "detail": "version 1; «لم يُحدَّد الشكل الابتدائي في سياسة التمركز: استخدم «رسم حدود المنطقة»»"
+    },
+    {
+      "id": "DRY-RUN",
+      "pass": true,
+      "what": "the server dry run accepts the values (publishing enabled)",
+      "detail": ""
+    },
+    {
+      "id": "PUBLISHED",
+      "pass": true,
+      "what": "a new version holds exactly SQUARE 90,000 m², every other value as before, with the acceptance label as reference and reason",
+      "detail": "version 2 · مدير النظام التجريبي · ACCEPTANCE-V3-POLICY-2 · قيمة قبول تجريبية — ليست قيمة إنتاجية معتمدة"
+    },
+    {
+      "id": "ONE-CHANGE",
+      "pass": true,
+      "what": "the version history records one change: deploymentAreaDefault (was not configured)",
+      "detail": "[{\"key\":\"deploymentAreaDefault\",\"previous\":null,\"current\":{\"shape\":\"SQUARE\",\"areaM2\":90000}}]"
+    },
+    {
+      "id": "LABELLED",
+      "pass": true,
+      "what": "the deployment step offers click placement with the policy value, shown as «قيمة قبول تجريبية — ليست قيمة إنتاجية معتمدة»",
+      "detail": "«الشكل الابتدائي من سياسة التمركز (النسخة 2): مربع 90,000 م² (300 م × 300 م) — ACCEPTANCE-V3-POLICY-2 · قيمة قبول تجريبية — ليست قيمة إنتاجية معتمدة»"
+    },
+    {
+      "id": "NET",
+      "pass": true,
+      "what": "no request leaves the application",
+      "detail": ""
+    },
+    {
+      "id": "CONSOLE",
+      "pass": true,
+      "what": "no console error",
+      "detail": ""
+    }
+  ],
+  "external": [],
+  "consoleErrors": []
+}

@@ -1,0 +1,46 @@
+{
+  "ui": "http://localhost:5180",
+  "at": "2026-11-05T03:07:32.812Z",
+  "site": "موقع RS-2026-0022",
+  "results": [
+    {
+      "id": "P-COPY",
+      "pass": true,
+      "what": "the current Polygon is copied at once (no save), marked «مقترح» on the organisation symbol; the current site keeps its own tag",
+      "detail": "«موقع RS-2026-0022»"
+    },
+    {
+      "id": "P-DRAG",
+      "pass": true,
+      "what": "the polygon itself follows the pointer and drops where released; no handles in the move",
+      "detail": "moved 969 m; chip «969 م»"
+    },
+    {
+      "id": "P-VERTEX",
+      "pass": true,
+      "what": "vertex editing shows every vertex numbered and every side measured; one vertex moved changes the area, the moved vertex is marked",
+      "detail": "4 vertices, 4 sides; active 2"
+    },
+    {
+      "id": "P-NO-DRAFT",
+      "pass": true,
+      "what": "copy, drag and vertex editing created no draft: no write at all",
+      "detail": "writes 0; requests 39 → 39"
+    },
+    {
+      "id": "P-NET",
+      "pass": true,
+      "what": "no request leaves the application",
+      "detail": ""
+    },
+    {
+      "id": "P-CONSOLE",
+      "pass": true,
+      "what": "no console error",
+      "detail": ""
+    }
+  ],
+  "writes": [],
+  "external": [],
+  "consoleErrors": []
+}

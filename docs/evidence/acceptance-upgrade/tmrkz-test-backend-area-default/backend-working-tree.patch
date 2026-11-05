@@ -1,0 +1,300 @@
+diff --git a/backend/src/main/java/ae/mover/stationing/StationingPolicy.java b/backend/src/main/java/ae/mover/stationing/StationingPolicy.java
+index cb8796f..8d8b4fc 100644
+--- a/backend/src/main/java/ae/mover/stationing/StationingPolicy.java
++++ b/backend/src/main/java/ae/mover/stationing/StationingPolicy.java
+@@ -19,6 +19,10 @@ import java.util.Set;
+  * gradients as the initial values), and the allowance of each class is a separate administrator value in
+  * {@link #terrainAllowancesM}; no allowance is ever assumed. The allowance extends the maximum only (O-06).
+  *
++ * <p>The initial footprint of a deployment area placed by a single map click is {@link #deploymentAreaDefault} (owner
++ * decision, 5 Nov 2026): an administrator value like every other, never a size in client code. It is the last component
++ * and nullable so versions stored before it read it as null («not configured») without a migration.
++ *
+  * <p>Versioning, effective dating, author, reason and reference belong to the stored version
+  * ({@code stationing_policy_version}, {@link StationingPolicyStore}); this record is the value set of one version.
+  */
+@@ -33,7 +37,8 @@ public record StationingPolicy(
+         TerrainAppliesTo terrainAppliesTo,
+         DistanceException exception,
+         CrossBranch crossBranch,
+-        Routing routing) {
++        Routing routing,
++        DeploymentAreaDefault deploymentAreaDefault) {
+ 
+     /** `stationing_areas_requirement`: both deployment areas, or none or both. */
+     public enum DeploymentRequirement { REQUIRED, OPTIONAL }
+@@ -50,6 +55,19 @@ public record StationingPolicy(
+     /** O-09: the first stage is the requesting unit's own approver (default) or its direct parent's. */
+     public enum StartAt { SELF, PARENT }
+ 
++    /**
++     * Upper bound of {@link DeploymentAreaDefault#areaM2()}: 25 km². Deployment areas have no footprint maximum, so this
++     * is not a rule of the model, only a guard against a mistyped value drawing an absurd starting shape.
++     */
++    public static final double MAX_DEPLOYMENT_AREA_DEFAULT_M2 = 25_000_000;
++
++    /** The shape a single click draws; CIRCLE is drawn by the client as a regular 16-vertex polygon of the same area. */
++    public enum Shape { SQUARE, CIRCLE }
++
++    /** The initial footprint of a deployment area placed by a single map click: its shape and area in m². */
++    public record DeploymentAreaDefault(Shape shape, double areaM2) {
++    }
++
+     /** One deployment relation: stationing site → primary, primary → alternative (centre to centre, O-04). */
+     public record Leg(double minM, double maxM, boolean terrainApplies) {
+     }
+@@ -152,6 +170,18 @@ public record StationingPolicy(
+         if (routing.levels().stream().noneMatch(RoutingLevel::finalStage)) {
+             out.add("لا مستوى نهائي في إعداد المسار");
+         }
++        if (deploymentAreaDefault != null) { // absent is valid: not configured
++            if (deploymentAreaDefault.shape() == null) {
++                out.add("شكل المنطقة الابتدائية لمنطقة الانتشار مطلوب (مربع أو دائرة)");
++            }
++            double a = deploymentAreaDefault.areaM2();
++            if (!(a > 0)) {
++                out.add("مساحة المنطقة الابتدائية لمنطقة الانتشار يجب أن تكون أكبر من صفر");
++            } else if (a > MAX_DEPLOYMENT_AREA_DEFAULT_M2) { // JSON 1e400 reads as infinity, which BigDecimal refuses
++                out.add("مساحة المنطقة الابتدائية لمنطقة الانتشار لا تتجاوز 25 كم² (25000000 م²): "
++                        + (Double.isInfinite(a) ? "∞" : BigDecimal.valueOf(a).toPlainString()) + " م²");
++            }
++        }
+         return out;
+     }
+ 
+diff --git a/backend/src/test/java/ae/mover/stationing/StationingFixtures.java b/backend/src/test/java/ae/mover/stationing/StationingFixtures.java
+index 6cca56f..e059a79 100644
+--- a/backend/src/test/java/ae/mover/stationing/StationingFixtures.java
++++ b/backend/src/test/java/ae/mover/stationing/StationingFixtures.java
+@@ -105,7 +105,8 @@ final class StationingFixtures {
+                         new RoutingLevel(9, true, "معتمد الشعبة", false, EnumSet.of(Fact.SCOPE, Fact.CLASSIFICATION, Fact.DURATION)),
+                         new RoutingLevel(8, true, "معتمد القسم", false, EnumSet.of(Fact.SCOPE, Fact.CLASSIFICATION, Fact.DURATION)),
+                         new RoutingLevel(7, true, "معتمد وسيط — الإدارة", false, EnumSet.of(Fact.SCOPE, Fact.SITE, Fact.DEPLOYMENT, Fact.AVAILABILITY)),
+-                        new RoutingLevel(6, true, "المعتمد النهائي", true, Set.of()))));
++                        new RoutingLevel(6, true, "المعتمد النهائي", true, Set.of()))),
++                null); // the single-click deployment area footprint: not configured, as in a version stored before it
+     }
+ 
+     /** Allowances of the test policy only (in production every value is the administrator's; none is assumed). */
+diff --git a/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java b/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java
+index 17c18a3..30644ec 100644
+--- a/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java
++++ b/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java
+@@ -156,6 +156,91 @@ class StationingFoundationIT extends IntegrationTest {
+         assertThat(audit.path("detail").path("reference").asText()).isEqualTo("قرار اختبار 1");
+     }
+ 
++    @Test
++    @DisplayName("Policy: the single-click deployment area footprint is an optional, validated value requesters read")
++    void deploymentAreaDefault() {
++        Map<String, Object> values = policy(dataset(), List.of("ROLLING", "FLAT", "HILLY"));
++
++        // published without the value, as every version before it: not configured
++        Res v1 = publish("sysadmin", values, null);
++        assertThat(v1.status()).as(v1.toString()).isEqualTo(200);
++        int first = v1.body().path("version").path("version").asInt();
++        assertThat(v1.body().path("version").path("values").path("deploymentAreaDefault").isNull()).isTrue();
++
++        // a version stored before the value existed has no such key in its jsonb and reads it as null: no migration
++        jdbc.sql("""
++                insert into stationing_policy_version(id, version, previous_id, policy_values, effective_from, reason, created_by, created_at)
++                select gen_random_uuid(), v.version + 1, v.id, v.policy_values - 'deploymentAreaDefault', :at, 'نسخة مخزنة قبل الحقل',
++                       v.created_by, :at
++                  from stationing_policy_version v where v.version = :v""")
++                .param("at", java.sql.Timestamp.from(Instant.now())).param("v", first).update();
++        assertThat(jdbc.sql("select policy_values -> 'deploymentAreaDefault' is null from stationing_policy_version where version = :v")
++                .param("v", first + 1).query(Boolean.class).single()).isTrue();
++        JsonNode legacy = login("reqA").get("/stationing/policy").body().path("inForce");
++        assertThat(legacy.path("version").asInt()).isEqualTo(first + 1);
++        assertThat(legacy.path("values").has("deploymentAreaDefault")).isTrue();
++        assertThat(legacy.path("values").path("deploymentAreaDefault").isNull()).isTrue();
++        // a missing key and a stored null are the same value: no phantom change
++        JsonNode legacyView = null;
++        for (JsonNode h : login("sysadmin").get("/stationing/policy/versions").body()) {
++            if (h.path("version").path("version").asInt() == first + 1) {
++                legacyView = h;
++            }
++        }
++        assertThat(legacyView).isNotNull();
++        assertThat(legacyView.path("changes").size()).isZero();
++
++        // refused on the dry run and on publishing, with the reason in Arabic
++        Map<String, String> refused = new LinkedHashMap<>();
++        refused.put("{\"areaM2\":90000}", "شكل المنطقة الابتدائية لمنطقة الانتشار مطلوب");
++        refused.put("{\"shape\":\"SQUARE\",\"areaM2\":0}", "أكبر من صفر");
++        refused.put("{\"shape\":\"SQUARE\",\"areaM2\":-10}", "أكبر من صفر");
++        refused.put("{\"shape\":\"CIRCLE\",\"areaM2\":25000001}", "لا تتجاوز 25 كم²");
++        for (var c : refused.entrySet()) {
++            Map<String, Object> bad = new LinkedHashMap<>(values);
++            bad.put("deploymentAreaDefault", json.map(c.getKey()));
++            Res dry = login("sysadmin").post("/stationing/policy/validate", Map.of("values", bad));
++            assertThat(dry.status()).as(c.getKey()).isEqualTo(200);
++            assertThat(dry.body().path("ok").asBoolean()).as(c.getKey()).isFalse();
++            assertThat(dry.body().path("problems").toString()).as(c.getKey()).contains(c.getValue());
++            Res r = publish("sysadmin", bad, null);
++            assertThat(r.status()).as(c.getKey()).isEqualTo(400);
++            assertThat(r.body().path("details").path("problems").toString()).as(c.getKey()).contains(c.getValue());
++        }
++        Map<String, Object> unknownShape = new LinkedHashMap<>(values);
++        unknownShape.put("deploymentAreaDefault", Map.of("shape", "TRIANGLE", "areaM2", 90_000));
++        assertThat(publish("sysadmin", unknownShape, null).status()).isEqualTo(400);
++        Map<String, Object> overflow = new LinkedHashMap<>(values); // a number beyond double range reads as infinity
++        overflow.put("deploymentAreaDefault", Map.of("shape", "CIRCLE", "areaM2", new java.math.BigDecimal("1e400")));
++        assertThat(publish("sysadmin", overflow, null).status()).isEqualTo(400);
++        // deployment areas have no footprint maximum: a default above maxFootprintAreaM2 is valid
++        Map<String, Object> large = new LinkedHashMap<>(values);
++        large.put("deploymentAreaDefault", Map.of("shape", "CIRCLE", "areaM2", 400_000));
++        assertThat(login("sysadmin").post("/stationing/policy/validate", Map.of("values", large)).body().path("ok").asBoolean()).isTrue();
++        assertThat(publish("reqA", large, null).status()).isEqualTo(403);
++
++        // configured: a 300 m × 300 m square, published as one changed key and read back by a requester
++        Map<String, Object> square = new LinkedHashMap<>(values);
++        square.put("deploymentAreaDefault", Map.of("shape", "SQUARE", "areaM2", 90_000));
++        Res v3 = publish("sysadmin", square, null);
++        assertThat(v3.status()).as(v3.toString()).isEqualTo(200);
++        assertThat(v3.body().path("version").path("version").asInt()).isEqualTo(first + 2);
++        assertThat(v3.body().path("changes").size()).isEqualTo(1);
++        JsonNode change = v3.body().path("changes").get(0);
++        assertThat(change.path("key").asText()).isEqualTo("deploymentAreaDefault");
++        assertThat(change.path("previous").isNull()).isTrue();
++        assertThat(change.path("current").path("shape").asText()).isEqualTo("SQUARE");
++        assertThat(change.path("current").path("areaM2").asDouble()).isEqualTo(90_000);
++        JsonNode inForce = login("reqA").get("/stationing/policy").body().path("inForce");
++        assertThat(inForce.path("version").asInt()).isEqualTo(first + 2);
++        assertThat(inForce.path("values").path("deploymentAreaDefault").path("shape").asText()).isEqualTo("SQUARE");
++        assertThat(inForce.path("values").path("deploymentAreaDefault").path("areaM2").asDouble()).isEqualTo(90_000);
++        JsonNode audited = lastAudit("STATIONING_POLICY", "STATIONING_POLICY_PUBLISHED").path("detail").path("changes").get(0);
++        assertThat(audited.path("key").asText()).isEqualTo("deploymentAreaDefault");
++        assertThat(audited.path("previous").isNull()).isTrue();
++        assertThat(audited.path("new").path("shape").asText()).isEqualTo("SQUARE");
++    }
++
+     // ---- terrain -------------------------------------------------------------------------------------
+ 
+     @Test
+diff --git a/backend/src/test/java/ae/mover/stationing/StationingRulesTest.java b/backend/src/test/java/ae/mover/stationing/StationingRulesTest.java
+index c61208e..54a19bf 100644
+--- a/backend/src/test/java/ae/mover/stationing/StationingRulesTest.java
++++ b/backend/src/test/java/ae/mover/stationing/StationingRulesTest.java
+@@ -18,7 +18,10 @@ import org.junit.jupiter.api.DisplayName;
+ import org.junit.jupiter.api.Nested;
+ import org.junit.jupiter.api.Test;
+ 
++import com.fasterxml.jackson.databind.node.ObjectNode;
++
+ import ae.mover.access.Permission;
++import ae.mover.common.Json;
+ import ae.mover.stationing.DeploymentRules.LegStatus;
+ import ae.mover.stationing.OccupancyRule.Kind;
+ import ae.mover.stationing.OccupancyRule.Occupancy;
+@@ -30,8 +33,10 @@ import ae.mover.stationing.StationingEventSender.State;
+ import ae.mover.stationing.StationingFixtures.FixtureHierarchy;
+ import ae.mover.stationing.StationingPolicy.CrossAuthority;
+ import ae.mover.stationing.StationingPolicy.CrossBranch;
++import ae.mover.stationing.StationingPolicy.DeploymentAreaDefault;
+ import ae.mover.stationing.StationingPolicy.DeploymentRequirement;
+ import ae.mover.stationing.StationingPolicy.Routing;
++import ae.mover.stationing.StationingPolicy.Shape;
+ import ae.mover.stationing.StationingPolicy.StartAt;
+ import ae.mover.stationing.StationingPolicy.TerrainAppliesTo;
+ import ae.mover.stationing.StationingReadAccess.StationingView;
+@@ -196,7 +201,7 @@ class StationingRulesTest {
+             assertThat(DeploymentRules.leg(policy.primary(), policy, 7000.0, t).effectiveMaxM()).isEqualTo(8000);
+             var reversed = new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
+                     policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), List.of("HILLY", "FLAT", "ROLLING"), policy.terrainAppliesTo(),
+-                    policy.exception(), policy.crossBranch(), policy.routing());
++                    policy.exception(), policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault());
+             assertThat(TerrainRule.decide(shares, reversed).controlling().code()).isEqualTo("HILLY");
+         }
+ 
+@@ -204,7 +209,7 @@ class StationingRulesTest {
+         void tiedClassesWithoutAValidPriorityBlock() {
+             var partial = new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
+                     policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), List.of("ROLLING", "FLAT"), policy.terrainAppliesTo(),
+-                    policy.exception(), policy.crossBranch(), policy.routing());
++                    policy.exception(), policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault());
+             TerrainDecision t = TerrainRule.decide(List.of(new TerrainShare("HILLY", 500_000), new TerrainShare("FLAT", 500_000)), partial);
+             assertThat(t.resolved()).isFalse();
+             assertThat(DeploymentRules.leg(partial.primary(), partial, 6000.0, t).status()).isEqualTo(LegStatus.TERRAIN_TIE_UNRESOLVED);
+@@ -214,7 +219,7 @@ class StationingRulesTest {
+         void minAndMaxIsNeverPublishableTheMinimumStays() {
+             var mm = new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
+                     policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), policy.terrainClassPriority(), TerrainAppliesTo.MIN_AND_MAX,
+-                    policy.exception(), policy.crossBranch(), policy.routing());
++                    policy.exception(), policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault());
+             var t = TerrainRule.decide(List.of(new TerrainShare("HILLY", 1)), mm);
+             var leg = DeploymentRules.leg(mm.primary(), mm, 6000.0, t);
+             assertThat(leg.effectiveMinM()).isEqualTo(7000);
+@@ -449,7 +454,7 @@ class StationingRulesTest {
+         StationingPolicy withClassification(StationingPolicy.SlopeClassification sc, Map<String, Double> allowances) {
+             return new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
+                     policy.alternative(), sc, allowances, List.of(), policy.terrainAppliesTo(), policy.exception(),
+-                    policy.crossBranch(), policy.routing());
++                    policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault());
+         }
+     }
+ 
+@@ -467,9 +472,62 @@ class StationingRulesTest {
+             var bad = new StationingPolicy(0, DeploymentRequirement.OPTIONAL, new StationingPolicy.Leg(8000, 5000, true),
+                     policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), List.of("FLAT", "FLAT", "UNKNOWN"), TerrainAppliesTo.MAX_ONLY,
+                     new StationingPolicy.DistanceException(true, 0), new CrossBranch(true, List.of(), false),
+-                    new Routing(StartAt.SELF, policy.routing().levels().stream().filter(l -> !l.finalStage()).toList()));
++                    new Routing(StartAt.SELF, policy.routing().levels().stream().filter(l -> !l.finalStage()).toList()), null);
+             assertThat(bad.problems()).hasSize(7);
+         }
++
++        @Test
++        void theSingleClickDeploymentAreaDefaultIsOptionalAndBounded() {
++            assertThat(policy.deploymentAreaDefault()).isNull(); // not configured is a valid policy
++            assertThat(withDefault(new DeploymentAreaDefault(Shape.SQUARE, 90_000)).problems()).isEmpty();
++            assertThat(withDefault(new DeploymentAreaDefault(Shape.CIRCLE, StationingPolicy.MAX_DEPLOYMENT_AREA_DEFAULT_M2)).problems()).isEmpty();
++            // deployment areas have no footprint maximum
++            assertThat(withDefault(new DeploymentAreaDefault(Shape.SQUARE, policy.maxFootprintAreaM2() * 10)).problems()).isEmpty();
++
++            assertThat(withDefault(new DeploymentAreaDefault(null, 90_000)).problems())
++                    .containsExactly("شكل المنطقة الابتدائية لمنطقة الانتشار مطلوب (مربع أو دائرة)");
++            for (double a : new double[] {0, -1, Double.NaN}) {
++                assertThat(withDefault(new DeploymentAreaDefault(Shape.SQUARE, a)).problems()).as("" + a)
++                        .containsExactly("مساحة المنطقة الابتدائية لمنطقة الانتشار يجب أن تكون أكبر من صفر");
++            }
++            assertThat(withDefault(new DeploymentAreaDefault(Shape.CIRCLE, 25_000_001)).problems())
++                    .containsExactly("مساحة المنطقة الابتدائية لمنطقة الانتشار لا تتجاوز 25 كم² (25000000 م²): 25000001 م²");
++            assertThat(withDefault(new DeploymentAreaDefault(Shape.CIRCLE, Double.POSITIVE_INFINITY)).problems()).hasSize(1);
++        }
++
++        @Test
++        void aVersionStoredBeforeTheDeploymentAreaDefaultReadsItAsNotConfigured() {
++            Json json = new Json();
++            ObjectNode stored = (ObjectNode) json.tree(withDefault(new DeploymentAreaDefault(Shape.SQUARE, 90_000)));
++            assertThat(stored.path("deploymentAreaDefault").path("shape").asText()).isEqualTo("SQUARE");
++            assertThat(stored.path("deploymentAreaDefault").path("areaM2").asDouble()).isEqualTo(90_000);
++            stored.remove("deploymentAreaDefault"); // the jsonb of a version published before the value existed
++            StationingPolicy legacy = json.read(stored.toString(), StationingPolicy.class);
++            assertThat(legacy.deploymentAreaDefault()).isNull();
++            assertThat(legacy).isEqualTo(policy);
++            assertThat(legacy.problems()).isEmpty();
++        }
++
++        @Test
++        void theVersionChangesListTheDeploymentAreaDefault() {
++            Json json = new Json();
++            var square = withDefault(new DeploymentAreaDefault(Shape.SQUARE, 90_000));
++            var changes = StationingPolicyStore.diff(json.tree(policy), json.tree(square));
++            assertThat(changes).extracting(StationingPolicyStore.Change::key).containsExactly("deploymentAreaDefault");
++            assertThat(changes.get(0).previous().isNull()).isTrue();
++            assertThat(changes.get(0).current().path("areaM2").asDouble()).isEqualTo(90_000);
++            assertThat(StationingPolicyStore.diff(json.tree(square), json.tree(policy))).extracting(StationingPolicyStore.Change::key)
++                    .containsExactly("deploymentAreaDefault"); // removing it (back to not configured) is a change too
++            var circle = withDefault(new DeploymentAreaDefault(Shape.CIRCLE, 90_000));
++            assertThat(StationingPolicyStore.diff(json.tree(square), json.tree(circle))).hasSize(1);
++            assertThat(StationingPolicyStore.diff(json.tree(policy), json.tree(policy))).isEmpty();
++        }
++
++        StationingPolicy withDefault(DeploymentAreaDefault d) {
++            return new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
++                    policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), policy.terrainClassPriority(),
++                    policy.terrainAppliesTo(), policy.exception(), policy.crossBranch(), policy.routing(), d);
++        }
+     }
+ 
+     /** In-memory {@link StationingEventSender.Ledger} (the stationing outbox table comes with the schema work). */
