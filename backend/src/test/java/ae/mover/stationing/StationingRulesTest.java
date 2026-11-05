@@ -18,7 +18,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import ae.mover.access.Permission;
+import ae.mover.common.Json;
 import ae.mover.stationing.DeploymentRules.LegStatus;
 import ae.mover.stationing.OccupancyRule.Kind;
 import ae.mover.stationing.OccupancyRule.Occupancy;
@@ -30,8 +33,10 @@ import ae.mover.stationing.StationingEventSender.State;
 import ae.mover.stationing.StationingFixtures.FixtureHierarchy;
 import ae.mover.stationing.StationingPolicy.CrossAuthority;
 import ae.mover.stationing.StationingPolicy.CrossBranch;
+import ae.mover.stationing.StationingPolicy.DeploymentAreaDefault;
 import ae.mover.stationing.StationingPolicy.DeploymentRequirement;
 import ae.mover.stationing.StationingPolicy.Routing;
+import ae.mover.stationing.StationingPolicy.Shape;
 import ae.mover.stationing.StationingPolicy.StartAt;
 import ae.mover.stationing.StationingPolicy.TerrainAppliesTo;
 import ae.mover.stationing.StationingReadAccess.StationingView;
@@ -196,7 +201,7 @@ class StationingRulesTest {
             assertThat(DeploymentRules.leg(policy.primary(), policy, 7000.0, t).effectiveMaxM()).isEqualTo(8000);
             var reversed = new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
                     policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), List.of("HILLY", "FLAT", "ROLLING"), policy.terrainAppliesTo(),
-                    policy.exception(), policy.crossBranch(), policy.routing());
+                    policy.exception(), policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault());
             assertThat(TerrainRule.decide(shares, reversed).controlling().code()).isEqualTo("HILLY");
         }
 
@@ -204,7 +209,7 @@ class StationingRulesTest {
         void tiedClassesWithoutAValidPriorityBlock() {
             var partial = new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
                     policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), List.of("ROLLING", "FLAT"), policy.terrainAppliesTo(),
-                    policy.exception(), policy.crossBranch(), policy.routing());
+                    policy.exception(), policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault());
             TerrainDecision t = TerrainRule.decide(List.of(new TerrainShare("HILLY", 500_000), new TerrainShare("FLAT", 500_000)), partial);
             assertThat(t.resolved()).isFalse();
             assertThat(DeploymentRules.leg(partial.primary(), partial, 6000.0, t).status()).isEqualTo(LegStatus.TERRAIN_TIE_UNRESOLVED);
@@ -214,7 +219,7 @@ class StationingRulesTest {
         void minAndMaxIsNeverPublishableTheMinimumStays() {
             var mm = new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
                     policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), policy.terrainClassPriority(), TerrainAppliesTo.MIN_AND_MAX,
-                    policy.exception(), policy.crossBranch(), policy.routing());
+                    policy.exception(), policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault());
             var t = TerrainRule.decide(List.of(new TerrainShare("HILLY", 1)), mm);
             var leg = DeploymentRules.leg(mm.primary(), mm, 6000.0, t);
             assertThat(leg.effectiveMinM()).isEqualTo(7000);
@@ -449,7 +454,7 @@ class StationingRulesTest {
         StationingPolicy withClassification(StationingPolicy.SlopeClassification sc, Map<String, Double> allowances) {
             return new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
                     policy.alternative(), sc, allowances, List.of(), policy.terrainAppliesTo(), policy.exception(),
-                    policy.crossBranch(), policy.routing());
+                    policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault());
         }
     }
 
@@ -467,8 +472,61 @@ class StationingRulesTest {
             var bad = new StationingPolicy(0, DeploymentRequirement.OPTIONAL, new StationingPolicy.Leg(8000, 5000, true),
                     policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), List.of("FLAT", "FLAT", "UNKNOWN"), TerrainAppliesTo.MAX_ONLY,
                     new StationingPolicy.DistanceException(true, 0), new CrossBranch(true, List.of(), false),
-                    new Routing(StartAt.SELF, policy.routing().levels().stream().filter(l -> !l.finalStage()).toList()));
+                    new Routing(StartAt.SELF, policy.routing().levels().stream().filter(l -> !l.finalStage()).toList()), null);
             assertThat(bad.problems()).hasSize(7);
+        }
+
+        @Test
+        void theSingleClickDeploymentAreaDefaultIsOptionalAndBounded() {
+            assertThat(policy.deploymentAreaDefault()).isNull(); // not configured is a valid policy
+            assertThat(withDefault(new DeploymentAreaDefault(Shape.SQUARE, 90_000)).problems()).isEmpty();
+            assertThat(withDefault(new DeploymentAreaDefault(Shape.CIRCLE, StationingPolicy.MAX_DEPLOYMENT_AREA_DEFAULT_M2)).problems()).isEmpty();
+            // deployment areas have no footprint maximum
+            assertThat(withDefault(new DeploymentAreaDefault(Shape.SQUARE, policy.maxFootprintAreaM2() * 10)).problems()).isEmpty();
+
+            assertThat(withDefault(new DeploymentAreaDefault(null, 90_000)).problems())
+                    .containsExactly("شكل المنطقة الابتدائية لمنطقة الانتشار مطلوب (مربع أو دائرة)");
+            for (double a : new double[] {0, -1, Double.NaN}) {
+                assertThat(withDefault(new DeploymentAreaDefault(Shape.SQUARE, a)).problems()).as("" + a)
+                        .containsExactly("مساحة المنطقة الابتدائية لمنطقة الانتشار يجب أن تكون أكبر من صفر");
+            }
+            assertThat(withDefault(new DeploymentAreaDefault(Shape.CIRCLE, 25_000_001)).problems())
+                    .containsExactly("مساحة المنطقة الابتدائية لمنطقة الانتشار لا تتجاوز 25 كم² (25000000 م²): 25000001 م²");
+            assertThat(withDefault(new DeploymentAreaDefault(Shape.CIRCLE, Double.POSITIVE_INFINITY)).problems()).hasSize(1);
+        }
+
+        @Test
+        void aVersionStoredBeforeTheDeploymentAreaDefaultReadsItAsNotConfigured() {
+            Json json = new Json();
+            ObjectNode stored = (ObjectNode) json.tree(withDefault(new DeploymentAreaDefault(Shape.SQUARE, 90_000)));
+            assertThat(stored.path("deploymentAreaDefault").path("shape").asText()).isEqualTo("SQUARE");
+            assertThat(stored.path("deploymentAreaDefault").path("areaM2").asDouble()).isEqualTo(90_000);
+            stored.remove("deploymentAreaDefault"); // the jsonb of a version published before the value existed
+            StationingPolicy legacy = json.read(stored.toString(), StationingPolicy.class);
+            assertThat(legacy.deploymentAreaDefault()).isNull();
+            assertThat(legacy).isEqualTo(policy);
+            assertThat(legacy.problems()).isEmpty();
+        }
+
+        @Test
+        void theVersionChangesListTheDeploymentAreaDefault() {
+            Json json = new Json();
+            var square = withDefault(new DeploymentAreaDefault(Shape.SQUARE, 90_000));
+            var changes = StationingPolicyStore.diff(json.tree(policy), json.tree(square));
+            assertThat(changes).extracting(StationingPolicyStore.Change::key).containsExactly("deploymentAreaDefault");
+            assertThat(changes.get(0).previous().isNull()).isTrue();
+            assertThat(changes.get(0).current().path("areaM2").asDouble()).isEqualTo(90_000);
+            assertThat(StationingPolicyStore.diff(json.tree(square), json.tree(policy))).extracting(StationingPolicyStore.Change::key)
+                    .containsExactly("deploymentAreaDefault"); // removing it (back to not configured) is a change too
+            var circle = withDefault(new DeploymentAreaDefault(Shape.CIRCLE, 90_000));
+            assertThat(StationingPolicyStore.diff(json.tree(square), json.tree(circle))).hasSize(1);
+            assertThat(StationingPolicyStore.diff(json.tree(policy), json.tree(policy))).isEmpty();
+        }
+
+        StationingPolicy withDefault(DeploymentAreaDefault d) {
+            return new StationingPolicy(policy.maxFootprintAreaM2(), policy.deploymentRequirement(), policy.primary(),
+                    policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(), policy.terrainClassPriority(),
+                    policy.terrainAppliesTo(), policy.exception(), policy.crossBranch(), policy.routing(), d);
         }
     }
 

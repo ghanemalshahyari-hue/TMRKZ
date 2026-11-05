@@ -156,6 +156,91 @@ class StationingFoundationIT extends IntegrationTest {
         assertThat(audit.path("detail").path("reference").asText()).isEqualTo("قرار اختبار 1");
     }
 
+    @Test
+    @DisplayName("Policy: the single-click deployment area footprint is an optional, validated value requesters read")
+    void deploymentAreaDefault() {
+        Map<String, Object> values = policy(dataset(), List.of("ROLLING", "FLAT", "HILLY"));
+
+        // published without the value, as every version before it: not configured
+        Res v1 = publish("sysadmin", values, null);
+        assertThat(v1.status()).as(v1.toString()).isEqualTo(200);
+        int first = v1.body().path("version").path("version").asInt();
+        assertThat(v1.body().path("version").path("values").path("deploymentAreaDefault").isNull()).isTrue();
+
+        // a version stored before the value existed has no such key in its jsonb and reads it as null: no migration
+        jdbc.sql("""
+                insert into stationing_policy_version(id, version, previous_id, policy_values, effective_from, reason, created_by, created_at)
+                select gen_random_uuid(), v.version + 1, v.id, v.policy_values - 'deploymentAreaDefault', :at, 'نسخة مخزنة قبل الحقل',
+                       v.created_by, :at
+                  from stationing_policy_version v where v.version = :v""")
+                .param("at", java.sql.Timestamp.from(Instant.now())).param("v", first).update();
+        assertThat(jdbc.sql("select policy_values -> 'deploymentAreaDefault' is null from stationing_policy_version where version = :v")
+                .param("v", first + 1).query(Boolean.class).single()).isTrue();
+        JsonNode legacy = login("reqA").get("/stationing/policy").body().path("inForce");
+        assertThat(legacy.path("version").asInt()).isEqualTo(first + 1);
+        assertThat(legacy.path("values").has("deploymentAreaDefault")).isTrue();
+        assertThat(legacy.path("values").path("deploymentAreaDefault").isNull()).isTrue();
+        // a missing key and a stored null are the same value: no phantom change
+        JsonNode legacyView = null;
+        for (JsonNode h : login("sysadmin").get("/stationing/policy/versions").body()) {
+            if (h.path("version").path("version").asInt() == first + 1) {
+                legacyView = h;
+            }
+        }
+        assertThat(legacyView).isNotNull();
+        assertThat(legacyView.path("changes").size()).isZero();
+
+        // refused on the dry run and on publishing, with the reason in Arabic
+        Map<String, String> refused = new LinkedHashMap<>();
+        refused.put("{\"areaM2\":90000}", "شكل المنطقة الابتدائية لمنطقة الانتشار مطلوب");
+        refused.put("{\"shape\":\"SQUARE\",\"areaM2\":0}", "أكبر من صفر");
+        refused.put("{\"shape\":\"SQUARE\",\"areaM2\":-10}", "أكبر من صفر");
+        refused.put("{\"shape\":\"CIRCLE\",\"areaM2\":25000001}", "لا تتجاوز 25 كم²");
+        for (var c : refused.entrySet()) {
+            Map<String, Object> bad = new LinkedHashMap<>(values);
+            bad.put("deploymentAreaDefault", json.map(c.getKey()));
+            Res dry = login("sysadmin").post("/stationing/policy/validate", Map.of("values", bad));
+            assertThat(dry.status()).as(c.getKey()).isEqualTo(200);
+            assertThat(dry.body().path("ok").asBoolean()).as(c.getKey()).isFalse();
+            assertThat(dry.body().path("problems").toString()).as(c.getKey()).contains(c.getValue());
+            Res r = publish("sysadmin", bad, null);
+            assertThat(r.status()).as(c.getKey()).isEqualTo(400);
+            assertThat(r.body().path("details").path("problems").toString()).as(c.getKey()).contains(c.getValue());
+        }
+        Map<String, Object> unknownShape = new LinkedHashMap<>(values);
+        unknownShape.put("deploymentAreaDefault", Map.of("shape", "TRIANGLE", "areaM2", 90_000));
+        assertThat(publish("sysadmin", unknownShape, null).status()).isEqualTo(400);
+        Map<String, Object> overflow = new LinkedHashMap<>(values); // a number beyond double range reads as infinity
+        overflow.put("deploymentAreaDefault", Map.of("shape", "CIRCLE", "areaM2", new java.math.BigDecimal("1e400")));
+        assertThat(publish("sysadmin", overflow, null).status()).isEqualTo(400);
+        // deployment areas have no footprint maximum: a default above maxFootprintAreaM2 is valid
+        Map<String, Object> large = new LinkedHashMap<>(values);
+        large.put("deploymentAreaDefault", Map.of("shape", "CIRCLE", "areaM2", 400_000));
+        assertThat(login("sysadmin").post("/stationing/policy/validate", Map.of("values", large)).body().path("ok").asBoolean()).isTrue();
+        assertThat(publish("reqA", large, null).status()).isEqualTo(403);
+
+        // configured: a 300 m × 300 m square, published as one changed key and read back by a requester
+        Map<String, Object> square = new LinkedHashMap<>(values);
+        square.put("deploymentAreaDefault", Map.of("shape", "SQUARE", "areaM2", 90_000));
+        Res v3 = publish("sysadmin", square, null);
+        assertThat(v3.status()).as(v3.toString()).isEqualTo(200);
+        assertThat(v3.body().path("version").path("version").asInt()).isEqualTo(first + 2);
+        assertThat(v3.body().path("changes").size()).isEqualTo(1);
+        JsonNode change = v3.body().path("changes").get(0);
+        assertThat(change.path("key").asText()).isEqualTo("deploymentAreaDefault");
+        assertThat(change.path("previous").isNull()).isTrue();
+        assertThat(change.path("current").path("shape").asText()).isEqualTo("SQUARE");
+        assertThat(change.path("current").path("areaM2").asDouble()).isEqualTo(90_000);
+        JsonNode inForce = login("reqA").get("/stationing/policy").body().path("inForce");
+        assertThat(inForce.path("version").asInt()).isEqualTo(first + 2);
+        assertThat(inForce.path("values").path("deploymentAreaDefault").path("shape").asText()).isEqualTo("SQUARE");
+        assertThat(inForce.path("values").path("deploymentAreaDefault").path("areaM2").asDouble()).isEqualTo(90_000);
+        JsonNode audited = lastAudit("STATIONING_POLICY", "STATIONING_POLICY_PUBLISHED").path("detail").path("changes").get(0);
+        assertThat(audited.path("key").asText()).isEqualTo("deploymentAreaDefault");
+        assertThat(audited.path("previous").isNull()).isTrue();
+        assertThat(audited.path("new").path("shape").asText()).isEqualTo("SQUARE");
+    }
+
     // ---- terrain -------------------------------------------------------------------------------------
 
     @Test

@@ -19,6 +19,10 @@ import java.util.Set;
  * gradients as the initial values), and the allowance of each class is a separate administrator value in
  * {@link #terrainAllowancesM}; no allowance is ever assumed. The allowance extends the maximum only (O-06).
  *
+ * <p>The initial footprint of a deployment area placed by a single map click is {@link #deploymentAreaDefault} (owner
+ * decision, 5 Nov 2026): an administrator value like every other, never a size in client code. It is the last component
+ * and nullable so versions stored before it read it as null («not configured») without a migration.
+ *
  * <p>Versioning, effective dating, author, reason and reference belong to the stored version
  * ({@code stationing_policy_version}, {@link StationingPolicyStore}); this record is the value set of one version.
  */
@@ -33,7 +37,8 @@ public record StationingPolicy(
         TerrainAppliesTo terrainAppliesTo,
         DistanceException exception,
         CrossBranch crossBranch,
-        Routing routing) {
+        Routing routing,
+        DeploymentAreaDefault deploymentAreaDefault) {
 
     /** `stationing_areas_requirement`: both deployment areas, or none or both. */
     public enum DeploymentRequirement { REQUIRED, OPTIONAL }
@@ -49,6 +54,19 @@ public record StationingPolicy(
 
     /** O-09: the first stage is the requesting unit's own approver (default) or its direct parent's. */
     public enum StartAt { SELF, PARENT }
+
+    /**
+     * Upper bound of {@link DeploymentAreaDefault#areaM2()}: 25 km². Deployment areas have no footprint maximum, so this
+     * is not a rule of the model, only a guard against a mistyped value drawing an absurd starting shape.
+     */
+    public static final double MAX_DEPLOYMENT_AREA_DEFAULT_M2 = 25_000_000;
+
+    /** The shape a single click draws; CIRCLE is drawn by the client as a regular 16-vertex polygon of the same area. */
+    public enum Shape { SQUARE, CIRCLE }
+
+    /** The initial footprint of a deployment area placed by a single map click: its shape and area in m². */
+    public record DeploymentAreaDefault(Shape shape, double areaM2) {
+    }
 
     /** One deployment relation: stationing site → primary, primary → alternative (centre to centre, O-04). */
     public record Leg(double minM, double maxM, boolean terrainApplies) {
@@ -151,6 +169,18 @@ public record StationingPolicy(
         }
         if (routing.levels().stream().noneMatch(RoutingLevel::finalStage)) {
             out.add("لا مستوى نهائي في إعداد المسار");
+        }
+        if (deploymentAreaDefault != null) { // absent is valid: not configured
+            if (deploymentAreaDefault.shape() == null) {
+                out.add("شكل المنطقة الابتدائية لمنطقة الانتشار مطلوب (مربع أو دائرة)");
+            }
+            double a = deploymentAreaDefault.areaM2();
+            if (!(a > 0)) {
+                out.add("مساحة المنطقة الابتدائية لمنطقة الانتشار يجب أن تكون أكبر من صفر");
+            } else if (a > MAX_DEPLOYMENT_AREA_DEFAULT_M2) { // JSON 1e400 reads as infinity, which BigDecimal refuses
+                out.add("مساحة المنطقة الابتدائية لمنطقة الانتشار لا تتجاوز 25 كم² (25000000 م²): "
+                        + (Double.isInfinite(a) ? "∞" : BigDecimal.valueOf(a).toPlainString()) + " م²");
+            }
         }
         return out;
     }

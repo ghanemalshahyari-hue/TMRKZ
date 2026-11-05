@@ -105,7 +105,8 @@ final class StationingFixtures {
                         new RoutingLevel(9, true, "معتمد الشعبة", false, EnumSet.of(Fact.SCOPE, Fact.CLASSIFICATION, Fact.DURATION)),
                         new RoutingLevel(8, true, "معتمد القسم", false, EnumSet.of(Fact.SCOPE, Fact.CLASSIFICATION, Fact.DURATION)),
                         new RoutingLevel(7, true, "معتمد وسيط — الإدارة", false, EnumSet.of(Fact.SCOPE, Fact.SITE, Fact.DEPLOYMENT, Fact.AVAILABILITY)),
-                        new RoutingLevel(6, true, "المعتمد النهائي", true, Set.of()))));
+                        new RoutingLevel(6, true, "المعتمد النهائي", true, Set.of()))),
+                null); // the single-click deployment area footprint: not configured, as in a version stored before it
     }
 
     /** Allowances of the test policy only (in production every value is the administrator's; none is assumed). */
