@@ -282,6 +282,51 @@ class StationingFoundationIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("Current stationing carries its site's place for a readable unit only, and opens nothing of the site (owner, 5 Nov 2026)")
+    void currentStationingCarriesTheSitePlace() {
+        // a site registered the way activation registers one: a boundary and no responsible organisation
+        UUID registered = UUID.randomUUID();
+        jdbc.sql("insert into site(id, code, name, kind, lat, lng) values (:id, :c, 'موقع سجّله التفعيل', 'موقع', 24.305, 54.305)")
+                .param("id", registered).param("c", "ACT-" + sfx).update();
+        jdbc.sql("""
+                insert into site_geometry_version(id, site_id, version, geojson, crs, source, valid_from, geom, geometry_type, original_format)
+                select :g, :s, 1, ST_AsGeoJSON(x.geom)::jsonb, 'EPSG:4326', 'تفعيل طلب إعادة تمركز (اختبار)', now(), x.geom, 'Polygon', 'GEOJSON'
+                  from (select ST_GeomFromText('POLYGON((54.30 24.30, 54.31 24.30, 54.31 24.31, 54.30 24.31, 54.30 24.30))', 4326) as geom) x""")
+                .param("g", UUID.randomUUID()).param("s", registered).update();
+        jdbc.sql("update site set geometry_version = 1 where id = :s").param("s", registered).update();
+        assertThat(jdbc.sql("select count(*) from site_responsibility where site_id = :s").param("s", registered).query(Long.class).single()).isZero();
+        Api corr = login("corrA");
+        Res siteBefore = corr.get("/sites/" + registered);
+        boolean drawnBefore = corr.get("/map/features").body().path("features").toString().contains(registered.toString());
+        assertThat(corr.post("/stationing/corrections", Map.of("organizationId", orgA, "siteId", registered,
+                "reason", "تمركز في موقع سجّله التفعيل")).status()).isEqualTo(200);
+
+        // 1 and 4: the reader of unit A's stationing gets the site's boundary with it, although no organisation is responsible
+        JsonNode current = corr.get("/stationing/current?orgId=" + orgA).body();
+        assertThat(current.size()).isEqualTo(1);
+        JsonNode place = current.get(0).path("siteGeometry");
+        assertThat(place.path("type").asText()).isEqualTo("Polygon");
+        assertThat(place.path("coordinates").get(0).size()).isEqualTo(5);
+        assertThat(corr.get("/stationing/current?siteId=" + registered).body().get(0).path("siteGeometry").path("type").asText()).isEqualTo("Polygon");
+
+        // 2: whoever may not read unit A's stationing obtains neither the record nor the place
+        assertThat(login("viewB").get("/stationing/current?orgId=" + orgA).body().size()).isZero();
+        assertThat(login("viewB").get("/stationing/current?siteId=" + registered).body().size()).isZero();
+        Res nobody = login("nobody").get("/stationing/current?siteId=" + registered);
+        assertThat(nobody.status() == 403 || nobody.body().size() == 0).as(nobody.toString()).isTrue();
+
+        // 3: the place of a readable stationing is not access to the site: the register and the map answer as before
+        Res siteAfter = corr.get("/sites/" + registered);
+        assertThat(siteAfter.status()).isEqualTo(siteBefore.status());
+        assertThat(siteAfter.body() == null ? null : siteAfter.body().path("view").asText(null))
+                .isEqualTo(siteBefore.body() == null ? null : siteBefore.body().path("view").asText(null));
+        assertThat(corr.get("/map/features").body().path("features").toString().contains(registered.toString())).isEqualTo(drawnBefore);
+        assertThat(login("viewB").get("/sites/" + registered).status()).isIn(403, 404);
+        // the history keeps its own facts; only the current read carries a place
+        assertThat(corr.get("/stationing/organizations/" + orgA + "/history").body().get(0).path("siteGeometry").isNull()).isTrue();
+    }
+
+    @Test
     @DisplayName("Links: own permission, never stationing or occupancy, published and ended with a reason")
     void linksAreNotStationing() {
         Api link = login("linkA");

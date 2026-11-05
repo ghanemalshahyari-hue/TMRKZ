@@ -16,6 +16,7 @@ import ae.mover.access.Permission;
 import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
 import ae.mover.common.Db;
+import ae.mover.common.Json;
 
 /**
  * Authoritative stationing ({@code org_stationing}, V3 §1.4.3) and site ↔ unit links ({@code site_link}, §6) — two
@@ -28,10 +29,16 @@ import ae.mover.common.Db;
 @Service
 public class StationingRegister {
 
+    /**
+     * @param siteGeometry the site's registered boundary, or its display marker, as GeoJSON — only in the current-stationing
+     *                     read, for a unit whose stationing this actor may read (owner decision of 5 Nov 2026). It is the
+     *                     place of that stationing, not access to the site: the site register and the map keep their own
+     *                     visibility, and a site registered by activation has no responsible organisation to give it.
+     */
     public record StationingRecord(UUID id, UUID orgId, String orgCode, String orgName, String orgExternalId, UUID siteId,
                                    String siteCode, String siteName, String kind, UUID baseId, Instant validFrom, Instant validTo,
                                    Instant plannedEnd, String origin, UUID requestId, String reason, String reference,
-                                   String endReason, Instant recordedAt) {
+                                   String endReason, Instant recordedAt, Map<String, Object> siteGeometry) {
     }
 
     public record SiteLinkRecord(UUID id, UUID siteId, String siteName, UUID orgId, String orgName, String orgExternalId,
@@ -48,12 +55,14 @@ public class StationingRegister {
     }
 
     private final JdbcClient jdbc;
+    private final Json json;
     private final AuditService audit;
     private final StationingOutbox outbox;
     private final StationingPolicyStore policies;
 
-    public StationingRegister(JdbcClient jdbc, AuditService audit, StationingOutbox outbox, StationingPolicyStore policies) {
+    public StationingRegister(JdbcClient jdbc, Json json, AuditService audit, StationingOutbox outbox, StationingPolicyStore policies) {
         this.jdbc = jdbc;
+        this.json = json;
         this.audit = audit;
         this.outbox = outbox;
         this.policies = policies;
@@ -61,7 +70,11 @@ public class StationingRegister {
 
     // ---- reads ---------------------------------------------------------------------------------------
 
-    /** Current stationing (permanent, and a temporary one in force) of the units this actor may read. */
+    /**
+     * Current stationing (permanent, and a temporary one in force) of the units this actor may read, each with the place of
+     * its site ({@code siteGeometry}) so the re-stationing map can draw where a readable unit is — also a site registered
+     * by activation, which has no responsible organisation. Records of other units are dropped before anything is returned.
+     */
     public List<StationingRecord> current(AccessContext ctx, UUID orgId, UUID siteId, Instant at) {
         String where = "where s.valid_from <= :at and (s.valid_to is null or s.valid_to > :at) and s.start_held_at is null"
                 + (orgId == null ? "" : " and s.organization_id = :org") + (siteId == null ? "" : " and s.site_id = :site");
@@ -73,7 +86,7 @@ public class StationingRegister {
         if (siteId != null) {
             p.put("site", siteId);
         }
-        return records(where + " order by o.code, s.kind", p).stream().filter(r -> readable(ctx, r.orgId())).toList();
+        return records(where + " order by o.code, s.kind", p, true).stream().filter(r -> readable(ctx, r.orgId())).toList();
     }
 
     /** The full stationing history of one unit (nothing is deleted). */
@@ -269,17 +282,25 @@ public class StationingRegister {
     }
 
     private List<StationingRecord> records(String where, Map<String, ?> params) {
-        return jdbc.sql("""
-                select s.id, s.organization_id, o.code as org_code, o.name as org_name, o.source_external_id, s.site_id,
-                       si.code as site_code, si.name as site_name, s.kind, s.base_id, s.valid_from, s.valid_to, s.planned_end,
-                       s.origin, s.request_id, s.reason, s.reference, s.end_reason, s.recorded_at
-                  from org_stationing s join organization o on o.id = s.organization_id join site si on si.id = s.site_id
-                """ + where).params(params)
+        return records(where, params, false);
+    }
+
+    /** @param withPlace adds the site's current boundary (or marker) as GeoJSON; only the current-stationing read asks. */
+    private List<StationingRecord> records(String where, Map<String, ?> params, boolean withPlace) {
+        String sql = "select s.id, s.organization_id, o.code as org_code, o.name as org_name, o.source_external_id, s.site_id,"
+                + " si.code as site_code, si.name as site_name, s.kind, s.base_id, s.valid_from, s.valid_to, s.planned_end,"
+                + " s.origin, s.request_id, s.reason, s.reference, s.end_reason, s.recorded_at,"
+                + (withPlace ? " ST_AsGeoJSON(coalesce(gv.geom, si.marker)) as site_geometry" : " null::text as site_geometry")
+                + " from org_stationing s join organization o on o.id = s.organization_id join site si on si.id = s.site_id"
+                + (withPlace ? " left join site_geometry_version gv on gv.site_id = si.id and gv.version = si.geometry_version" : "")
+                + " " + where;
+        return jdbc.sql(sql).params(params)
                 .query((rs, n) -> new StationingRecord(Db.uuid(rs, "id"), Db.uuid(rs, "organization_id"), rs.getString("org_code"),
                         rs.getString("org_name"), rs.getString("source_external_id"), Db.uuid(rs, "site_id"), rs.getString("site_code"),
                         rs.getString("site_name"), rs.getString("kind"), Db.uuid(rs, "base_id"), Db.instant(rs, "valid_from"),
                         Db.instant(rs, "valid_to"), Db.instant(rs, "planned_end"), rs.getString("origin"), Db.uuid(rs, "request_id"),
-                        rs.getString("reason"), rs.getString("reference"), rs.getString("end_reason"), Db.instant(rs, "recorded_at")))
+                        rs.getString("reason"), rs.getString("reference"), rs.getString("end_reason"), Db.instant(rs, "recorded_at"),
+                        rs.getString("site_geometry") == null ? null : json.map(rs.getString("site_geometry"))))
                 .list();
     }
 
