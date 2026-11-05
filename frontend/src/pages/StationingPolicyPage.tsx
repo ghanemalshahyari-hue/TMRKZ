@@ -42,6 +42,7 @@ function blank(classes: StationingPolicyValues['terrainSlopeClassification']['cl
     exception: { allowed: false, maxExtraM: 0 },
     crossBranch: { allowed: false, authorities: [], independent: false },
     routing: { startAt: 'SELF', levels: levels.map((l) => ({ level: l.level, approves: false, label: '', finalStage: false, dependsOn: [] })) },
+    deploymentAreaDefault: null,
   };
 }
 
@@ -71,7 +72,9 @@ export function StationingPolicyPage() {
     setHistory(hist);
     setLevels(lv);
     setDatasets(ds);
-    setValues(ov.inForce ? structuredClone(ov.inForce.values) : blank(ov.initialSlopeClasses, ds[0], lv));
+    // a version published before the single-click footprint existed may lack the key: keep it on the page as «not
+    // configured» so a JSON import can still set it (the import only takes keys the page already has)
+    setValues(ov.inForce ? { ...structuredClone(ov.inForce.values), deploymentAreaDefault: ov.inForce.values.deploymentAreaDefault ?? null } : blank(ov.initialSlopeClasses, ds[0], lv));
   };
   useEffect(() => {
     load().catch((e: Error) => app.toast(e.message));
@@ -137,6 +140,8 @@ export function StationingPolicyPage() {
 
   const km = (m: number) => (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 2 }) + ' كم';
   const num = (v: string) => (v === '' ? 0 : Number(v));
+  const areaDefault = values.deploymentAreaDefault ?? null;
+  const metres = (m: number) => m.toLocaleString('ar-AE', { maximumFractionDigits: 0 }) + ' م';
 
   return (
     <>
@@ -183,6 +188,25 @@ export function StationingPolicyPage() {
             الحد الأقصى لمساحة الموقع المقترح (م²)
             <input type="number" min={0} value={values.maxFootprintAreaM2} onChange={(e) => set({ maxFootprintAreaM2: num(e.target.value) })} />
           </label>
+          {/* no size is assumed: «غير محددة» until the administrator enters one; the server checks it (0 < area ≤ 25 كم²) */}
+          <fieldset className="rs-inline">
+            <legend>المنطقة الابتدائية لمنطقة الانتشار (عند وضعها بنقرة)</legend>
+            <label><input type="checkbox" checked={!areaDefault} onChange={(e) => set({ deploymentAreaDefault: e.target.checked ? null : { shape: 'SQUARE', areaM2: 0 } })} /> غير محددة</label>
+            <label>
+              الشكل
+              <select disabled={!areaDefault} value={areaDefault?.shape ?? 'SQUARE'} onChange={(e) => areaDefault && set({ deploymentAreaDefault: { ...areaDefault, shape: e.target.value as 'SQUARE' | 'CIRCLE' } })}>
+                <option value="SQUARE">مربع</option>
+                <option value="CIRCLE">دائرة</option>
+              </select>
+            </label>
+            <label>المساحة (م²) <input type="number" min={0} disabled={!areaDefault} value={areaDefault?.areaM2 ?? ''} placeholder="—" onChange={(e) => areaDefault && set({ deploymentAreaDefault: { ...areaDefault, areaM2: num(e.target.value) } })} /></label>
+            {areaDefault && areaDefault.areaM2 > 0 && (
+              <span className="muted">
+                {/* the circle is drawn as a regular 16-vertex polygon of this area: its centre-to-vertex distance */}
+                {areaDefault.shape === 'SQUARE' ? 'الضلع ≈ ' + metres(Math.sqrt(areaDefault.areaM2)) : 'مضلع منتظم بـ16 رأساً، نصف قطره ≈ ' + metres(Math.sqrt((2 * areaDefault.areaM2) / (16 * Math.sin(Math.PI / 8))))}
+              </span>
+            )}
+          </fieldset>
         </section>
 
         <section className="card rs-form">

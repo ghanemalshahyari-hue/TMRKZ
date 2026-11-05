@@ -1,0 +1,54 @@
+/*
+ * The accepted Stationing footprint editor's on-map look (retired Leaflet page, styles/stationing.css «footprint preview
+ * (approved polygon prototype, 2 Nov 2026)»), carried over rule for rule onto the MapLibre editor (owner, 5 Nov 2026).
+ * Colours are the old page's tokens resolved: green #21886b, red #c5625f, ink #263b40, accent #137c68.
+ */
+.stw-ml { width: 0; height: 0; direction: ltr; }
+.stw-ml.stw-edge-wrap, .stw-ml.stw-dist { pointer-events: none; }
+
+/* the proposal's identity mark: the organisation's symbol (or a neutral pin) with the «مقترح» tag — also a drag handle */
+.stw-prop-sym, .stw-orig-sym { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; pointer-events: auto; }
+.stw-prop-sym { cursor: grab; flex-direction: column-reverse; transform: translate(-50%, -62%); touch-action: none; }
+.stw-orig-sym { transform: translate(-50%, -38%); pointer-events: none; }
+.stw-prop-sym .lbl, .stw-orig-sym .lbl { font-size: 10.5px; font-weight: 600; background: #fff; border: 1px solid #cfe3da; border-radius: 6px; padding: 0 6px; white-space: nowrap; box-shadow: 0 2px 6px #19363822; direction: rtl; color: #263b40; line-height: 1.6; }
+.stw-prop-sym .lbl { background: #21886b; border-color: #21886b; color: #fff; }
+.stw-prop-sym.bad .lbl { background: #c5625f; border-color: #c5625f; }
+.stw-orig-sym .lbl { border-color: #b9cde6; color: #2f6db0; }
+.stw-sym-img { width: 46px; height: auto; filter: drop-shadow(0 2px 3px #0004); }
+.stw-ml .stw-pin { position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50% 50% 50% 4px; transform: rotate(-45deg); border: 3px solid #fff; box-shadow: 0 4px 14px #0004; color: #fff; margin-bottom: 6px; }
+.stw-ml .stw-pin i { transform: rotate(45deg); font-style: normal; font-size: 14px; }
+.stw-ml .stw-pin.green { background: #21886b; }
+.stw-ml .stw-pin.blue { background: #2f6db0; }
+.stw-prop-sym.bad .stw-pin { background: #c5625f; }
+
+/* numbered vertex handles and the length of each side */
+.stw-vtx { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 2px solid #21886b; color: #21886b; font: 700 10.5px/1 Arial, sans-serif; cursor: move; box-shadow: 0 1px 4px #0003; touch-action: none; }
+.stw-vtx.on { background: #21886b; color: #fff; box-shadow: 0 0 0 4px #21886b40, 0 1px 4px #0003; }
+.stw-vtx.first { cursor: pointer; }
+.stw-vtx.first.closable { box-shadow: 0 0 0 4px #21886b55, 0 1px 4px #0003; }
+.stw-vtx.static { cursor: default; }
+.stw-edge { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); font-size: 10px; background: #ffffffde; border-radius: 5px; padding: 0 4px; white-space: nowrap; color: #2c4a4f; direction: rtl; font-family: inherit; line-height: 1.6; }
+
+/* the distance from the current site, on the connector — information only (no verdict colour) */
+.stw-dist span { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); background: #16324f; color: #fff; font-weight: 700; font-size: 12px; border-radius: 7px; padding: 3px 9px; white-space: nowrap; box-shadow: 0 3px 10px #0003; border: 2px solid #fff; direction: rtl; }
+
+/* cursors: drawing places vertices; a drag holds the pointer */
+.stw-drawing .maplibregl-canvas { cursor: crosshair !important; }
+.stw-dragging, .stw-dragging * { cursor: grabbing !important; user-select: none; }
+
+/* the map's own controls (old page: zoom in / out, the proposal, both sites) */
+.stw-zoom { position: absolute; z-index: 5; top: 50%; transform: translateY(-50%); inset-inline-end: 12px; display: flex; flex-direction: column; gap: 6px; }
+.stw-zoom button { width: 36px; height: 36px; border: 1px solid #e3e9e8; background: #fff; border-radius: 9px; font-size: 17px; line-height: 1; box-shadow: 0 2px 8px #1936381a; color: #263b40; cursor: pointer; display: grid; place-items: center; padding: 0; }
+.stw-zoom button:hover { background: #f1f7f4; }
+.stw-zoom button:disabled { opacity: 0.45; cursor: default; }
+/* the proposal still on the current site: only the current site's name tag, below the proposal's symbol */
+.stw-current.near .stw-orig-sym > :not(.lbl) { display: none; }
+.stw-current.near .stw-orig-sym { transform: translate(-50%, 26px); }
+/* the scale bar (old page: .leaflet-control-scale-line) */
+.tz-mapframe .maplibregl-ctrl-scale { border: 2px solid #263b40; border-top: 0; background: #ffffffcc; color: #263b40; font-size: 11px; line-height: 1.4; padding: 0 5px; direction: ltr; margin: 0 10px 26px 0; }
+/* a deployment leg: inside its band green, outside red (the old editor's chip colours; the server decides on save) */
+.stw-dist.y span { background: #21886b; }
+.stw-dist.n span { background: #c5625f; }
+.stw-dist.w span { background: #b7791f; }
+/* «تحديد الموقع على الخريطة» / «تحديد المنطقة على الخريطة»: the next click places the shape */
+.stw-picking .maplibregl-canvas { cursor: crosshair !important; }

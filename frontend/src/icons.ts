@@ -18,5 +18,20 @@ export const ICONS: Record<string, string> = {
   "close": "<path d=\"m6 6 12 12M6 18 18 6\"/>",
   "building": "<path d=\"M5 21V3h14v18M2 21h20M9 7h1m4 0h1m-6 4h1m4 0h1m-6 4h1m4 0h1M10 21v-3h4v3\"/>",
   "shield": "<path d=\"m12 2 9 4v6c0 5-9 10-9 10S3 17 3 12V6Z\"/><path d=\"m8 12 3 3 5-6\"/>",
-  "external": "<path d=\"M14 3h7v7M21 3 10 14M10 4H3v17h17v-7\"/>"
+  "external": "<path d=\"M14 3h7v7M21 3 10 14M10 4H3v17h17v-7\"/>",
+  // added for the operational shell (owner brief «FULL APPLICATION UI REBUILD», 5 Nov 2026)
+  "home": "<path d=\"M3 11 12 4l9 7\"/><path d=\"M5 10v10h5v-6h4v6h5V10\"/>",
+  "chart": "<path d=\"M4 20V10M10 20V4M16 20v-7M22 20H2\"/>",
+  "route": "<circle cx=\"6\" cy=\"18\" r=\"2.5\"/><circle cx=\"18\" cy=\"6\" r=\"2.5\"/><path d=\"M8.5 18H15a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h6.5\"/>",
+  "link": "<path d=\"M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1\"/><path d=\"M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1\"/>",
+  "boundary": "<path d=\"M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3\"/><path d=\"m9 15 1.5-4.5L15 9l-1.5 4.5L9 15Z\"/>",
+  "user": "<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6\"/>",
+  "logout": "<path d=\"M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3\"/><path d=\"M10 17 5 12l5-5M5 12h11\"/>",
+  "menu": "<path d=\"M4 7h16M4 12h16M4 17h16\"/>",
+  "chevron": "<path d=\"m6 9 6 6 6-6\"/>",
+  "units": "<rect x=\"9\" y=\"3\" width=\"6\" height=\"5\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"6\" height=\"5\" rx=\"1\"/><rect x=\"15\" y=\"16\" width=\"6\" height=\"5\" rx=\"1\"/><path d=\"M12 8v4M6 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2\"/>",
+  "panel": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M15 4v16\"/>",
+  "target": "<circle cx=\"12\" cy=\"12\" r=\"8\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3\"/>",
+  "lock": "<rect x=\"5\" y=\"11\" width=\"14\" height=\"10\" rx=\"2\"/><path d=\"M8 11V8a4 4 0 0 1 8 0v3\"/>",
+  "folder": "<path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z\"/>",
 };

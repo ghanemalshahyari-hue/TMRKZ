@@ -1,14 +1,17 @@
-import { Fragment, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, onUnauthorized } from './api/client';
-import type {Me, Notification, OrgNode, Permission, RequestType, Settings, Site } from './api/types';
+import type { Me, OrgNode, Permission, RequestType, Settings, Site } from './api/types';
 import { RequestWizard } from './components/RequestWizard';
-import { Icon, NoAccess, ScreenBoundary } from './components/ui';
+import { TopNavigation } from './components/shell/TopNavigation';
+import { NoAccess, ScreenBoundary } from './components/ui';
 import { AppContext, NAV, flattenOrgs, type AppContextValue, type View, type WizardRequest } from './lib/app';
-import { fullTime, todayDubai } from './lib/dates';
+import { todayDubai } from './lib/dates';
 import { clearMapContexts } from './lib/mapState';
+import { moreNav, primaryNav, restriction } from './lib/navigation';
 import { AuditPage } from './pages/AuditPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { DocsPage } from './pages/DocsPage';
+import { HomePage } from './pages/HomePage';
 import { FormStudio } from './pages/FormStudio';
 import { LoginPage } from './pages/LoginPage';
 import { OrgPage } from './pages/OrgPage';
@@ -16,7 +19,7 @@ import { PermissionsPage } from './pages/PermissionsPage';
 import { RequestsPage } from './pages/RequestsPage';
 import { ReviewPage } from './pages/ReviewPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { StationingPage } from './pages/StationingPage';
+import { SitesPage } from './pages/SitesPage';
 import { WorkflowStudio } from './pages/WorkflowStudio';
 
 // Stationing V3 (behind VITE_STATIONING_V3): loaded on demand, so the offline map code is a separate chunk
@@ -25,30 +28,16 @@ const RestationingPage = lazy(() => import('./pages/RestationingPage').then((m) 
 
 const POLL_MS = 30_000;
 
-/** The retired «الخريطة والمرافق» route and any unknown one open «مساحة التمركز»; the address shows the real route. */
+/**
+ * The address names the view. An empty address opens the home dashboard; the retired «الخريطة والمرافق» route and any
+ * unknown one open «المواقع» (#stationing), and the address shows the real route.
+ */
 function viewFromHash(): View {
   const next = location.hash.replace('#', '').split('/')[0];
+  if (next === 'home' || !next) return 'home';
   if (NAV.some(([id]) => id === next)) return next as View;
-  if (next) history.replaceState(null, '', '#stationing');
+  history.replaceState(null, '', '#stationing');
   return 'stationing';
-}
-
-/** Server-enforced permissions decide what each screen shows; this mirrors them for navigation only. */
-function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: boolean): boolean {
-  if (view === 'docs') return false;
-  if (['workflow', 'forms', 'settings'].includes(view)) return !can('CONFIGURE');
-  if (view === 'permissions') return !can('MANAGE_ACCESS');
-  if (view === 'org') return !(can('VIEW') || can('MANAGE_ACCESS') || can('MANAGE_FACILITIES') || can('CONFIGURE'));
-  if (['stationing', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
-  if (view === 'stationingPolicy') return !can('CONFIGURE');
-  // the lifecycle rights (ADR-034) open the page too: their holders decide the requests they act on
-  if (view === 'restationing')
-    return !(['VIEW', 'CREATE_RESTATIONING', 'APPROVE', 'ACTIVATE_STATIONING', 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION', 'DECIDE_PRE_ACTIVATION_CANCELLATION',
-      'ACTIVATE_TEMPORARY_EXTENSION', 'DECIDE_EARLY_RETURN', 'DECIDE_BEFORE_START_CANCELLATION'] as Permission[]).some((p) => can(p));
-  if (summaryOnly) return true;
-  if (view === 'review') return !can('REVIEW');
-  if (view === 'audit') return !can('AUDIT');
-  return !(can('VIEW') || can('CREATE'));
 }
 
 export function App() {
@@ -192,7 +181,8 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
   };
 
   const pages: Record<View, () => ReactNode> = {
-    stationing: () => <StationingPage />,
+    home: () => <HomePage />,
+    stationing: () => <SitesPage />,
     stationingPolicy: () => (
       <Suspense fallback={<div className="empty">جارٍ التحميل…</div>}>
         <StationingPolicyPage />
@@ -214,104 +204,10 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     audit: () => <AuditPage />,
     docs: () => <DocsPage />,
   };
-  const title = NAV.find(([id]) => id === view)?.[2] ?? 'مساحة العمل';
-
-  return (
-    <AppContext.Provider value={ctx}>
-      <div className="demo-ribbon">
-        <span>
-          <i /> TMRKZ · تشغيل داخل شبكة معزولة
-        </span>
-        <a href="#docs">التوثيق والتشغيل ↖</a>
-        <a href="/docs/handoff/START_HERE.md">حزمة التسليم الأصلية ↓</a>
-      </div>
-      <aside id="sidebar" className="sidebar">
-        <a className="brand" href="#stationing">
-          <span className="brand-logo">
-            <Icon name="map" />
-          </span>
-          <span>
-            <strong>
-              TMRKZ<span>.</span>
-            </strong>
-            <small>المواقع · المرافق · الإجراءات</small>
-          </span>
-        </a>
-        <div className="workspace-label">
-          <span className="workspace-icon">م</span>
-          <span>
-            <b>مجمع المؤسسة</b>
-            <small>{me.primaryOrg?.name ?? 'مساحة عمل تشغيلية'}</small>
-          </span>
-          <span className="workspace-caret">⌄</span>
-        </div>
-        <span className="nav-section">مساحة العمل</span>
-        <nav id="navigation" aria-label="القائمة الرئيسية">
-          {NAV.map(([id, ico, label]) => (
-            <Fragment key={id}>
-              {id === 'workflow' && <div className="nav-divider" />}
-              <a className={'nav-item ' + (view === id ? 'active' : '')} href={'#' + id}>
-                <Icon name={ico} />
-                <span>{label}</span>
-                {id === 'review' && <span className="nav-count">{counts.tasks}</span>}
-                {id === 'requests' && <span className="nav-count">{counts.submitted}</span>}
-              </a>
-            </Fragment>
-          ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="environment-dot" />
-          <span>
-            خادم محلي داخل الشبكة
-            <br />
-            <small>الحفظ في قاعدة البيانات · {me.timezone}</small>
-          </span>
-          <span className="version">v1.0</span>
-        </div>
-      </aside>
-      <button id="navShade" className="nav-shade" aria-label="إغلاق القائمة" onClick={() => setNavOpen(false)} hidden={!navOpen} />
-      <div className="app-shell">
-        <header className="app-header">
-          <button className="icon-button mobile-menu" onClick={() => setNavOpen((o) => !o)} aria-label="فتح القائمة">
-            ☰
-          </button>
-          <div className="breadcrumb">
-            <span>مجمع المؤسسة</span>
-            <i>/</i>
-            <b id="breadcrumbTitle">{title}</b>
-          </div>
-          <div className="header-actions">
-            <Notifications />
-            <a className="text-link handoff-link" href="#docs">
-              دليل التشغيل
-            </a>
-            <button className="button primary compact" onClick={() => ctx.openWizard({ origin: 'LIST', layout: 'dialog' })} disabled={!can('CREATE')}>
-              <span>＋</span>طلب جديد
-            </button>
-            <IdentitySwitch me={me} setMe={setMe} onSwitched={bump} toast={toast} />
-            <span className="avatar" id="roleAvatar" title={me.displayName}>
-              {me.initials}
-            </span>
-          </div>
-        </header>
-        <main id="main" tabIndex={-1}>
-          <ScreenBoundary resetKey={view}>{restriction(view, can, me.summaryOnly) ? <NoAccess /> : pages[view]()}</ScreenBoundary>
-        </main>
-        <footer className="app-footer">
-          <span>TMRKZ / FACILITIES WORKSPACE</span>
-          <span>إدارة مرافق وموافقات إدارية · خادم وقاعدة بيانات وسجل تدقيق داخل الشبكة</span>
-        </footer>
-      </div>
-      <RequestWizard request={wizard} update={wizardUpdate} onUpdateHandled={() => setWizardUpdate(null)} onClose={() => (setWizard(null), setWizardUpdate(null))} />
-      <div id="toast" className="toast" role="status" hidden={!toastMsg}>
-        {toastMsg}
-      </div>
-    </AppContext.Provider>
-  );
-}
-
-/** The signed-in identity and logout (which also ends the identity provider's session). */
-function IdentitySwitch({ me, setMe }: { me: Me; setMe: (m: Me | null) => void; onSwitched: () => void; toast: (m: string) => void }) {
+  const links = useMemo(() => primaryNav(can, me.summaryOnly), [can, me.summaryOnly]);
+  const more = useMemo(() => moreNav(can, me.summaryOnly), [can, me.summaryOnly]);
+  // the operational views fill the screen below the top bar; every other page keeps its own layout inside the shell
+  const console = view === 'home' || view === 'restationing' || view === 'stationing';
   const logout = async () => {
     let target = '/';
     try {
@@ -322,71 +218,21 @@ function IdentitySwitch({ me, setMe }: { me: Me; setMe: (m: Me | null) => void; 
       window.location.assign(target);
     }
   };
-  return (
-    <div className="role-switch">
-      <label>{me.primaryRole?.name ?? 'المستخدم'}</label>
-      <span className="identity-name">{me.displayName}</span>
-      <button className="text-link link-button" onClick={logout}>
-        خروج
-      </button>
-    </div>
-  );
-}
 
-function Notifications() {
-  const [items, setItems] = useState<Notification[]>([]);
-  const [open, setOpen] = useState(false);
-  const load = useCallback(() => {
-    api
-      .notifications()
-      .then(setItems)
-      .catch(() => setItems([]));
-  }, []);
-  useEffect(() => {
-    load();
-    const t = window.setInterval(load, POLL_MS);
-    return () => window.clearInterval(t);
-  }, [load]);
-  const unread = items.filter((n) => !n.readAt).length;
-  const read = async (n: Notification) => {
-    if (!n.readAt) {
-      try {
-        await api.markRead(n.id);
-      } catch {
-        /* ignore */
-      }
-      load();
-    }
-    if (n.requestId) {
-      setOpen(false);
-      location.hash = 'requests';
-    }
-  };
   return (
-    <div className="notif-wrap">
-      <button className="icon-button" aria-label={'الإشعارات' + (unread ? ' — ' + unread + ' غير مقروءة' : '')} onClick={() => setOpen((o) => !o)}>
-        <Icon name="bell" />
-        {unread > 0 && <span className="notif-badge">{unread}</span>}
-      </button>
-      {open && (
-        <div className="card notif-pop" role="dialog" aria-label="الإشعارات">
-          <div className="flex spread">
-            <h3>الإشعارات</h3>
-            <span className="pill">{items.length}</span>
-          </div>
-          {items.length ? (
-            items.slice(0, 20).map((n) => (
-              <button key={n.id} className={'notif-item ' + (n.readAt ? '' : 'unread')} onClick={() => read(n)}>
-                <b>{n.title}</b>
-                <small>{n.body}</small>
-                <small className="muted">{fullTime(n.createdAt)}</small>
-              </button>
-            ))
-          ) : (
-            <p className="micro muted">لا توجد إشعارات.</p>
-          )}
-        </div>
-      )}
-    </div>
+    <AppContext.Provider value={ctx}>
+      <div className={'tz-app' + (console ? ' is-console' : ' is-page')} data-view={view}>
+        <a className="tz-skip" href="#main">تخطي إلى المحتوى</a>
+        <TopNavigation me={me} view={view} links={links} more={more} onLogout={logout} navOpen={navOpen} setNavOpen={setNavOpen} />
+        <button id="navShade" className="nav-shade" aria-label="إغلاق القائمة" onClick={() => setNavOpen(false)} hidden={!navOpen} />
+        <main id="main" className="tz-main" tabIndex={-1}>
+          <ScreenBoundary resetKey={view}>{restriction(view, can, me.summaryOnly) ? <NoAccess /> : pages[view]()}</ScreenBoundary>
+        </main>
+      </div>
+      <RequestWizard request={wizard} update={wizardUpdate} onUpdateHandled={() => setWizardUpdate(null)} onClose={() => (setWizard(null), setWizardUpdate(null))} />
+      <div id="toast" className="toast" role="status" hidden={!toastMsg}>
+        {toastMsg}
+      </div>
+    </AppContext.Provider>
   );
 }

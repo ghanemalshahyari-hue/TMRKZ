@@ -1,5 +1,7 @@
 import type {
   HierarchyLevel,
+  SiteLinkRecord,
+  StationingRecord,
   PolicyChange,
   StationingPolicyOverview,
   StationingPolicyValues,
@@ -503,5 +505,8 @@ export const api = {
   publishStationingPolicy: (values: StationingPolicyValues, effectiveFrom: string | null, reason: string, reference: string) =>
     post<{ version: StationingPolicyVersion; changes: PolicyChange[] }>('/stationing/policy/versions', { values, effectiveFrom, reason, reference }),
   hierarchyLevels: () => get<HierarchyLevel[]>('/stationing/hierarchy-levels'),
+  // Stationing register read contract (ADR-031): the server returns only the units this person may read
+  stationingCurrent: (orgId?: string, siteId?: string) => get<StationingRecord[]>('/stationing/current' + query({ orgId, siteId })),
+  siteLinks: (orgId?: string, siteId?: string) => get<SiteLinkRecord[]>('/site-links' + query({ orgId, siteId })),
   terrainDatasets: () => get<TerrainDatasetView[]>('/terrain/datasets'),
 };

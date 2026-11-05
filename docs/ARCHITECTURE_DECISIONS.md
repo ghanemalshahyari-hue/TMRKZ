@@ -1015,6 +1015,19 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
     - 0 terrain rows, 0 policy versions.
   - **Result.** Database comment `ACCEPTANCE / V18`. Evidence `docs/evidence/acceptance-upgrade/tmrkz-test-v18/`.
 
+**Amendment — the single-click deployment area footprint is a policy value (owner decision, 2026-11-05).**
+
+- The initial footprint a single map click gives a deployment area is `deploymentAreaDefault`
+  `{"shape": "SQUARE" | "CIRCLE", "areaM2": number}` in the versioned policy, never a size in client code. The client
+  draws CIRCLE as a regular 16-vertex polygon of that area.
+- **No migration.** It is the last, nullable component of `StationingPolicy`. The stored-document reader ignores
+  unknown keys and leaves absent ones null, so a version stored before it reads null, meaning «غير محددة» (not
+  configured).
+- **Validation.** The shape is required and 0 < area ≤ 25 km². The upper bound only guards against a mistyped value;
+  it is not a footprint maximum, since deployment areas have none.
+- **Values.** No production value is assumed: the System Administrator sets it in «سياسة التمركز». A change appears
+  as one changed key in the version's audited changes. Requesters read it from `GET /stationing/policy`.
+
 ## ADR-032 Offline MapLibre map for Stationing V3, Arabic labels without a right-to-left plugin — Accepted, module not yet wired (2026-11-04)
 
 - **Context.** Owner stop-gate decision 5 (4 Nov 2026): MapLibre for the production Stationing V3 map (vector roads,

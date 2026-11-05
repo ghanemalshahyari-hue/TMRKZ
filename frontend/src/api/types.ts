@@ -1131,6 +1131,29 @@ export type RestationingChecks = {
   needsDistanceException?: boolean;
 };
 
+/** One authoritative stationing of a unit at a site (`GET /stationing/current`); a site link is a different record. */
+export type StationingRecord = {
+  id: string;
+  orgId: string;
+  orgCode: string;
+  orgName: string;
+  siteId: string;
+  siteCode: string;
+  siteName: string;
+  kind: 'PERMANENT' | 'TEMPORARY';
+  validFrom: string;
+  validTo: string | null;
+  plannedEnd: string | null;
+  origin: string;
+  requestId: string | null;
+  reference: string | null;
+  /** Not sent today: when the server adds the site's boundary or marker, the map draws a site it otherwise cannot. */
+  siteGeometry?: GeoJsonGeometry | null;
+  siteLocation?: { lat: number; lng: number } | null;
+};
+/** A unit's association with a site (`GET /site-links`): never an occupancy or a stationing. */
+export type SiteLinkRecord = { id: string; siteId: string; siteName: string; orgId: string; orgName: string; validFrom: string; validTo: string | null; source: string; reason: string | null };
+
 // ---- Stationing V3 policy studio (ADR-031, ADR-033) ------------------------------------------------------------------
 
 export type StationingFact = 'SCOPE' | 'CLASSIFICATION' | 'DURATION' | 'SITE' | 'DEPLOYMENT' | 'AVAILABILITY';
@@ -1148,6 +1171,11 @@ export type StationingPolicyValues = {
   exception: { allowed: boolean; maxExtraM: number };
   crossBranch: { allowed: boolean; authorities: ('OTHER_UNIT' | 'OTHER_UNIT_PARENT' | 'SITE_RESPONSIBLE')[]; independent: boolean };
   routing: { startAt: 'SELF' | 'PARENT'; levels: RoutingLevelValue[] };
+  /**
+   * The initial footprint of a deployment area placed by a single map click (owner decision, 5 Nov 2026). Null or
+   * absent: not configured (every version published before it). CIRCLE is drawn as a regular 16-vertex polygon of that area.
+   */
+  deploymentAreaDefault?: { shape: 'SQUARE' | 'CIRCLE'; areaM2: number } | null;
 };
 export type StationingPolicyVersion = {
   id: string;

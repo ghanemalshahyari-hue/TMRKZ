@@ -335,6 +335,26 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     - **Evidence:** `docs/evidence/map-package/SUMMARY.md`; release record `map-packages/tmrkz-map-2026.11.1/`.
     - **Open:** the terrain loader needs `rasterio` on the operator host; open-sea cells show the water colour in
       terrain mode; 2–3 long tasks during a cold page load; assessment `processing` field empty (manifest key).
+  - **Single-click deployment area footprint as a policy value (owner decision, 5 Nov; ADR-031 amendment) — on
+    `tmrkz-test` (backend only, owner-approved), no production value:**
+    - `deploymentAreaDefault` `{shape: SQUARE | CIRCLE, areaM2}` is a nullable last component of the versioned
+      policy. Versions stored before it read null («غير محددة»), so no migration is needed. No production value is
+      chosen, so none is set.
+    - Shape required, 0 < area ≤ 25 km² (a typo guard, not a footprint maximum). Field group in «سياسة التمركز»;
+      requesters read it from `GET /stationing/policy`.
+    - **Tests:** `StationingRulesTest` + `StationingFoundationIT` 44/44 on PostgreSQL + PostGIS + OpenFGA; frontend
+      144/144, type check clean.
+    - **tmrkz-test (5 Nov):** backend `mover/backend:rel-b60dafc-area-default` (b60dafc + this uncommitted change,
+      patch sha256 5bb7a2e3…) by the guarded swap: schema V20, plan empty, 7771 rows unchanged, backup verified,
+      OpenFGA 220 tuples unchanged (`docs/evidence/acceptance-upgrade/tmrkz-test-backend-area-default/`). Acceptance
+      policy version 2 published in the studio as t.admin: SQUARE 90,000 m² only, reference «ACCEPTANCE-V3-POLICY-2 ·
+      قيمة قبول تجريبية — ليست قيمة إنتاجية معتمدة» (`tests/acceptance/publish-acceptance-area-default.mjs` 7/7).
+    - **Editor (UI rebuild, uncommitted, not deployed):** site «تحديد الموقع على الخريطة» (the same shape's centre to a
+      clicked point) beside dragging; deployment «تحديد المنطقة على الخريطة» (the policy's initial area; unavailable
+      when unset — no fallback) and «رسم حدود المنطقة»; range rings replaced by centre-to-centre leg connectors with
+      distance, allowed range (terrain allowance) and verdict. `tests/acceptance/geometry-two-methods.mjs` 10/10 on
+      `tmrkz-test`, 0 writes.
+    - **Open:** the owner's production value (shape, area); the UI rebuild itself is not deployed.
   - **Before production readiness (owner list):**
     - the long mixed-label wrap on the map;
     - D11 reminders and presentation polish;

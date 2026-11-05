@@ -2,14 +2,16 @@ import { createContext, useContext } from 'react';
 import type { Me, OrgNode, Permission, RequestType, Settings, Site } from '../api/types';
 import { STATIONING_V3_ENABLED } from './stationingV3';
 
-export type View = 'stationing' | 'restationing' | 'stationingPolicy' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs';
+export type View = 'home' | 'stationing' | 'restationing' | 'stationingPolicy' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs';
 
 /**
- * Same order, icons and labels as the prototype NAV (the last entry replaces «حزمة البناء»). «مساحة التمركز» is the one
- * GIS workspace; the retired «الخريطة والمرافق» route (#map) is redirected to it (owner decision of 2 Nov 2026).
+ * The views, in the prototype NAV's order (the last entry replaces «حزمة البناء»). #stationing is now «المواقع», the
+ * registered sites workspace; re-stationing is only «إعادة التمركز» (owner decision of 5 Nov 2026). The retired
+ * «الخريطة والمرافق» route (#map) opens «المواقع».
  */
 export const NAV: [View, string, string][] = [
-  ['stationing', 'map', 'مساحة التمركز'],
+  // the registered sites workspace (owner decision of 5 Nov 2026): re-stationing itself is only «إعادة التمركز»
+  ['stationing', 'pin', 'المواقع'],
   // Stationing V3 re-stationing requests (ADR-033): only in builds with VITE_STATIONING_V3=true until accepted
   ...(STATIONING_V3_ENABLED ? ([['restationing', 'layers', 'إعادة التمركز']] as [View, string, string][]) : []),
   ...(STATIONING_V3_ENABLED ? ([['stationingPolicy', 'filter', 'سياسة التمركز']] as [View, string, string][]) : []),

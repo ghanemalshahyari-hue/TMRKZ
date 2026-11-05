@@ -1,39 +1,30 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { GeoJSONSource, Map as MlMap } from 'maplibre-gl';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../api/client';
-import type { Ref, RestationingChecks, RestationingListItem, RestationingRequest, RestationingState } from '../api/types';
-import { Heading, Icon } from '../components/ui';
-import { BASEMAP_URL, HILLSHADE, OfflineMapLibre, addOverlayLayer } from '../components/map/maplibre';
-import { LABEL_FONT, type BasemapMode } from '../components/map/maplibre/offlineStyle';
+import type { RestationingChecks, RestationingListItem, RestationingRequest } from '../api/types';
+import { Icon } from '../components/ui';
+import type { BasemapMode } from '../components/map/maplibre/offlineStyle';
+import { ActionRail, type RailAction } from '../components/workspace/ActionRail';
+import { ApprovalRouteStrip } from '../components/workspace/ApprovalRouteStrip';
+import { DeploymentCheckCard } from '../components/workspace/DeploymentCheckCard';
+import { MapFrame, MapLegend } from '../components/workspace/MapFrame';
+import { OperationalWorkspace } from '../components/workspace/OperationalWorkspace';
+import { OrgContextPanel, type ContextTab } from '../components/workspace/OrgContextPanel';
+import { RequestDrawer } from '../components/workspace/RequestDrawer';
+import { RequestMap } from '../components/workspace/RequestMap';
+import { SitesMap } from '../components/workspace/SitesMap';
+import { RS_STATE, StatePill } from '../components/workspace/StatePill';
+import { useRegisteredSites } from '../components/workspace/useRegisteredSites';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
 import { formatArea } from '../lib/footprint';
-import { centre, requestFeatures } from '../lib/requestMap';
+import { restriction } from '../lib/navigation';
+import { parseRestationingHash } from '../lib/restationingRoute';
 import { partsOf, siteArea } from '../lib/siteGeometry';
 import { HIERARCHY_CHANGED } from '../lib/stationingV3';
 import { RestationingEditor } from './RestationingEditor';
 import './restationing.css';
 
-/** Request states of Model V3 §3 with the owner's wording. */
-export const RS_STATE: Record<RestationingState, [string, string]> = {
-  DRAFT: ['مسودة', ''],
-  UNDER_REVIEW: ['قيد الاعتماد', 'orange'],
-  RETURNED_FOR_CHANGES: ['معاد للتعديل', 'orange'],
-  PAUSED_HIERARCHY_CHANGED: ['موقوف — تغيّر الهيكل', 'red'],
-  REJECTED: ['مرفوض', 'red'],
-  APPROVED_NOT_ACTIVATED: ['معتمد — بانتظار التفعيل', 'blue'],
-  CANCELLATION_PENDING: ['بانتظار قرار الإلغاء', 'orange'],
-  CANCELLED_BEFORE_ACTIVATION: ['أُلغي قبل التفعيل', ''],
-  ACTIVATED_PERMANENT: ['مفعّل — دائم', 'green'],
-  TEMPORARY_SCHEDULED: ['مؤقت مجدول', 'blue'],
-  START_HELD_PENDING_CANCELLATION: ['البدء موقوف — بانتظار قرار الإلغاء', 'orange'],
-  ACTIVE_TEMPORARY: ['مؤقت نافذ', 'green'],
-  TEMPORARY_RETURNED: ['انتهى المؤقت — عادت الوحدات', ''],
-  TEMPORARY_CANCELLED_BEFORE_START: ['أُلغي قبل البدء', ''],
-  TEMPORARY_WINDOW_EXPIRED_WITHOUT_START: ['انقضت النافذة دون بدء', ''],
-  EXTENSION_ACTIVATED: ['تمديد مفعّل', 'green'],
-  LAPSED_NOT_ACTIVATED: ['سقط دون تفعيل', ''],
-};
+export { RS_STATE, StatePill, RequestMap };
 
 /** The lifecycle actions (ADR-034) with the owner's wording. */
 const ACTION_KIND: Record<string, string> = {
@@ -49,16 +40,6 @@ const ACTION_STATE: Record<string, string> = {
   SUPERSEDED: 'تجاوزه انتهاء المؤقت',
 };
 
-const LEG_STATUS: Record<string, string> = {
-  NOT_PLACED: 'غير موضوعة',
-  OK: 'ضمن النطاق',
-  NEEDS_EXCEPTION: 'تحتاج استثناء مسافة',
-  OUT_OF_RANGE: 'خارج النطاق',
-  TERRAIN_TIE_UNRESOLVED: 'تعادل فئات أرض دون أولوية',
-};
-
-const km = (m: number | null | undefined) => (m == null ? '—' : (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 2 }) + ' كم');
-
 /** The proposed site as an approver reads it: type, part count, area and, once submitted, the submission holding it. */
 function proposedSite(r: RestationingRequest): string {
   const g = r.content.site?.geometry;
@@ -69,30 +50,36 @@ function proposedSite(r: RestationingRequest): string {
     formatArea(siteArea(parts)), ...(held ? [`الإرسال #${held}`] : [])].join(' · ');
 }
 
-export function StatePill({ state }: { state: RestationingState }) {
-  const [label, tone] = RS_STATE[state] ?? [state, ''];
-  return (
-    <span className={'pill ' + tone}>
-      <i className="dot" />
-      {label}
-    </span>
-  );
-}
+const route = () => parseRestationingHash(location.hash);
+const idFromHash = () => {
+  const r = route();
+  return r.kind === 'request' ? r.id : null;
+};
+/** #restationing/new?site=<siteId> or ?unit=<orgId>: a new request opened from a site (the Sites page) or a unit. */
+const newFromHash = (): { id: null; unit: string | null; site: string | null } | null => {
+  const r = route();
+  return r.kind === 'new' ? { id: null, unit: r.unit, site: r.site } : null;
+};
 
-/** «إعادة التمركز»: the re-stationing requests the server lets this person see, one at a time on the offline map. */
-/** The unit of a stage, shown apart from the stage's fixed label (owner, 4 Nov 2026); the exception stage acts for the requesting unit. */
-function StageUnit({ unit, kind }: { unit: Ref | null; kind: string }) {
-  if (unit) return <small className="rs-stage-unit">الجهة: {unit.name}</small>;
-  return kind === 'EXCEPTION' ? <small className="rs-stage-unit">يقررها صاحب «اعتماد استثناء مسافة الانتشار»</small> : null;
-}
-
+/**
+ * «إعادة التمركز» as one operational workspace (owner brief «FULL APPLICATION UI REBUILD», §6–§18): the action panel
+ * and the request drawer on the left, the request on the offline map in the centre with its approval strip, the
+ * request's details, the organisation and the linked sites on the right. The new-request editor opens in the same
+ * workspace. Every action and check is the server's; nothing here grants or decides anything.
+ */
 export function RestationingPage() {
   const app = useApp();
   const [items, setItems] = useState<RestationingListItem[] | null>(null);
-  const [selected, setSelected] = useState<string | null>(() => location.hash.split('/')[1] ?? null);
-  const [editing, setEditing] = useState<{ id: string | null } | null>(null);
+  const [selected, setSelected] = useState<string | null>(idFromHash);
+  const [editing, setEditing] = useState<{ id: string | null; unit?: string | null; site?: string | null } | null>(newFromHash);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  // open beside the map on a desktop; on a tablet or phone it slides over the map only when asked for
+  const [drawerOpen, setDrawerOpen] = useState(() => window.innerWidth > 1180);
+  const [tab, setTab] = useState<ContextTab>('request');
+  const [unitId, setUnitId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [fitKey, setFitKey] = useState(0);
   const reload = useCallback(() => setTick((t) => t + 1), []);
 
   useEffect(() => {
@@ -101,68 +88,118 @@ export function RestationingPage() {
       .then((l) => {
         setItems(l);
         setError(null);
-        setSelected((s) => s ?? l[0]?.id ?? null);
       })
       .catch((e: Error) => setError(e.message));
   }, [tick, app.revision]);
 
+  // the address carries the open request: a link, the search or the back button opens it here
+  useEffect(() => {
+    const onHash = () => {
+      const id = idFromHash();
+      if (id) setSelected(id);
+      const fresh = newFromHash();
+      if (fresh) setEditing(fresh);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+  const select = (id: string) => {
+    setSelected(id);
+    setEditing(null);
+    setTab('request');
+    setUnitId(null);
+    history.replaceState(null, '', '#restationing/' + id);
+  };
+
   const canCreate = app.can('CREATE_RESTATIONING');
-  return (
-    <>
-      <Heading
-        en="RE-STATIONING / MODEL V3"
-        title="إعادة التمركز"
-        description="موقع مقترح واحد، والوحدات المنتقلة يختارها مقدم الطلب، ومسار الاعتماد يبدأ من الوحدة الطالبة ويصعد في الهيكل. التحقق على الخادم ولا توصية بمكان."
-        actions={
-          <button className="button primary" disabled={!canCreate} onClick={() => setEditing({ id: null })} title={canCreate ? '' : 'تحتاج صلاحية «طلب إعادة التمركز»'}>
-            ＋ طلب إعادة تمركز
-          </button>
-        }
-      />
+  const canAccess = !restriction('permissions', app.can, app.summaryOnly) || !restriction('audit', app.can, app.summaryOnly);
+  const actions: RailAction[] = [
+    { key: 'links', label: 'ربط الوحدات بالمواقع', hint: 'التمركز الحالي وارتباطات المواقع', icon: 'link', active: !editing && tab === 'sites', onClick: () => (setEditing(null), setTab('sites')) },
+    { key: 'map', label: 'إعادة التمركز عبر الخريطة', hint: 'الطلبات، وطلب جديد', icon: 'map', active: drawerOpen, onClick: () => setDrawerOpen((o) => !o) },
+    {
+      key: 'bounds',
+      label: 'الحدود والمناطق',
+      hint: 'الموقع ومنطقتا الانتشار على الخريطة',
+      icon: 'boundary',
+      onClick: () => (editing ? document.getElementById('rs-step-4')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : setFitKey((k) => k + 1)),
+    },
+    { key: 'route', label: 'مسار الاعتماد', hint: 'المراحل والسجل الكامل', icon: 'route', active: historyOpen, onClick: () => setHistoryOpen((o) => !o) },
+    ...(canAccess
+      ? [{ key: 'access', label: 'الصلاحيات والتدقيق', hint: 'حسب صلاحياتك', icon: 'shield', onClick: () => (location.hash = app.can('MANAGE_ACCESS') ? 'permissions' : 'audit') }]
+      : []),
+  ];
+  const rail = (
+    <ActionRail actions={actions}>
+      <RequestDrawer items={items} selected={editing ? null : selected} onSelect={select} open={drawerOpen} setOpen={setDrawerOpen} canCreate={canCreate} onCreate={() => setEditing({ id: null })} />
       {error && <div className="rs-error">{error}</div>}
-      {editing ? (
-        <RestationingEditor
-          requestId={editing.id}
-          onClose={(id) => {
-            setEditing(null);
-            if (id) setSelected(id);
-            reload();
-          }}
-        />
-      ) : (
-        <div className="rs-layout">
-          <aside className="card rs-list">
-            {items == null && <div className="empty">جارٍ التحميل…</div>}
-            {items?.length === 0 && <div className="empty">لا توجد طلبات ضمن نطاقك.</div>}
-            {items?.map((r) => (
-              <button key={r.id} className={'rs-item' + (r.id === selected ? ' active' : '')} onClick={() => setSelected(r.id)}>
-                <span className="rs-item-head">
-                  <b>{r.number}</b>
-                  <StatePill state={r.state} />
-                </span>
-                <span>{r.requestingUnit.name} · {r.kind === 'TEMPORARY' ? 'مؤقت' : 'دائم'} · {r.units} وحدة</span>
-                {r.currentStage && <small>المرحلة الحالية: {r.currentStage}{r.currentStageUnit ? ' · ' + r.currentStageUnit : ''}</small>}
-                <small>
-                  {r.requester.name}
-                  {r.mine ? ' (أنت)' : ''} · {fullDate(r.updatedAt)}
-                </small>
-              </button>
-            ))}
-          </aside>
-          {selected ? <RequestDetail id={selected} onChanged={reload} onEdit={() => setEditing({ id: selected })} onOpen={(x) => { setSelected(x); reload(); }} /> : <div className="card empty">اختر طلباً.</div>}
-        </div>
-      )}
-    </>
+    </ActionRail>
+  );
+
+  if (editing) {
+    return (
+      // the editor brings its own step panel on the left: the request list steps aside until it closes
+      <RestationingEditor
+        key={editing.id ?? 'new:' + (editing.unit ?? '') + ':' + (editing.site ?? '')}
+        requestId={editing.id}
+        preselectUnit={editing.unit ?? null}
+        preselectSite={editing.site ?? null}
+        historyOpen={historyOpen}
+        setHistoryOpen={setHistoryOpen}
+        onClose={(id) => {
+          setEditing(null);
+          if (id) select(id);
+          else if (route().kind === 'new') history.replaceState(null, '', '#restationing');
+          reload();
+        }}
+      />
+    );
+  }
+  if (!selected) {
+    return <StartWorkspace rail={rail} tab={tab} setTab={setTab} unitId={unitId} setUnitId={setUnitId} />;
+  }
+  return (
+    <RequestWorkspace
+      key={selected}
+      id={selected}
+      rail={rail}
+      tab={tab}
+      setTab={setTab}
+      unitId={unitId}
+      setUnitId={(u) => (setUnitId(u), setTab('sites'))}
+      historyOpen={historyOpen}
+      setHistoryOpen={setHistoryOpen}
+      fitKey={fitKey}
+      onChanged={reload}
+      onEdit={() => setEditing({ id: selected })}
+      onOpen={(x) => {
+        select(x);
+        reload();
+      }}
+    />
   );
 }
 
-function RequestDetail({ id, onChanged, onEdit, onOpen }: { id: string; onChanged: () => void; onEdit: () => void; onOpen: (id: string) => void }) {
+function RequestWorkspace({ id, rail, tab, setTab, unitId, setUnitId, historyOpen, setHistoryOpen, fitKey, onChanged, onEdit, onOpen }: {
+  id: string;
+  rail: ReactNode;
+  tab: ContextTab;
+  setTab: (t: ContextTab) => void;
+  unitId: string | null;
+  setUnitId: (id: string) => void;
+  historyOpen: boolean;
+  setHistoryOpen: (o: boolean) => void;
+  fitKey: number;
+  onChanged: () => void;
+  onEdit: () => void;
+  onOpen: (id: string) => void;
+}) {
   const app = useApp();
   const [r, setR] = useState<RestationingRequest | null>(null);
   const [checks, setChecks] = useState<RestationingChecks | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<BasemapMode>('street');
+  const [refit, setRefit] = useState(0);
 
   useEffect(() => {
     setR(null);
@@ -170,7 +207,7 @@ function RequestDetail({ id, onChanged, onEdit, onOpen }: { id: string; onChange
     setReason('');
     api.restationingRequest(id).then(setR).catch((e: Error) => app.toast(e.message));
     api.restationingChecks(id).then(setChecks).catch(() => setChecks(null));
-  }, [id, app]);
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = async (what: () => Promise<RestationingRequest>, done: string) => {
     setBusy(true);
@@ -188,22 +225,71 @@ function RequestDetail({ id, onChanged, onEdit, onOpen }: { id: string; onChange
     }
   };
 
-  if (!r) return <div className="card empty">جارٍ التحميل…</div>;
+  if (!r) {
+    return (
+      <OperationalWorkspace
+        rail={rail}
+        context={<aside className="tz-context"><div className="tz-context-body"><div className="tz-card tz-muted">جارٍ التحميل…</div></div></aside>}
+        centre={<section className="tz-mapframe tz-empty"><p>جارٍ تحميل الطلب…</p></section>}
+      />
+    );
+  }
+  const c = r.content;
+  const title = `${r.requestKind === 'EXTENSION' ? 'تمديد' : c.kind === 'TEMPORARY' ? 'إعادة تمركز مؤقتة' : 'إعادة تمركز دائمة'} — ${r.requestingUnit.name}`;
+  return (
+    <OperationalWorkspace
+      sheetKey={r.id}
+      rail={rail}
+      context={
+        <OrgContextPanel
+          request={r}
+          tab={tab}
+          setTab={setTab}
+          unitId={unitId}
+          setUnitId={setUnitId}
+          requestContent={<RequestPanel r={r} checks={checks} busy={busy} act={act} reason={reason} setReason={setReason} onEdit={onEdit} onOpen={onOpen} />}
+        />
+      }
+      centre={
+        <MapFrame
+          title={
+            <>
+              <b className="tz-reqno">{r.number}</b>
+              <span className="tz-reqtitle">{title}</span>
+            </>
+          }
+          badge={<StatePill state={r.state} />}
+          mode={mode}
+          setMode={setMode}
+          onFit={() => setRefit((k) => k + 1)}
+          legend={<MapLegend />}
+          strip={<ApprovalRouteStrip request={r} checks={checks} open={historyOpen} setOpen={setHistoryOpen} />}
+        >
+          <RequestMap request={r} checks={checks} mode={mode} fitKey={fitKey + refit} />
+        </MapFrame>
+      }
+    />
+  );
+}
+
+/** The request's details in the context panel: summary and facts, the server's actions, the checks and the lifecycle. */
+function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen }: {
+  r: RestationingRequest;
+  checks: RestationingChecks | null;
+  busy: boolean;
+  act: (what: () => Promise<RestationingRequest>, done: string) => void;
+  reason: string;
+  setReason: (s: string) => void;
+  onEdit: () => void;
+  onOpen: (id: string) => void;
+}) {
   const c = r.content;
   const resubmit = r.state === 'RETURNED_FOR_CHANGES' || r.state === 'PAUSED_HIERARCHY_CHANGED';
   return (
-    <section className="rs-detail">
-      <div className="card rs-summary">
-        <div className="rs-summary-head">
-          <div>
-            <span className="eyebrow">{r.number}</span>
-            <h2>
-              {c.kind === 'TEMPORARY' ? 'إعادة تمركز مؤقتة' : 'إعادة تمركز دائمة'} — {r.requestingUnit.name}
-            </h2>
-            <p>{c.reason}</p>
-          </div>
-          <StatePill state={r.state} />
-        </div>
+    <>
+      {/* the number, kind and state are the map header's; the panel starts with the request's reason */}
+      <section className="tz-card rs-summary">
+        <p className="tz-reason">{c.reason}</p>
         {r.state === 'PAUSED_HIERARCHY_CHANGED' && (
           <div className="rs-banner red">
             <b>موقوف — تغيّر الهيكل:</b> {HIERARCHY_CHANGED}. المسار السابق محفوظ بقراراته، وبعد التأكيد يُعاد بناء المسار من الوحدة نفسها وتُعاد كل المراحل.
@@ -220,11 +306,11 @@ function RequestDetail({ id, onChanged, onEdit, onOpen }: { id: string; onChange
             <dd>{r.units.map((u) => u.name).join('، ') || '—'}</dd>
           </div>
           <div>
-            <dt>من</dt>
+            <dt>الموقع الحالي</dt>
             <dd>{r.currentSites.map((s) => s.site.name).join('، ') || '—'}</dd>
           </div>
           <div>
-            <dt>الموقع المقترح</dt>
+            <dt>موقع إعادة التمركز</dt>
             <dd data-testid="proposed-site">{proposedSite(r)}</dd>
           </div>
           <div>
@@ -248,129 +334,10 @@ function RequestDetail({ id, onChanged, onEdit, onOpen }: { id: string; onChange
             </div>
           )}
         </dl>
-      </div>
+      </section>
 
-      <div className="card rs-map-card">
-        <div className="rs-map-tools">
-          <span>الخلفية:</span>
-          <button className={'chip' + (mode === 'street' ? ' active' : '')} onClick={() => setMode('street')}>الشوارع</button>
-          <button className={'chip' + (mode === 'terrain' ? ' active' : '')} onClick={() => setMode('terrain')}>طبيعة الأرض</button>
-          <span className="rs-legend">
-            <i className="current" /> الموقع الحالي <i className="site" /> الموقع المقترح <i className="primary" /> الانتشار الرئيسية <i className="alternative" /> الانتشار البديلة <i className="band" /> النطاق المسموح (إرشاد)
-          </span>
-        </div>
-        <RequestMap request={r} checks={checks} mode={mode} />
-      </div>
-
-      <div className="rs-columns">
-        <div className="card rs-route">
-          <h3>مسار الاعتماد {r.routeNo > 1 ? `(البناء ${r.routeNo})` : ''}</h3>
-          {r.route.length === 0 && checks?.route && (
-            <>
-              <p className="muted">المسار المتوقع عند الإرسال (من الوحدة الطالبة صعوداً):</p>
-              <ol className="rs-stages">
-                {checks.route.map((s) => (
-                  <li key={s.key}>
-                    <b>{s.label}</b>
-                    <StageUnit unit={s.unit} kind={s.kind} />
-                    <small>يستوفي: {s.satisfies.join('، ')}</small>
-                  </li>
-                ))}
-              </ol>
-            </>
-          )}
-          <ol className="rs-stages">
-            {r.route.map((s) => (
-              <li key={s.key} className={s.mark ? 'done' : s.current ? 'current' : ''}>
-                <b>{s.label}</b>
-                <StageUnit unit={s.unit} kind={s.kind} />
-                <small>يستوفي: {s.satisfies.join('، ')}</small>
-                {s.mark && (
-                  <small>
-                    {s.mark === 'CARRIED' ? 'محمول من قرار سابق' : 'اعتمدها'} {s.decidedBy?.name} · {fullDate(s.decidedAt ?? '')}
-                  </small>
-                )}
-                {s.current && <small className="rs-now">المرحلة الحالية</small>}
-              </li>
-            ))}
-          </ol>
-          {r.previousRoutes.length > 0 && (
-            <details>
-              <summary>المسارات السابقة المحفوظة ({r.previousRoutes.length})</summary>
-              {r.previousRoutes.map((p) => (
-                <ol key={p.routeNo} className="rs-stages old">
-                  {p.stages.map((s) => (
-                    <li key={s.key} className={s.mark ? 'done' : ''}>
-                      <b>{s.label}</b>
-                      <StageUnit unit={s.unit} kind={s.kind} />
-                      {s.mark && <small>اعتمدها {s.decidedBy?.name}</small>}
-                    </li>
-                  ))}
-                </ol>
-              ))}
-            </details>
-          )}
-          {r.revisions.length > 0 && (
-            <details>
-              <summary>الإرسالات ({r.revisions.length})</summary>
-              <ul className="rs-revisions">
-                {r.revisions.map((v) => (
-                  <li key={v.n}>
-                    #{v.n} · {v.submittedBy} · {fullDate(v.submittedAt)} · تغيّر: {v.changed.join('، ') || '—'} · أُعيد: {v.invalidated.length} · حُمل: {v.carried.length}
-                    {v.reason && <div className="muted">{v.reason}</div>}
-                  </li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-
-        <div className="card rs-checks">
-          <h3>الفحوص على السياسة {checks?.policyVersion != null ? `(نسخة ${checks.policyVersion})` : ''}</h3>
-          {checks == null && <div className="muted">جارٍ الفحص…</div>}
-          {checks && (
-            <>
-              <div className={'rs-verdict ' + (checks.ok ? 'ok' : 'no')}>{checks.ok ? 'كل الفحوص مستوفاة' : 'فحوص غير مستوفاة'}</div>
-              {checks.problems.length > 0 && (
-                <ul className="rs-problems">
-                  {checks.problems.map((p) => (
-                    <li key={p}>{p}</li>
-                  ))}
-                </ul>
-              )}
-              {checks.siteAreaM2 != null && (
-                <p>
-                  مساحة الموقع المقترح: <b>{Number(checks.siteAreaM2).toLocaleString('ar-AE')} م²</b> من حد{' '}
-                  {Number(checks.maxFootprintAreaM2).toLocaleString('ar-AE')} م²
-                </p>
-              )}
-              {checks.legs?.map((l) => (
-                <div key={l.leg} className={'rs-leg ' + l.status}>
-                  <b>{l.label}</b> — {LEG_STATUS[l.status]}
-                  <div>
-                    المسافة من المركز إلى المركز: <b>{km(l.distanceM)}</b> · المسموح {km(l.baseMinM)}–{km(l.baseMaxM)}
-                    {l.effectiveMaxM !== l.baseMaxM ? ` ← ${km(l.effectiveMinM)}–${km(l.effectiveMaxM)} بعد إضافة الأرض` : ''}
-                  </div>
-                  {l.terrain && (
-                    <div className="muted">
-                      فئة الأرض الحاكمة: <b>{l.terrain.controllingLabel}</b> (+{km(l.terrain.allowanceM)})
-                      {l.terrain.tie ? ` · تعادل ${l.terrain.tied.join('/')} حسمه ترتيب الأولوية` : ''} · النسب:{' '}
-                      {l.terrain.shares
-                        .filter((s) => s.percent > 0)
-                        .map((s) => `${s.label} ${s.percent.toLocaleString('ar-AE', { maximumFractionDigits: 1 })}٪`)
-                        .join('، ')}{' '}
-                      · {l.terrain.dataset} (نموذج سطح {l.terrain.surfaceModel})
-                    </div>
-                  )}
-                  {l.conflicts.length > 0 && <div className="rs-bad">أرض مشغولة: {l.conflicts.join('، ')}</div>}
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="card rs-actions">
+      {(r.can.edit || r.can.submit || r.can.decide || r.can.activate || !hasLifecycle(r)) && (
+      <section className="tz-card rs-actions" aria-label="الإجراءات">
         {r.can.edit && (
           <button className="button" onClick={onEdit} disabled={busy}>
             <Icon name="file" /> تعديل الطلب
@@ -408,12 +375,14 @@ function RequestDetail({ id, onChanged, onEdit, onOpen }: { id: string; onChange
           </button>
         )}
         {!r.can.edit && !r.can.submit && !r.can.decide && !r.can.activate && !hasLifecycle(r) && (
-          <span className="muted">لا إجراء لك على هذا الطلب في حالته الحالية — الخادم يقرر من يرى ويقرر.</span>
+          <span className="tz-muted">لا إجراء لك على هذا الطلب في حالته الحالية — الخادم يقرر من يرى ويقرر.</span>
         )}
-      </div>
+      </section>
+      )}
 
+      <DeploymentCheckCard request={r} checks={checks} />
       <Lifecycle r={r} busy={busy} act={act} onOpen={onOpen} />
-    </section>
+    </>
   );
 }
 
@@ -432,7 +401,7 @@ function Lifecycle({ r, busy, act, onOpen }: { r: RestationingRequest; busy: boo
   const asks = r.can.askCancellation || r.can.askStartCancellation || r.can.askEarlyReturn || r.can.askExtension;
   if (!asks && !pending && !(r.actions?.length || r.extensions?.length || r.parent)) return null;
   return (
-    <div className="card rs-lifecycle">
+    <section className="tz-card rs-lifecycle">
       <h3>دورة حياة الطلب</h3>
       {r.parent && (
         <p>
@@ -529,99 +498,41 @@ function Lifecycle({ r, busy, act, onOpen }: { r: RestationingRequest; busy: boo
           </ul>
         </details>
       )}
-    </div>
+    </section>
   );
 }
 
-/** The request on the offline map: current sites, the proposed site, the deployment areas and their guidance bands. */
-export function RequestMap({ request, checks, mode, height = 420, onMap, fitMaxZoom = 15, hideSite = false, fit = true }: { request: RestationingRequest; checks: RestationingChecks | null; mode: BasemapMode; height?: number; onMap?: (m: MlMap) => void; fitMaxZoom?: number; hideSite?: boolean; fit?: boolean }) {
-  const [map, setMap] = useState<MlMap | null>(null);
-  // the editor draws the proposed site itself while it is being edited (hideSite); the bands still follow it
-  const data = useMemo(() => requestFeatures(request, checks, hideSite), [request, checks, hideSite]);
-  const initial = useMemo(() => {
-    const c = request.content.site?.geometry ? centre(request.content.site.geometry) : { lng: 55.3, lat: 25.2 };
-    return [c.lng, c.lat] as [number, number];
-  }, [request.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fitted = useRef<string | null>(null);
-  useEffect(() => {
-    if (!map) return;
-    (map.getSource('rs') as GeoJSONSource | undefined)?.setData(data);
-    const pts = data.features.flatMap((f) =>
-      f.geometry.type === 'Polygon' ? (f.geometry.coordinates[0] as [number, number][]) : f.geometry.type === 'MultiPolygon' ? f.geometry.coordinates.flatMap((part) => part[0] as [number, number][]) : [],
-    );
-    // the camera follows a newly opened request once; editing it never moves the camera under the user's hand
-    if (fit && pts.length && fitted.current !== request.id) {
-      fitted.current = request.id;
-      const xs = pts.map((p) => p[0]);
-      const ys = pts.map((p) => p[1]);
-      map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 40, maxZoom: fitMaxZoom, duration: 0 });
-    }
-  }, [map, data]);
-
+/**
+ * The workspace before a request is open: the sites on the offline map (those with a current stationing coloured), the
+ * organisation on the right, and the request list with «طلب إعادة تمركز» on the left. No request opens by itself.
+ */
+function StartWorkspace({ rail, tab, setTab, unitId, setUnitId }: { rail: ReactNode; tab: ContextTab; setTab: (t: ContextTab) => void; unitId: string | null; setUnitId: (id: string | null) => void }) {
+  const [mode, setMode] = useState<BasemapMode>('street');
+  const registered = useRegisteredSites();
   return (
-    <div style={{ height }}>
-      <OfflineMapLibre
-        basemapUrl={BASEMAP_URL}
-        hillshade={HILLSHADE}
-        mode={mode}
-        center={initial}
-        zoom={12}
-        onReady={(m) => {
-          m.addSource('rs', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-          addOverlayLayer(m, { id: 'rs-band', type: 'fill', source: 'rs', filter: ['==', ['get', 'role'], 'BAND'], paint: { 'fill-color': '#2f6fd6', 'fill-opacity': 0.08 } });
-          addOverlayLayer(m, { id: 'rs-band-line', type: 'line', source: 'rs', filter: ['==', ['get', 'role'], 'BAND'], paint: { 'line-color': '#2f6fd6', 'line-width': 1, 'line-dasharray': [3, 3] } });
-          addOverlayLayer(m, {
-            id: 'rs-fill',
-            type: 'fill',
-            source: 'rs',
-            filter: ['!=', ['get', 'role'], 'BAND'],
-            paint: {
-              'fill-color': ['match', ['get', 'role'], 'CURRENT', '#8a8f98', 'SITE', '#1f8a4c', 'PRIMARY', '#d9822b', 'ALTERNATIVE', '#8e44ad', '#888'],
-              'fill-opacity': 0.28,
-            },
-          });
-          addOverlayLayer(m, {
-            id: 'rs-line',
-            type: 'line',
-            source: 'rs',
-            filter: ['!=', ['get', 'role'], 'BAND'],
-            paint: {
-              'line-color': ['match', ['get', 'role'], 'CURRENT', '#5b6069', 'SITE', '#13643a', 'PRIMARY', '#a8611c', 'ALTERNATIVE', '#6c3483', '#555'],
-              'line-width': 2,
-            },
-          });
-          addOverlayLayer(
-            m,
-            {
-              id: 'rs-label',
-              type: 'symbol',
-              source: 'rs',
-              // only the label points carry a label: one per site or area, a MultiPolygon included (requestFeatures)
-              filter: ['has', 'label'],
-              // labels never overlap (owner, 4 Nov 2026): each may move around its polygon; when none fits at this zoom the
-              // least important waits for a closer zoom (proposed site first, then the primary, alternative, current site)
-              layout: {
-                'text-field': ['get', 'label'],
-                'text-font': [LABEL_FONT],
-                'text-size': 13,
-                // one line: a mixed Arabic/Latin name («موقع RS-2026-0012 (الحالي)») must not wrap inside its number
-                'text-max-width': 40,
-                'text-allow-overlap': false,
-                'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
-                'text-radial-offset': 0.9,
-                'text-justify': 'auto',
-                'text-padding': 4,
-                'symbol-sort-key': ['match', ['get', 'role'], 'SITE', 0, 'PRIMARY', 1, 'ALTERNATIVE', 2, 'CURRENT', 3, 4],
-              },
-              paint: { 'text-color': '#1d2733', 'text-halo-color': '#ffffff', 'text-halo-width': 1.5 },
-            },
-            'top',
-          );
-          setMap(m);
-          onMap?.(m);
-        }}
-      />
+    <OperationalWorkspace
+      rail={rail}
+      context={<OrgContextPanel request={null} tab={tab === 'request' ? 'units' : tab} setTab={setTab} requestContent={null} unitId={unitId} setUnitId={setUnitId} />}
+      centre={
+        <MapFrame title={<span className="tz-reqtitle">المواقع المسجلة (للمرجع)</span>} mode={mode} setMode={setMode} legend={<SitesLegend />}>
+          <SitesMap sites={registered.all} current={registered.current} mode={mode} />
+          <div className="tz-map-hint" role="note">
+            <Icon name="map" /> اختر طلباً من القائمة، أو ابدأ «طلب إعادة تمركز» جديداً.
+          </div>
+        </MapFrame>
+      }
+    />
+  );
+}
+
+/** The legend of a map that shows only the registered sites. */
+function SitesLegend() {
+  return (
+    <div className="tz-legend rs-legend">
+      <ul>
+        <li><i className="sw ref" /> موقع مسجّل (حدود)</li>
+        <li><i className="sw ref-marker" /> موقع مسجّل (علامة)</li>
+      </ul>
     </div>
   );
 }

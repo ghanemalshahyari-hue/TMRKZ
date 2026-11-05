@@ -1,7 +1,8 @@
 /**
- * Addresses inside «مساحة التمركز»: a saved stationing draft (#stationing/<requestId>) or a site with the organisation it
- * was opened for (#stationing/site/<siteId>/org/<orgId>, e.g. from «على الخريطة» on the organisation page). Identifiers
- * only — never names or data; the page checks everything with the server.
+ * Addresses inside «المواقع» (#stationing): a site, with the organisation it was opened for
+ * (#stationing/site/<siteId>/org/<orgId>, e.g. from «على الخريطة» on the organisation page). The older draft form
+ * (#stationing/<requestId>) belonged to the retired proposal workflow and opens nothing. Identifiers only — never names
+ * or data; the page checks everything with the server.
  */
 export type StationingLink = { draft?: string; site?: string; org?: string };
 

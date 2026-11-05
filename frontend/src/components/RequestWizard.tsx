@@ -554,7 +554,9 @@ export function RequestWizard({
           </label>
         )}
         <div className="type-grid">
-          {requestTypes.map((t) => (
+          {/* a unit's move is re-stationing, done only in «إعادة التمركز» (owner decision of 5 Nov 2026); an earlier
+              relocation request still opens with its own type */}
+          {requestTypes.filter((t) => t.kind !== 'RELOCATION' || t.code === w.typeCode).map((t) => (
             <button
               key={t.code}
               className={'type-button ' + (t.code === w.typeCode ? 'active' : '')}
