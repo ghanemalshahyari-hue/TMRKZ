@@ -17,10 +17,16 @@ import { partVectors, proposedParts, recordOf, rendersRole, ringCentre, slowDrag
 
 const UI = process.env.UI_URL ?? 'http://localhost:5180';
 const AUTH = process.env.AUTH_URL ?? 'http://localhost:8088';
-const OUT = fileURLToPath(new URL('../../docs/evidence/ui-rebuild/geometry-interaction/', import.meta.url));
+// EVIDENCE_DIR=<folder> keeps a regression run's evidence apart from the accepted run's
+const OUT = process.env.EVIDENCE_DIR ? process.env.EVIDENCE_DIR.replace(/[\/]?$/, '/') : fileURLToPath(new URL('../../docs/evidence/ui-rebuild/geometry-interaction/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 const PASSWORD = readFileSync(new URL('../../ops/test-env/.generated/user-password', import.meta.url), 'utf8').trim();
 const { chromium } = createRequire(new URL('./package.json', import.meta.url))('playwright-core');
+// POLY_UNIT / MP_UNIT / PT_UNIT name the units whose current site is a Polygon, a MultiPolygon and a marker (defaults: the
+// tmrkz-test fixtures)
+const POLY_UNIT = process.env.POLY_UNIT ?? 'الخدمات المشتركة';
+const MP_UNIT = process.env.MP_UNIT ?? 'قسم الخدمات العامة';
+const PT_UNIT = process.env.PT_UNIT ?? 'قسم النقل والحركة الإدارية';
 const SIZE = { width: 1920, height: 1080 };
 const results = [];
 const ok = (pass, id, what, detail = '') => {
@@ -44,7 +50,7 @@ await lp.waitForURL((u) => u.toString().startsWith(AUTH) && !u.toString().includ
 await lp.goto(UI + '/');
 const state = await login.storageState();
 const count0 = (await lp.evaluate(async () => (await (await fetch('/api/v1/restationing-requests')).json()).length));
-const rec = { a: await recordOf(lp, 'الخدمات المشتركة'), b: await recordOf(lp, 'قسم الخدمات العامة'), c: await recordOf(lp, 'قسم النقل والحركة الإدارية') };
+const rec = { a: await recordOf(lp, POLY_UNIT), b: await recordOf(lp, MP_UNIT), c: await recordOf(lp, PT_UNIT) };
 await login.close();
 
 async function recording(name, run) {

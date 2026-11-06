@@ -18,10 +18,16 @@ import { partVectors, proposedParts, recordOf, ringCentre, toNewSiteStep, toScre
 const UI = process.env.UI_URL ?? 'http://localhost:5180';
 const AUTH = process.env.AUTH_URL ?? 'http://localhost:8088';
 const DRAFT = process.env.REUSE_DRAFT ?? 'RS-2026-0057';
-const OUT = fileURLToPath(new URL('../../docs/evidence/ui-rebuild/geometry-two-methods/', import.meta.url));
+// EVIDENCE_DIR=<folder> keeps a regression run's evidence apart from the accepted run's
+const OUT = process.env.EVIDENCE_DIR ? process.env.EVIDENCE_DIR.replace(/[\/]?$/, '/') : fileURLToPath(new URL('../../docs/evidence/ui-rebuild/geometry-two-methods/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 const PASSWORD = readFileSync(new URL('../../ops/test-env/.generated/user-password', import.meta.url), 'utf8').trim();
 const { chromium } = createRequire(new URL('./package.json', import.meta.url))('playwright-core');
+// POLY_UNIT / MP_UNIT / PT_UNIT name the units whose current site is a Polygon, a MultiPolygon and a marker (defaults: the
+// tmrkz-test fixtures)
+const POLY_UNIT = process.env.POLY_UNIT ?? 'الخدمات المشتركة';
+const MP_UNIT = process.env.MP_UNIT ?? 'قسم الخدمات العامة';
+const PT_UNIT = process.env.PT_UNIT ?? 'قسم النقل والحركة الإدارية';
 const SIZE = { width: 1440, height: 900 };
 const results = [];
 const ok = (pass, id, what, detail = '') => {
@@ -47,7 +53,7 @@ const getJson = (p, path) => p.evaluate(async (u) => (await fetch('/api/v1' + u)
 const list = await getJson(lp, '/restationing-requests');
 const count0 = list.length;
 const draft = list.find((r) => r.number === DRAFT);
-const rec = { poly: await recordOf(lp, 'الخدمات المشتركة'), mp: await recordOf(lp, 'قسم الخدمات العامة') };
+const rec = { poly: await recordOf(lp, POLY_UNIT), mp: await recordOf(lp, MP_UNIT) };
 if (!draft) throw new Error('draft ' + DRAFT + ' not found');
 const draftBefore = await getJson(lp, '/restationing-requests/' + draft.id);
 await login.close();
@@ -60,7 +66,8 @@ async function recording(name, run) {
   page.on('request', (q) => {
     const u = q.url();
     if (!u.startsWith(UI) && !u.startsWith(AUTH) && !u.startsWith('data:') && !u.startsWith('blob:')) external.push(u);
-    if (q.method() !== 'GET') writes.push(`${name}: ${q.method()} ${u}`);
+    // the terrain analysis (6 Nov 2026) is a read-only POST — it carries a geometry and saves nothing — not a write
+    if (q.method() !== 'GET' && !u.endsWith('/api/v1/stationing/terrain/assess')) writes.push(`${name}: ${q.method()} ${u}`);
   });
   page.on('console', (m) => m.type() === 'error' && consoleErrors.push(`${name}: ${m.text()}`));
   page.on('pageerror', (e) => consoleErrors.push(`${name}: ${e.message}`));
@@ -114,8 +121,15 @@ const slowDrag = async (page, from, dx, dy) => {
 const coordsOf = (g) => (g.type === 'Polygon' ? [g.coordinates] : g.coordinates);
 const kmText = (m) => (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 1 });
 /** The connector's allowed range is the server's leg: minimum–policy maximum, and the terrain allowance when it extends it. */
+/**
+ * The connector's allowed range is the server's: its terrain analysis of the area WHERE IT NOW IS (owner brief «TRUE
+ * OFFLINE 3D TERRAIN», §25, 6 Nov 2026 — a moved area's allowance and range follow its new ground at once). Before that
+ * brief the connector kept the last saved check's range until the next save; this expectation followed it.
+ */
 const rangeMatches = async (page, k, text) => {
-  const l = (await getJson(page, `/restationing-requests/${draft.id}/checks`)).legs.find((x) => x.leg === k);
+  const g = await page.evaluate((sel) => document.querySelector(sel).tmrkzMap.getSource('rs-edit').serialize().data.features[0].geometry, MAP);
+  const a = await page.evaluate(async (geometry) => (await fetch('/api/v1/stationing/terrain/assess', { method: 'POST', headers: { 'content-type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'mover' }, body: JSON.stringify({ geometry }) })).json(), g);
+  const l = a[k];
   const want = `المسموح ${kmText(l.effectiveMinM)}–${kmText(l.baseMaxM)} كم` + (l.effectiveMaxM !== l.baseMaxM ? ` (حتى ${kmText(l.effectiveMaxM)} كم مع طبيعة الأرض)` : '');
   return { ok: (text ?? '').includes(want), want };
 };

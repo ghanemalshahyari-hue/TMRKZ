@@ -1,0 +1,95 @@
+/* 3D terrain view (owner brief «TRUE OFFLINE 3D TERRAIN», 6 Nov 2026): the 2D | 3D switch, cards and connector chips on
+   the ground, and «تحليل طبيعة الأرض». Dark TMRKZ shell; role colours as on the map (current blue, re-stationing site
+   green, primary amber, alternative purple). */
+
+.tz-view-switch { position: absolute; z-index: 6; top: 12px; left: 12px; display: flex; padding: 3px; gap: 3px; border-radius: 11px; background: rgba(9, 27, 40, 0.92); border: 1px solid rgba(160, 196, 214, 0.28); box-shadow: 0 6px 18px #0006; direction: ltr; }
+.tz-view-switch button { min-width: 44px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: #c9d6de; font: 700 13px/1 system-ui, sans-serif; cursor: pointer; }
+.tz-view-switch button.on { background: #2563eb; color: #fff; box-shadow: 0 2px 8px #2563eb66; }
+.tz-view-switch button:disabled { opacity: 0.4; cursor: not-allowed; }
+.tz-mapbody .maplibregl-ctrl-top-left { top: 96px; }
+.tz-view-3d .maplibregl-ctrl-group { background: rgba(9, 27, 40, 0.92); border: 1px solid rgba(160, 196, 214, 0.28); }
+.tz-view-3d .maplibregl-ctrl-group button .maplibregl-ctrl-icon { filter: invert(1) brightness(1.4); }
+
+/* in 3D the connectors carry the chips below; the flat editor's chip and the current site's tag would repeat them */
+.tz-view-3d .stw-dist, .tz-view-3d .stw-current { display: none; }
+
+/* a card stands on its geometry: a short stem down to the ground point */
+.tz3-card-wrap { cursor: pointer; }
+.tz3-card { position: relative; min-width: 128px; max-width: 230px; padding: 5px 9px 6px; border-radius: 9px; border: 2px solid var(--c, #8aa); background: rgba(8, 22, 34, 0.9); color: #eef4f7; box-shadow: 0 8px 22px #0008; direction: rtl; font: 12px/1.45 Arabic, system-ui, sans-serif; text-align: right; }
+.tz3-card::after { content: ''; position: absolute; left: 50%; bottom: -60px; width: 2px; height: 58px; background: linear-gradient(var(--c, #8aa), color-mix(in srgb, var(--c, #8aa) 40%, transparent)); transform: translateX(-50%); pointer-events: none; }
+.tz3-card::before { content: ''; position: absolute; left: 50%; bottom: -64px; width: 7px; height: 7px; border-radius: 50%; background: var(--c, #8aa); border: 1.5px solid #fff; transform: translateX(-50%); pointer-events: none; }
+.tz3-card b { display: block; font-size: 13px; color: #fff; }
+.tz3-card small { display: block; color: #a9bcc7; font-size: 11px; }
+.tz3-card .c { display: block; color: #d6e2e8; font-variant-numeric: tabular-nums; }
+.tz3-card dl { display: grid; grid-template-columns: auto 1fr; gap: 1px 10px; margin: 4px 0 0; }
+.tz3-card dt { color: #9fb3bf; }
+.tz3-card dd { margin: 0; color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tz3-card.sel { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 35%, transparent), 0 10px 26px #000a; }
+.tz3-card.r-CURRENT { --c: #3d8bfd; }
+.tz3-card.r-SITE { --c: #22c55e; }
+.tz3-card.r-PRIMARY { --c: #f59e0b; }
+.tz3-card.r-ALTERNATIVE { --c: #b06cf5; }
+.tz3-card.r-CURRENT b { color: #9cc4ff; }
+.tz3-card.r-SITE b { color: #86efac; }
+.tz3-card.r-PRIMARY b { color: #fcd34d; }
+.tz3-card.r-ALTERNATIVE b { color: #d8b4fe; }
+
+/* a connector's chip: its distance, and for a deployment leg the verdict of the server's analysis */
+.tz3-chip-wrap { cursor: pointer; }
+.tz3-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; border: 1.5px solid #9fb3bf; background: rgba(9, 27, 40, 0.92); color: #fff; font: 700 12px/1.5 Arabic, system-ui, sans-serif; white-space: nowrap; box-shadow: 0 4px 14px #0008; direction: rtl; cursor: pointer; }
+.tz3-chip i { font-style: normal; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; font-size: 11px; background: #64748b; }
+.tz3-chip.k-primary { border-color: #f59e0b; }
+.tz3-chip.k-alternative { border-color: #b06cf5; }
+.tz3-chip.t-ok i { background: #16a34a; }
+.tz3-chip.t-warn i { background: #d97706; }
+.tz3-chip.t-bad i { background: #dc2626; }
+.tz3-chip.t-pending i { background: #475569; }
+
+/* «تحليل طبيعة الأرض» in the context column */
+.tz-terrain { display: flex; flex-direction: column; gap: 8px; }
+.tz-terrain h4 { margin: 4px 0 2px; font-size: 13px; color: var(--tz-text, #e6eef2); }
+.tz-terrain-roles, .tz-terrain-legs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tz-terrain-roles .chip, .tz-terrain-legs .chip { font-size: 11.5px; padding: 3px 9px; display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; border: 1px solid var(--tz-line-2, #ffffff26); background: rgba(255, 255, 255, 0.05); color: var(--tz-text, #e6eef2); cursor: pointer; }
+.tz-terrain-roles .chip.active, .tz-terrain-legs .chip.active { background: #2563eb; border-color: #3b82f6; color: #fff; }
+.tz-terrain-facts { display: grid; grid-template-columns: 1fr; gap: 2px; margin: 0; }
+.tz-terrain-facts > div { display: flex; justify-content: space-between; gap: 6px; border-bottom: 1px solid var(--tz-line-2, #ffffff1a); padding: 2px 0; }
+.tz-terrain-facts dt { color: var(--tz-text-2, #a9bcc7); font-size: 12px; }
+.tz-terrain-facts dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tz-terrain-shares { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; }
+.tz-terrain-shares li { display: grid; grid-template-columns: minmax(0, 1.3fr) 1fr 42px; align-items: center; gap: 6px; }
+.tz-terrain-shares span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tz-terrain-shares i { display: block; height: 7px; border-radius: 4px; background: #64748b; }
+.tz-terrain-shares li.on i { background: #f59e0b; }
+.tz-terrain-shares li.on span { font-weight: 700; }
+.tz-terrain-shares b { text-align: left; font-variant-numeric: tabular-nums; }
+.tz-terrain-src { margin: 0; font-size: 11px; color: var(--tz-text-2, #a9bcc7); line-height: 1.5; }
+.tz-terrain-rule { border: 1px solid var(--tz-line-2, #ffffff1a); border-radius: 10px; padding: 6px 10px 8px; display: flex; flex-direction: column; gap: 4px; }
+.tz-terrain-rule dl { margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.tz-terrain-rule dl > div { display: flex; justify-content: space-between; gap: 8px; }
+.tz-terrain-rule dt { color: var(--tz-text-2, #a9bcc7); font-size: 12px; }
+.tz-terrain-rule dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tz-terrain-verdict { align-self: stretch; text-align: center; border-radius: 8px; padding: 4px 8px; font-weight: 700; background: #334155; color: #fff; }
+.tz-terrain-verdict.ok { background: #14532d; border: 1px solid #22c55e; color: #bbf7d0; }
+.tz-terrain-verdict.warn { background: #78350f; border: 1px solid #f59e0b; color: #fde68a; }
+.tz-terrain-verdict.bad { background: #7f1d1d; border: 1px solid #ef4444; color: #fecaca; }
+.tz-terrain-profile { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--tz-line-2, #ffffff1a); padding-top: 6px; }
+.tz-profile { margin: 0; }
+.tz-profile svg { width: 100%; height: auto; display: block; background: rgba(6, 18, 28, 0.6); border-radius: 8px; }
+.tz-profile svg text { fill: #9fb3bf; font: 9px system-ui, sans-serif; }
+.tz-profile svg .grid { stroke: #ffffff18; stroke-width: 1; }
+.tz-profile svg .line { fill: none; stroke: #4ade80; stroke-width: 1.8; }
+.tz-profile figcaption { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; font-size: 11.5px; color: var(--tz-text-2, #a9bcc7); margin-top: 4px; }
+.tz-profile figcaption b { color: var(--tz-text, #e6eef2); font-variant-numeric: tabular-nums; }
+
+/* «الانحدار»: the slope classes toggle and legend under the 2D | 3D switch */
+.tz-slope { position: absolute; z-index: 6; top: 54px; left: 12px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.tz-slope > button { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 9px; border: 1px solid rgba(160, 196, 214, 0.28); background: rgba(9, 27, 40, 0.92); color: #c9d6de; font: 700 12.5px/1 Arabic, system-ui, sans-serif; cursor: pointer; box-shadow: 0 6px 18px #0006; }
+.tz-slope > button.on { background: #0f766e; color: #fff; border-color: #14b8a6; }
+.tz-slope > button:disabled { opacity: 0.45; cursor: not-allowed; }
+.tz-slope-swatch { width: 14px; height: 10px; border-radius: 2px; background: linear-gradient(90deg, #2e9e4f, #9acd32, #f2d22e, #f28c28, #d7301f); }
+.tz-slope-legend { max-width: 250px; padding: 7px 10px; border-radius: 10px; background: rgba(9, 27, 40, 0.93); border: 1px solid rgba(160, 196, 214, 0.28); color: #e6eef2; direction: rtl; font: 12px/1.5 Arabic, system-ui, sans-serif; box-shadow: 0 6px 18px #0006; }
+.tz-slope-legend ul { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.tz-slope-legend li { display: flex; align-items: center; gap: 7px; }
+.tz-slope-legend li i { width: 16px; height: 10px; border-radius: 2px; opacity: 0.9; }
+.tz-slope-legend li small { margin-inline-start: auto; color: #a9bcc7; font-variant-numeric: tabular-nums; }
+.tz-slope-legend > small { color: #a9bcc7; font-size: 10.5px; line-height: 1.45; display: block; }

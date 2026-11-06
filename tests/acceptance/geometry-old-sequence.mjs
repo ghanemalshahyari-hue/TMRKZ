@@ -13,10 +13,16 @@ import { partVectors, proposedParts, recordOf, ringCentre, toNewSiteStep, toScre
 
 const UI = process.env.UI_URL ?? 'http://localhost:5180';
 const AUTH = process.env.AUTH_URL ?? 'http://localhost:8088';
-const OUT = fileURLToPath(new URL('../../docs/evidence/ui-rebuild/geometry-old-sequence/', import.meta.url));
+// EVIDENCE_DIR=<folder> keeps a regression run's evidence apart from the accepted run's
+const OUT = process.env.EVIDENCE_DIR ? process.env.EVIDENCE_DIR.replace(/[\/]?$/, '/') : fileURLToPath(new URL('../../docs/evidence/ui-rebuild/geometry-old-sequence/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 const PASSWORD = readFileSync(new URL('../../ops/test-env/.generated/user-password', import.meta.url), 'utf8').trim();
 const { chromium } = createRequire(new URL('./package.json', import.meta.url))('playwright-core');
+// POLY_UNIT / MP_UNIT / PT_UNIT name the units whose current site is a Polygon, a MultiPolygon and a marker (defaults: the
+// tmrkz-test fixtures)
+const POLY_UNIT = process.env.POLY_UNIT ?? 'الخدمات المشتركة';
+const MP_UNIT = process.env.MP_UNIT ?? 'قسم الخدمات العامة';
+const PT_UNIT = process.env.PT_UNIT ?? 'قسم النقل والحركة الإدارية';
 const SIZE = { width: 1440, height: 900 };
 const results = [];
 const step = (pass, id, what, detail = '') => {
@@ -40,7 +46,7 @@ await lp.goto(UI + '/');
 const state = await login.storageState();
 const countOf = (p) => p.evaluate(async () => (await (await fetch('/api/v1/restationing-requests')).json()).length);
 const count0 = await countOf(lp);
-const rec = await recordOf(lp, 'الخدمات المشتركة');
+const rec = await recordOf(lp, POLY_UNIT);
 await login.close();
 
 const tmp = OUT + '.video';
@@ -50,7 +56,8 @@ const page = await ctx.newPage();
 page.on('request', (q) => {
   const u = q.url();
   if (!u.startsWith(UI) && !u.startsWith(AUTH) && !u.startsWith('data:') && !u.startsWith('blob:')) external.push(u);
-  if (q.method() !== 'GET') writes.push(`${q.method()} ${u}`);
+  // the terrain analysis (6 Nov 2026) is a read-only POST — it carries a geometry and saves nothing — not a write
+  if (q.method() !== 'GET' && !u.endsWith('/api/v1/stationing/terrain/assess')) writes.push(`${q.method()} ${u}`);
 });
 page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
 page.on('pageerror', (e) => consoleErrors.push(e.message));

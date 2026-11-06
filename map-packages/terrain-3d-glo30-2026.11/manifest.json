@@ -1,0 +1,328 @@
+{
+  "code": "copernicus-glo30-3d",
+  "name": "3D visual terrain (Terrain-RGB) from Copernicus DEM GLO-30",
+  "version": "2026.11",
+  "kind": "VISUALIZATION",
+  "status": "display only — never an input to a business rule (the slope analysis of copernicus-glo30 is)",
+  "derivedFrom": {
+    "dataset": "terrain-glo30",
+    "version": "2026.11",
+    "manifest": "map-packages/terrain-glo30-2026.11/manifest.json",
+    "sourceTiles": [
+      {
+        "name": "Copernicus_DSM_COG_10_N22_00_E051_00_DEM.tif",
+        "code": "N22E051",
+        "bytes": 45650188,
+        "sha256": "2ba7014e80b32d761b21581a6682d0c4af223037db5d44038aa252fcb9800716"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N22_00_E052_00_DEM.tif",
+        "code": "N22E052",
+        "bytes": 48348835,
+        "sha256": "fda289a942c62afabdab107a9457435c1314ef3ac1dbf4de79161cb2a37b530d"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N22_00_E053_00_DEM.tif",
+        "code": "N22E053",
+        "bytes": 49450340,
+        "sha256": "7c26fc16425d639c5a06fadf5126211d786a0f97da179884c3e70aa983bb0faf"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N22_00_E054_00_DEM.tif",
+        "code": "N22E054",
+        "bytes": 48277338,
+        "sha256": "a33e0813eb483f685034c491b78af126bb7736d64c29da0249e6eb68d679b882"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N22_00_E055_00_DEM.tif",
+        "code": "N22E055",
+        "bytes": 42890050,
+        "sha256": "eea9c91614bff5053b22462635120b481bbddcdb846d8ba06ac2a5db3815d306"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N22_00_E056_00_DEM.tif",
+        "code": "N22E056",
+        "bytes": 40836407,
+        "sha256": "aa00f2e3d13a0930225960b5c0ce9fa47a4b464062462b90278125a70a4d95c3"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N23_00_E051_00_DEM.tif",
+        "code": "N23E051",
+        "bytes": 46900427,
+        "sha256": "59875875d47ba8cbb15384191fbd7944467ca7333973cce90856a92fe8da3703"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N23_00_E052_00_DEM.tif",
+        "code": "N23E052",
+        "bytes": 47811306,
+        "sha256": "de32b083017370d53ecbebf22fc87722605fc14ac7b153b4afa5711d4b6e7576"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N23_00_E053_00_DEM.tif",
+        "code": "N23E053",
+        "bytes": 48561117,
+        "sha256": "1b6bb95ecf03a2e89d0f10cae5cd125ffdfd49994f0dbe6ba6c3242bde699a96"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N23_00_E054_00_DEM.tif",
+        "code": "N23E054",
+        "bytes": 48740943,
+        "sha256": "bb613ea45fc3242aee28ba307478d936fc62cd0e090795ea200ec71c3c3ce841"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N23_00_E055_00_DEM.tif",
+        "code": "N23E055",
+        "bytes": 43138750,
+        "sha256": "31fe2c52db8c4ac03b73c5c496478e493b3466dec4c5c01e92eccef965960a43"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N23_00_E056_00_DEM.tif",
+        "code": "N23E056",
+        "bytes": 42970043,
+        "sha256": "6795a35f7a7b980acc88692689a170246fd1914d65ffaa504d0b244423890870"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N24_00_E051_00_DEM.tif",
+        "code": "N24E051",
+        "bytes": 26885216,
+        "sha256": "24dd2af0ff4cd73e88eaab8d8aa0c3a8e248cdc733e30cb98333ec6d22cad9f2"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N24_00_E052_00_DEM.tif",
+        "code": "N24E052",
+        "bytes": 5283343,
+        "sha256": "b174a0654b34f9933c4851655b79802bda24d17a0ad9f22435749af574afeb69"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N24_00_E053_00_DEM.tif",
+        "code": "N24E053",
+        "bytes": 7322975,
+        "sha256": "03a887d778a994352ffbe690824ac47fca9ad2b4cbca5a481daea519dcfefef9"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N24_00_E054_00_DEM.tif",
+        "code": "N24E054",
+        "bytes": 28282630,
+        "sha256": "aa3b6d63c48d46242ef313c5c7be098867d2a5459d43d4f1a71b04510c428793"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N24_00_E055_00_DEM.tif",
+        "code": "N24E055",
+        "bytes": 43713741,
+        "sha256": "bb98178567b880aa6b66fcf48ec11bade94c13236ae63ec8e8c0e894b54225b3"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N24_00_E056_00_DEM.tif",
+        "code": "N24E056",
+        "bytes": 30873705,
+        "sha256": "bfe784101727ab7d641a243b6bf7cbfc92e6d9195b92170b4e649aa1c17c125d"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N25_00_E051_00_DEM.tif",
+        "code": "N25E051",
+        "bytes": 27243413,
+        "sha256": "4c8c0c82e870c071a5f9f373f6526914382edf99b00dfac72805b09b8ecc2f8c"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N25_00_E052_00_DEM.tif",
+        "code": "N25E052",
+        "bytes": 135237,
+        "sha256": "96c5de4844bf437d87419981cad429780f304c6426e77ce8815b7492f5bbe62b"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N25_00_E054_00_DEM.tif",
+        "code": "N25E054",
+        "bytes": 313530,
+        "sha256": "72c65f62b0fdf017562bd58b23c5330eb5589725ca02f0b4cd601f909a61cd54"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N25_00_E055_00_DEM.tif",
+        "code": "N25E055",
+        "bytes": 22291663,
+        "sha256": "eef300a92e416071e8cf9fdba8018126de8a7af1fae7b0068a1b360f9ff522fd"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N25_00_E056_00_DEM.tif",
+        "code": "N25E056",
+        "bytes": 17482544,
+        "sha256": "41efa33154e8d90d2273577c454f247fca8ad35a5ff4b14fed2b29c5de499909"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N26_00_E051_00_DEM.tif",
+        "code": "N26E051",
+        "bytes": 2078581,
+        "sha256": "92b668a43e8e9930b4896f353b87f1ee9c5429e5583f9871f0edada77018f239"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N26_00_E053_00_DEM.tif",
+        "code": "N26E053",
+        "bytes": 7440659,
+        "sha256": "6e9060f1ad321ac5c0b144bc73b5945da50ca2d90a368fab6a2b14fa4fbf8a9f"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N26_00_E054_00_DEM.tif",
+        "code": "N26E054",
+        "bytes": 19175086,
+        "sha256": "6e0da9ee706bea763c1e410f6da6ce188c3269de1de97d5496961f4b67fd7fff"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N26_00_E055_00_DEM.tif",
+        "code": "N26E055",
+        "bytes": 14203836,
+        "sha256": "6a1a7b403fb2e0fdda7ee12ac5b2ddb85051b79547ec85ab7149962d6adc687f"
+      },
+      {
+        "name": "Copernicus_DSM_COG_10_N26_00_E056_00_DEM.tif",
+        "code": "N26E056",
+        "bytes": 6775419,
+        "sha256": "084a330741202377007347bffaae7fdbd09eb1c369af0e4c0ce789afeae16ca2"
+      }
+    ],
+    "absentCells": [
+      {
+        "cell": "N25E053",
+        "verdict": "OPEN_SEA",
+        "glo30_neighbour_edges": [
+          {
+            "tile": "Copernicus_DSM_COG_10_N24_00_E053_00_DEM.tif",
+            "side": "north",
+            "samples": 3600,
+            "min_m": 0.0,
+            "max_m": 0.0,
+            "share_exactly_0": 1.0,
+            "share_above_2m": 0.0
+          },
+          {
+            "tile": "Copernicus_DSM_COG_10_N26_00_E053_00_DEM.tif",
+            "side": "south",
+            "samples": 3600,
+            "min_m": 0.0,
+            "max_m": 0.0,
+            "share_exactly_0": 1.0,
+            "share_above_2m": 0.0
+          },
+          {
+            "tile": "Copernicus_DSM_COG_10_N25_00_E052_00_DEM.tif",
+            "side": "east",
+            "samples": 3600,
+            "min_m": 0.0,
+            "max_m": 0.0,
+            "share_exactly_0": 1.0,
+            "share_above_2m": 0.0
+          },
+          {
+            "tile": "Copernicus_DSM_COG_10_N25_00_E054_00_DEM.tif",
+            "side": "west",
+            "samples": 3600,
+            "min_m": 0.0,
+            "max_m": 0.0,
+            "share_exactly_0": 1.0,
+            "share_above_2m": 0.0
+          }
+        ],
+        "srtm": {
+          "file": "N25E053.hgt.gz",
+          "size": 3601,
+          "min_m": -79,
+          "max_m": -11,
+          "samples_above_0m": 0,
+          "voids": 0
+        }
+      },
+      {
+        "cell": "N26E052",
+        "verdict": "OPEN_SEA",
+        "glo30_neighbour_edges": [
+          {
+            "tile": "Copernicus_DSM_COG_10_N25_00_E052_00_DEM.tif",
+            "side": "north",
+            "samples": 3600,
+            "min_m": 0.0,
+            "max_m": 0.0,
+            "share_exactly_0": 1.0,
+            "share_above_2m": 0.0
+          },
+          {
+            "tile": "Copernicus_DSM_COG_10_N26_00_E051_00_DEM.tif",
+            "side": "east",
+            "samples": 3600,
+            "min_m": 0.0,
+            "max_m": 0.0,
+            "share_exactly_0": 1.0,
+            "share_above_2m": 0.0
+          },
+          {
+            "tile": "Copernicus_DSM_COG_10_N26_00_E053_00_DEM.tif",
+            "side": "west",
+            "samples": 3600,
+            "min_m": 0.0,
+            "max_m": 0.0,
+            "share_exactly_0": 1.0,
+            "share_above_2m": 0.0
+          }
+        ],
+        "srtm": {
+          "file": "N26E052.hgt.gz",
+          "size": 3601,
+          "min_m": -87,
+          "max_m": -9,
+          "samples_above_0m": 0,
+          "voids": 0
+        }
+      }
+    ]
+  },
+  "limitation": "Copernicus GLO-30 is a Digital Surface Model (DSM), not bare-earth DTM; it may include buildings, infrastructure and vegetation. It is not official UAE bare-earth terrain.",
+  "processing": {
+    "version": "tmrkz-terrain-3d-1.0.0",
+    "tool": "ops/terrain/build_terrain_3d.py (Python, rasterio/GDAL, numpy, Pillow, pmtiles; ops/terrain/requirements.txt)",
+    "mosaic": "VRT of all source tiles (the same grid as the slope analysis)",
+    "finestZoom": "bilinear reprojection of the mosaic to Web Mercator 256 px tiles",
+    "coarserZooms": "mean of the four children's samples",
+    "noData": "the absent open-sea cells are sea level (0 m)",
+    "encoding": "MAPBOX_TERRAIN_RGB_0.1M",
+    "formula": "height_m = -10000 + (R*65536 + G*256 + B) * 0.1",
+    "verticalDatum": "EGM2008 geoid (as the source), metres"
+  },
+  "product": {
+    "file": "terrain-rgb.pmtiles",
+    "format": "PMTiles v3, PNG (RGB) 256 px Terrain-RGB, Web Mercator",
+    "mapLibre": {
+      "type": "raster-dem",
+      "encoding": "mapbox",
+      "tileSize": 256
+    },
+    "minzoom": 6,
+    "maxzoom": 12,
+    "bounds": [
+      50.9998611,
+      22.0001389,
+      56.9998611,
+      27.0001389
+    ],
+    "tiles": 5932,
+    "tilesPerZoom": {
+      "6": 2,
+      "7": 6,
+      "8": 20,
+      "9": 80,
+      "10": 288,
+      "11": 1120,
+      "12": 4416
+    },
+    "heightRangeM": [
+      -16.2,
+      2629.1
+    ],
+    "bytes": 208669916,
+    "sha256": "c31bf31acfa2661b9f8c3cce15618a88afe52df223695278a29161ae581df8a7"
+  },
+  "licence": {
+    "title": "Licence for Copernicus DEM instance COP-DEM-GLO-30-F Global 30m Full, Free & Open — Licence for the use of the Copernicus WorldDEM-30",
+    "instance": "COP-DEM-GLO-30-F",
+    "url": "https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
+    "documentSha256": "9cd37d37ea654bbcaf0a2e059e6a3a5b5f76072824d8dd860ccf274ada8951bd",
+    "modifiedDataAttribution": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "noLiability": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30"
+  }
+}

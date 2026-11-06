@@ -12,6 +12,7 @@ import {
   type BasemapMode,
   type HillshadeSource,
   type LabelLanguage,
+  type Terrain3dSource,
 } from './offlineStyle';
 import { ensureOfflineMapSetup } from './setup';
 import { MAP_FONT_URL } from './mapPackage';
@@ -27,6 +28,7 @@ export function OfflineMapLibre({
   basemapUrl,
   fontUrl = MAP_FONT_URL,
   hillshade = null,
+  terrain3d = null,
   mode,
   labels = 'ar',
   center,
@@ -41,6 +43,8 @@ export function OfflineMapLibre({
   basemapUrl: string;
   fontUrl?: string;
   hillshade?: HillshadeSource | null;
+  /** The 3D view's elevation tiles, when the installed package carries them (the 3D view is turned on by the page). */
+  terrain3d?: Terrain3dSource | null;
   mode: BasemapMode;
   labels?: LabelLanguage;
   center: [number, number];
@@ -68,6 +72,7 @@ export function OfflineMapLibre({
         basemapUrl: abs(basemapUrl),
         fontUrl: abs(fontUrl),
         hillshade: hillshade && { ...hillshade, url: abs(hillshade.url) },
+        terrain3d: terrain3d && { ...terrain3d, url: abs(terrain3d.url) },
         mode: initial.current.mode,
         labels: initial.current.labels,
       }),
@@ -94,7 +99,7 @@ export function OfflineMapLibre({
     };
     // the style is built once; mode changes go through setBasemapMode below
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basemapUrl, fontUrl, hillshade?.url, hillshade?.kind]);
+  }, [basemapUrl, fontUrl, hillshade?.url, hillshade?.kind, terrain3d?.url]);
 
   useEffect(() => {
     const map = mapRef.current;

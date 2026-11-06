@@ -43,6 +43,15 @@ working tree (never a release), memory caps, and illustrative development values
 VITE_STATIONING_V3=true npx vite --config vite.dev.config.mjs --host 127.0.0.1`, then «إعادة التمركز» at `http://127.0.0.1:5173/#restationing`. It is
 never the acceptance (`tmrkz-test`) or production (`tmrkz-mover`) project.
 
+**3D terrain on the development environment (6 Nov 2026, ADR-038).** In this order:
+1. `dev-v3.sh build`, `up` and `seed`.
+2. Load the slope analysis: `CONFIRM_TARGET=tmrkz-v3dev sh ops/terrain/load-slope.sh tmrkz-v3dev 2026.11`.
+3. Add the fictional sites on real Hajar-foothill relief and policy `DEV-3D`: `docker exec -i tmrkz-v3dev-db-1 psql -U
+   mover -d mover -v ON_ERROR_STOP=1 -f - < ops/test-env/dev-3d-terrain-seed.sql`. Policy `DEV-3D` holds the owner's
+   acceptance values and the labelled 90,000 m² initial area, not production values.
+4. Install `tmrkz-map-2026.11.2` into `map-data/runtime-3d` with `ops/map-package/install_package.py`.
+5. Run the dev server with `TMRKZ_MAP_ROOT=../map-data/runtime-3d` (port 5197 in `tests/acceptance/terrain-3d.mjs`).
+
 Open `http://localhost:8088` and choose either **الدخول الآلي بالحساب المؤسسي** (Keycloak) or **إدخال اسم المستخدم
 وكلمة المرور يدوياً** (checked by the directory). Keycloak shows the TMRKZ sign-in page. The
 directory (OpenLDAP, StartTLS with a test CA that only this environment trusts) verifies the password, and TMRKZ links

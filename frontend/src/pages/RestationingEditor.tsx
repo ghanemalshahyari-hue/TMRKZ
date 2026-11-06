@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScaleControl, type MapLayerMouseEvent, type MapLayerTouchEvent, type Map as MlMap, type MapMouseEvent } from 'maplibre-gl';
+import { NavigationControl, ScaleControl, type MapLayerMouseEvent, type MapLayerTouchEvent, type Map as MlMap, type MapMouseEvent } from 'maplibre-gl';
 import { api } from '../api/client';
-import type { GeoPolygon, RestationingChecks, RestationingContent, RestationingLeg, RestationingRequest, RestationingUnit, SiteGeometry } from '../api/types';
-import { SITE_LOOK, SiteEditor, addOverlayLayer, type EditorLook, type SiteLive } from '../components/map/maplibre';
-import type { BasemapMode } from '../components/map/maplibre/offlineStyle';
+import type { GeoPolygon, RestationingChecks, RestationingContent, RestationingLeg, RestationingRequest, RestationingUnit, SiteGeometry, StationingPolicyValues } from '../api/types';
+import { DemSampler, SITE_LOOK, SiteEditor, addOverlayLayer, frame, installedTerrain3d, showSlope, type EditorLook, type MapView, type SiteLive } from '../components/map/maplibre';
+import type { BasemapMode, Terrain3dSource } from '../components/map/maplibre/offlineStyle';
 import { Icon } from '../components/ui';
 import { ApprovalRouteStrip } from '../components/workspace/ApprovalRouteStrip';
 import { DeploymentCheckCard } from '../components/workspace/DeploymentCheckCard';
@@ -12,6 +12,8 @@ import { RequestContext, SiteSearch, StepTracker } from '../components/workspace
 import { OperationalWorkspace } from '../components/workspace/OperationalWorkspace';
 import { MAP_COLOURS, RequestMap } from '../components/workspace/RequestMap';
 import { StatePill } from '../components/workspace/StatePill';
+import { ROLE_TITLE, SlopeControl, TerrainPanel, cardLines, geometryKey, useAreaInsight, useProfile } from '../components/workspace/TerrainPanel';
+import { TerrainCards, type CardRole, type CardSpec, type ChipSpec } from '../components/workspace/terrainCards';
 import { useRegisteredSites } from '../components/workspace/useRegisteredSites';
 import { useApp } from '../lib/app';
 import { formatArea, formatMeters } from '../lib/footprint';
@@ -19,7 +21,8 @@ import { parseCoordinates } from '../lib/coords';
 import { describeAreaDefault, initialArea, resolveAreaDefault, type AreaDefault } from '../lib/deploymentDefault';
 import { legText } from '../lib/requestMap';
 import { distanceM, type LatLng } from '../lib/geo';
-import { anchorOf, partsOf, validateSite } from '../lib/siteGeometry';
+import { anchorOf, labelPoint, partsOf, validateSite } from '../lib/siteGeometry';
+import { VERDICT, connectors, discrepancy, previewLeg, serverLegFor, type Connector, type ConnectorKind } from '../lib/terrainAnalysis';
 import { renderSymbol } from '../lib/unitSymbols';
 import { canOpen as flowCanOpen, completed, deriveRequesting, firstOpen, unitsAtSite, type FlowInput, type FlowStep } from '../lib/newRequestFlow';
 import { occupiedFeatures, occupiedSites, overlapsOccupied } from '../lib/occupied';
@@ -30,12 +33,21 @@ type Placing = 'site' | 'primary' | 'alternative' | null;
 
 /** A deployment area is edited on the map with the site's own editor (owner, 5 Nov 2026), in its own colour and tag. */
 const AREA_LOOK: Record<'primary' | 'alternative', EditorLook> = {
-  primary: { tag: 'الانتشار الرئيسي', stroke: '#2f9a55', fill: '#2f9a55', symbol: false },
+  primary: { tag: 'الانتشار الرئيسي', stroke: '#d9822b', fill: '#e8963a', symbol: false },
   alternative: { tag: 'الانتشار البديل', stroke: '#7b4fc0', fill: '#7b4fc0', symbol: false },
 };
 /** The re-stationing move is information only: no minimum, no maximum, no verdict. */
 const MOVE_LABEL = (d: number) => ({ text: 'المسافة: ' + formatMeters(d) + ' — للعلم فقط', tone: 'none' as const });
 const isoDay = (s?: string | null) => (s ? s.slice(0, 10) : '');
+const kmText = (m: number) => (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 2 }) + ' كم';
+const midpoint = (c: Connector) => ({ lat: (c.from.lat + c.to.lat) / 2, lng: (c.from.lng + c.to.lng) / 2 });
+/** The geometry a card stands for, and the connector that measures it (the leg ending at it). */
+const ROLE_OF_TARGET = { site: 'SITE', primary: 'PRIMARY', alternative: 'ALTERNATIVE' } as const;
+const LEG_OF_ROLE: Record<CardRole, ConnectorKind> = { CURRENT: 'move', SITE: 'move', PRIMARY: 'primary', ALTERNATIVE: 'alternative' };
+const ROLE_OF_LEG: Record<ConnectorKind, CardRole> = { move: 'SITE', primary: 'PRIMARY', alternative: 'ALTERNATIVE' };
+const ROLE_OF_LEG_KIND = { primary: 'PRIMARY', alternative: 'ALTERNATIVE' } as const;
+/** The connectors a moving shape changes: the one ending at it and the one leaving it. */
+const TOUCHES: Record<CardRole, ConnectorKind[]> = { CURRENT: ['move'], SITE: ['move', 'primary'], PRIMARY: ['primary', 'alternative'], ALTERNATIVE: ['alternative'] };
 const dayStart = (d: string) => (d ? new Date(d + 'T00:00:00+04:00').toISOString() : null);
 /** The question of each step, in the left panel. */
 const QUESTION: Record<FlowStep, string> = {
@@ -91,6 +103,16 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   const [checks, setChecks] = useState<RestationingChecks | null>(null);
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<BasemapMode>('street');
+  // «2D | 3D» (owner brief «TRUE OFFLINE 3D TERRAIN», 6 Nov 2026): presentation only — the request, the edited geometry,
+  // its history and the selection never change with it. 3D needs the installed package's elevation tiles.
+  const [view, setViewState] = useState<MapView>('2d');
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const [terrain3d, setTerrain3d] = useState<Terrain3dSource | null | undefined>(undefined);
+  useEffect(() => {
+    installedTerrain3d().then(setTerrain3d);
+  }, []);
+  const sampler = useMemo(() => (terrain3d ? new DemSampler(terrain3d.url) : null), [terrain3d]);
   const placingRef = useRef<Placing>(null);
   placingRef.current = placing;
   const clickRef = useRef<(e: MapMouseEvent) => void>(() => undefined);
@@ -119,10 +141,12 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   const [policyAreaDefault, setPolicyAreaDefault] = useState<AreaDefault | null>(null);
   // the version in force and its reference: an acceptance environment's test value says so there
   const [policyVersion, setPolicyVersion] = useState<{ version: number; reference: string | null } | null>(null);
+  const [policyValues, setPolicyValues] = useState<StationingPolicyValues | null>(null);
   useEffect(() => {
     api
       .stationingPolicy()
       .then((p) => {
+        setPolicyValues(p.inForce?.values ?? null);
         setPolicyMaxArea(p.inForce?.values.maxFootprintAreaM2 ?? null);
         setPolicyAreaDefault((p.inForce?.values as { deploymentAreaDefault?: AreaDefault | null } | undefined)?.deploymentAreaDefault ?? null);
         setPolicyVersion(p.inForce ? { version: p.inForce.version, reference: p.inForce.reference } : null);
@@ -240,12 +264,18 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     };
     m.on('mousedown', 'rs-hatch', pickArea);
     m.on('touchstart', 'rs-hatch', pickArea);
+    m.on('mousedown', 'rs-area-fill', pickArea);
+    m.on('touchstart', 'rs-area-fill', pickArea);
+    // the 3D view's cards and connector chips on the ground: a click selects what the terrain panel shows
+    cardsRef.current = new TerrainCards(m, (r) => selectRef.current(r, null), (k) => selectRef.current(ROLE_OF_LEG[k], k));
     setMapReady(true);
   };
   const onSiteRef = useRef(onSite);
   onSiteRef.current = onSite;
   useEffect(() => () => editorRef.current?.destroy(), []);
   const mapInst = useRef<MlMap | null>(null);
+  const cardsRef = useRef<TerrainCards | null>(null);
+  useEffect(() => () => cardsRef.current?.destroy(), []);
   // the accepted Stationing editor's marks (owner, 5 Nov 2026): the organisation's symbol on the proposal and on the
   // current site (a neutral pin without one); while the new site is placed the move is measured from the current site
   const symbolOrg = content.scope[0] ?? null;
@@ -278,8 +308,8 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     const at = origin;
     const legFrom = step === 5 ? (deployTarget === 'primary' ? content.site?.geometry ?? null : ((content.primary as SiteGeometry | null) ?? null)) : null;
     ed.setOrigin(placingSite && current && at ? { at, label: current.name + ' · الموقع الحالي' } : legFrom ? { at: anchorOf(partsOf(legFrom)), label: null } : null);
-    const l = step === 5 ? checks?.legs?.find((x) => x.leg === deployTarget) : undefined;
-    ed.setDistanceLabel(placingSite ? MOVE_LABEL : step === 5 ? (d: number) => legText(d, l) : null);
+    // a deployment leg's chip follows the same rule as the terrain panel (set below, with the leg's analysis)
+    if (step !== 5) ed.setDistanceLabel(placingSite ? MOVE_LABEL : null);
     // the current site's name is then on its own tag (with the symbol), not as a map label
     if (m.getLayer('rs-label')) m.setFilter('rs-label', placingSite ? ['all', ['has', 'label'], ['!=', ['get', 'role'], 'CURRENT']] : ['has', 'label']);
     const refLabel: ['in', ['get', string], ['literal', string[]]] = ['in', ['get', 'role'], ['literal', ['REF_LABEL', 'REF_MARKER']]];
@@ -315,7 +345,10 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     const r = area ? 900 : (l?.effectiveMaxM ?? 6000) * 1.05;
     const dLat = r / 110_900;
     const dLng = r / (111_320 * Math.cos((o.lat * Math.PI) / 180));
-    m.fitBounds([[o.lng - dLng, o.lat - dLat], [o.lng + dLng, o.lat + dLat]], { duration: 400, padding: { top: 40, right: 40, bottom: 150, left: 70 } });
+    // in 3D the same view, tilted (owner brief §29: the leg's two ends, never somewhere unrelated)
+    const pts = [{ lat: o.lat - dLat, lng: o.lng - dLng }, { lat: o.lat + dLat, lng: o.lng + dLng }];
+    if (area && viewRef.current === '3d') pts.push(anchorOf(partsOf(from)));
+    frame(m, pts, viewRef.current, { duration: 400, padding: { top: 40, right: 40, bottom: 150, left: 70 }, maxZoom: 22 });
   };
   // the next map click places the shape: crosshair while waiting for it
   useEffect(() => {
@@ -440,6 +473,182 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   occupiedRef.current = occupied;
   const occupiedFc = useMemo(() => occupiedFeatures(occupied), [occupied]);
   const leg = (k: 'primary' | 'alternative') => checks?.legs?.find((l) => l.leg === k);
+
+  // ---- terrain: the geometries, their analysis, the connectors and the 3D view (owner brief «TRUE OFFLINE 3D TERRAIN»)
+  const [pickedRole, setPickedRole] = useState<CardRole | null>(null);
+  const [pickedLeg, setPickedLeg] = useState<ConnectorKind | null>(null);
+  useEffect(() => {
+    setPickedRole(null);
+    setPickedLeg(null);
+  }, [step, deployTarget]);
+  const geo: Record<CardRole, SiteGeometry | null> = {
+    CURRENT: step >= 4 ? currentShape : null,
+    SITE: step >= 4 ? content.site?.geometry ?? null : null,
+    PRIMARY: step >= 4 ? ((content.primary as SiteGeometry | null) ?? null) : null,
+    ALTERNATIVE: step >= 4 ? ((content.alternative as SiteGeometry | null) ?? null) : null,
+  };
+  const geoRef = useRef(geo);
+  geoRef.current = geo;
+  const roles = (['CURRENT', 'SITE', 'PRIMARY', 'ALTERNATIVE'] as CardRole[]).filter((r) => geo[r]);
+  const defaultRole: CardRole | null = step === 5 ? (deployTarget === 'primary' ? 'PRIMARY' : 'ALTERNATIVE') : step >= 4 ? 'SITE' : null;
+  const selectedRole = pickedRole && geo[pickedRole] ? pickedRole : defaultRole && geo[defaultRole] ? defaultRole : roles[0] ?? null;
+  const pinnedVersion = loaded?.policyVersion ?? null;
+  const insights: Record<CardRole, ReturnType<typeof useAreaInsight>> = {
+    CURRENT: useAreaInsight(geo.CURRENT, sampler, pinnedVersion),
+    SITE: useAreaInsight(geo.SITE, sampler, pinnedVersion),
+    PRIMARY: useAreaInsight(geo.PRIMARY, sampler, pinnedVersion),
+    ALTERNATIVE: useAreaInsight(geo.ALTERNATIVE, sampler, pinnedVersion),
+  };
+  const conns = connectors({ current: geo.CURRENT, site: geo.SITE, primary: geo.PRIMARY, alternative: geo.ALTERNATIVE });
+  /** A deployment leg's rule: the server's check when it checked exactly this geometry, otherwise the analysis preview. */
+  const ruleOf = (k: 'primary' | 'alternative') => {
+    const c = conns.find((x) => x.kind === k);
+    const preview = previewLeg(k, c?.distanceM ?? null, insights[ROLE_OF_LEG_KIND[k]]?.assess ?? null, policyValues);
+    const keyOf = (site: unknown, primary: unknown, alternative: unknown) =>
+      geometryKey(site as SiteGeometry) + '|' + geometryKey(primary as SiteGeometry) + (k === 'alternative' ? '|' + geometryKey(alternative as SiteGeometry) : '');
+    const server = serverLegFor(k, checks, loaded ? keyOf(loaded.content.site?.geometry, loaded.content.primary, loaded.content.alternative) : null, keyOf(geo.SITE, geo.PRIMARY, geo.ALTERNATIVE));
+    return { leg: server ?? preview, source: (server ? 'server' : 'preview') as 'server' | 'preview', discrepancy: discrepancy(preview, server) };
+  };
+  const rules = { primary: ruleOf('primary'), alternative: ruleOf('alternative') };
+  // the edited leg's chip on the map: the server's check of exactly this geometry, otherwise the preview of the
+  // server's analysis of the area where it now is — never the range of a check made before the area moved
+  const legsKey = JSON.stringify([rules.primary.leg, rules.alternative.leg].map((l) => l && [l.status, l.effectiveMinM, l.effectiveMaxM, l.baseMaxM, l.exceptionMaxM]));
+  useEffect(() => {
+    if (step !== 5 || !mapReady) return;
+    const l = rules[deployTarget].leg;
+    editorRef.current?.setDistanceLabel((d: number) => legText(d, l));
+  }, [step, deployTarget, legsKey, mapReady, content.site, content.primary, checks]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** The legs as the map labels them (the same rule as the panel); the server's checks keep their own card. */
+  const mapChecks: RestationingChecks | null =
+    step >= 5 ? { ...(checks ?? { ok: true, problems: [], policyVersion: null }), legs: [rules.primary.leg, rules.alternative.leg].filter((l): l is RestationingLeg => !!l) } : null;
+  const legKind = pickedLeg && conns.some((c) => c.kind === pickedLeg) ? pickedLeg : selectedRole && conns.some((c) => c.kind === LEG_OF_ROLE[selectedRole]) ? LEG_OF_ROLE[selectedRole] : conns[0]?.kind ?? null;
+  const legConn = conns.find((c) => c.kind === legKind) ?? null;
+  const profile = useProfile(legConn, sampler);
+  const chipOf = (c: Connector): ChipSpec => {
+    if (c.kind === 'move') return { kind: 'move', at: midpoint(c), from: c.from, to: c.to, text: kmText(c.distanceM) + ' — للعلم فقط', tone: 'none', title: c.fromLabel + ' ← ' + c.toLabel + ': للعلم فقط، لا قيد' };
+    const r = rules[c.kind];
+    const pending = insights[ROLE_OF_LEG[c.kind]]?.pending;
+    // the leg in focus says its rule on the map: distance · effective range · verdict (the server decides on save)
+    const rule = r.leg && legKind === c.kind ? ` · الفعّال ${(r.leg.effectiveMinM / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 2 })}–${kmText(r.leg.effectiveMaxM)} · ${VERDICT[r.leg.status].text}` : '';
+    return { kind: c.kind, at: midpoint(c), from: c.from, to: c.to, text: kmText(c.distanceM) + rule, tone: r.leg ? VERDICT[r.leg.status].tone : pending ? 'pending' : 'none', title: c.fromLabel + ' ← ' + c.toLabel + (r.leg ? ' · ' + VERDICT[r.leg.status].text : '') };
+  };
+  const cardOf = (r: CardRole): CardSpec => {
+    const extra: [string, string][] = [];
+    const move = conns.find((c) => c.kind === 'move');
+    if (r === 'SITE' && move) extra.push(['من الموقع الحالي', kmText(move.distanceM) + ' — للعلم فقط']);
+    if (r === 'PRIMARY' || r === 'ALTERNATIVE') {
+      const l = rules[r === 'PRIMARY' ? 'primary' : 'alternative'].leg;
+      if (l?.distanceM != null) extra.push(['المسافة', kmText(l.distanceM)], ['الحد الفعّال', 'حتى ' + kmText(l.effectiveMaxM)], ['الحكم', VERDICT[l.status].text]);
+    }
+    const { compact, lines } = cardLines(r, insights[r], extra);
+    return { role: r, at: labelPoint(geo[r]!), title: ROLE_TITLE[r], sub: r === 'CURRENT' ? current?.name ?? loaded?.currentSites[0]?.site.name : undefined, compact, lines, selected: r === selectedRole };
+  };
+  // the cards and chips follow every committed change; the editor's own drag frames move them in place (below)
+  useEffect(() => {
+    const cards = cardsRef.current;
+    if (!cards) return;
+    cards.setVisible(view === '3d' && step >= 4);
+    cards.setCards(roles.map(cardOf));
+    cards.setChips(conns.map(chipOf));
+  });
+  useEffect(() => {
+    const listeners = liveListeners.current;
+    const follow = (live: SiteLive) => {
+      const cards = cardsRef.current;
+      if (!cards || viewRef.current !== '3d' || !live.geometry || live.mode === 'draw') return;
+      const role = ROLE_OF_TARGET[editTargetRef.current];
+      cards.moveCard(role, labelPoint(live.geometry));
+      const g = { ...geoRef.current, [role]: live.geometry };
+      for (const c of connectors({ current: g.CURRENT, site: g.SITE, primary: g.PRIMARY, alternative: g.ALTERNATIVE }))
+        if (TOUCHES[role].includes(c.kind)) cards.moveChip(c.kind, midpoint(c), kmText(c.distanceM) + (c.kind === 'move' ? ' — للعلم فقط' : ''));
+    };
+    listeners.add(follow);
+    return () => {
+      listeners.delete(follow);
+    };
+  }, []);
+  // «الانحدار»: the policy's slope classes over the ground (display only), in 2D and 3D
+  const [slopeOn, setSlopeOn] = useState(false);
+  const bands = policyValues?.terrainSlopeClassification?.classes ?? null;
+  useEffect(() => {
+    const m = mapInst.current;
+    if (!m || !mapReady || !terrain3d || !bands) return;
+    showSlope(m, slopeOn, mode, terrain3d.url, bands);
+  }, [slopeOn, mode, mapReady, terrain3d, bands]);
+  // the compass (with the tilt) while the view is 3D
+  const compass = useRef<NavigationControl | null>(null);
+  useEffect(() => {
+    const m = mapInst.current;
+    if (!m || !mapReady) return;
+    if (view === '3d' && !compass.current) {
+      compass.current = new NavigationControl({ showZoom: false, visualizePitch: true });
+      m.addControl(compass.current, 'top-left');
+    } else if (view === '2d' && compass.current) {
+      m.removeControl(compass.current);
+      compass.current = null;
+    }
+  }, [view, mapReady]);
+  /**
+   * Selecting a geometry (its card, chip or the panel) shows its analysis; in 3D the camera also frames it with the
+   * geometry its leg starts from (§29: proposed with current, primary with proposed, alternative with primary).
+   */
+  const select = (r: CardRole, k: ConnectorKind | null) => {
+    setPickedRole(r);
+    setPickedLeg(k);
+    const m = mapInst.current;
+    if (!m || viewRef.current !== '3d') return;
+    const g = geoRef.current;
+    if (k) {
+      // a connector: both of its ends
+      const ends: Record<ConnectorKind, CardRole[]> = { move: ['CURRENT', 'SITE'], primary: ['SITE', 'PRIMARY'], alternative: ['PRIMARY', 'ALTERNATIVE'] };
+      const points = ends[k].flatMap((x) => (g[x] ? partsOf(g[x]!).flatMap((p) => p[0]) : []));
+      if (points.length) frame(m, points, '3d', { maxZoom: 15.5 });
+      return;
+    }
+    // a geometry: itself, with enough of the ground around it to read the slopes it lies on (at least about 2 km)
+    if (!g[r]) return;
+    const pts = partsOf(g[r]!).flatMap((p) => p[0]);
+    const c = anchorOf(partsOf(g[r]!));
+    const dLat = 1000 / 110_900;
+    const dLng = 1000 / (111_320 * Math.cos((c.lat * Math.PI) / 180));
+    frame(m, [...pts, { lat: c.lat - dLat, lng: c.lng - dLng }, { lat: c.lat + dLat, lng: c.lng + dLng }], '3d', { maxZoom: 16 });
+  };
+  const selectRef = useRef(select);
+  selectRef.current = select;
+  /** «الحدود والمناطق»: every geometry of the request in view (tilted in 3D). */
+  const frameAll = () => {
+    const m = mapInst.current;
+    const points = roles.flatMap((r) => partsOf(geo[r]!).flatMap((p) => p[0]));
+    if (m && points.length) frame(m, points, view, { maxZoom: 15.5 });
+  };
+  /** 2D ↔ 3D: the camera keeps the place; 3D frames what this step is about (§29), 2D lies flat again, north up. */
+  const setView = (v: MapView) => {
+    if (v === view || (v === '3d' && !terrain3d)) return;
+    setViewState(v);
+    const m = mapInst.current;
+    if (!m) return;
+    if (v === '2d') return void m.easeTo({ pitch: 0, bearing: 0, duration: 600 });
+    const pts = (rs: CardRole[]) => rs.flatMap((r) => (geo[r] ? partsOf(geo[r]!).flatMap((p) => p[0]) : []));
+    const what: CardRole[] = step === 5 ? (deployTarget === 'primary' ? ['SITE', 'PRIMARY'] : ['PRIMARY', 'ALTERNATIVE']) : step === 4 ? ['CURRENT', 'SITE'] : roles;
+    const points = pts(what);
+    if (points.length) frame(m, points, '3d', { maxZoom: 15.5 });
+    else m.easeTo({ pitch: 55, duration: 700 });
+  };
+  const terrainPanel = step >= 4 && (
+    <TerrainPanel
+      role={selectedRole}
+      roles={roles}
+      onRole={(r) => select(r, null)}
+      insight={selectedRole ? insights[selectedRole] : null}
+      rule={selectedRole === 'PRIMARY' ? rules.primary : selectedRole === 'ALTERNATIVE' ? rules.alternative : null}
+      move={selectedRole === 'SITE' ? conns.find((c) => c.kind === 'move')?.distanceM ?? null : null}
+      connector={legConn}
+      kinds={conns.map((c) => c.kind)}
+      onLeg={(k) => select(ROLE_OF_LEG[k], k)}
+      profile={profile}
+      demAvailable={!!sampler}
+    />
+  );
   const PLACING: Record<Exclude<Placing, null>, string> = { site: 'موقع إعادة التمركز', primary: 'منطقة الانتشار الرئيسية', alternative: 'منطقة الانتشار البديلة' };
   const KIND = content.kind === 'TEMPORARY' ? 'مؤقت' : 'دائم';
 
@@ -602,7 +811,8 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
                 editorRef.current?.setTarget(n);
               }}
               origin={deployTarget === 'primary' ? (content.site ? anchorOf(partsOf(content.site.geometry)) : null) : content.primary ? anchorOf(partsOf(content.primary as SiteGeometry)) : null}
-              leg={leg(deployTarget)}
+              leg={rules[deployTarget].leg}
+              checked={leg(deployTarget)}
             >
               {leg(deployTarget)?.status === 'NEEDS_EXCEPTION' && (
                 <label>
@@ -646,7 +856,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     <RequestContext site={pickedSite ?? null} units={pickedSite ? unitsAtSite(registered.current, pickedSite.siteId, units) : []} moving={[]} requesting={null} fromUnit={preselectUnit} onChoose={() => pickedSite && chooseSite(pickedSite.siteId)}
       stack={stack ? stack.map(siteOf).filter((s): s is NonNullable<typeof s> => !!s) : null} sites={registered.all} onSelect={pickOne} />
   ) : (
-    <RequestContext site={current ?? (currentSite && loaded ? { siteId: currentSite, code: '', name: loaded.currentSites[0]?.site.name ?? '', kind: '', geometry: null, lat: null, lng: null, parentId: null, onMap: false } : null)} units={here} moving={content.scope} requesting={requesting} fromUnit={preselectUnit}>
+    <RequestContext first={terrainPanel} site={current ?? (currentSite && loaded ? { siteId: currentSite, code: '', name: loaded.currentSites[0]?.site.name ?? '', kind: '', geometry: null, lat: null, lng: null, parentId: null, onMap: false } : null)} units={here} moving={content.scope} requesting={requesting} fromUnit={preselectUnit}>
       {step >= 5 && <DeploymentCheckCard request={preview} checks={checks} />}
     </RequestContext>
   );
@@ -673,14 +883,21 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
           badge={id ? <StatePill state={loaded?.state ?? 'DRAFT'} /> : undefined}
           mode={mode}
           setMode={setMode}
-          legend={<MapLegend stage={step <= 3 ? 'sites' : step === 4 ? 'site' : 'full'} />}
+          view={view}
+          setView={setView}
+          has3d={!!terrain3d}
+          onFit={step >= 4 ? frameAll : undefined}
+          legend={<MapLegend stage={step <= 3 ? 'sites' : step === 4 ? 'site' : 'full'} fold={view === '3d'} />}
           placing={!!placing}
           strip={id ? <ApprovalRouteStrip request={preview} checks={checks} open={historyOpen} setOpen={setHistoryOpen} /> : undefined}
         >
-          <RequestMap
+          {terrain3d !== undefined && <RequestMap
+            view={view}
+            terrain3d={terrain3d}
+            selected={view === '3d' ? selectedRole : null}
             request={step === 4 ? { ...preview, content: { ...preview.content, site: null } } : step === 5 ? { ...preview, content: { ...preview.content, [deployTarget]: null } } : preview}
             // no deployment band before the deployment step, whatever a reopened draft already holds
-            checks={step >= 5 ? checks : null}
+            checks={mapChecks}
             mode={mode}
             fitMaxZoom={11.5}
             hideSite={step !== 5}
@@ -693,7 +910,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
             occupied={step >= 4 ? occupiedFc : null}
             focus={focus}
             fitSites={!requestId && !preselectSite}
-          />
+          />}
           {step === 4 && mapReady && (
             <div className="stw-zoom" role="group" aria-label="أدوات الخريطة">
               <button title="تكبير" aria-label="تكبير" onClick={() => mapInst.current?.zoomIn()}>+</button>
@@ -702,6 +919,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
               <button title="مقارنة الموقعين" aria-label="مقارنة الموقعين" disabled={!content.site || !current} onClick={() => editorRef.current?.compare()}>⇆</button>
             </div>
           )}
+          {mapReady && step >= 4 && <SlopeControl on={slopeOn} setOn={setSlopeOn} bands={bands} available={!!terrain3d} />}
           {placing && (
             <div className="tz-placing" role="status">
               انقر على الخريطة لوضع «{PLACING[placing]}»
@@ -927,7 +1145,7 @@ function PlaceControls({ editor, listeners, setMode, maxAreaM2, occupiedHits, sh
  * from the new site, the alternative from the primary — with the leg's allowed range and a verdict from the server's
  * last check (the server decides on save). No range ring.
  */
-function AreaControls({ editor, listeners, area, onArea, hasPrimary, placing, areaDefault, policyVersion, onPlace, onDraw, target, setTarget, origin, leg, children }: {
+function AreaControls({ editor, listeners, area, onArea, hasPrimary, placing, areaDefault, policyVersion, onPlace, onDraw, target, setTarget, origin, leg, checked, children }: {
   editor: React.RefObject<SiteEditor | null>;
   listeners: React.RefObject<Set<(l: SiteLive) => void>>;
   area: 'primary' | 'alternative';
@@ -941,7 +1159,10 @@ function AreaControls({ editor, listeners, area, onArea, hasPrimary, placing, ar
   target: number;
   setTarget: (n: number) => void;
   origin: LatLng | null;
+  /** The leg as the map shows it: the server's check of exactly this geometry, otherwise the analysis preview. */
   leg: RestationingLeg | undefined;
+  /** The server's check at the last save («تحقق الخادم»). */
+  checked: RestationingLeg | undefined;
   children?: React.ReactNode;
 }) {
   const [live, setLive] = useState<SiteLive | null>(null);
@@ -1017,7 +1238,7 @@ function AreaControls({ editor, listeners, area, onArea, hasPrimary, placing, ar
           {open ? ((d?.count ?? 0) < 3 ? 'لم يكتمل الرسم' : d?.ok ? '✓ صالح' : '✕ غير صالح') : has ? (live!.ok ? '✓ صالح' : '✕ ' + live!.problems.join('، ')) : '—'}
         </dd>
         <dt>تحقق الخادم</dt>
-        <dd>{leg && leg.status !== 'NOT_PLACED' ? 'عند آخر حفظ: ' + (leg.status === 'OK' ? 'ضمن النطاق' : leg.status === 'NEEDS_EXCEPTION' ? 'يحتاج استثناء' : leg.status === 'OUT_OF_RANGE' ? 'خارج النطاق' : 'تعادل في طبيعة الأرض') : 'عند الحفظ'}</dd>
+        <dd>{checked && checked.status !== 'NOT_PLACED' ? 'عند آخر حفظ: ' + (checked.status === 'OK' ? 'ضمن النطاق' : checked.status === 'NEEDS_EXCEPTION' ? 'يحتاج استثناء' : checked.status === 'OUT_OF_RANGE' ? 'خارج النطاق' : 'تعادل في طبيعة الأرض') : 'عند الحفظ'}</dd>
       </dl>
       {children}
       {vertexMode && ring && (

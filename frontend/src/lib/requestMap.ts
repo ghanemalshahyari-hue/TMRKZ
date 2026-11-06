@@ -90,6 +90,9 @@ export function requestFeatures(r: RestationingRequest, checks: RestationingChec
     out.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[a.lng, a.lat], [b.lng, b.lat]] }, properties: { role: 'LEG', leg, tone: t.tone } });
     const mid = destination(a, bearing(a, b), d / 2);
     point(mid.lng, mid.lat, { role: 'LEG_LABEL', leg, tone: t.tone, label: t.text });
+    // the direction of the leg (owner brief «TRUE OFFLINE 3D TERRAIN», §9–§11): an arrowhead short of the area's centre
+    const head = destination(a, bearing(a, b), d * 0.9);
+    point(head.lng, head.lat, { role: 'LEG_HEAD', leg, rotate: bearing(a, b) });
   };
   legLine(c.site?.geometry, c.primary as SiteGeometry | null, 'primary');
   legLine(c.primary as SiteGeometry | null, c.alternative as SiteGeometry | null, 'alternative');

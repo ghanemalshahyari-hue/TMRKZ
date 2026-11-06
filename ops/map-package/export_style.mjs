@@ -33,7 +33,9 @@ try {
     logLevel: 'error',
   });
   const m = await import(pathToFileURL(bundle).href);
-  const style = m.buildOfflineStyle({ basemapUrl: m.BASEMAP_URL, fontUrl: m.MAP_FONT_URL, hillshade: m.HILLSHADE, mode: 'street', labels: 'ar' });
+  // --no-terrain-3d: the style of a package without the 3D terrain component (format v1 packages before 2026.11.2)
+  const terrain3d = process.argv.includes('--no-terrain-3d') ? null : m.TERRAIN_3D;
+  const style = m.buildOfflineStyle({ basemapUrl: m.BASEMAP_URL, fontUrl: m.MAP_FONT_URL, hillshade: m.HILLSHADE, terrain3d, mode: 'street', labels: 'ar' });
   writeFileSync(out, JSON.stringify(style, null, 2) + '\n', 'utf8');
   console.log(`[style] ${style.layers.length} layers, sources ${Object.keys(style.sources).join(', ')} → ${out}`);
 } finally {

@@ -128,13 +128,15 @@ export function SitePickCard({ site, units, fromUnit, onStart, onClose }: { site
  * The right panel of a request being prepared: the current site, the units stationed there (who moves marked), each
  * moving unit inside its ancestry, and the unit the request comes from (derived, shown — not asked first).
  */
-export function RequestContext({ site, units, moving, requesting, fromUnit, children, onChoose, stack = null, sites = [], onSelect }: {
+export function RequestContext({ site, units, moving, requesting, fromUnit, children, first, onChoose, stack = null, sites = [], onSelect }: {
   site: RefSite | null;
   units: UnitHere[];
   moving: string[];
   requesting: Ref | null;
   fromUnit: string | null;
   children?: React.ReactNode;
+  /** Shown above the site and its units (the terrain analysis while the geometry is placed). */
+  first?: React.ReactNode;
   /** Step 1: the site last clicked, not yet chosen; one clear «اختيار هذا الموقع» completes the step. */
   onChoose?: () => void;
   /** Step 1: the sites that share the clicked point (a main site and its sub-site); the person says which is meant. */
@@ -150,6 +152,7 @@ export function RequestContext({ site, units, moving, requesting, fromUnit, chil
   return (
     <aside className="tz-context" aria-label="سياق الطلب">
       <div className="tz-context-body" data-testid="request-context">
+        {first}
         <section className="tz-card" aria-label="الموقع">
           <h4>
             <i className="sw current" /> الموقع الحالي

@@ -19,7 +19,10 @@ const SRC = REPO + 'docs/evidence/maplibre-labels/';
 const OUT = process.env.LABELS_OUT ? REPO + process.env.LABELS_OUT.replace(/\/?$/, '/') : SRC;
 mkdirSync(OUT, { recursive: true });
 const HOST = '127.0.0.1';
-const BASE = `http://${HOST}:5197`;
+// LABELS_PORT=<port> runs the harness on another port (default 5197, the harness's own; e.g. while an application dev
+// server already holds 5197)
+const PORT = process.env.LABELS_PORT ?? '5197';
+const BASE = `http://${HOST}:${PORT}`;
 const HILLSHADE = 'map-data/terrain/glo30/visualization/hillshade.pmtiles';
 const CMAP = new Set(JSON.parse(readFileSync(SRC + 'font-cmap.json', 'utf8')).codepoints);
 
@@ -43,7 +46,7 @@ for (const f of ['map-data/basemap/uae.pmtiles', 'frontend/node_modules/maplibre
 const hasHillshade = existsSync(REPO + HILLSHADE);
 
 // the harness (Vite dev server of prototypes/maplibre-offline) for the duration of the run
-const server = spawn(process.execPath, ['frontend/node_modules/vite/bin/vite.js', '--config', 'prototypes/maplibre-offline/vite.config.mjs'], {
+const server = spawn(process.execPath, ['frontend/node_modules/vite/bin/vite.js', '--config', 'prototypes/maplibre-offline/vite.config.mjs', ...(process.env.LABELS_PORT ? ['--port', PORT] : [])], {
   cwd: REPO,
   stdio: 'ignore',
 });

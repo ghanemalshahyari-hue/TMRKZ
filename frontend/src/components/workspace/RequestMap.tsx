@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as MlMap } from 'maplibre-gl';
 import type { RestationingChecks, RestationingRequest } from '../../api/types';
-import { BASEMAP_URL, HILLSHADE, OfflineMapLibre, addOverlayLayer } from '../map/maplibre';
-import { LABEL_FONT, type BasemapMode } from '../map/maplibre/offlineStyle';
+import { BASEMAP_URL, HILLSHADE, OfflineMapLibre, addOverlayLayer, setView3d, type MapView } from '../map/maplibre';
+import { LABEL_FONT, type BasemapMode, type Terrain3dSource } from '../map/maplibre/offlineStyle';
 import { centre, requestFeatures } from '../../lib/requestMap';
 import { siteReferenceFeatures, sitesExtent } from '../../lib/sitesLayer';
 import { SiteInfoCard } from './SiteInfoCard';
@@ -10,20 +10,48 @@ import { addSiteLayers, bindSiteClicks, setSiteData } from './siteLayers';
 import { useRegisteredSites } from './useRegisteredSites';
 
 /**
- * Map semantics of the operational workspace (owner brief «FULL APPLICATION UI REBUILD», §9): current site coral, the
- * proposed re-stationing site teal, the primary deployment area green hatch, the alternative cyan hatch, deployment
- * bands dashed teal, and the re-stationing move a neutral slate line (information only: no colour verdict).
+ * Map semantics of the operational workspace (owner brief «FULL APPLICATION UI REBUILD», §9, and «TRUE OFFLINE 3D
+ * TERRAIN», §6–§7): current site blue, the proposed re-stationing site green, the primary deployment area amber, the
+ * alternative purple, occupied ground red, and the re-stationing move a neutral slate line (information only: no colour
+ * verdict). The primary area was green until 6 Nov 2026; amber keeps it apart from the green proposed site.
  */
 export const MAP_COLOURS = {
   CURRENT: '#2f6db0',
   SITE: '#0b9e86',
-  PRIMARY: '#2f9a55',
+  PRIMARY: '#d9822b',
   ALTERNATIVE: '#7b4fc0',
   BAND_PRIMARY: '#127f73',
   BAND_ALTERNATIVE: '#2a6fa8',
   MOVE: '#3c4c59',
   OCCUPIED: '#c0392b',
 } as const;
+
+/**
+ * The same roles over 3D terrain (§24): brighter colours, a translucent fill that leaves the ground readable, a stronger
+ * outline and a soft halo around the selected geometry. Presentation only; 2D keeps its accepted look.
+ */
+export const COLOURS_3D = { CURRENT: '#3d8bfd', SITE: '#22c55e', PRIMARY: '#f59e0b', ALTERNATIVE: '#b06cf5', OCCUPIED: '#ef4444' } as const;
+const byRole3d = ['match', ['get', 'role'], 'CURRENT', COLOURS_3D.CURRENT, 'SITE', COLOURS_3D.SITE, 'PRIMARY', COLOURS_3D.PRIMARY, COLOURS_3D.ALTERNATIVE];
+const byRole2d = ['match', ['get', 'role'], 'CURRENT', MAP_COLOURS.CURRENT, 'SITE', MAP_COLOURS.SITE, 'PRIMARY', MAP_COLOURS.PRIMARY, MAP_COLOURS.ALTERNATIVE];
+
+/** Switches the request's own layers between their 2D and 3D look (setView3d turns the terrain itself on or off). */
+function lookFor(m: MlMap, view: MapView, selected: string | null) {
+  const on = view === '3d';
+  const set = (layer: string, prop: string, value: unknown) => m.getLayer(layer) && m.setPaintProperty(layer, prop as never, value as never);
+  const show = (layer: string, v: boolean) => m.getLayer(layer) && m.setLayoutProperty(layer, 'visibility', v ? 'visible' : 'none');
+  set('rs-fill', 'fill-color', on ? ['match', ['get', 'role'], 'CURRENT', COLOURS_3D.CURRENT, COLOURS_3D.SITE] : ['match', ['get', 'role'], 'CURRENT', '#4a86c8', MAP_COLOURS.SITE]);
+  set('rs-fill', 'fill-opacity', on ? 0.3 : ['match', ['get', 'role'], 'CURRENT', 0.22, 0.16]);
+  set('rs-line', 'line-color', on ? byRole3d : byRole2d);
+  set('rs-line', 'line-width', on ? ['match', ['get', 'role'], selected ?? '', 4.6, 3.6] : ['match', ['get', 'role'], 'SITE', 3, 2.4]);
+  set('occ-line', 'line-color', on ? COLOURS_3D.OCCUPIED : MAP_COLOURS.OCCUPIED);
+  show('rs-hatch', !on);
+  show('rs-area-fill', on);
+  show('rs-glow', on && !!selected);
+  if (m.getLayer('rs-glow')) m.setFilter('rs-glow', ['==', ['get', 'role'], selected ?? '']);
+  // names and distances stand on the ground as cards and chips in 3D (TerrainCards); the flat labels stay in 2D
+  show('rs-label', !on);
+  show('rs-edit-glow', on);
+}
 
 const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 
@@ -66,10 +94,16 @@ function arrow(hex: string) {
 }
 
 /** The request on the offline map: current sites, the proposed site, the deployment areas, their bands and the move. */
-export function RequestMap({ request, checks, mode, onMap, fitMaxZoom = 15, hideSite = false, fit = true, fitKey = 0, referenceInteractive = true, pick = null, focus = null, fitSites = false, highlight = null, occupied = null }: {
+export function RequestMap({ request, checks, mode, view = '2d', terrain3d = null, selected = null, onMap, fitMaxZoom = 15, hideSite = false, fit = true, fitKey = 0, referenceInteractive = true, pick = null, focus = null, fitSites = false, highlight = null, occupied = null }: {
   request: RestationingRequest;
   checks: RestationingChecks | null;
   mode: BasemapMode;
+  /** 2D or the 3D terrain view (presentation only: nothing of the request changes). */
+  view?: MapView;
+  /** The installed package's elevation tiles; without them the map stays 2D. */
+  terrain3d?: Terrain3dSource | null;
+  /** The request geometry shown with a halo in 3D (CURRENT, SITE, PRIMARY or ALTERNATIVE). */
+  selected?: string | null;
   onMap?: (m: MlMap) => void;
   fitMaxZoom?: number;
   hideSite?: boolean;
@@ -173,12 +207,20 @@ export function RequestMap({ request, checks, mode, onMap, fitMaxZoom = 15, hide
     }
   }, [map, data, fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // the 3D terrain view and the request's 3D look follow the view, the background mode and the selection
+  useEffect(() => {
+    if (!map) return;
+    setView3d(map, view, mode);
+    lookFor(map, view, selected);
+  }, [map, view, mode, selected]);
+
   const bands = data.features.filter((f) => f.properties.role === 'BAND').length;
   return (
     <div ref={wrap} className="tz-map-layer" data-bands={bands} data-ref-sites={new Set(refData.features.map((f) => f.properties.siteId)).size}>
     <OfflineMapLibre
       basemapUrl={BASEMAP_URL}
       hillshade={HILLSHADE}
+      terrain3d={terrain3d}
       mode={mode}
       center={initial}
       zoom={12}
@@ -204,6 +246,8 @@ export function RequestMap({ request, checks, mode, onMap, fitMaxZoom = 15, hide
         });
         m.addImage('tz-hatch-alternative', hatch(MAP_COLOURS.ALTERNATIVE).image, hatch(MAP_COLOURS.ALTERNATIVE).options);
         m.addImage('tz-arrow', arrow(MAP_COLOURS.MOVE).image, arrow(MAP_COLOURS.MOVE).options);
+        m.addImage('tz-arrow-primary', arrow(MAP_COLOURS.PRIMARY).image, arrow(MAP_COLOURS.PRIMARY).options);
+        m.addImage('tz-arrow-alternative', arrow(MAP_COLOURS.ALTERNATIVE).image, arrow(MAP_COLOURS.ALTERNATIVE).options);
         m.addSource('rs', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         const role = (r: string) => ['==', ['get', 'role'], r] as ['==', ['get', string], string];
         // deployment bands (leg 1 around the stationing site, leg 2 around the primary area)
@@ -229,6 +273,23 @@ export function RequestMap({ request, checks, mode, onMap, fitMaxZoom = 15, hide
           filter: ['in', ['get', 'role'], ['literal', ['PRIMARY', 'ALTERNATIVE']]],
           paint: { 'fill-pattern': ['match', ['get', 'role'], 'PRIMARY', 'tz-hatch-primary', 'tz-hatch-alternative'] },
         });
+        // 3D only (lookFor): the deployment areas as a translucent fill instead of the hatch, and the selection's halo
+        addOverlayLayer(m, {
+          id: 'rs-area-fill',
+          type: 'fill',
+          source: 'rs',
+          filter: ['in', ['get', 'role'], ['literal', ['PRIMARY', 'ALTERNATIVE']]],
+          layout: { visibility: 'none' },
+          paint: { 'fill-color': ['match', ['get', 'role'], 'PRIMARY', COLOURS_3D.PRIMARY, COLOURS_3D.ALTERNATIVE], 'fill-opacity': 0.3 },
+        });
+        addOverlayLayer(m, {
+          id: 'rs-glow',
+          type: 'line',
+          source: 'rs',
+          filter: ['==', ['get', 'role'], ''],
+          layout: { visibility: 'none', 'line-join': 'round' },
+          paint: { 'line-color': byRole3d as never, 'line-width': 12, 'line-blur': 7, 'line-opacity': 0.55 },
+        });
         addOverlayLayer(m, {
           id: 'rs-line',
           type: 'line',
@@ -250,7 +311,25 @@ export function RequestMap({ request, checks, mode, onMap, fitMaxZoom = 15, hide
             type: 'symbol',
             source: 'rs',
             filter: role('MOVE_HEAD'),
-            layout: { 'icon-image': 'tz-arrow', 'icon-rotate': ['get', 'rotate'], 'icon-rotation-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+            layout: { 'icon-image': 'tz-arrow', 'icon-rotate': ['get', 'rotate'], 'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+          },
+          'top',
+        );
+        addOverlayLayer(
+          m,
+          {
+            id: 'rs-leg-head',
+            type: 'symbol',
+            source: 'rs',
+            filter: role('LEG_HEAD'),
+            layout: {
+              'icon-image': ['match', ['get', 'leg'], 'primary', 'tz-arrow-primary', 'tz-arrow-alternative'],
+              'icon-rotate': ['get', 'rotate'],
+              'icon-rotation-alignment': 'map',
+              'icon-pitch-alignment': 'map',
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': true,
+            },
           },
           'top',
         );
@@ -278,7 +357,7 @@ export function RequestMap({ request, checks, mode, onMap, fitMaxZoom = 15, hide
               'symbol-sort-key': ['match', ['get', 'role'], 'SITE', 0, 'PRIMARY', 1, 'ALTERNATIVE', 2, 'CURRENT', 3, 'MOVE_LABEL', 4, 5],
             },
             paint: {
-              'text-color': ['match', ['get', 'role'], 'CURRENT', '#2f6db0', 'SITE', '#05634f', 'PRIMARY', '#1d6a39', 'ALTERNATIVE', '#5b3896', 'LEG_LABEL', ['match', ['get', 'tone'], 'ok', '#1d6a39', 'warn', '#9a6212', 'bad', '#a3322a', '#1d2733'], '#1d2733'],
+              'text-color': ['match', ['get', 'role'], 'CURRENT', '#2f6db0', 'SITE', '#05634f', 'PRIMARY', '#9a5212', 'ALTERNATIVE', '#5b3896', 'LEG_LABEL', ['match', ['get', 'tone'], 'ok', '#1d6a39', 'warn', '#9a6212', 'bad', '#a3322a', '#1d2733'], '#1d2733'],
               'text-halo-color': '#ffffff',
               'text-halo-width': 1.8,
             },

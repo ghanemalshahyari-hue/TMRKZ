@@ -263,6 +263,10 @@ class StationingFoundationIT extends IntegrationTest {
         assertThat(all.path("surfaceModel").asText()).isEqualTo("DSM");
         assertThat(all.path("encoding").asText()).isEqualTo(TerrainClassifier.ENCODING);
         assertThat(all.path("policyVersion").asInt()).isEqualTo(v1);
+        // descriptive only (3D terrain panel): mean and largest slope of the same counted cells, no rule reads them
+        // per row: 9 × 1.50 % + 1.99 % + 5 × 2.00 % + 5 × 12.00 % over 20 cells = 4.2745 %
+        assertThat(all.path("meanSlopePct").asDouble()).isCloseTo(4.2745, org.assertj.core.data.Offset.offset(1e-9));
+        assertThat(all.path("maxSlopePct").asDouble()).isEqualTo(12.0);
 
         // cols 10–19: 45 UNDULATING against 45 ROLLING; UNDULATING has no place in the priority → blocked
         JsonNode tied = req.post("/stationing/terrain/assess", Map.of("geometry", rect(9.8, 0.1, 19.9, 9.9))).body();

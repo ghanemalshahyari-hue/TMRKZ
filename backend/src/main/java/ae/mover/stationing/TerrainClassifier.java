@@ -36,12 +36,17 @@ public class TerrainClassifier {
     public record ClassShare(String code, String label, long cells, double areaM2, double percent) {
     }
 
-    /** Everything the audit keeps for one assessment (classifier, dataset, shares, decision, allowance, ranges). */
+    /**
+     * Everything the audit keeps for one assessment (classifier, dataset, shares, decision, allowance, ranges). The mean
+     * and the largest slope of the counted cells (percent, from the same encoded values) are descriptive only: no rule
+     * reads them (owner brief «TRUE OFFLINE 3D TERRAIN», §18: «متوسط الانحدار» when the authoritative data supports it).
+     */
     public record TerrainAssessment(String datasetCode, String datasetVersion, String surfaceModel, String encoding,
                                     String processing, String method, Integer policyVersion, List<SlopeClass> classification,
                                     List<ClassShare> shares, long coveredCells, long estimatedCells, String controllingClass,
                                     String controllingLabel, boolean tie, List<String> tied, boolean resolved,
-                                    List<String> priority, double allowanceM, Range primary, Range alternative) {
+                                    List<String> priority, double allowanceM, Range primary, Range alternative,
+                                    double meanSlopePct, double maxSlopePct) {
     }
 
     /** Effective deployment band of one leg after the allowance (the minimum never changes, O-06). */
@@ -85,11 +90,15 @@ public class TerrainClassifier {
         Map<String, Long> cells = new LinkedHashMap<>();
         sc.classes().forEach(c -> cells.put(c.code(), 0L));
         long covered = 0;
+        double encodedSum = 0;
+        int encodedMax = 0;
         for (Map<String, Object> r : counts) {
             int v = ((Number) r.get("v")).intValue();
             long n = ((Number) r.get("n")).longValue();
             cells.merge(classOf(sc.classes(), v).code(), n, Long::sum);
             covered += n;
+            encodedSum += (double) v * n;
+            encodedMax = Math.max(encodedMax, v);
         }
         if (covered == 0) {
             throw ApiException.validation("لا تغطية لبيانات الأرض داخل منطقة الانتشار؛ لا يمكن تحديد فئتها.");
@@ -110,7 +119,8 @@ public class TerrainClassifier {
         return new TerrainAssessment(sc.datasetCode(), sc.datasetVersion(), (String) ds.get("surface_model"), ENCODING,
                 (String) ds.get("processing"), METHOD, policyVersion, sc.classes(), view, covered, Math.max(estimated, covered),
                 d.controlling().code(), d.controlling().label(), d.tie(), d.tied(), d.resolved(), d.priority(),
-                d.resolved() ? d.controlling().allowanceM() : 0, range(policy.primary(), policy, d), range(policy.alternative(), policy, d));
+                d.resolved() ? d.controlling().allowanceM() : 0, range(policy.primary(), policy, d), range(policy.alternative(), policy, d),
+                encodedSum / covered / 100.0, encodedMax / 100.0);
     }
 
     /** The class of an encoded value: from ≤ value < to, compared in hundredths of a percent. */

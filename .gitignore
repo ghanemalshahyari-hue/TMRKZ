@@ -37,3 +37,6 @@ ops/local/.generated/
 map-data/
 # Installed offline map root of a production checkout (TMRKZ_MAP_ROOT default)
 map-runtime/
+# Stationing regression reruns of 6 Nov 2026: screenshots, results and logs are kept; their recordings (about 200 MB) stay local
+docs/evidence/terrain-3d/regressions/**/*.webm
+docs/evidence/terrain-3d/regressions/**/*.gif

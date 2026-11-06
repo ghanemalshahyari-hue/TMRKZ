@@ -1118,6 +1118,32 @@ export type RestationingLeg = {
     surfaceModel: string;
   };
 };
+/**
+ * The server's terrain analysis of a polygon (`POST /stationing/terrain/assess`): the slope classes' shares inside it,
+ * the governing class and its allowance, and both deployment legs' ranges under the policy version. Mean and largest
+ * slope are descriptive only.
+ */
+export type TerrainRange = { baseMinM: number; baseMaxM: number; effectiveMinM: number; effectiveMaxM: number; terrainApplies: boolean };
+export type TerrainAssessment = {
+  datasetCode: string;
+  datasetVersion: string;
+  surfaceModel: string;
+  method: string;
+  policyVersion: number | null;
+  shares: { code: string; label: string; cells: number; areaM2: number; percent: number }[];
+  coveredCells: number;
+  estimatedCells: number;
+  controllingClass: string;
+  controllingLabel: string;
+  tie: boolean;
+  tied: string[];
+  resolved: boolean;
+  allowanceM: number;
+  primary: TerrainRange;
+  alternative: TerrainRange;
+  meanSlopePct?: number;
+  maxSlopePct?: number;
+};
 export type RestationingChecks = {
   ok: boolean;
   problems: string[];

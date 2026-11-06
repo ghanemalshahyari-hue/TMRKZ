@@ -538,6 +538,41 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   - **Not done:** terrain slope data is not loaded into the new database; HR, the directory and PKI are not connected.
   - **Weak passwords:** the values chosen for this machine must be replaced before any real deployment.
 
+- **True offline 3D terrain (6 Nov 2026, owner brief «TRUE OFFLINE 3D TERRAIN»; ADR-038) — built, NOT deployed, NOT
+  committed; awaiting the owner's visual review:**
+  - **Audit:** `tmrkz-map-2026.11.1` had only a grey hillshade (no elevations), so a new display-only Terrain-RGB
+    product was built from the same 28 GLO-30 source tiles (`ops/terrain/build_terrain_3d.py`, 5,932 tiles, 209 MB,
+    deterministic).
+  - **Package:** `tmrkz-map-2026.11.2` with the optional component `terrain-3d`; verifier, builder and readiness
+    (`--require-terrain-3d`) extended. The slope analysis is byte-identical (`9a91d9af…`). The build is reproducible but
+    was made from an unclean tree; a release build must be repeated from a commit. It is installed only in the
+    development root `map-data/runtime-3d`; the owner's :8088 installation keeps 2026.11.1.
+  - **Map:** «2D | 3D» on the re-stationing map:
+    - MapLibre terrain (exaggeration 1, pitch 55°), elevation tint and shade, sky; every geometry draped by MapLibre;
+    - cards on the ground and connector chips with arrowheads, in one order (current → proposed information only,
+      proposed → primary, primary → alternative), no rings;
+    - «تحليل طبيعة الأرض»: the server class, shares and mean slope through the existing read-only assess endpoint;
+      heights and a profile from the elevation tiles (display only);
+    - drawing, dragging and click placement work directly in 3D; the primary deployment area is now amber in 2D and 3D.
+  - **Backend:** the assessment gains `meanSlopePct`/`maxSlopePct` (descriptive, read by no rule). No migration and no
+    policy change.
+  - **Tests:**
+    - real browser `tests/acceptance/terrain-3d.mjs` 23/23: zero writes, zero external requests, zero console errors,
+      2D↔3D geometry identical; drag frames p50 13 ms with 2, 4 and 1,501 vertices;
+    - `StationingFoundationIT` 9/9 and `RestationingWorkflowIT` 15/15;
+    - frontend 157 unit tests, type check and production build;
+    - `ops/map-package` + `ops/terrain` pytest: 52 passed, 1 skipped (symlinks cannot be created on this Windows host).
+    - Evidence: `docs/evidence/terrain-3d/`.
+  - **Owner review (6 Nov):**
+    - provisional acceptance; primary amber is permanent in 2D and 3D;
+    - `2026.11.2` stays a development candidate until it is rebuilt from committed source;
+    - added since: 3D framing that fits the portrait and landscape screens, chips kept clear of cards, and the optional
+      «الانحدار» slope-class layer (display only, policy thresholds);
+    - review evidence: `docs/evidence/terrain-3d/review/` (`tests/acceptance/terrain-3d-review.mjs`).
+  - **Not run:** the acceptance environment was removed on 6 Nov, so the earlier `tmrkz-test` browser suites
+    (`ui-rebuild.mjs`, `geometry-*.mjs`, `restationing-*.mjs`) could not run. The 2D flows they cover were exercised
+    only inside `terrain-3d.mjs`. No real touch device was used.
+
 ## Known limitations
 
 | Area | Limitation | Planned handling |

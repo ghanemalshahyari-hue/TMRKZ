@@ -2,18 +2,19 @@
 """Production readiness of the offline map: is the installed map package complete and is it the one Stationing uses?
 
   python ops/map-package/readiness.py --root <map-root> [--url http://localhost:8088] [--db-container <name>]
-                                      [--expect-package tmrkz-map-2026.11.1] [--quick]
+                                      [--expect-package tmrkz-map-2026.11.2] [--require-terrain-3d] [--quick]
 
 Package (from <map-root>/current, package_format.verify): package present, manifest valid, required files present (no
 file missing or unexpected), checksums valid (every file
 hashed unless --quick), basemap readable, required fonts present, style local, terrain dataset consistent, geographic
-coverage complete, attribution and licence notices present.
+coverage complete, attribution and licence notices present, and, when the package carries the optional 3D visual terrain
+(component terrain-3d), 3D terrain consistent. With --require-terrain-3d a package without that component FAILS.
 
 Database (--db-container, read-only): the terrain dataset the package carries is loaded (terrain_dataset row with the
 same slope product checksum and its tiles), and the Stationing policy in force names exactly that dataset version.
 
-Served (--url): the web entry point serves this package — the same manifest bytes, PMTiles answered with ranges, the map
-font — and does not serve the business slope analysis.
+Served (--url): the web entry point serves this package — the same manifest bytes, PMTiles answered with ranges (the
+3D terrain's too when the package carries it), the map font — and does not serve the business slope analysis.
 
 Every required check must pass: one failure makes the result NOT READY (exit 1). Checks that were not asked for are
 reported as NOT CHECKED and make the result INCOMPLETE (exit 2); nothing required is ever downgraded to a warning.
@@ -45,6 +46,7 @@ PKG_CHECKS = {  # verifier check → readiness question
     "terrain dataset consistent": "terrain dataset present",
     "geographic coverage": "geographic coverage valid",
     "attribution and licences": "attribution/licence present",
+    "3d terrain consistent": "3d terrain consistent",
 }
 
 
@@ -72,6 +74,8 @@ def main(argv=None) -> int:
     ap.add_argument("--url", help="the web entry point, e.g. http://localhost:8088")
     ap.add_argument("--db-container", help="PostgreSQL container of the same environment (read-only queries)")
     ap.add_argument("--expect-package", help="the package id this environment must run")
+    ap.add_argument("--require-terrain-3d", action="store_true",
+                    help="the active package must carry the 3D visual terrain (component terrain-3d)")
     ap.add_argument("--quick", action="store_true", help="sizes instead of full checksums and content checks")
     a = ap.parse_args(argv)
     root = Path(a.root).resolve()
@@ -90,6 +94,10 @@ def main(argv=None) -> int:
     m = r.manifest
     if m and a.expect_package:
         add("expected package", m["packageId"] == a.expect_package, f"{m['packageId']} (expected {a.expect_package})")
+    has3d = bool(m) and pf.has_component(m, "terrain-3d")
+    if a.require_terrain_3d:
+        add("3d terrain present", has3d, f"component terrain-3d ({pf.T3D_FILE}) present" if has3d else
+            f"{m['packageId'] if m else 'no valid package'} does not carry the 3D visual terrain (component terrain-3d)")
     ds = next((c["dataset"] for c in (m or {}).get("components", []) if c["id"] == "terrain-analysis"), None)
 
     if a.db_container and ds:
@@ -125,7 +133,8 @@ def main(argv=None) -> int:
             st, body, _ = fetch(base + "/manifest.json")
             add("served package is the installed one", st == 200 and body == (cur / "manifest.json").read_bytes(),
                 f"GET /map-data/manifest.json → {st}, {'identical to' if body == (cur / 'manifest.json').read_bytes() else 'DIFFERENT from'} {cur / 'manifest.json'}")
-            for path, magic in (("basemap/uae.pmtiles", b"PMTiles"), ("terrain/glo30/visualization/hillshade.pmtiles", b"PMTiles")):
+            served = ["basemap/uae.pmtiles", "terrain/glo30/visualization/hillshade.pmtiles"] + ([pf.T3D_FILE] if has3d else [])
+            for path, magic in ((p, b"PMTiles") for p in served):
                 st, body, h = fetch(f"{base}/{path}", "bytes=0-126")
                 add(f"served {path}", st == 206 and body.startswith(magic), f"range request → {st}, {len(body)} bytes, "
                     f"{h.get('Content-Range', 'no Content-Range')}")

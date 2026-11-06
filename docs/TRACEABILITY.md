@@ -532,3 +532,32 @@ Report: `docs/audit/stationing-v3-production/CONTINUATION_REPORT.md`. Run with
 | Page «إعادة التمركز» on MapLibre (behind `VITE_STATIONING_V3`) | `frontend/src/pages/RestationingPage.tsx`, `RestationingEditor.tsx` | headless Edge check on `tmrkz-v3dev` | Development |
 | D4 real non-production Oracle | — | — | Release gate (not available) |
 | D6 real touch device | — | — | Release gate (not available) |
+
+## True offline 3D terrain (2026-11-06, ADR-038; owner brief «TRUE OFFLINE 3D TERRAIN»)
+
+Evidence: `docs/evidence/terrain-3d/` (`tests/acceptance/terrain-3d.mjs`, real page, headless Edge on the GPU, development project `tmrkz-v3dev`, fictional data). Not deployed, not committed.
+
+| Brief § | Implementation | Test / evidence | Result |
+|---|---|---|---|
+| §1–§2 2D and 3D; real MapLibre terrain from an offline `raster-dem`, no tilt/extrusion fake | `terrain3d.ts` (`setView3d`, exaggeration 1), `MapFrame` «2D \| 3D», `offlineStyle.ts` `terrain3d` source | T01, T03, T04; `B-3d-request.png`, `E-2d-to-3d-rotate.webm` | Pass |
+| §3–§4, §35 Package audit; new 3D VISUALIZATION product kept apart from the business slope; package safeguards extended | `ops/terrain/build_terrain_3d.py`, record `map-packages/terrain-3d-glo30-2026.11/`, `package_format.py` (`terrain-3d`, «3d terrain consistent»), `build_package.py`, `readiness.py --require-terrain-3d`; package `map-packages/tmrkz-map-2026.11.2/` | `ops/terrain/test_build_terrain_3d.py`, `ops/map-package/test_map_package.py` (52 passed, 1 skipped); verify 13/13 and readiness on `map-data/runtime-3d` | Pass |
+| §5, §33 No database change; 2D↔3D never alters geometry, part order or history | presentation only (no Z, no migration) | T14 | Pass |
+| §6–§7, §24, §26 Current, proposed, primary, alternative, occupied and reference sites draped; translucent, outlined, selection halo | `RequestMap` `lookFor` (`COLOURS_3D`, `rs-area-fill`, `rs-glow`), `SiteEditor` `rs-edit-glow` | T05, T06, T07, T18; `C-…png` | Pass |
+| §8, §27 Markers and cards at terrain height, compact or expanded | `components/workspace/terrainCards.ts` (MapLibre markers, `opacityWhenCovered`) | T08 | Pass |
+| §9–§12, §28 Connectors in one order with arrowheads and chips; move information only; no rings | `lib/terrainAnalysis.ts` `connectors`, `rs-leg-head`, `rs-edit-head`, chips | T09, T10; `terrainAnalysis.test.ts` | Pass |
+| §13–§15, §31 Policy allowance exactly; server classification of the real area (shares, ties) authoritative | existing `POST /stationing/terrain/assess`; `previewLeg` = `DeploymentRules.leg`; server check wins for the checked geometry, disagreement shown | T11, T12; `terrainAnalysis.test.ts` | Pass |
+| §16–§19 Elevation statistics and profile (display only); mean slope from authoritative data | `lib/terrainRgb.ts`, `DemSampler`, `TerrainPanel`; `TerrainClassifier` `meanSlopePct`/`maxSlopePct` | T11, T13; `terrainRgb.test.ts`; `StationingFoundationIT.terrainClasses` | Pass |
+| §20–§23, §25 Draw, edit, drag and click-place in 3D; analysis re-read after a drop | SiteEditor with terrain-aware pointer positions (unchanged engine) | T02, T15, T16, T17; `F-…webm`, `G-…webm` | Pass |
+| §29 Camera keeps context; framing by step and selection | `frame()`, `setView`, `select` | screenshots B–D | Pass (visual) |
+| §30 Exaggeration 1, no control | `EXAGGERATION = 1` | T03 | Pass |
+| §32 Performance (2, 4 parts; 1,501 vertices; frame-coalesced drag) | unchanged rAF coalescing; cards/chips moved in place | T19 | Pass |
+| §34 Zero external requests; elevation only from the package | `/map-data/` | T21, T22 | Pass |
+| §36 Accepted rules unchanged; production deployment default unset | no migration, no policy change | T20 (zero writes) | Pass |
+| §40 / review §11 Earlier browser regressions on the recreated development environment | test env overrides (`EVIDENCE_DIR`, `POLY_UNIT`, `MP_UNIT`, `PT_UNIT`, `LABELS_PORT`) | old-sequence 8/8, old-mp-point 12/12, two-methods 10/10, ui-rebuild 44/46 (2 = 5 Nov wording), maplibre-labels 21/21; not runnable listed with reasons in `docs/evidence/terrain-3d/REPORT.md` §5 | Pass / listed |
+| Review §2 Practical 3D on the owner's portrait and landscape screens; no geometry behind a ridge; chips clear of cards; legend never over cards | `fit3d` (terrain-aware framing), `TerrainCards.declutter`, `MapLegend fold` | headless at 1072×1788 and 1920×1032: four cards inside, none covered | Pass |
+| Review §3 Draped on slopes from two bearings | MapLibre draping | `terrain-3d-review.mjs` R2 | Pass |
+| Review §4 MultiPolygon in 3D: one part moves the whole site, both drape, order and 2D geometry unchanged | SiteEditor (unchanged engine) | R3 (parts differ 0.1 m) | Pass |
+| Review §5 «رسم حدود جديدة» in 3D with the accepted editor | SiteEditor draw mode | R4, R4b | Pass |
+| Review §6 Mountain → plain at the same distance: class, allowance, effective maximum, verdict | server assess + `previewLeg` | R1 (MOUNTAINOUS → FLAT, +2000 → 0 m, 7000 → 5000 m, OK → OUT_OF_RANGE) | Pass |
+| Owner request «الانحدار»: slope classes of the policy over the ground (display only) | `showSlope`, `slopeTileImage` | R1b; `terrainRgb.test.ts` (classes, no seam) | Pass |
+| One rule for a moved leg everywhere (chip, area panel, map label, terrain panel) | `rules` in `RestationingEditor` | `geometry-two-methods.mjs` 10/10 | Pass |

@@ -4,6 +4,8 @@ import type {
   StationingRecord,
   PolicyChange,
   StationingPolicyOverview,
+  SiteGeometry,
+  TerrainAssessment,
   StationingPolicyValues,
   StationingPolicyVersion,
   TerrainDatasetView,
@@ -500,6 +502,9 @@ export const api = {
 
   // Stationing V3 policy studio (System Administrator)
   stationingPolicy: () => get<StationingPolicyOverview>('/stationing/policy'),
+  /** The server's terrain analysis of one polygon under the policy in force (read only; nothing is saved). */
+  terrainAssess: (geometry: SiteGeometry, policyVersion?: number | null) =>
+    post<TerrainAssessment>('/stationing/terrain/assess', policyVersion == null ? { geometry } : { geometry, policyVersion }),
   stationingPolicyVersions: () => get<{ version: StationingPolicyVersion; changes: PolicyChange[] }[]>('/stationing/policy/versions'),
   validateStationingPolicy: (values: StationingPolicyValues) => post<{ ok: boolean; problems: string[] }>('/stationing/policy/validate', { values }),
   publishStationingPolicy: (values: StationingPolicyValues, effectiveFrom: string | null, reason: string, reference: string) =>

@@ -59,6 +59,19 @@ const NAVY = '#16324f';
 export type EditorLook = { tag: string; stroke: string; fill: string; symbol: boolean };
 export const SITE_LOOK: EditorLook = { tag: 'مقترح', stroke: GREEN, fill: GREEN_FILL, symbol: true };
 
+/** The connector's arrowhead, pointing north before rotation (drawn here, no sprite file), at device pixel ratio 2. */
+function arrowImage(hex: string) {
+  const n = 28;
+  const data = new Uint8Array(n * n * 4);
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  for (let y = 0; y < n; y++)
+    for (let x = 0; x < n; x++) {
+      if (y < 3 || y > n - 4 || Math.abs(x + 0.5 - n / 2) > ((y + 1) / n) * (n / 2) * 0.85) continue;
+      data.set([r, g, b, 235], (y * n + x) * 4);
+    }
+  return { width: n, height: n, data };
+}
+
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 
 /**
@@ -124,6 +137,14 @@ export class SiteEditor {
       source: 'rs-edit',
       paint: { 'fill-color': ['case', ['get', 'bad'], RED_FILL, ['get', 'fill']], 'fill-opacity': 0.32 },
     }, 'top');
+    // the selection's halo over 3D terrain (shown only by the 3D look of the request map)
+    addOverlayLayer(map, {
+      id: 'rs-edit-glow',
+      type: 'line',
+      source: 'rs-edit',
+      layout: { visibility: 'none', 'line-join': 'round' },
+      paint: { 'line-color': ['get', 'stroke'], 'line-width': 12, 'line-blur': 7, 'line-opacity': 0.5 },
+    }, 'top');
     addOverlayLayer(map, {
       id: 'rs-edit-line',
       type: 'line',
@@ -137,6 +158,15 @@ export class SiteEditor {
     }, 'top');
     // the move from the current site, for information: a dashed connector (the distance sits on it)
     addOverlayLayer(map, { id: 'rs-edit-link', type: 'line', source: 'rs-edit-link', paint: { 'line-color': NAVY, 'line-width': 2, 'line-dasharray': [3, 3] } }, 'top');
+    // its direction (owner brief «TRUE OFFLINE 3D TERRAIN», §9): an arrowhead short of the edited shape's centre
+    if (!map.hasImage('stw-arrow')) map.addImage('stw-arrow', arrowImage(NAVY), { pixelRatio: 2 });
+    map.addSource('rs-edit-head', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    addOverlayLayer(map, {
+      id: 'rs-edit-head',
+      type: 'symbol',
+      source: 'rs-edit-head',
+      layout: { 'icon-image': 'stw-arrow', 'icon-rotate': ['get', 'rotate'], 'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true },
+    }, 'top');
     map.addSource('rs-draw', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     addOverlayLayer(map, { id: 'rs-draw-fill', type: 'fill', source: 'rs-draw', filter: ['==', ['get', 'role'], 'shape'], paint: { 'fill-color': GREEN_FILL, 'fill-opacity': 0.18 } }, 'top');
     addOverlayLayer(map, { id: 'rs-draw-line', type: 'line', source: 'rs-draw', filter: ['==', ['get', 'role'], 'edges'], paint: { 'line-color': GREEN, 'line-width': 2.2, 'line-dasharray': [2.3, 2.3] } }, 'top');
@@ -190,9 +220,9 @@ export class SiteEditor {
     this.vertices.destroy();
     this.edges.destroy();
     for (const o of [this.prop, this.dist, this.orig]) o.marker.remove();
-    for (const id of ['rs-draw-rubber', 'rs-draw-line', 'rs-draw-fill', 'rs-edit-link', 'rs-edit-line', 'rs-edit-fill'])
+    for (const id of ['rs-draw-rubber', 'rs-draw-line', 'rs-draw-fill', 'rs-edit-head', 'rs-edit-link', 'rs-edit-line', 'rs-edit-glow', 'rs-edit-fill'])
       if (this.map.getLayer(id)) this.map.removeLayer(id);
-    for (const id of ['rs-draw', 'rs-edit-link', 'rs-edit']) if (this.map.getSource(id)) this.map.removeSource(id);
+    for (const id of ['rs-draw', 'rs-edit-head', 'rs-edit-link', 'rs-edit']) if (this.map.getSource(id)) this.map.removeSource(id);
   }
 
   // ---- what is shown around the site -----------------------------------------------------------------------------
@@ -719,9 +749,13 @@ export class SiteEditor {
     this.prop.el.firstElementChild?.classList.toggle('bad', !this.last.ok || this.conflict);
     const d = anchor && this.origin ? distanceM(this.origin.at, anchor) : 0;
     const link = this.map.getSource('rs-edit-link') as GeoJSONSource | undefined;
+    const head = this.map.getSource('rs-edit-head') as GeoJSONSource | undefined;
     if (anchor && this.origin && d >= 1) {
       const o = this.origin.at;
       link?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [[o.lng, o.lat], [anchor.lng, anchor.lat]] }, properties: {} });
+      const b = bearing(o, anchor);
+      const h = destination(o, b, d * 0.9);
+      head?.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: [h.lng, h.lat] }, properties: { rotate: b } });
       show('dist', this.dist, { lat: (o.lat + anchor.lat) / 2, lng: (o.lng + anchor.lng) / 2 });
       const label = this.distanceLabel ? this.distanceLabel(d) : { text: formatMeters(d), tone: 'none' as const };
       this.text(this.dist.el.firstElementChild as HTMLElement, label.text);
@@ -730,6 +764,7 @@ export class SiteEditor {
       this.dist.el.classList.toggle('n', label.tone === 'bad');
     } else {
       link?.setData({ type: 'FeatureCollection', features: [] });
+      head?.setData({ type: 'FeatureCollection', features: [] });
       show('dist', this.dist, null);
     }
     if (this.drawing) return;

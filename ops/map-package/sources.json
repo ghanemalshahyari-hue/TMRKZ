@@ -1,6 +1,6 @@
 {
   "comment": "Inputs of the TMRKZ offline map package (ops/map-package/build_package.py). Paths are relative to the repository root; the large files are git-ignored under map-data/. Every input is checked against the checksum recorded here or in the terrain manifest before anything is packaged.",
-  "packageVersion": "2026.11.1",
+  "packageVersion": "2026.11.2",
   "coverage": {
     "name": "United Arab Emirates (mainland and islands)",
     "bbox": [51.5, 22.6, 56.4, 26.1],
@@ -30,6 +30,11 @@
     "notice": "map-packages/terrain-glo30-2026.11/LICENSE-NOTICE.txt",
     "datasetCode": "copernicus-glo30",
     "grid": { "lat": [22, 26], "lon": [51, 56] }
+  },
+  "terrain3d": {
+    "comment": "3D visual terrain (package component terrain-3d, display only): the Terrain-RGB archive built by ops/terrain/build_terrain_3d.py and its git-tracked record; the build checks the archive against the record and the record's source tiles against the terrain manifest",
+    "record": "map-packages/terrain-3d-glo30-2026.11/manifest.json",
+    "derived": "map-data/terrain/glo30/visualization-3d"
   },
   "licences": {
     "odbl": "ops/map-package/licences/ODbL-1.0-NOTICE.txt"

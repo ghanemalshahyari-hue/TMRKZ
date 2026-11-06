@@ -218,6 +218,8 @@
 .tz-legend-toggle .icon { width: 14px; color: var(--tz-teal); }
 .tz-legend ul { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .tz-legend li { display: flex; align-items: center; gap: 8px; line-height: 1.45; }
+/* a folded legend shows only its toggle (`hidden` would otherwise lose to the list's display: flex) */
+.tz-legend ul[hidden] { display: none; }
 /* the hint never takes a map click (only its cancel button does) */
 .tz-placing { pointer-events: none; position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 10px; padding: 7px 8px 7px 14px; border: 1px solid var(--tz-teal); border-radius: 12px; background: rgba(9, 27, 40, 0.94); color: var(--tz-text); font-size: 13px; box-shadow: var(--tz-shadow); }
 .tz-placing button { pointer-events: auto; }
@@ -228,10 +230,10 @@
 .sw { display: inline-block; flex-shrink: 0; width: 18px; height: 12px; border-radius: 3px; vertical-align: middle; }
 .sw.current { border: 2px solid #2f6db0; background: rgba(74, 134, 200, 0.22); }
 .sw.site { border: 2px solid #1f9d55; background: rgba(43, 179, 106, 0.32); }
-.sw.primary { border: 2px solid #2f9a55; background: repeating-linear-gradient(135deg, #2f9a55 0 2px, transparent 2px 5px); }
+.sw.primary { border: 2px solid #d9822b; background: repeating-linear-gradient(135deg, #d9822b 0 2px, transparent 2px 5px); }
 .sw.alternative { border: 2px solid #7b4fc0; background: repeating-linear-gradient(135deg, #7b4fc0 0 2px, transparent 2px 5px); }
 .sw.band { border: 2px dashed #3fbfae; border-radius: 99px; background: none; }
-.sw.leg { height: 0; border-top: 3px dashed #2f9a55; border-radius: 0; }
+.sw.leg { height: 0; border-top: 3px dashed #d9822b; border-radius: 0; }
 .sw.move { height: 0; border-top: 3px dashed #c7d3db; border-radius: 0; }
 .sw.link { border: 2px dotted #9db2bb; background: none; }
 

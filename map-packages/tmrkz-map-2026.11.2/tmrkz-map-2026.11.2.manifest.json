@@ -1,0 +1,769 @@
+{
+  "format": "tmrkz-offline-map-package",
+  "formatVersion": 1,
+  "packageId": "tmrkz-map-2026.11.2",
+  "packageVersion": "2026.11.2",
+  "createdAt": "2026-11-06T00:00:00Z",
+  "builtBy": {
+    "tool": "ops/map-package/build_package.py",
+    "toolVersion": "1.1.0",
+    "sourceRevision": "79e3ec9bfbe4767acdb62d695cfa77b86939c4c1",
+    "sourceTreeClean": false
+  },
+  "compatibility": {
+    "application": "TMRKZ Stationing V3 offline map (RestationingPage)",
+    "servedAt": "/map-data/",
+    "mapLibre": "6.15.0",
+    "pmtiles": "4.5.0",
+    "terrainSchema": "Flyway V18 or later (terrain_dataset, terrain_slope); loaded by ops/terrain/load-slope.sh",
+    "styleSha256": "e2efffe75d7f782d26e1f8e62e88ed242e27f93cf0a4b79181971b5ce4bd62f2",
+    "terrainEncoding": "SLOPE_PERCENT_X100_FLOOR_U16"
+  },
+  "coverage": {
+    "name": "United Arab Emirates (mainland and islands)",
+    "bbox": [
+      51.5,
+      22.6,
+      56.4,
+      26.1
+    ],
+    "basis": "approximate extent of UAE territory, where Stationing sites and deployment areas lie; the basemap and the terrain grid must both cover it",
+    "basemapBounds": [
+      51.1303709,
+      22.451649,
+      56.689453,
+      26.332807
+    ],
+    "terrainGrid": "N22-N26 × E051-E056"
+  },
+  "components": [
+    {
+      "id": "basemap",
+      "role": "MAP_VISUALIZATION",
+      "required": true,
+      "title": "UAE street basemap (offline vector tiles)",
+      "format": "PMTiles v3, Mapbox Vector Tiles, Protomaps basemap schema",
+      "source": {
+        "product": "Protomaps Basemap",
+        "version": "4.14.9",
+        "data": "OpenStreetMap and Natural Earth",
+        "builder": "planetiler 0.10.2 (0e5588c4a6e8)",
+        "builtAt": "2026-03-28T14:41:39.524Z",
+        "osmReplication": "2026-06-25T04:00:00Z (sequence 120813)",
+        "obtainedFrom": "byte-identical copy of MOVER's app/NavMap/data/uae.pmtiles (MOVER docs/OFFLINE_MAP_DATA_SOURCE_OF_TRUTH.md: PMTiles v3, Protomaps schema, OSM only)"
+      },
+      "tiles": {
+        "type": "mvt",
+        "compression": "gzip",
+        "minZoom": 0,
+        "maxZoom": 15,
+        "bounds": [
+          51.1303709,
+          22.451649,
+          56.689453,
+          26.332807
+        ],
+        "addressedTiles": 263479,
+        "layers": [
+          "boundaries",
+          "buildings",
+          "earth",
+          "landcover",
+          "landuse",
+          "places",
+          "pois",
+          "roads",
+          "water"
+        ]
+      },
+      "licence": {
+        "id": "ODbL-1.0",
+        "file": "licences/ODbL-1.0-NOTICE.txt"
+      },
+      "roadNames": "OpenStreetMap names, shown as unofficial map labels; not UAE-government authoritative road names. No official road-name layer is included."
+    },
+    {
+      "id": "fonts",
+      "role": "MAP_VISUALIZATION",
+      "required": true,
+      "title": "Map label font (MapLibre font-faces)",
+      "fonts": [
+        {
+          "file": "fonts/NotoSansArabic.ttf",
+          "styleName": "Noto Sans Arabic Regular",
+          "fullName": "Noto Sans Arabic Regular",
+          "family": "Noto Sans Arabic",
+          "version": "Version 2.012",
+          "covers": "Arabic and its presentation forms, Latin, Arabic-Indic and European digits, brackets and guillemets",
+          "licence": "SIL Open Font License 1.1",
+          "licenceFile": "licences/OFL-1.1.txt"
+        }
+      ]
+    },
+    {
+      "id": "style",
+      "role": "MAP_VISUALIZATION",
+      "required": true,
+      "title": "Stationing V3 map style",
+      "file": "styles/stationing-v3.json",
+      "generator": "frontend/src/components/map/maplibre/offlineStyle.ts buildOfflineStyle (street mode, Arabic labels) with the served paths of mapPackage.ts, exported by ops/map-package/export_style.mjs",
+      "use": "the application builds the same style in code; this copy and its checksum record which style the package was made for",
+      "layers": 21
+    },
+    {
+      "id": "terrain-analysis",
+      "role": "BUSINESS_ANALYSIS",
+      "required": true,
+      "title": "Slope analysis (the only terrain input of a business rule)",
+      "dataset": {
+        "code": "copernicus-glo30",
+        "version": "2026.11",
+        "surfaceModel": "DSM",
+        "encoding": "SLOPE_PERCENT_X100_FLOOR_U16",
+        "processingVersion": "tmrkz-terrain-1.0.0",
+        "slopeSha256": "9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682",
+        "files": 28,
+        "cellsTotal": 362880000,
+        "cellsNoData": 100796
+      },
+      "format": "GeoTIFF uint16, EPSG:4326, tiled 256, deflate + predictor 2, one file per source tile",
+      "use": "loaded into PostGIS (terrain_dataset, terrain_slope) by ops/terrain/load-slope.sh; the backend classifies slope with the administrator's versioned policy. Not served to browsers."
+    },
+    {
+      "id": "terrain-visualization",
+      "role": "MAP_VISUALIZATION",
+      "required": true,
+      "title": "Hillshade (display only, never a business input)",
+      "format": "PMTiles v3, PNG (grey + alpha) 256 px, Web Mercator",
+      "minZoom": 6,
+      "maxZoom": 12,
+      "tiles": 5598,
+      "bounds": [
+        50.9998611,
+        22.0001388,
+        56.9998611,
+        27.0001388
+      ],
+      "processingVersion": "tmrkz-terrain-1.0.0"
+    },
+    {
+      "id": "terrain-3d",
+      "role": "MAP_VISUALIZATION",
+      "required": false,
+      "title": "3D visual terrain (Terrain-RGB elevation tiles; display only, never a business input)",
+      "code": "copernicus-glo30-3d",
+      "version": "2026.11",
+      "file": "terrain/glo30/visualization-3d/terrain-rgb.pmtiles",
+      "record": "terrain/glo30/visualization-3d/terrain-3d-manifest.json",
+      "format": "PMTiles v3, PNG (RGB) 256 px Terrain-RGB, Web Mercator",
+      "encoding": "mapbox",
+      "tileSize": 256,
+      "minZoom": 6,
+      "maxZoom": 12,
+      "tiles": 5932,
+      "bounds": [
+        50.9998611,
+        22.0001389,
+        56.9998611,
+        27.0001389
+      ],
+      "heightRangeM": [
+        -16.2,
+        2629.1
+      ],
+      "processingVersion": "tmrkz-terrain-3d-1.0.0",
+      "derivedFrom": "terrain-glo30 2026.11: the same 28 GLO-30 source tiles as terrain-analysis (terrain-provenance.sourceTiles)",
+      "use": "display only: MapLibre terrain (raster-dem source, setTerrain) and displayed elevations; never an input to a business rule and never loaded into PostGIS (the slope analysis, terrain-analysis, is)"
+    },
+    {
+      "id": "terrain-provenance",
+      "role": "PROVENANCE",
+      "required": true,
+      "title": "Copernicus DEM GLO-30 provenance",
+      "product": "Copernicus DEM GLO-30",
+      "instance": "COP-DEM-GLO-30-F",
+      "surfaceModel": "DSM",
+      "limitation": "Copernicus GLO-30 is a Digital Surface Model (DSM), not bare-earth DTM; it may include buildings, infrastructure and vegetation. It is not official UAE bare-earth terrain.",
+      "fgic": "FGIC data is not used. A future FGIC dataset would be a separate, versioned terrain dataset.",
+      "publisher": "ESA / Copernicus programme (AWS Open Data, copernicus-dem-30m)",
+      "resolution": "1 arc-second (1/3600 degree, about 30 m)",
+      "crs": "EPSG:4326",
+      "grid": {
+        "lat": [
+          22,
+          26
+        ],
+        "lon": [
+          51,
+          56
+        ]
+      },
+      "presentCells": [
+        "N22E051",
+        "N22E052",
+        "N22E053",
+        "N22E054",
+        "N22E055",
+        "N22E056",
+        "N23E051",
+        "N23E052",
+        "N23E053",
+        "N23E054",
+        "N23E055",
+        "N23E056",
+        "N24E051",
+        "N24E052",
+        "N24E053",
+        "N24E054",
+        "N24E055",
+        "N24E056",
+        "N25E051",
+        "N25E052",
+        "N25E054",
+        "N25E055",
+        "N25E056",
+        "N26E051",
+        "N26E053",
+        "N26E054",
+        "N26E055",
+        "N26E056"
+      ],
+      "absentCells": [
+        {
+          "cell": "N25E053",
+          "verdict": "OPEN_SEA"
+        },
+        {
+          "cell": "N26E052",
+          "verdict": "OPEN_SEA"
+        }
+      ],
+      "sourceTiles": [
+        {
+          "name": "Copernicus_DSM_COG_10_N22_00_E051_00_DEM.tif",
+          "code": "N22E051",
+          "bytes": 45650188,
+          "sha256": "2ba7014e80b32d761b21581a6682d0c4af223037db5d44038aa252fcb9800716",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N22_00_E052_00_DEM.tif",
+          "code": "N22E052",
+          "bytes": 48348835,
+          "sha256": "fda289a942c62afabdab107a9457435c1314ef3ac1dbf4de79161cb2a37b530d",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N22_00_E053_00_DEM.tif",
+          "code": "N22E053",
+          "bytes": 49450340,
+          "sha256": "7c26fc16425d639c5a06fadf5126211d786a0f97da179884c3e70aa983bb0faf",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N22_00_E054_00_DEM.tif",
+          "code": "N22E054",
+          "bytes": 48277338,
+          "sha256": "a33e0813eb483f685034c491b78af126bb7736d64c29da0249e6eb68d679b882",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N22_00_E055_00_DEM.tif",
+          "code": "N22E055",
+          "bytes": 42890050,
+          "sha256": "eea9c91614bff5053b22462635120b481bbddcdb846d8ba06ac2a5db3815d306",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N22_00_E056_00_DEM.tif",
+          "code": "N22E056",
+          "bytes": 40836407,
+          "sha256": "aa00f2e3d13a0930225960b5c0ce9fa47a4b464062462b90278125a70a4d95c3",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N23_00_E051_00_DEM.tif",
+          "code": "N23E051",
+          "bytes": 46900427,
+          "sha256": "59875875d47ba8cbb15384191fbd7944467ca7333973cce90856a92fe8da3703",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N23_00_E052_00_DEM.tif",
+          "code": "N23E052",
+          "bytes": 47811306,
+          "sha256": "de32b083017370d53ecbebf22fc87722605fc14ac7b153b4afa5711d4b6e7576",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N23_00_E053_00_DEM.tif",
+          "code": "N23E053",
+          "bytes": 48561117,
+          "sha256": "1b6bb95ecf03a2e89d0f10cae5cd125ffdfd49994f0dbe6ba6c3242bde699a96",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N23_00_E054_00_DEM.tif",
+          "code": "N23E054",
+          "bytes": 48740943,
+          "sha256": "bb613ea45fc3242aee28ba307478d936fc62cd0e090795ea200ec71c3c3ce841",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N23_00_E055_00_DEM.tif",
+          "code": "N23E055",
+          "bytes": 43138750,
+          "sha256": "31fe2c52db8c4ac03b73c5c496478e493b3466dec4c5c01e92eccef965960a43",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N23_00_E056_00_DEM.tif",
+          "code": "N23E056",
+          "bytes": 42970043,
+          "sha256": "6795a35f7a7b980acc88692689a170246fd1914d65ffaa504d0b244423890870",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N24_00_E051_00_DEM.tif",
+          "code": "N24E051",
+          "bytes": 26885216,
+          "sha256": "24dd2af0ff4cd73e88eaab8d8aa0c3a8e248cdc733e30cb98333ec6d22cad9f2",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N24_00_E052_00_DEM.tif",
+          "code": "N24E052",
+          "bytes": 5283343,
+          "sha256": "b174a0654b34f9933c4851655b79802bda24d17a0ad9f22435749af574afeb69",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N24_00_E053_00_DEM.tif",
+          "code": "N24E053",
+          "bytes": 7322975,
+          "sha256": "03a887d778a994352ffbe690824ac47fca9ad2b4cbca5a481daea519dcfefef9",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N24_00_E054_00_DEM.tif",
+          "code": "N24E054",
+          "bytes": 28282630,
+          "sha256": "aa3b6d63c48d46242ef313c5c7be098867d2a5459d43d4f1a71b04510c428793",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N24_00_E055_00_DEM.tif",
+          "code": "N24E055",
+          "bytes": 43713741,
+          "sha256": "bb98178567b880aa6b66fcf48ec11bade94c13236ae63ec8e8c0e894b54225b3",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N24_00_E056_00_DEM.tif",
+          "code": "N24E056",
+          "bytes": 30873705,
+          "sha256": "bfe784101727ab7d641a243b6bf7cbfc92e6d9195b92170b4e649aa1c17c125d",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N25_00_E051_00_DEM.tif",
+          "code": "N25E051",
+          "bytes": 27243413,
+          "sha256": "4c8c0c82e870c071a5f9f373f6526914382edf99b00dfac72805b09b8ecc2f8c",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N25_00_E052_00_DEM.tif",
+          "code": "N25E052",
+          "bytes": 135237,
+          "sha256": "96c5de4844bf437d87419981cad429780f304c6426e77ce8815b7492f5bbe62b",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N25_00_E054_00_DEM.tif",
+          "code": "N25E054",
+          "bytes": 313530,
+          "sha256": "72c65f62b0fdf017562bd58b23c5330eb5589725ca02f0b4cd601f909a61cd54",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N25_00_E055_00_DEM.tif",
+          "code": "N25E055",
+          "bytes": 22291663,
+          "sha256": "eef300a92e416071e8cf9fdba8018126de8a7af1fae7b0068a1b360f9ff522fd",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N25_00_E056_00_DEM.tif",
+          "code": "N25E056",
+          "bytes": 17482544,
+          "sha256": "41efa33154e8d90d2273577c454f247fca8ad35a5ff4b14fed2b29c5de499909",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N26_00_E051_00_DEM.tif",
+          "code": "N26E051",
+          "bytes": 2078581,
+          "sha256": "92b668a43e8e9930b4896f353b87f1ee9c5429e5583f9871f0edada77018f239",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N26_00_E053_00_DEM.tif",
+          "code": "N26E053",
+          "bytes": 7440659,
+          "sha256": "6e9060f1ad321ac5c0b144bc73b5945da50ca2d90a368fab6a2b14fa4fbf8a9f",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N26_00_E054_00_DEM.tif",
+          "code": "N26E054",
+          "bytes": 19175086,
+          "sha256": "6e0da9ee706bea763c1e410f6da6ce188c3269de1de97d5496961f4b67fd7fff",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N26_00_E055_00_DEM.tif",
+          "code": "N26E055",
+          "bytes": 14203836,
+          "sha256": "6a1a7b403fb2e0fdda7ee12ac5b2ddb85051b79547ec85ab7149962d6adc687f",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        },
+        {
+          "name": "Copernicus_DSM_COG_10_N26_00_E056_00_DEM.tif",
+          "code": "N26E056",
+          "bytes": 6775419,
+          "sha256": "084a330741202377007347bffaae7fdbd09eb1c369af0e4c0ce789afeae16ca2",
+          "retrievedAt": "2026-10-04T12:26:48Z"
+        }
+      ],
+      "sourceBytes": 813077322,
+      "sourceTilesIncluded": false,
+      "processing": {
+        "version": "tmrkz-terrain-1.0.0",
+        "tool": "ops/terrain/build_terrain.py (Python, rasterio/GDAL, numpy; ops/terrain/requirements.txt)"
+      },
+      "licence": {
+        "title": "Licence for Copernicus DEM instance COP-DEM-GLO-30-F Global 30m Full, Free & Open — Licence for the use of the Copernicus WorldDEM-30",
+        "instance": "COP-DEM-GLO-30-F",
+        "url": "https://documentation.dataspace.copernicus.eu/APIs/SentinelHub/Data/DEM/resources/license/License-COPDEM-30.pdf",
+        "documentSha256": "9cd37d37ea654bbcaf0a2e059e6a3a5b5f76072824d8dd860ccf274ada8951bd",
+        "checkedOn": "2026-11-04",
+        "file": "licences/COPERNICUS-DEM-GLO-30-NOTICE.txt"
+      }
+    },
+    {
+      "id": "licences",
+      "role": "LEGAL",
+      "required": true,
+      "title": "Attribution and licence notices",
+      "notices": {
+        "ATTRIBUTION.txt": "what each component requires",
+        "licences/ODbL-1.0-NOTICE.txt": "OpenStreetMap, ODbL 1.0",
+        "licences/COPERNICUS-DEM-GLO-30-NOTICE.txt": "Copernicus WorldDEM-30 licence, Article 6 (a)-(d)",
+        "licences/OFL-1.1.txt": "Noto Sans Arabic, SIL Open Font License 1.1"
+      }
+    }
+  ],
+  "attribution": {
+    "file": "ATTRIBUTION.txt",
+    "map": {
+      "street": "© OpenStreetMap contributors (ODbL) · Protomaps — أسماء الطرق من OpenStreetMap وليست أسماء رسمية",
+      "terrain": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved"
+    },
+    "required": [
+      {
+        "component": "basemap",
+        "text": "© OpenStreetMap contributors (ODbL) · Protomaps"
+      },
+      {
+        "component": "terrain-analysis",
+        "text": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+        "basis": "Copernicus licence Art. 6(b)"
+      },
+      {
+        "component": "terrain-visualization",
+        "text": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+        "basis": "Copernicus licence Art. 6(b)"
+      },
+      {
+        "component": "terrain-3d",
+        "text": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+        "basis": "Copernicus licence Art. 6(b)"
+      },
+      {
+        "component": "terrain-provenance",
+        "text": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30",
+        "basis": "Copernicus licence Art. 6(c)"
+      },
+      {
+        "component": "fonts",
+        "text": "Noto Sans Arabic © 2022 The Noto Project Authors — SIL Open Font License 1.1"
+      }
+    ]
+  },
+  "totals": {
+    "files": 43,
+    "bytes": 792440943
+  },
+  "contentSha256": "c4c0efaf2b151328e5336015ec525a2b5afe1c0353f52351e1d8a8202023b922",
+  "files": [
+    {
+      "path": "ATTRIBUTION.txt",
+      "sha256": "0edfc09eabe3b123bbdcd17f2d279b6233afa8b63938d99882a13d361668ded0",
+      "size": 2623,
+      "component": "licences"
+    },
+    {
+      "path": "basemap/uae.pmtiles",
+      "sha256": "17de2d52a6fca1b633fbe2bbfa7265a9287980c59391274fd97427506b73028f",
+      "size": 123069269,
+      "component": "basemap"
+    },
+    {
+      "path": "fonts/NotoSansArabic.ttf",
+      "sha256": "146b2193f4aee343a8da5e2295255b04db547d74339a12be51763b3a0081868d",
+      "size": 192144,
+      "component": "fonts"
+    },
+    {
+      "path": "licences/COPERNICUS-DEM-GLO-30-NOTICE.txt",
+      "sha256": "5f36ce0359cc2b0780935ad1adab180fdc21f0a7bbcf25dabdfffbd16c448003",
+      "size": 1431,
+      "component": "licences"
+    },
+    {
+      "path": "licences/ODbL-1.0-NOTICE.txt",
+      "sha256": "0b68facc46f67e4019a30399611ce2b94853c19c2aef6b1cb92a41b7b28ddea6",
+      "size": 984,
+      "component": "licences"
+    },
+    {
+      "path": "licences/OFL-1.1.txt",
+      "sha256": "fa27a4641d00020ca4522b71d7e9d2eddafcd5031a2e55b4cfb3eedfe33a865a",
+      "size": 4475,
+      "component": "licences"
+    },
+    {
+      "path": "styles/stationing-v3.json",
+      "sha256": "e2efffe75d7f782d26e1f8e62e88ed242e27f93cf0a4b79181971b5ce4bd62f2",
+      "size": 15585,
+      "component": "style"
+    },
+    {
+      "path": "terrain/glo30/analysis/SHA256SUMS",
+      "sha256": "9a91d9af6153baf943713eceb33db22366dbe97fb5840774f0e54cd390992682",
+      "size": 2604,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N22E051.tif",
+      "sha256": "3e299945655cd35fdc0ac9a0f783afddbb7a516849e70850cd3f864c22e7160d",
+      "size": 18654603,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N22E052.tif",
+      "sha256": "597a00d255bf17506ec3db07329ef2b10d55a6ca997e7e8574fc7bb9e1c5fa96",
+      "size": 20105550,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N22E053.tif",
+      "sha256": "1ab223e602004c9a245b0afebca2c3b62e880a9f24506f8f528f14ff7a1d7f5b",
+      "size": 20536766,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N22E054.tif",
+      "sha256": "44918b93409fab65f10b8862939cf99b63c8a054b569374efacc62a104ff549e",
+      "size": 20192744,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N22E055.tif",
+      "sha256": "27f021f269b9df339cf30538be69dc4ccd9c592a18dfacd779fec01ce5ba922e",
+      "size": 17016154,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N22E056.tif",
+      "sha256": "18a7d30cb29666fa638ca2b97fb4689cd8141577d62518a413c95897b59f0272",
+      "size": 17318026,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N23E051.tif",
+      "sha256": "8b127a3fa982a0f6c036bc91ab659cb64da6e03ef30d1cb891c79b9093e7e37f",
+      "size": 17736979,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N23E052.tif",
+      "sha256": "5be45dfaa204438985f91a7298882c554e1d7dfa9bb9c863f6b9655204f1b68d",
+      "size": 18896698,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N23E053.tif",
+      "sha256": "bab95725abbdd07a0a233f0dcb157db05a67af6b2664cd867569eec338d8eea7",
+      "size": 20109688,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N23E054.tif",
+      "sha256": "38e7d2d45d11924bef1eaa1dfbf512a654d21a0982ac27686824e778fe95cf4d",
+      "size": 19952233,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N23E055.tif",
+      "sha256": "4e3bfa862e597d84a82235be9db067b25f4404829d74de4c7d319d2c6d08c38c",
+      "size": 18215368,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N23E056.tif",
+      "sha256": "5e4c96e5c1f467022cde594ebce0529f2246eede5bb6c69955348ad374c08dec",
+      "size": 19989727,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N24E051.tif",
+      "sha256": "43f617cbae86af552d87f16643f1734e5747ff9eaaa2b1b9d6251538863c6a4c",
+      "size": 9702247,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N24E052.tif",
+      "sha256": "47a2134093a47a6ad86c870470689d8e37e75f481382df682d810b8111b656e6",
+      "size": 1836383,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N24E053.tif",
+      "sha256": "9a05181a0102961cbe143b2c74362b56aea0a9d56ee7d3c3d365bbce39c372b9",
+      "size": 2376785,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N24E054.tif",
+      "sha256": "21c1ab2f4365c6de0f74d6c42b19f296d51b6bd0e533e99a883b52856225e046",
+      "size": 10223004,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N24E055.tif",
+      "sha256": "3cdf14c79ebbe79d12f63c993177e714b16566156fd6be38d5611244e489bd37",
+      "size": 18898667,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N24E056.tif",
+      "sha256": "de653bbdf544fba775b30ba53110f5a9da48b34380bffffadedab468a4e8e329",
+      "size": 13700101,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N25E051.tif",
+      "sha256": "ed95b2f2d0e7ddd83af6d32b9fd53aa54b98a2815ef1853dac08d38b2b90f3b2",
+      "size": 9637373,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N25E052.tif",
+      "sha256": "6d0183e2ff3d93d6638eee193abb2677fcdb1a9c665d02194798c258e15cfc61",
+      "size": 56676,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N25E054.tif",
+      "sha256": "64464eda7bb67c9efc5c17a26c2bb76412adbb92cc9f4702c735cfc3bb24e100",
+      "size": 122448,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N25E055.tif",
+      "sha256": "f5525c2ee4d78285c30449424eec883e320b14a62dd04dd302649bd94cf7b450",
+      "size": 8735771,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N25E056.tif",
+      "sha256": "8ba452634852fe8570f07a1bea0f22e67108a813df0b1ddac6e888fedc823e68",
+      "size": 7809020,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N26E051.tif",
+      "sha256": "346728aeb4efaf25d71ba0999deca4f262a770bb6362682ad17d93a78a656d30",
+      "size": 690811,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N26E053.tif",
+      "sha256": "7455f238516318f265869226839ac24aaa59fed082dec181ff6e0606efc8f80e",
+      "size": 3110107,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N26E054.tif",
+      "sha256": "04abe43fb84e01bf4159485466ef5d60fdddd8e858f99c63e3d5b86bd299c08b",
+      "size": 7874571,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N26E055.tif",
+      "sha256": "5582b5f29192903779e25754213beca01eb1b87304b817c97e19d1e79beb7cc2",
+      "size": 5501464,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/analysis/slope_pct_x100_N26E056.tif",
+      "sha256": "00f9e9661ccc119532a4f218b51c3c99e9411ee4607e65fb6028de28907df745",
+      "size": 2759677,
+      "component": "terrain-analysis"
+    },
+    {
+      "path": "terrain/glo30/provenance/absent-tiles.json",
+      "sha256": "20c0728ff431703badd9d9257d4da12eae02871aaec15cb7cc73fbb1cda93a41",
+      "size": 2424,
+      "component": "terrain-provenance"
+    },
+    {
+      "path": "terrain/glo30/provenance/build-report.json",
+      "sha256": "a15907397503cfaeaafb223c7bc8050aa5e38d9e4530e2c5f644b18d331917b4",
+      "size": 5970,
+      "component": "terrain-provenance"
+    },
+    {
+      "path": "terrain/glo30/provenance/source-verification.json",
+      "sha256": "005d1d694a81ece54bdc0a4df8721cf586b23251b56b3d89a03077d903e1144f",
+      "size": 26129,
+      "component": "terrain-provenance"
+    },
+    {
+      "path": "terrain/glo30/provenance/terrain-manifest.json",
+      "sha256": "6943630c7c866d145c11a4f88d425fb6165380205c63988138d90fba0637fe0f",
+      "size": 22356,
+      "component": "terrain-provenance"
+    },
+    {
+      "path": "terrain/glo30/visualization-3d/terrain-3d-manifest.json",
+      "sha256": "87bfcf2e883cc3c321b30ba0b76d3ce8f4ad01707c9f963a744815a64f0c1255",
+      "size": 11477,
+      "component": "terrain-3d"
+    },
+    {
+      "path": "terrain/glo30/visualization-3d/terrain-rgb.pmtiles",
+      "sha256": "c31bf31acfa2661b9f8c3cce15618a88afe52df223695278a29161ae581df8a7",
+      "size": 208669916,
+      "component": "terrain-3d"
+    },
+    {
+      "path": "terrain/glo30/visualization/hillshade.pmtiles",
+      "sha256": "a033c2487a3474078fff8fa11412c087bea700c11ebe6895127eb315c8f9e84f",
+      "size": 128653915,
+      "component": "terrain-visualization"
+    }
+  ]
+}

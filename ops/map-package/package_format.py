@@ -9,13 +9,15 @@ for `sha256sum -c`). README.md beside this file describes the layout and every m
 A package is untrusted until it has passed `verify`: only regular files at the paths of the layout below, nothing else
 (no links, no devices, no extra or missing files, no path that leaves the package), sizes within limits, the manifest's
 own structure, every checksum, and the content of each component (readable PMTiles, font, style with local URLs only,
-terrain products matching their provenance, complete coverage, the required attribution). Nothing in a package is ever
-executed. Standard library only, so it runs on an isolated host with any Python 3.9+.
+terrain products matching their provenance, complete coverage, the required attribution; when the optional 3D visual
+terrain is present, its record, its source tiles, its tile pyramid and two decoded sample tiles). Nothing in a package is
+ever executed. Standard library only, so it runs on an isolated host with any Python 3.9+.
 
   python ops/map-package/package_format.py <package-dir | package.tar> [--quick]
 """
 from __future__ import annotations
 
+import bisect
 import hashlib
 import io
 import json
@@ -25,6 +27,7 @@ import stat
 import struct
 import sys
 import tarfile
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -40,6 +43,14 @@ CREATED_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 CELL_RE = re.compile(r"^N(\d{2})E(\d{3})$")
 ROOT_FILES = ("manifest.json", "SHA256SUMS")
 
+# the 3D visual terrain (optional component terrain-3d): Terrain-RGB elevation tiles for MapLibre terrain, display only,
+# and the copy of their record (map-packages/terrain-3d-glo30-<version>/manifest.json); nothing else lives beside them
+T3D_DIR = "terrain/glo30/visualization-3d"
+T3D_FILE = T3D_DIR + "/terrain-rgb.pmtiles"
+T3D_RECORD = T3D_DIR + "/terrain-3d-manifest.json"
+T3D_SOURCE = "terrain3d"                       # the style's source name (offlineStyle.ts TERRAIN_3D_SOURCE)
+T3D_BASE_M, T3D_STEP_M = -10000.0, 0.1         # Mapbox Terrain-RGB: height = -10000 + (R*65536 + G*256 + B) * 0.1
+
 # component → (role, required, the only paths it may hold)
 LAYOUT: dict[str, tuple[str, bool, re.Pattern]] = {
     "basemap": ("MAP_VISUALIZATION", True, re.compile(r"^basemap/uae\.pmtiles$")),
@@ -48,6 +59,8 @@ LAYOUT: dict[str, tuple[str, bool, re.Pattern]] = {
     "terrain-analysis": ("BUSINESS_ANALYSIS", True,
                          re.compile(r"^terrain/glo30/analysis/(slope_pct_x100_N\d{2}E\d{3}\.tif|SHA256SUMS)$")),
     "terrain-visualization": ("MAP_VISUALIZATION", True, re.compile(r"^terrain/glo30/visualization/hillshade\.pmtiles$")),
+    "terrain-3d": ("MAP_VISUALIZATION", False,
+                   re.compile(r"^terrain/glo30/visualization-3d/(terrain-rgb\.pmtiles|terrain-3d-manifest\.json)$")),
     "terrain-provenance": ("PROVENANCE", True, re.compile(
         r"^terrain/glo30/provenance/(terrain-manifest|build-report|absent-tiles|source-verification)\.json$")),
     "terrain-source": ("PROVENANCE", False,
@@ -55,6 +68,8 @@ LAYOUT: dict[str, tuple[str, bool, re.Pattern]] = {
     "licences": ("LEGAL", True, re.compile(r"^(ATTRIBUTION\.txt|licences/[A-Za-z0-9.-]+\.txt)$")),
 }
 REQUIRED_COMPONENTS = tuple(c for c, (_, req, _) in LAYOUT.items() if req)
+# a component listed here holds exactly these files, never a subset
+EXACT_FILES = {"terrain-3d": (T3D_FILE, T3D_RECORD)}
 MANIFEST_KEYS = {"format", "formatVersion", "packageId", "packageVersion", "createdAt", "builtBy", "compatibility",
                  "coverage", "components", "attribution", "totals", "contentSha256", "files"}
 FILE_KEYS = {"path", "sha256", "size", "component"}
@@ -184,7 +199,7 @@ def validate_manifest(m: object, r: Result) -> bool:
     if files is None or not files or len(files) > LIMITS["files"]:
         probs.append(f"files: not a list of 1..{LIMITS['files']} entries")
         files = []
-    seen, total, per = set(), 0, {}
+    seen, total, per, held = set(), 0, {}, {}
     for f in files:
         if not isinstance(f, dict) or set(f.keys()) != FILE_KEYS:
             probs.append(f"file entry {f!r:.80}: keys must be {sorted(FILE_KEYS)}")
@@ -205,9 +220,12 @@ def validate_manifest(m: object, r: Result) -> bool:
             probs.append(f"{f['path']}: listed twice")
         seen.add(f["path"])
         per[f["component"]] = per.get(f["component"], 0) + 1
+        held.setdefault(f["component"], set()).add(f["path"])
     for c in ids:
         if c in LAYOUT and not per.get(c):
             probs.append(f"component {c} holds no file")
+        elif c in EXACT_FILES and held.get(c) != set(EXACT_FILES[c]):
+            probs.append(f"component {c} must hold exactly {list(EXACT_FILES[c])}, it holds {sorted(held.get(c, ()))}")
     if total > LIMITS["total_bytes"]:
         probs.append(f"total {total} bytes exceeds {LIMITS['total_bytes']}")
     if m["totals"] != {"files": len(files), "bytes": total}:
@@ -502,8 +520,10 @@ def content_checks(pkg, m: dict, r: Result) -> None:
             probs.append("the style's source attributions differ from the manifest's map attribution")
         if hashlib.sha256(raw).hexdigest() != m["compatibility"]["styleSha256"]:
             probs.append("style checksum differs from compatibility.styleSha256")
+        probs += terrain3d_style_problems(st, m)
         return r.add("style local and consistent", not probs, "; ".join(probs[:6]) or
-                     f"{len(st.get('layers', []))} layers, {len(urls)} URLs, all under {served}/")
+                     f"{len(st.get('layers', []))} layers, {len(urls)} URLs, all under {served}/"
+                     + (f", 3D terrain source {T3D_SOURCE!r}" if T3D_SOURCE in src else ""))
 
     def terrain():
         ta, tv, tp = comp(m, "terrain-analysis"), comp(m, "terrain-visualization"), comp(m, "terrain-provenance")
@@ -604,14 +624,247 @@ def content_checks(pkg, m: dict, r: Result) -> None:
         if files.get(LICENCE_FILES[1]) and "Article 6" not in pkg.read(LICENCE_FILES[1], 1024 * 1024).decode("utf-8") \
                 and "6(a)" not in pkg.read(LICENCE_FILES[1], 1024 * 1024).decode("utf-8"):
             probs.append("Copernicus notice lacks the Article 6 notices")
+        if has_component(m, "terrain-3d") and T3D_DIR not in att:
+            probs.append(f"ATTRIBUTION.txt does not name the 3D terrain ({T3D_DIR})")
         return r.add("attribution and licences", not probs, "; ".join(probs) or
                      f"ATTRIBUTION.txt and {len(LICENCE_FILES)} licence notices")
 
-    for check in (basemap, fonts, style, terrain, coverage, licences):
+    def terrain3d():
+        if has_component(m, "terrain-3d"):  # optional: packages without it (2026.11.1) report no such check
+            check_terrain_3d(pkg, m, r)
+
+    for check in (basemap, fonts, style, terrain, coverage, licences, terrain3d):
         try:
             check()
         except (PackageError, PMTilesError, KeyError, TypeError, ValueError, StopIteration) as ex:
             r.add(check.__name__, False, f"{type(ex).__name__}: {ex}")
+
+
+def has_component(m: dict, cid: str) -> bool:
+    return any(isinstance(c, dict) and c.get("id") == cid for c in m.get("components", []))
+
+
+def terrain3d_style_problems(st: dict, m: dict) -> list[str]:
+    """The style and the 3D terrain agree: a `terrain3d` source exists exactly when the package carries terrain-3d, and
+    then it is the packaged Terrain-RGB archive, with the component's encoding and tile size and the terrain attribution."""
+    sources = st.get("sources") or {}
+    src = sources.get(T3D_SOURCE)
+    has = has_component(m, "terrain-3d")
+    users = [l.get("id") for l in st.get("layers", []) if isinstance(l, dict) and l.get("source") == T3D_SOURCE]
+    if src is None:
+        probs = [f"layers {users[:4]} use the source {T3D_SOURCE!r}, which the style lacks"] if users else []
+        if has:
+            probs.append(f"the package carries terrain-3d but the style has no {T3D_SOURCE!r} source")
+        return probs
+    if not has:
+        return [f"the style's {T3D_SOURCE!r} source needs the terrain-3d component, which the package lacks"]
+    c, probs = comp(m, "terrain-3d"), []
+    want = "pmtiles://" + m["compatibility"]["servedAt"].rstrip("/") + "/" + T3D_FILE
+    if src.get("url") != want:
+        probs.append(f"the style's {T3D_SOURCE!r} URL {src.get('url')!r} is not the packaged {want!r}")
+    if src.get("type") != "raster-dem" or src.get("encoding") != c.get("encoding") or src.get("tileSize") != c.get("tileSize"):
+        probs.append(f"the style's {T3D_SOURCE!r} source is {src.get('type')}/{src.get('encoding')}/{src.get('tileSize')}, "
+                     f"the component raster-dem/{c.get('encoding')}/{c.get('tileSize')}")
+    if src.get("attribution") != m["attribution"]["map"]["terrain"]:
+        probs.append(f"the style's {T3D_SOURCE!r} attribution differs from the manifest's terrain attribution")
+    return probs
+
+
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def png_rgb8(raw: bytes, limit: int = 4096 * 4096 * 3) -> tuple[int, int, bytes]:
+    """Decodes a non-interlaced 8-bit RGB PNG (colour type 2): every chunk's CRC, IHDR first, IDAT inflated to exactly the
+    expected size, rows unfiltered (filters 0-4). Returns (width, height, RGB bytes); anything else is a PackageError."""
+    if raw[:8] != PNG_SIGNATURE:
+        raise PackageError("not a PNG (signature)")
+    pos, ihdr, idat, ended = 8, None, [], False
+    while pos < len(raw) and not ended:
+        if pos + 8 > len(raw):
+            raise PackageError("PNG truncated in a chunk header")
+        ln, typ = struct.unpack_from(">I4s", raw, pos)
+        data, crc = raw[pos + 8:pos + 8 + ln], raw[pos + 8 + ln:pos + 12 + ln]
+        if len(data) != ln or len(crc) != 4:
+            raise PackageError(f"PNG chunk {typ!r} truncated")
+        if zlib.crc32(typ + data) & 0xFFFFFFFF != struct.unpack(">I", crc)[0]:
+            raise PackageError(f"PNG chunk {typ!r} fails its CRC")
+        pos += 12 + ln
+        if ihdr is None and typ != b"IHDR":
+            raise PackageError("PNG does not start with IHDR")
+        if typ == b"IHDR":
+            if ihdr is not None or ln != 13:
+                raise PackageError("PNG IHDR repeated or malformed")
+            ihdr = struct.unpack(">IIBBBBB", data)
+        elif typ == b"IDAT":
+            idat.append(data)
+        elif typ == b"IEND":
+            ended = True
+        elif not typ[0] & 0x20:
+            raise PackageError(f"PNG critical chunk {typ!r} is not allowed in an RGB tile")
+    if not ended or ihdr is None:
+        raise PackageError("PNG has no IEND")
+    w, h, depth, ctype, compression, filt, interlace = ihdr
+    if (depth, ctype, compression, filt, interlace) != (8, 2, 0, 0, 0):
+        raise PackageError(f"PNG is bit depth {depth}, colour type {ctype}, interlace {interlace}; expected 8-bit RGB "
+                           "(colour type 2), not interlaced")
+    if not 0 < w * h * 3 <= limit:
+        raise PackageError(f"PNG size {w}x{h} outside the limit")
+    stride, bpp = w * 3, 3
+    need = h * (stride + 1)
+    d = zlib.decompressobj()
+    try:
+        flat = d.decompress(b"".join(idat), need + 1)
+    except zlib.error as e:
+        raise PackageError(f"PNG image data does not inflate: {e}") from None
+    if len(flat) != need or not d.eof:
+        raise PackageError(f"PNG image data is {len(flat)} bytes, expected {need}")
+    out, prev = bytearray(h * stride), bytearray(stride)
+    for y in range(h):
+        ft, line = flat[y * (stride + 1)], bytearray(flat[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        if ft == 1:
+            for i in range(bpp, stride):
+                line[i] = (line[i] + line[i - bpp]) & 255
+        elif ft == 2:
+            for i in range(stride):
+                line[i] = (line[i] + prev[i]) & 255
+        elif ft == 3:
+            for i in range(stride):
+                line[i] = (line[i] + (((line[i - bpp] if i >= bpp else 0) + prev[i]) >> 1)) & 255
+        elif ft == 4:
+            for i in range(stride):
+                a = line[i - bpp] if i >= bpp else 0
+                b, c = prev[i], (prev[i - bpp] if i >= bpp else 0)
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                line[i] = (line[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        elif ft != 0:
+            raise PackageError(f"PNG row {y} has the unknown filter type {ft}")
+        out[y * stride:(y + 1) * stride] = line
+        prev = line
+    return w, h, bytes(out)
+
+
+def terrain_rgb_range(rgb: bytes) -> tuple[float, float]:
+    """The lowest and highest height (metres) of Mapbox Terrain-RGB pixels."""
+    vals = [(rgb[i] << 16) | (rgb[i + 1] << 8) | rgb[i + 2] for i in range(0, len(rgb), 3)]
+    return T3D_BASE_M + min(vals) * T3D_STEP_M, T3D_BASE_M + max(vals) * T3D_STEP_M
+
+
+def check_terrain_3d(pkg, m: dict, r: Result) -> bool:
+    """The 3D visual terrain (component terrain-3d) against its record, the package's provenance and its own tiles."""
+    name = "3d terrain consistent"
+    try:
+        return _check_terrain_3d(pkg, m, r, name)
+    except (PackageError, PMTilesError, KeyError, TypeError, ValueError, AttributeError, IndexError, OSError,
+            struct.error, StopIteration) as ex:
+        return r.add(name, False, f"{type(ex).__name__}: {ex}")
+
+
+def _check_terrain_3d(pkg, m: dict, r: Result, name: str) -> bool:
+    c = comp(m, "terrain-3d")
+    files = {f["path"]: f for f in m["files"]}
+    rec = parse_json(pkg.read(T3D_RECORD, LIMITS["json_bytes"]), "3D terrain record")
+    if not isinstance(rec, dict):
+        raise PackageError("the 3D terrain record is not a JSON object")
+    prod, df = rec.get("product") or {}, rec.get("derivedFrom") or {}
+    ml = prod.get("mapLibre") or {}
+    probs = []
+    # the record describes exactly the packaged file
+    if prod.get("file") != T3D_FILE.rsplit("/", 1)[1]:
+        probs.append(f"record names the product {prod.get('file')!r}")
+    if prod.get("sha256") != files[T3D_FILE]["sha256"] or prod.get("bytes") != files[T3D_FILE]["size"]:
+        probs.append("the record's product sha256/bytes differ from the packaged terrain-rgb.pmtiles")
+    if rec.get("kind") != "VISUALIZATION" or rec.get("code") != c["code"]:
+        probs.append(f"record kind/code {rec.get('kind')}/{rec.get('code')}, expected VISUALIZATION/{c['code']}")
+    # the record and the manifest component say the same thing; the encoding is one this verifier can decode
+    if (ml.get("type"), ml.get("encoding"), ml.get("tileSize")) != ("raster-dem", c["encoding"], c["tileSize"]):
+        probs.append(f"record MapLibre source {ml}, component encoding {c['encoding']} tileSize {c['tileSize']}")
+    if c["encoding"] != "mapbox":
+        probs.append(f"encoding {c['encoding']!r}: only Mapbox Terrain-RGB ('mapbox') is part of format v1")
+    for rk, ck in (("minzoom", "minZoom"), ("maxzoom", "maxZoom"), ("tiles", "tiles"), ("bounds", "bounds"),
+                   ("heightRangeM", "heightRangeM")):
+        if prod.get(rk) != c[ck]:
+            probs.append(f"record {rk} {prod.get(rk)} ≠ component {ck} {c[ck]}")
+    # made from the package's own GLO-30 source tiles
+    tm = parse_json(pkg.read("terrain/glo30/provenance/terrain-manifest.json", LIMITS["json_bytes"]), "terrain manifest")
+    if (df.get("dataset"), df.get("version")) != (tm.get("code"), tm.get("version")):
+        probs.append(f"record derives from {df.get('dataset')} {df.get('version')}, the package's terrain is "
+                     f"{tm.get('code')} {tm.get('version')}")
+    rsrc = [(t.get("name"), t.get("sha256")) for t in df.get("sourceTiles") or []]
+    psrc = [(t["name"], t["sha256"]) for t in comp(m, "terrain-provenance")["sourceTiles"]]
+    if sorted(rsrc) != sorted(psrc) or len(set(rsrc)) != len(rsrc):
+        probs.append(f"record source tiles ({len(rsrc)}) differ from terrain-provenance.sourceTiles ({len(psrc)}) "
+                     "in names or sha256")
+    req = [a for a in m["attribution"].get("required", []) if a.get("component") == "terrain-3d"]
+    if len(req) != 1 or req[0].get("text") != (rec.get("licence") or {}).get("modifiedDataAttribution"):
+        probs.append("attribution.required has no single terrain-3d entry with the record's Article 6(b) text")
+    lo, hi = c["heightRangeM"]
+    p = pkg.local(T3D_FILE)
+    if p is None:
+        return r.add(name, not probs, "; ".join(probs[:6]) or
+                     f"{rec['code']} record consistent; tiles checked after installation (archive)")
+    rd = Reader(p)
+    h = rd.header
+    b = h.bounds
+    cw, cs, ce, cn = m["coverage"]["bbox"]
+    if h.tile_type != "png" or h.tile_compression != "none":
+        probs.append(f"tile type {h.tile_type}/{h.tile_compression}, expected png without tile compression")
+    if (h.min_zoom, h.max_zoom) != (c["minZoom"], c["maxZoom"]):
+        probs.append(f"zooms z{h.min_zoom}-{h.max_zoom} ≠ component z{c['minZoom']}-{c['maxZoom']}")
+    if any(abs(x - y) > 1e-6 for x, y in zip(b, c["bounds"])):
+        probs.append(f"header bounds {list(b)} ≠ component bounds {c['bounds']}")
+    if not (b[0] <= cw and b[1] <= cs and b[2] >= ce and b[3] >= cn):
+        probs.append(f"bounds {list(b)} do not cover the required extent {m['coverage']['bbox']}")
+    ids = sorted(rd.tile_ids())
+    acc = lambda zz: ((1 << (2 * zz)) - 1) // 3  # noqa: E731 first tile id of zoom zz
+    per = {str(zz): bisect.bisect_left(ids, acc(zz + 1)) - bisect.bisect_left(ids, acc(zz))
+           for zz in range(h.min_zoom, h.max_zoom + 1)}
+    if per != prod.get("tilesPerZoom") or len(ids) != c["tiles"] or sum(per.values()) != len(ids):
+        probs.append(f"tiles per zoom {per} (total {len(ids)}) ≠ record {prod.get('tilesPerZoom')} (total {c['tiles']})")
+    # every finest-zoom tile whose centre lies inside the product bounds exists: the map never asks for a missing one
+    from pmtiles_reader import lat_to_y, lon_to_x
+    z, idset, want, gaps = h.max_zoom, set(ids), 0, 0
+    for x in range(lon_to_x(b[0], z), lon_to_x(b[2], z) + 1):
+        for y in range(lat_to_y(b[3], z), lat_to_y(b[1], z) + 1):
+            lon, lat = tile_centre(z, x, y)
+            if b[0] <= lon <= b[2] and b[1] <= lat <= b[3]:
+                want += 1
+                gaps += zxy_to_tileid(z, x, y) not in idset
+    if gaps or not want:
+        probs.append(f"z{z} misses {gaps} of {want} tiles whose centre lies inside the bounds")
+    # finest-zoom tiles decoded (8-bit RGB of the tile size, heights in the record's range): the one at the centre of the
+    # required extent, and the largest one, the most relief, so the heights checked are not only sea level
+    samples = []
+    sx, sy = lon_to_x((cw + ce) / 2, z), lat_to_y((cs + cn) / 2, z)
+    raw = rd.tile(z, sx, sy)
+    if raw is None:
+        probs.append(f"the sample tile {z}/{sx}/{sy} at the coverage centre is missing")
+    else:
+        samples.append((f"{z}/{sx}/{sy} (coverage centre)", raw))
+    big = max(((ln, off, tid) for tid, _, ln, off in rd.entries() if acc(z) <= tid < acc(z + 1)), default=None)
+    if big is not None:
+        with open(p, "rb") as f:
+            f.seek(h.data_offset + big[1])
+            samples.append((f"z{z} id {big[2]} (largest)", f.read(big[0])))
+    seen_samples = []
+    for label, raw in samples:
+        try:
+            tw, th, rgb = png_rgb8(raw)
+        except PackageError as ex:
+            probs.append(f"the sample tile {label} is not an 8-bit RGB PNG: {ex}")
+            continue
+        smin, smax = terrain_rgb_range(rgb)
+        if (tw, th) != (c["tileSize"], c["tileSize"]):
+            probs.append(f"sample tile {label} is {tw}x{th}, the component's tile size is {c['tileSize']}")
+        if smin < lo - T3D_STEP_M - 1e-6 or smax > hi + T3D_STEP_M + 1e-6:  # within one encoding step of the record
+            probs.append(f"sample tile {label} heights {smin:.1f}..{smax:.1f} m fall outside the record's {lo}..{hi} m")
+        seen_samples.append(f"{label} {tw}x{th} RGB {smin:.1f}..{smax:.1f} m")
+    return r.add(name, not probs, "; ".join(probs[:6]) or
+                 f"{rec['code']} {rec.get('version')} PMTiles png z{h.min_zoom}-{h.max_zoom}, {len(ids)} tiles, bounds "
+                 f"{list(b)}; z{z}: {want} tiles inside the bounds, none missing; samples "
+                 f"{', '.join(seen_samples)}, within {lo}..{hi} m; "
+                 f"{c['encoding']} {c['tileSize']} px; record product {prod['sha256'][:12]}…, "
+                 f"{len(rsrc)} source tiles as terrain-provenance")
 
 
 def ttf_name(raw: bytes, name_id: int) -> str | None:

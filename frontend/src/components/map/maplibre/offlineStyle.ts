@@ -21,12 +21,24 @@ export interface HillshadeSource {
   encoding?: 'terrarium' | 'mapbox';
 }
 
+/**
+ * The 3D visual terrain (owner brief «TRUE OFFLINE 3D TERRAIN», 6 Nov 2026): Terrain-RGB elevation tiles of the package's
+ * `terrain-3d` component for MapLibre's own terrain (`setTerrain`). Display only: it never feeds a business rule.
+ */
+export interface Terrain3dSource {
+  url: string;
+  encoding: 'mapbox' | 'terrarium';
+  tileSize: number;
+}
+
 export interface OfflineStyleOptions {
   /** Absolute URL of the basemap PMTiles. */
   basemapUrl: string;
   /** Absolute URL of the label font file (Noto Sans Arabic covers Arabic, its presentation forms, Latin and digits). */
   fontUrl: string;
   hillshade?: HillshadeSource | null;
+  /** The elevation tiles of the 3D view, when the installed package carries them. */
+  terrain3d?: Terrain3dSource | null;
   mode?: BasemapMode;
   labels?: LabelLanguage;
 }
@@ -39,6 +51,11 @@ export const OVERLAY_ANCHOR = 'tmrkz-overlay-anchor';
 
 /** Layer metadata key naming the mode a basemap layer belongs to ("street", "terrain" or "labels" for both). */
 export const GROUP = 'tmrkz:group';
+
+/** The elevation source of the 3D view and its display-only layers (hidden in 2D; placed by terrain3d.ts). */
+export const TERRAIN_3D_SOURCE = 'terrain3d';
+export const RELIEF_3D = 'terrain3d-relief';
+export const SHADE_3D = 'terrain3d-shade';
 
 export const ROUTE_SHIELD = 'tmrkz-route-shield';
 
@@ -252,6 +269,38 @@ function labelLayers(lang: LabelLanguage): LayerSpecification[] {
   ];
 }
 
+/**
+ * The 3D view's own background layers, display only and hidden until the view is 3D: an elevation tint (sea level
+ * transparent, sand to brown and grey with height) and a relief shade, both from the elevation tiles. Their place in the
+ * stack follows the background mode (terrain3d.ts), always below roads, water lines and labels.
+ */
+function terrain3dLayers(): LayerSpecification[] {
+  return [
+    {
+      id: RELIEF_3D,
+      type: 'color-relief',
+      source: TERRAIN_3D_SOURCE,
+      layout: { visibility: 'none' },
+      paint: {
+        'color-relief-opacity': 0.55,
+        'color-relief-color': [
+          'interpolate', ['linear'], ['elevation'],
+          0, 'rgba(0,0,0,0)', 1, 'rgba(226,214,184,0.6)', 120, '#dccaa0', 350, '#c9a878', 650, '#a8805a', 950, '#8a6b52', 1400, '#7d7570', 1900, '#a9a6a3',
+        ],
+      },
+      metadata: { [GROUP]: '3d' },
+    } as LayerSpecification,
+    {
+      id: SHADE_3D,
+      type: 'hillshade',
+      source: TERRAIN_3D_SOURCE,
+      layout: { visibility: 'none' },
+      paint: { 'hillshade-shadow-color': '#3b3127', 'hillshade-highlight-color': '#fffaf0', 'hillshade-accent-color': '#5a4a3a', 'hillshade-exaggeration': 0.55 },
+      metadata: { [GROUP]: '3d' },
+    },
+  ];
+}
+
 /** The complete offline style; `mode` only sets the initial visibility of the two background groups. */
 export function buildOfflineStyle(o: OfflineStyleOptions): StyleSpecification {
   const mode = o.mode ?? 'street';
@@ -263,7 +312,10 @@ export function buildOfflineStyle(o: OfflineStyleOptions): StyleSpecification {
   } else if (o.hillshade?.kind === 'raster-dem') {
     sources.hillshade = { type: 'raster-dem', url: 'pmtiles://' + o.hillshade.url, tileSize: 256, encoding: o.hillshade.encoding ?? 'terrarium', attribution: TERRAIN_ATTRIBUTION };
   }
-  const layers = [...streetLayers(), ...terrainLayers(o.hillshade), ...labelLayers(o.labels ?? 'ar')].map((l) => withVisibility(l, mode));
+  if (o.terrain3d) {
+    sources[TERRAIN_3D_SOURCE] = { type: 'raster-dem', url: 'pmtiles://' + o.terrain3d.url, tileSize: o.terrain3d.tileSize, encoding: o.terrain3d.encoding, attribution: TERRAIN_ATTRIBUTION };
+  }
+  const layers = [...streetLayers(), ...terrainLayers(o.hillshade), ...(o.terrain3d ? terrain3dLayers() : []), ...labelLayers(o.labels ?? 'ar')].map((l) => withVisibility(l, mode));
   return {
     version: 8,
     name: 'TMRKZ offline (Stationing V3)',

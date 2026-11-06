@@ -9,12 +9,13 @@
 // geometry check; it is never submitted. Evidence: docs/evidence/ui-rebuild/first-delivery/.
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { partVectors, proposedParts, recordOf, rendersRole, ringCentre, slowDrag, toNewSiteStep, toScreen } from './geometry-helpers.mjs';
 
 const UI = process.env.UI_URL ?? 'http://localhost:5180';
 const AUTH = process.env.AUTH_URL ?? 'http://localhost:8088';
-const OUT = new URL('../../docs/evidence/ui-rebuild/first-delivery/', import.meta.url);
+// EVIDENCE_DIR=<folder> keeps a regression run's evidence apart from the accepted run's
+const OUT = process.env.EVIDENCE_DIR ? pathToFileURL(process.env.EVIDENCE_DIR.replace(/[\/]?$/, '/')) : new URL('../../docs/evidence/ui-rebuild/first-delivery/', import.meta.url);
 mkdirSync(OUT, { recursive: true });
 const shot = (name) => fileURLToPath(new URL(name, OUT));
 const PASSWORD = readFileSync(new URL('../../ops/test-env/.generated/user-password', import.meta.url), 'utf8').trim();
@@ -22,6 +23,11 @@ const require = createRequire(new URL('./package.json', import.meta.url));
 const { chromium } = require('playwright-core');
 const DATA = 'بيانات قبول وهمية';
 const UNDER_REVIEW = process.env.UNDER_REVIEW ?? 'RS-2026-0043';
+// POLY_UNIT / MP_UNIT / PT_UNIT name the units whose current site is a Polygon, a MultiPolygon and a marker (defaults: the
+// tmrkz-test fixtures)
+const POLY_UNIT = process.env.POLY_UNIT ?? 'الخدمات المشتركة';
+const MP_UNIT = process.env.MP_UNIT ?? 'قسم الخدمات العامة';
+const PT_UNIT = process.env.PT_UNIT ?? 'قسم النقل والحركة الإدارية';
 const SIZES = { desktop: [1920, 1080], laptop: [1366, 768], tablet: [1024, 768], mobile: [390, 844] };
 
 const results = [];
@@ -297,10 +303,11 @@ const unitNamesAt = (current, siteId) => [...new Set(current.filter((c) => c.sit
   await page.goto(UI + '/');
   const countBefore = (await api(page, '/restationing-requests')).body.length;
   const writes = [];
-  page.on('request', (q) => q.method() !== 'GET' && writes.push(q.method() + ' ' + q.url()));
-  const mp = await recordOf(page, 'قسم الخدمات العامة');
-  const poly = await recordOf(page, 'الخدمات المشتركة');
-  const pt = await recordOf(page, 'قسم النقل والحركة الإدارية');
+  // the terrain analysis (6 Nov 2026) is a read-only POST — it carries a geometry and saves nothing — not a write
+  page.on('request', (q) => q.method() !== 'GET' && !q.url().endsWith('/api/v1/stationing/terrain/assess') && writes.push(q.method() + ' ' + q.url()));
+  const mp = await recordOf(page, MP_UNIT);
+  const poly = await recordOf(page, POLY_UNIT);
+  const pt = await recordOf(page, PT_UNIT);
   const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
   const step4 = () => page.locator('[data-testid=flow-question]').textContent();
   // the accepted Stationing editor's readouts (dt → dd) in the proposal panel
@@ -419,7 +426,7 @@ let draftId = null;
     await page.getByRole('button', { name: 'الخطوة 4: الموقع الجديد' }).click();
   } else {
     // map first: the unit's site located, confirmed, the unit chosen, permanent; the copy creates the draft
-    const unit = (await (async () => { await page.goto(UI + '/'); return api(page, '/stationing/current'); })()).body.find((c) => c.orgName === 'قسم الخدمات العامة');
+    const unit = (await (async () => { await page.goto(UI + '/'); return api(page, '/stationing/current'); })()).body.find((c) => c.orgName === MP_UNIT);
     await open(page, 'restationing/new?unit=' + unit.orgId);
     await page.getByRole('button', { name: 'اختيار هذا الموقع' }).click();
     await page.locator('[data-testid=units-to-move] .rs-check', { hasText: unit.orgName }).first().locator('input').check();

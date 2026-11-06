@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """Builds the TMRKZ offline map package from verified local sources (ops/map-package/sources.json): the UAE street
-basemap, the map font, the application's style, the Copernicus GLO-30 terrain products with their provenance, and the
-licence notices. Nothing is downloaded.
+basemap, the map font, the application's style, the Copernicus GLO-30 terrain products with their provenance, the
+optional 3D visual terrain (component terrain-3d, display only), and the licence notices. Nothing is downloaded.
 
 Before copying anything it checks every input against its recorded checksum: the basemap and the font against
 sources.json; the 28 GLO-30 source tiles, the slope analysis files and the hillshade against the terrain manifest
-(map-packages/terrain-glo30-2026.11/manifest.json). The package is assembled in a temporary directory, verified in full
+(map-packages/terrain-glo30-2026.11/manifest.json); the 3D terrain's Terrain-RGB archive against its record
+(map-packages/terrain-3d-glo30-2026.11/manifest.json), whose source tiles must be the terrain manifest's. With
+--no-terrain-3d the package has no 3D terrain and its style no `terrain3d` source. The package is assembled in a
+temporary directory, verified in full
 (package_format.verify) and only then renamed into place. With --archive it also writes a deterministic tar (sorted
 members, fixed owner, mode and time) and its .sha256.
 
 Deterministic: the same inputs, revision and SOURCE_DATE_EPOCH give byte-identical files, manifest and tar. Without
 SOURCE_DATE_EPOCH the creation time is the build time, which changes only manifest.json (createdAt).
 
-  python ops/map-package/build_package.py [--out map-data/packages] [--archive] [--with-source]
-         [--terrain-derived DIR] [--terrain-source DIR] [--version 2026.11.1]
+  python ops/map-package/build_package.py [--out map-data/packages] [--archive] [--with-source] [--no-terrain-3d]
+         [--terrain-derived DIR] [--terrain-source DIR] [--version 2026.11.2]
 """
 from __future__ import annotations
 
@@ -35,7 +38,7 @@ sys.path.insert(0, str(HERE))
 import package_format as pf  # noqa: E402
 from pmtiles_reader import Reader  # noqa: E402
 
-TOOL_VERSION = "1.0.0"
+TOOL_VERSION = "1.1.0"
 
 
 def fail(msg: str) -> None:
@@ -74,7 +77,13 @@ def dumps(o) -> bytes:
     return (json.dumps(o, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
 
-def check_inputs(src: dict, derived: Path, source: Path, with_source: bool) -> dict:
+def lf(raw: bytes) -> bytes:
+    """A git-tracked text file as git stores it (.gitattributes: eol=lf), whatever the working tree's line endings: a
+    record written or checked out with CRLF on Windows packages to the same bytes as on Linux."""
+    return raw.replace(b"\r\n", b"\n")
+
+
+def check_inputs(src: dict, derived: Path, source: Path, with_source: bool, terrain3d: bool) -> dict:
     """Every input against its recorded checksum; returns what the manifest records about them."""
     out: dict = {}
     bm = src["basemap"]
@@ -123,11 +132,43 @@ def check_inputs(src: dict, derived: Path, source: Path, with_source: bool) -> d
     cells = {a["cell"]: a.get("verdict") for a in absent.get("absent_cells", [])}
     if cells != {a["cell"]: a["verdict"] for a in tm["absentCells"]}:
         fail("absent-tiles.json disagrees with the terrain manifest's absent cells")
+    if terrain3d:
+        out["terrain3d"] = check_terrain_3d_input(src, tm)
     return out
 
 
-def assemble(src: dict, derived: Path, source: Path, with_source: bool, stage: Path, version: str) -> dict:
-    inputs = check_inputs(src, derived, source, with_source)
+def check_terrain_3d_input(src: dict, tm: dict) -> tuple:
+    """The 3D visual terrain: the product against its record (size, sha256, PMTiles header), the record's source tiles
+    against the terrain manifest (the same 28 GLO-30 tiles as the slope analysis)."""
+    t3 = src.get("terrain3d")
+    if not t3:
+        fail("sources.json has no terrain3d entry (build with --no-terrain-3d for a package without the 3D terrain)")
+    rec_path = rel(t3["record"])
+    rec_raw = lf(rec_path.read_bytes())
+    rec = json.loads(rec_raw.decode("utf-8"))
+    prod, df = rec["product"], rec["derivedFrom"]
+    pp = rel(t3["derived"]) / prod["file"]
+    if not pp.is_file() or pp.stat().st_size != prod["bytes"] or pf.sha256_file(pp) != prod["sha256"]:
+        fail(f"3D terrain {pp} missing or not the size/sha256 of its record {rec_path} ({prod['sha256'][:12]}…)")
+    if rec.get("kind") != "VISUALIZATION" or prod["mapLibre"] != {"type": "raster-dem", "encoding": "mapbox", "tileSize": 256}:
+        fail(f"{rec_path}: not a VISUALIZATION product with a raster-dem/mapbox/256 MapLibre source")
+    if (df["dataset"], df["version"]) != (tm["code"], tm["version"]):
+        fail(f"{rec_path} derives from {df['dataset']} {df['version']}, the terrain manifest is {tm['code']} {tm['version']}")
+    key = lambda t: (t["name"], t["sha256"], t["bytes"])  # noqa: E731
+    if sorted(map(key, df["sourceTiles"])) != sorted(map(key, tm["tiles"])):
+        fail(f"{rec_path}: its source tiles are not the terrain manifest's {len(tm['tiles'])} GLO-30 tiles")
+    h = Reader(pp).header
+    if (h.tile_type, h.tile_compression, h.min_zoom, h.max_zoom, h.addressed_tiles) != \
+            ("png", "none", prod["minzoom"], prod["maxzoom"], prod["tiles"]):
+        fail(f"{pp.name} header ({h.tile_type}, z{h.min_zoom}-{h.max_zoom}, {h.addressed_tiles} tiles) differs from its record")
+    print(f"[build] terrain 3d ok: {pp.name} sha256 {prod['sha256'][:12]}… ({prod['bytes']} bytes, {prod['tiles']} tiles "
+          f"z{prod['minzoom']}-{prod['maxzoom']}), record {rec_path.name} from the same {len(df['sourceTiles'])} source tiles")
+    return pp, rec_raw, rec
+
+
+def assemble(src: dict, derived: Path, source: Path, with_source: bool, stage: Path, version: str,
+             terrain3d: bool = True) -> dict:
+    inputs = check_inputs(src, derived, source, with_source, terrain3d)
     pid = f"tmrkz-map-{version}"
     files: list[dict] = []
 
@@ -153,7 +194,8 @@ def assemble(src: dict, derived: Path, source: Path, with_source: bool, stage: P
                       "licence": f["licence"], "licenceFile": "licences/OFL-1.1.txt"})
     style_tmp = stage / "styles" / "stationing-v3.json"
     style_tmp.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["node", str(HERE / "export_style.mjs"), str(style_tmp)], check=True, stdout=subprocess.DEVNULL)
+    subprocess.run(["node", str(HERE / "export_style.mjs"), str(style_tmp)] + ([] if terrain3d else ["--no-terrain-3d"]),
+                   check=True, stdout=subprocess.DEVNULL)
     files.append({"path": "styles/stationing-v3.json", "component": "style"})
     style = json.loads(style_tmp.read_text(encoding="utf-8"))
     ana = tm["products"]["analysis"]
@@ -161,6 +203,11 @@ def assemble(src: dict, derived: Path, source: Path, with_source: bool, stage: P
         put(f"terrain/glo30/analysis/{f['name']}", copy_from=derived / "analysis" / f["name"])
     put("terrain/glo30/analysis/SHA256SUMS", copy_from=derived / "analysis" / "SHA256SUMS")
     put("terrain/glo30/visualization/hillshade.pmtiles", copy_from=derived / "visualization" / "hillshade.pmtiles")
+    t3 = None
+    if terrain3d:
+        t3_path, t3_raw, t3 = inputs["terrain3d"]
+        put(pf.T3D_FILE, copy_from=t3_path)
+        put(pf.T3D_RECORD, t3_raw)
     put("terrain/glo30/provenance/terrain-manifest.json", copy_from=tm_path)
     report = json.loads((derived / "build-report.json").read_text(encoding="utf-8"))
     put("terrain/glo30/provenance/build-report.json", dumps(strip_timings(report)))
@@ -174,7 +221,7 @@ def assemble(src: dict, derived: Path, source: Path, with_source: bool, stage: P
     put("licences/OFL-1.1.txt", copy_from=rel(src["fonts"][0]["licenceFile"]))
     lic = tm["licence"]
     street, terrain_attr = style["sources"]["basemap"]["attribution"], style["sources"]["hillshade"]["attribution"]
-    put("ATTRIBUTION.txt", attribution_text(pid, meta, src, tm, street, terrain_attr, with_source).encode("utf-8"))
+    put("ATTRIBUTION.txt", attribution_text(pid, meta, src, tm, street, terrain_attr, with_source, terrain3d).encode("utf-8"))
 
     for f in files:
         p = stage / f["path"]
@@ -189,7 +236,12 @@ def assemble(src: dict, derived: Path, source: Path, with_source: bool, stage: P
     hv = tm["products"]["visualization"]["files"][0]
     hr = Reader(stage / "terrain/glo30/visualization/hillshade.pmtiles").header
     revision = git("rev-parse", "HEAD")
-    dirty = bool(git("status", "--porcelain", "--", "ops/map-package", "frontend/src/components/map/maplibre"))
+    # the tools and records the package is made from: map tools, terrain tools, the style source, the terrain records
+    tree = ["ops/map-package", "ops/terrain", "frontend/src/components/map/maplibre",
+            Path(src["terrain"]["manifest"]).parent.as_posix()]
+    if terrain3d:
+        tree.append(Path(src["terrain3d"]["record"]).parent.as_posix())
+    dirty = bool(git("status", "--porcelain", "--", *tree))
     components = [
         {"id": "basemap", "role": "MAP_VISUALIZATION", "required": True,
          "title": "UAE street basemap (offline vector tiles)",
@@ -226,6 +278,7 @@ def assemble(src: dict, derived: Path, source: Path, with_source: bool, stage: P
          "title": "Hillshade (display only, never a business input)", "format": hv["format"],
          "minZoom": hr.min_zoom, "maxZoom": hr.max_zoom, "tiles": hr.addressed_tiles, "bounds": list(hr.bounds),
          "processingVersion": tm["processing"]["version"]},
+        *([terrain3d_component(t3, tm)] if terrain3d else []),
         {"id": "terrain-provenance", "role": "PROVENANCE", "required": True,
          "title": "Copernicus DEM GLO-30 provenance",
          "product": tm["source"]["product"], "instance": tm["source"]["instance"], "surfaceModel": "DSM",
@@ -267,6 +320,8 @@ def assemble(src: dict, derived: Path, source: Path, with_source: bool, stage: P
                             {"component": "basemap", "text": "© OpenStreetMap contributors (ODbL) · Protomaps"},
                             {"component": "terrain-analysis", "text": lic["modifiedDataAttribution"], "basis": "Copernicus licence Art. 6(b)"},
                             {"component": "terrain-visualization", "text": lic["modifiedDataAttribution"], "basis": "Copernicus licence Art. 6(b)"},
+                            *([{"component": "terrain-3d", "text": lic["modifiedDataAttribution"], "basis": "Copernicus licence Art. 6(b)"}]
+                              if terrain3d else []),
                             {"component": "terrain-provenance", "text": lic["noLiability"], "basis": "Copernicus licence Art. 6(c)"},
                             {"component": "fonts", "text": "Noto Sans Arabic © 2022 The Noto Project Authors — SIL Open Font License 1.1"}]
                         + ([{"component": "terrain-source", "text": lic["requiredAttribution"], "basis": "Copernicus licence Art. 6(a)"}] if with_source else [])},
@@ -278,7 +333,21 @@ def assemble(src: dict, derived: Path, source: Path, with_source: bool, stage: P
     return manifest
 
 
-def attribution_text(pid, meta, src, tm, street, terrain_attr, with_source) -> str:
+def terrain3d_component(rec: dict, tm: dict) -> dict:
+    prod = rec["product"]
+    return {"id": "terrain-3d", "role": "MAP_VISUALIZATION", "required": False,
+            "title": "3D visual terrain (Terrain-RGB elevation tiles; display only, never a business input)",
+            "code": rec["code"], "version": rec["version"], "file": pf.T3D_FILE, "record": pf.T3D_RECORD,
+            "format": prod["format"], "encoding": prod["mapLibre"]["encoding"], "tileSize": prod["mapLibre"]["tileSize"],
+            "minZoom": prod["minzoom"], "maxZoom": prod["maxzoom"], "tiles": prod["tiles"], "bounds": prod["bounds"],
+            "heightRangeM": prod["heightRangeM"], "processingVersion": rec["processing"]["version"],
+            "derivedFrom": f"{tm['code']} {tm['version']}: the same {len(rec['derivedFrom']['sourceTiles'])} GLO-30 source "
+                           "tiles as terrain-analysis (terrain-provenance.sourceTiles)",
+            "use": "display only: MapLibre terrain (raster-dem source, setTerrain) and displayed elevations; never an input "
+                   "to a business rule and never loaded into PostGIS (the slope analysis, terrain-analysis, is)"}
+
+
+def attribution_text(pid, meta, src, tm, street, terrain_attr, with_source, terrain3d=False) -> str:
     lic = tm["licence"]
     lines = [
         f"TMRKZ offline map package {pid} — attribution and notices",
@@ -295,10 +364,14 @@ def attribution_text(pid, meta, src, tm, street, terrain_attr, with_source) -> s
         "TERRAIN (terrain/glo30/)",
         f"  Source: {tm['source']['product']} ({lic['instance']}), {tm['source']['publisher']}.",
         f"  Licence: {lic['title']} ({lic['url']}; checked {lic['checkedOn']}, sha256 {lic['documentSha256']}).",
-        f"  Derived products (slope analysis, hillshade), Article 6(b): {lic['modifiedDataAttribution']}",
+        f"  Derived products (slope analysis, hillshade{', 3D terrain' if terrain3d else ''}), Article 6(b): "
+        f"{lic['modifiedDataAttribution']}",
         f"  Article 6(c): {lic['noLiability']}",
         f"  {lic['noEndorsement']}",
     ]
+    if terrain3d:
+        lines += [f"  3D terrain ({pf.T3D_DIR}/): Terrain-RGB elevation tiles from the same GLO-30 source tiles, for the",
+                  "  map's 3D view and displayed elevations only; never an input to a business rule."]
     if with_source:
         lines.append(f"  Unmodified source tiles (terrain/glo30/source), Article 6(a): {lic['requiredAttribution']}")
     lines += [
@@ -329,7 +402,7 @@ def write_tar(pkg_dir: Path, manifest: dict, out: Path) -> str:
                 tf.addfile(ti, f)
     os.replace(tmp, out)
     digest = pf.sha256_file(out)
-    out.with_name(out.name + ".sha256").write_text(f"{digest}  {out.name}\n", encoding="utf-8")
+    out.with_name(out.name + ".sha256").write_bytes(f"{digest}  {out.name}\n".encode("utf-8"))  # LF on every host
     return digest
 
 
@@ -341,6 +414,8 @@ def main(argv=None) -> int:
     ap.add_argument("--terrain-derived", default=None, help="directory with analysis/, visualization/, build-report.json")
     ap.add_argument("--terrain-source", default=None, help="directory with the GLO-30 tiles, absent-tiles.json, verification.json")
     ap.add_argument("--with-source", action="store_true", help="include the 28 unmodified GLO-30 tiles (archival)")
+    ap.add_argument("--no-terrain-3d", action="store_true",
+                    help="no 3D visual terrain: no terrain-3d component and no terrain3d source in the style")
     ap.add_argument("--archive", action="store_true", help="also write <package-id>.tar and .tar.sha256")
     ap.add_argument("--replace", action="store_true", help="replace an existing build output of the same id")
     a = ap.parse_args(argv)
@@ -362,7 +437,7 @@ def main(argv=None) -> int:
     stage.mkdir(parents=True)
     started = time.time()
     try:
-        manifest = assemble(src, derived, source, a.with_source, stage, version)
+        manifest = assemble(src, derived, source, a.with_source, stage, version, terrain3d=not a.no_terrain_3d)
         r = pf.verify(stage)
         pf.print_result(r)
         if not r.ok:

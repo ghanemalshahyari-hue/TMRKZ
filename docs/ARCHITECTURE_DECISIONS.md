@@ -1536,3 +1536,81 @@ temporary by design.
   Keycloak brute-force protection (5 failures) applies to them.
 - Tests: `EnterpriseSignInIT.platformAccounts`. The test asserts creation, rights, refusal without the role, refusal of
   a login the installation does not name, renewal of an ended grant, a second account, revocation and audit.
+
+## ADR-038 True offline 3D terrain: a display-only Terrain-RGB component and MapLibre's own terrain — Proposed, awaiting the owner's visual review (2026-11-06)
+
+**Context.** Owner brief «TRUE OFFLINE 3D TERRAIN + TERRAIN-CONFORMING STATIONING UX» (6 Nov 2026, with two reference
+images): the Stationing map must become real 3D terrain, fully offline, and every re-stationing geometry must lie on the
+ground. That covers the current site, the proposed site, the primary and alternative deployment areas, occupied ground
+and the other registered sites. The brief also asks for directional connectors with distance chips, cards on the
+ground, terrain analysis with an elevation profile, and drawing and dragging in 3D. The installed package
+`tmrkz-map-2026.11.1` carries only a grey hillshade PNG (no elevations), so true terrain was not possible with it.
+
+**Decision.**
+- **A separate VISUALIZATION product** (`ops/terrain/build_terrain_3d.py`, record `map-packages/terrain-3d-glo30-2026.11/`):
+  - built from the same 28 approved GLO-30 source tiles, each checked against the terrain manifest's sha256;
+  - elevations reprojected to Web Mercator 256 px tiles (bilinear at z12, mean of four children below), z6–12;
+  - encoded as Mapbox Terrain-RGB at 0.1 m, PNG, one PMTiles archive (5,932 tiles, 208,669,916 bytes, sha256
+    `c31bf31a…`); deterministic.
+  - It never enters the database and never feeds a rule. The slope analysis (`terrain-analysis`, `9a91d9af…`) is
+    unchanged and remains the only terrain input of Stationing rules.
+- **Package `tmrkz-map-2026.11.2`**, format v1 with an OPTIONAL component `terrain-3d` (`visualization-3d/terrain-rgb.pmtiles` +
+  its record). The verifier checks:
+  - the record against the file and against the terrain provenance;
+  - coverage: every z12 tile inside the bounds is present;
+  - a decoded PNG sample with every CRC checked, and heights within the recorded range;
+  - the style source rule: a `terrain3d` source exists exactly when the component does.
+
+  `readiness.py --require-terrain-3d` FAILs a package without the component and range-checks the served file.
+  2026.11.1 still verifies unchanged; an older installer refuses the new component. The build tree was not clean, so a
+  release build must be repeated from a commit.
+- **MapLibre's own terrain** (`components/map/maplibre/terrain3d.ts`):
+  - a `raster-dem` source; `setTerrain` with exaggeration 1 (no visual exaggeration, §30);
+  - a display-only elevation tint and shade, placed below roads and labels for the background in use;
+  - a dark sky; camera pitch 55°.
+  - Fill and line layers are draped by MapLibre itself. Markers and labels stand at the terrain height and fade when a
+    ridge hides them.
+  - No tilted image, no canvas transform, no extrusion.
+- **Presentation only:**
+  - the 2D/3D switch never touches the request, the edited geometry, its parts or its history (no Z coordinates, no
+    migration);
+  - drawing, dragging and click placement use MapLibre's terrain-aware pointer position, so in 3D a vertex is the ground
+    point under the pointer.
+- **Information on the ground** (`components/workspace/terrainCards.ts`):
+  - one card per geometry on a stem, compact or expanded when selected, lifted clear of the editor's grab handle;
+  - one chip per connector, in one order only: current → proposed (information only, no verdict), proposed → primary,
+    primary → alternative;
+  - arrowheads on every connector; no range rings.
+- **Terrain analysis** (`components/workspace/TerrainPanel.tsx`), from two sources shown apart:
+  - SERVER (authoritative): the existing `POST /stationing/terrain/assess` (read only) gives the class, shares,
+    allowance and ranges. `TerrainAssessment` gains `meanSlopePct`/`maxSlopePct`: descriptive, from the same counted
+    cells, read by no rule; the persisted check fields are unchanged;
+  - ELEVATION tiles (display only): lowest, highest and centre height, and a profile of the selected connector.
+  - A leg's verdict comes from the server's check when it checked exactly this geometry, otherwise a preview built from
+    the server's analysis by the same rule as `DeploymentRules.leg`. Any disagreement is shown, never hidden.
+- **Colours:** primary deployment amber (was green, which clashed with the green proposed site), alternative purple,
+  current blue, occupied red. 3D uses brighter variants with translucent fills, stronger outlines and a halo on the
+  selection.
+
+**Consequences.**
+- The production deployment-area default stays unset.
+- The development environment `tmrkz-v3dev` uses fictional sites on real Hajar-foothill relief
+  (`ops/test-env/dev-3d-terrain-seed.sql`) and the labelled acceptance initial area (policy `DEV-3D`).
+- Evidence: `docs/evidence/terrain-3d/` (`tests/acceptance/terrain-3d.mjs`).
+- Not deployed to any installation, not committed: awaiting the owner's visual review.
+
+**Owner review, 6 Nov 2026 (direction accepted provisionally).**
+- **Colours, permanent:** current BLUE, proposed GREEN, primary AMBER/ORANGE, alternative PURPLE, occupied/invalid
+  RED — the same meanings in 2D and 3D.
+- **Package:** `tmrkz-map-2026.11.1` stays immutable. `2026.11.2` is a development candidate until it is rebuilt from
+  committed source and proven: deterministic rebuild, checksums, provenance, verify, install, rollback, readiness.
+- **No new rule:** elevation and the profile are information only. No elevation threshold or new approval condition.
+- **3D framing:** the camera fits all geometries with their real terrain heights at the target tilt and re-centres them
+  (`fit3d`). It was checked on the owner's portrait (1080 × 1920) and landscape (1920 × 1080) screens with no geometry
+  hidden by a ridge. A connector chip slides along its connector to stay clear of the cards.
+- **«الانحدار» (owner request):** an optional layer colouring the ground by the policy's slope classes, green (flat)
+  to red (steepest), to judge the ground while choosing where to draw:
+  - computed in the browser from the 3D elevation tiles (custom tile protocol, Horn slope, z12, policy thresholds);
+  - display only and off by default; the server's class of a drawn area remains the authoritative one;
+  - its red and orange share hues with the occupied and primary meanings, so it sits under every geometry outline and
+    carries its own legend.
