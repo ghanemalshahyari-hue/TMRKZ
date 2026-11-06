@@ -54,6 +54,8 @@ services:
       TMRKZ_OIDC_REDIRECT_URI: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}/api/v1/auth/oidc/callback
       TMRKZ_OIDC_POST_LOGOUT_REDIRECT_URI: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}/?signed-out=1
       TMRKZ_OIDC_LINK_KEY: ${TMRKZ_OIDC_LINK_KEY:-DOMAIN_ACCOUNT}
+      # The two lasting platform accounts (Keycloak local users with the realm role tmrkz-platform; ops/platform-accounts.sh)
+      TMRKZ_PLATFORM_ACCOUNTS: ${TMRKZ_PLATFORM_ACCOUNTS:-admin,developer}
       # Manual sign-in: username and password verified by the same directory (LDAP bind over TLS), as in TNQL.
       LDAP_URL: ${LDAP_URL:?set LDAP_URL to the enterprise directory (ldaps://... or ldap://... with LDAP_START_TLS=true)}
       LDAP_START_TLS: ${LDAP_START_TLS:-true}
@@ -95,7 +97,7 @@ services:
   # Identity provider: OIDC for TMRKZ, passwords verified by the enterprise directory (LDAP, read-only federation).
   # Not published on any host port; the admin console is not reachable through the web entry point.
   keycloak:
-    image: tmrkz/keycloak:26.7.5-1
+    image: tmrkz/keycloak:26.7.5-2
     build:
       context: .
       dockerfile: ops/keycloak/Dockerfile
@@ -178,6 +180,9 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      # Stationing V3 pages stay out of the build until accepted (ADR-033); an installation may opt in from .env.
+      args:
+        STATIONING_V3: ${TMRKZ_STATIONING_V3:-false}
     restart: unless-stopped
     depends_on:
       backend:

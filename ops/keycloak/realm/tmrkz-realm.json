@@ -27,6 +27,17 @@
   "accessTokenLifespan": 300,
   "revokeRefreshToken": true,
   "refreshTokenMaxReuse": 0,
+  "roles": {
+    "realm": [
+      {
+        "name": "tmrkz-platform",
+        "description": "Lasting TMRKZ platform account (admin, developer): a local user, never a directory user. Assigned by ops/platform-accounts.sh."
+      }
+    ]
+  },
+  "scopeMappings": [
+    { "client": "tmrkz-web", "roles": ["tmrkz-platform"] }
+  ],
   "clients": [
     {
       "clientId": "tmrkz-web",
@@ -61,6 +72,19 @@
           "config": {
             "user.attribute": "employee_number",
             "claim.name": "employee_number",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "platform role",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "tmrkz_roles",
+            "multivalued": "true",
             "jsonType.label": "String",
             "id.token.claim": "true",
             "access.token.claim": "false",

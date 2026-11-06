@@ -101,6 +101,7 @@ class EnterpriseSignInIT extends IntegrationTest {
         r.add("tmrkz.oidc.redirect-uri", () -> "http://tmrkz.test/api/v1/auth/oidc/callback");
         r.add("tmrkz.oidc.post-logout-redirect-uri", () -> "http://tmrkz.test/");
         r.add("tmrkz.oidc.link-key", () -> "DOMAIN_ACCOUNT");
+        r.add("tmrkz.oidc.platform-accounts", () -> "platform.admin.it, Platform.Dev.IT");
     }
 
     // ---- fixtures -------------------------------------------------------------------------------------------
@@ -216,6 +217,22 @@ class EnterpriseSignInIT extends IntegrationTest {
             b.claim("auth_time", authTime);
         }
         SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(KEY.getKeyID()).type(JOSEObjectType.JWT).build(), b.build());
+        jwt.sign(new RSASSASigner(KEY));
+        String code = UUID.randomUUID().toString();
+        CODES.put(code, new Grant(a.challenge(), jwt.serialize()));
+        return "/api/v1/auth/oidc/callback?code=" + code + "&state=" + a.state();
+    }
+
+    /** Like the provider for a local Keycloak user: the realm roles it holds travel in the tmrkz_roles claim. */
+    private String callbackWithRoles(Authorization a, String subject, String account, List<String> roles) throws Exception {
+        JWTClaimsSet.Builder c = new JWTClaimsSet.Builder().issuer(issuer()).subject(subject).audience(CLIENT)
+                .issueTime(new Date()).expirationTime(Date.from(Instant.now().plusSeconds(300)))
+                .claim("nonce", a.nonce()).claim("auth_time", Instant.now().getEpochSecond())
+                .claim("preferred_username", account).claim("name", "حساب " + account).claim("azp", CLIENT);
+        if (roles != null) {
+            c.claim("tmrkz_roles", roles);
+        }
+        SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(KEY.getKeyID()).type(JOSEObjectType.JWT).build(), c.build());
         jwt.sign(new RSASSASigner(KEY));
         String code = UUID.randomUUID().toString();
         CODES.put(code, new Grant(a.challenge(), jwt.serialize()));
@@ -360,6 +377,60 @@ class EnterpriseSignInIT extends IntegrationTest {
         assertThat(JSON.readTree(now.get("/api/v1/me").body()).path("id").asText()).isEqualTo(first.toString());
         person("plain", "REQUESTER", org);
         assertThat(login("plain").get("/identity-issues").status()).isEqualTo(403);
+    }
+
+    @Test
+    @DisplayName("V21: a platform account (named login + the provider's tmrkz-platform role) signs in as a lasting local administrator")
+    void platformAccounts() throws Exception {
+        List<String> platformRole = List.of("default-roles-tmrkz", "tmrkz-platform");
+        String adminSub = UUID.randomUUID().toString();
+        Browser b = new Browser();
+        assertThat(location(b.get(callbackWithRoles(authorizationOf(b.get("/api/v1/auth/oidc/start")), adminSub, "platform.admin.it", platformRole))))
+                .isEqualTo("/");
+        HttpResponse<String> me = b.get("/api/v1/me");
+        assertThat(me.statusCode()).isEqualTo(200);
+        String perms = JSON.readTree(me.body()).path("permissions").toString();
+        assertThat(perms).contains("CONFIGURE", "MANAGE_ACCESS", "MANAGE_FACILITIES", "VIEW_SOURCE_IDENTIFIERS", "AUDIT");
+        UUID admin = UUID.fromString(JSON.readTree(me.body()).path("id").asText());
+        Map<String, Object> p = jdbc.sql("select source, employee_no, bootstrap, status from person where id = :p").param("p", admin).query().singleRow();
+        assertThat(p).containsEntry("source", "LOCAL").containsEntry("employee_no", "PLATFORM-platform.admin.it")
+                .containsEntry("bootstrap", false).containsEntry("status", "ACTIVE");
+        assertThat(jdbc.sql("select method from identity_link where person_id = :p").param("p", admin).query(String.class).single()).isEqualTo("PLATFORM");
+        assertThat(jdbc.sql("select string_agg(role_code, ',' order by role_code) from membership where person_id = :p and valid_to is null")
+                .param("p", admin).query(String.class).single()).isEqualTo("AUDITOR,SYSTEM_ADMIN");
+
+        // A directory user of the same name holds no platform role: it is an ordinary sign-in (no HR record here).
+        Browser same = new Browser();
+        assertThat(location(same.get(callbackWithRoles(authorizationOf(same.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(),
+                "platform.admin.it", null)))).startsWith("/#auth-error=IDENTITY_NOT_LINKED");
+        // The role alone is not enough: the installation must name the login.
+        Browser unnamed = new Browser();
+        assertThat(location(unnamed.get(callbackWithRoles(authorizationOf(unnamed.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(),
+                "someone" + sfx, platformRole)))).startsWith("/#auth-error=IDENTITY_NOT_LINKED");
+        assertThat(jdbc.sql("select count(*) from person where employee_no like 'PLATFORM-%'").query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'PLATFORM_GRANT_RENEWED'").query(Long.class).single()).isZero();
+
+        // Lasting: a grant ended by someone is current again at the next sign-in; the same person, the same link.
+        jdbc.sql("update membership set valid_to = now(), ended_reason = 'TEST' where person_id = :p and role_code = 'SYSTEM_ADMIN' and valid_to is null")
+                .param("p", admin).update();
+        Browser again = new Browser();
+        again.get(callbackWithRoles(authorizationOf(again.get("/api/v1/auth/oidc/start")), adminSub, "platform.admin.it", platformRole));
+        assertThat(JSON.readTree(again.get("/api/v1/me").body()).path("id").asText()).isEqualTo(admin.toString());
+        assertThat(JSON.readTree(again.get("/api/v1/me").body()).path("permissions").toString()).contains("MANAGE_ACCESS");
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'PLATFORM_GRANT_RENEWED'").query(Long.class).single()).isEqualTo(1);
+
+        // The developer (named in another case) is a person of its own with the same rights.
+        Browser dev = new Browser();
+        dev.get(callbackWithRoles(authorizationOf(dev.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(), "platform.dev.it", platformRole));
+        String devId = JSON.readTree(dev.get("/api/v1/me").body()).path("id").asText();
+        assertThat(devId).isNotEqualTo(admin.toString());
+        assertThat(JSON.readTree(dev.get("/api/v1/me").body()).path("permissions").toString()).contains("CONFIGURE", "MANAGE_ACCESS", "AUDIT");
+
+        // Revoked in the provider (role removed): the linked identity no longer signs in.
+        Browser revoked = new Browser();
+        assertThat(location(revoked.get(callbackWithRoles(authorizationOf(revoked.get("/api/v1/auth/oidc/start")), adminSub, "platform.admin.it",
+                List.of("default-roles-tmrkz"))))).isEqualTo("/#auth-error=IDENTITY_NOT_LINKED&reason=PLATFORM_REVOKED");
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'PLATFORM_ACCOUNT_CREATED'").query(Long.class).single()).isEqualTo(2);
     }
 
     @Test

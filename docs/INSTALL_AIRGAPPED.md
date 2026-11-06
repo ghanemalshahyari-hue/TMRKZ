@@ -7,7 +7,7 @@ sh ops/airgap-bundle.sh            # → offline-bundle/mover-1.0.0/
 ```
 
 The bundle contains the runtime images saved with `docker save` (`mover/backend:1.0.0`, `mover/web:1.0.0`,
-`tmrkz/keycloak:26.7.5-1`, `postgis/postgis:17-3.5-alpine` — PostgreSQL 17.11 with PostGIS 3.5, GEOS and PROJ, whose
+`tmrkz/keycloak:26.7.5-2`, `postgis/postgis:17-3.5-alpine` — PostgreSQL 17.11 with PostGIS 3.5, GEOS and PROJ, whose
 coordinate transformations run locally with network access disabled) with their image IDs, `docker-compose.yml`, `.env.example`, operational scripts, the local
 map packages, all documentation, and a `SHA256SUMS` manifest. Build-only images (Maven, Node) are not needed in the
 isolated network. Transfer the directory through the organisation's approved media/transfer process.

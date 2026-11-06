@@ -1,0 +1,34 @@
+# The single local installation on a machine with no enterprise directory yet (owner decision of 6 Nov 2026): a local
+# stand-in directory (OpenLDAP over StartTLS with a CA generated on this machine) holding NO people — only the users
+# container. Keycloak federates it like the enterprise directory; the two platform accounts (admin, developer) are
+# Keycloak's own users and do not depend on it. Replace LDAP_* in .env with the enterprise directory and drop this file.
+# Used by ops/local/up.sh; certificates and the directory password live under ops/local/.generated/ (git-ignored).
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    restart: unless-stopped
+    command: --copy-service
+    environment:
+      LDAP_ORGANISATION: "TMRKZ"
+      LDAP_DOMAIN: "tmrkz.local"
+      LDAP_ADMIN_PASSWORD: ${LOCAL_LDAP_ADMIN_PASSWORD:?run ops/local/up.sh}
+      LDAP_TLS: "true"
+      LDAP_TLS_CRT_FILENAME: ldap.crt
+      LDAP_TLS_KEY_FILENAME: ldap.key
+      LDAP_TLS_CA_CRT_FILENAME: ca.crt
+      LDAP_TLS_VERIFY_CLIENT: never
+    volumes:
+      - ./ops/local/.generated/certs:/container/service/slapd/assets/certs
+      - ./ops/local/.generated/ldap:/container/service/slapd/assets/config/bootstrap/ldif/custom
+      - ldap-data:/var/lib/ldap
+      - ldap-config:/etc/ldap/slapd.d
+    networks: [internal]
+
+  keycloak:
+    depends_on:
+      openldap:
+        condition: service_started
+
+volumes:
+  ldap-data:
+  ldap-config:

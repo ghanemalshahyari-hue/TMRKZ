@@ -1,5 +1,9 @@
 package ae.mover.security;
 
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -19,7 +23,12 @@ public record OidcProperties(
         String enterpriseKeyClaim,
         int reauthMaxAgeSeconds,
         int loginMaxAgeSeconds,
-        int httpTimeoutMs) {
+        int httpTimeoutMs,
+        List<String> platformAccounts) {
+
+    /** The realm role a platform account holds in the provider, and the ID token claim that carries realm roles. */
+    public static final String PLATFORM_ROLE = "tmrkz-platform";
+    public static final String ROLES_CLAIM = "tmrkz_roles";
 
     public OidcProperties {
         if (!"EMPLOYEE_NUMBER".equals(linkKey)) linkKey = "DOMAIN_ACCOUNT";
@@ -27,6 +36,13 @@ public record OidcProperties(
         if (reauthMaxAgeSeconds <= 0) reauthMaxAgeSeconds = 300;
         if (loginMaxAgeSeconds <= 0) loginMaxAgeSeconds = 43200;
         if (httpTimeoutMs <= 0) httpTimeoutMs = 10000;
+        platformAccounts = platformAccounts == null ? List.of() : platformAccounts.stream()
+                .filter(Objects::nonNull).map(s -> s.trim().toLowerCase(Locale.ROOT)).filter(s -> !s.isEmpty()).distinct().toList();
+    }
+
+    /** A login named by the installation as a lasting platform account (TMRKZ_PLATFORM_ACCOUNTS). */
+    public boolean platformAccount(String login) {
+        return login != null && platformAccounts.contains(login.trim().toLowerCase(Locale.ROOT));
     }
 
     public boolean configured() {

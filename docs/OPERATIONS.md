@@ -166,6 +166,13 @@ configuration changes never require data migration of in-flight requests.
   person becomes a temporary administrator for 72 hours, enough to configure the HR source and grant rights. When the
   HR mirror contains them, their next sign-in moves to the HR record and the temporary grant ends. Business rights
   otherwise come only from memberships and responsibility seats.
+- **Lasting platform accounts (ADR-037):** «admin» and «developer» are local Keycloak users with the realm role
+  `tmrkz-platform`. After the first start, run `sh ops/platform-accounts.sh [project]`. It reads
+  `TMRKZ_PLATFORM_ADMIN_PASSWORD` and `TMRKZ_PLATFORM_DEVELOPER_PASSWORD` from `.env`. Run it again after changing
+  either password. They sign in with «الدخول الآلي بالحساب المؤسسي» and hold every administrative right. HR and the
+  directory never disable them. To revoke one, remove its role in Keycloak or drop it from `TMRKZ_PLATFORM_ACCOUNTS`.
+- **Single local installation:** `sh ops/local/up.sh` starts `tmrkz-mover` empty on :8088. Until `LDAP_*` point at the
+  enterprise directory, it uses a stand-in directory with no people, then creates the platform accounts.
 - Organisation structure comes from the HR mirror. The CSV import in «إعدادات النظام» remains for local organisations.
 
 ## Map workspace: boundaries and map packages

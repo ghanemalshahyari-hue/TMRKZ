@@ -31,6 +31,8 @@ offline-bundle/
 .vscode/
 # Acceptance test environment: generated test CA, keys and passwords
 ops/test-env/.generated/
+# Single local installation: generated directory CA, key and password (ops/local/up.sh)
+ops/local/.generated/
 # Large terrain/map data (raw DEM, derived rasters, PMTiles): packaged with checksums, never in git
 map-data/
 # Installed offline map root of a production checkout (TMRKZ_MAP_ROOT default)

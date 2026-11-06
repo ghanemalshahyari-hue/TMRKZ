@@ -1497,3 +1497,42 @@ offline package, installed and verified without internet access. The gate also r
   - long tasks during a cold page load;
   - the assessment `processing` field.
 
+
+## ADR-037 Two lasting platform accounts and one empty local installation — Accepted (2026-11-06)
+
+**Context.** The owner chose to restart from an empty system, as on a first launch, with one application run like
+production and no test accounts. Every earlier environment on the development machine was removed without a backup:
+`tmrkz-mover`, `tmrkz-test`, `tmrkz-clean`, `tmrkz-load` and `tmrkz-v3dev`. The owner also chose two accounts that stay
+active after deployment: «admin» (super administrator) and «developer», with the same rights. A person normally signs
+in only when the directory login equals one active HR record (ADR-015/016). The bootstrap administrator (V7) is
+temporary by design.
+
+**Decision.**
+- A platform account is a local Keycloak user of the `tmrkz` realm holding the realm role `tmrkz-platform`, never a
+  directory user. The role travels in the ID token claim `tmrkz_roles`; the client's scope mapping lets only this role
+  appear. TMRKZ accepts the account only when the installation also names the login in `TMRKZ_PLATFORM_ACCOUNTS`
+  (compose default `admin,developer`). The manual directory path never qualifies.
+- Its first sign-in creates a LOCAL person (`employee_no` `PLATFORM-<login>`) linked with method `PLATFORM` (V21). The
+  person holds lasting «مدير النظام» and «مدقق السجلات» grants, made current again at every sign-in. The HR projection
+  changes only HR people, so connecting HR or the directory never disables them. While they exist, the bootstrap
+  administrator is refused, because an administrator exists.
+- Revocation happens in the provider (remove the role or the user) or in the installation (remove the login from
+  `TMRKZ_PLATFORM_ACCOUNTS`). The linked identity is then refused with `PLATFORM_REVOKED`. A conflict
+  (`PLATFORM_CONFLICT`) is refused and audited, not placed on the review list.
+- Passwords live only in the installation's `.env` (`TMRKZ_PLATFORM_ADMIN_PASSWORD`,
+  `TMRKZ_PLATFORM_DEVELOPER_PASSWORD`). `ops/init-env.sh` generates random ones. `ops/platform-accounts.sh` creates the
+  users, sets the passwords and assigns the role; it refuses a login a directory user already holds. The values chosen
+  for the development machine are not in the repository.
+- `ops/local/up.sh` runs the single local installation: project `tmrkz-mover` on :8088, built from the working tree,
+  empty. Until the enterprise directory is configured, a local stand-in OpenLDAP holds only the users container and no
+  people (`ops/local/compose.local-directory.yml`). The web image may opt into the Stationing V3 pages through
+  `TMRKZ_STATIONING_V3` (default false). The offline map root comes from `TMRKZ_MAP_ROOT`.
+
+**Consequences.**
+- The fictional acceptance environment and its evidence history remain in the repository, but no environment runs
+  them. `sh ops/test-env/up.sh` recreates it when needed.
+- The weak passwords chosen for the development machine must be replaced in `.env` and set again with
+  `ops/platform-accounts.sh` before any real deployment. The accounts are a deliberate break-glass path, so the
+  Keycloak brute-force protection (5 failures) applies to them.
+- Tests: `EnterpriseSignInIT.platformAccounts`. The test asserts creation, rights, refusal without the role, refusal of
+  a login the installation does not name, renewal of an ended grant, a second account, revocation and audit.

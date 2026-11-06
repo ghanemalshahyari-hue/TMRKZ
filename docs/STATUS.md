@@ -524,6 +524,20 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   the real page keeps its current layout until the owner approves the design; its phone layout still hides the editing
   controls (V-01).
 
+- **Fresh start with lasting platform accounts (6 Nov 2026, owner decision; ADR-037, V21):**
+  - **Removed:** every environment on the development machine (`tmrkz-mover`, `tmrkz-test`, `tmrkz-clean`,
+    `tmrkz-load`, `tmrkz-v3dev`: containers and all 18 volumes), with no backup, on the owner's choice. The earlier
+    acceptance requests, fictional users and policies are gone.
+  - **One local installation:** `sh ops/local/up.sh` runs project `tmrkz-mover` on :8088, empty. A stand-in directory
+    holds no people until the enterprise directory is configured. Stationing V3 is opted in for owner review, and the
+    installed offline map package is mounted.
+  - **Accounts:** only «admin» and «developer» exist. They are local Keycloak users with the role `tmrkz-platform`, and
+    their passwords sit in the git-ignored `.env`. Both hold «مدير النظام» + «مدقق السجلات», and HR or the directory
+    never disables them.
+  - **Tests:** `EnterpriseSignInIT.platformAccounts` (with `DirectorySignInIT`: 11/11).
+  - **Not done:** terrain slope data is not loaded into the new database; HR, the directory and PKI are not connected.
+  - **Weak passwords:** the values chosen for this machine must be replaced before any real deployment.
+
 ## Known limitations
 
 | Area | Limitation | Planned handling |

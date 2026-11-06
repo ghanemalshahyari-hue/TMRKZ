@@ -65,12 +65,20 @@ public class IdentityService {
     /** Returns the linked person, linking on first sign-in when unambiguous; otherwise records an issue and refuses. */
     @Transactional(noRollbackFor = ApiException.class)
     public UUID resolve(OidcClient.Identity id) {
+        if (platform(id)) {
+            return platformPerson(id);
+        }
         Map<String, Object> linked = jdbc.sql("""
-                select il.id, il.person_id, p.bootstrap from identity_link il join person p on p.id = il.person_id
+                select il.id, il.person_id, p.bootstrap, p.source = 'LOCAL' and p.employee_no like 'PLATFORM-%' as platform
+                from identity_link il join person p on p.id = il.person_id
                 where il.issuer = :i and il.subject = :s""")
                 .param("i", id.issuer()).param("s", id.subject()).query().listOfRows().stream().findFirst().orElse(null);
         if (linked != null) {
             UUID person = (UUID) linked.get("person_id");
+            if (Boolean.TRUE.equals(linked.get("platform"))) {
+                // the provider no longer states the platform role, or the installation no longer names the login
+                throw platformRefused(id, "PLATFORM_REVOKED", "لم يعد هذا الحساب من حسابات المنصة الدائمة.");
+            }
             if (Boolean.TRUE.equals(linked.get("bootstrap"))) {
                 Match m = match(id);
                 if (m.person() != null) {
@@ -178,6 +186,83 @@ public class IdentityService {
                 .param("now", Db.ts(now)).param("p", person).param("l", login).update();
         audit.system("BOOTSTRAP_ADMIN_CREATED", "PERSON", person.toString(), id.displayName(), Map.of("login", login, "validHours", 72));
         return person;
+    }
+
+    // ---- platform accounts (V21, owner decision of 6 Nov 2026) ----------------------------------------------------
+
+    private static final String PLATFORM_PREFIX = "PLATFORM-";
+    /** Every administrative right: configuration, access, facilities, source identifiers (مدير النظام) and audit. */
+    private static final List<String> PLATFORM_ROLES = List.of("SYSTEM_ADMIN", "AUDITOR");
+
+    /**
+     * A lasting platform account («admin», «developer»): a local user of the identity provider holding the realm role
+     * tmrkz-platform, AND a login the installation names in TMRKZ_PLATFORM_ACCOUNTS. A directory user of the same name
+     * holds no such role, and the manual directory path never states it.
+     */
+    private boolean platform(OidcClient.Identity id) {
+        return id.platformRole() && props.platformAccount(id.username());
+    }
+
+    /**
+     * The account's LOCAL person (created on its first sign-in), linked to this identity, with its lasting grants made
+     * current on every sign-in. The HR projection only changes HR people, so neither HR nor the directory disables it.
+     */
+    private UUID platformPerson(OidcClient.Identity id) {
+        String login = id.username().trim().toLowerCase(Locale.ROOT);
+        Instant now = clock.instant();
+        int created = jdbc.sql("""
+                insert into person(id, employee_no, display_name, username, status, source)
+                values (:id, :e, :n, :l, 'ACTIVE', 'LOCAL') on conflict (employee_no) do nothing""")
+                .param("id", UUID.randomUUID()).param("e", PLATFORM_PREFIX + login)
+                .param("n", id.displayName() == null || id.displayName().isBlank() ? login : id.displayName()).param("l", login).update();
+        UUID person = jdbc.sql("select id from person where employee_no = :e and source = 'LOCAL'")
+                .param("e", PLATFORM_PREFIX + login).query(UUID.class).optional()
+                .orElseThrow(() -> platformRefused(id, "PLATFORM_CONFLICT", "اسم حساب المنصة محجوز لسجل آخر."));
+        if (created > 0) {
+            audit.system("PLATFORM_ACCOUNT_CREATED", "PERSON", person.toString(), login, Map.of("login", login, "roles", PLATFORM_ROLES));
+        }
+        UUID linkedTo = jdbc.sql("select person_id from identity_link where issuer = :i and subject = :s")
+                .param("i", id.issuer()).param("s", id.subject()).query(UUID.class).optional().orElse(null);
+        if (linkedTo == null) {
+            // a provider user re-created under the same login keeps the same person: the link follows the new subject
+            int moved = jdbc.sql("update identity_link set subject = :s, linked_at = :now where person_id = :p and issuer = :i")
+                    .param("s", id.subject()).param("now", Db.ts(now)).param("p", person).param("i", id.issuer()).update();
+            if (moved == 0) {
+                link(person, id.issuer(), id.subject(), "PLATFORM", null);
+            }
+        } else if (!linkedTo.equals(person)) {
+            throw platformRefused(id, "PLATFORM_CONFLICT", "هذا الحساب مرتبط بسجل آخر؛ لا يصبح حساب منصة.");
+        }
+        UUID org = jdbc.sql("select id from organization where status = 'ACTIVE' order by (parent_id is null) desc, (source = 'LOCAL') desc, created_at limit 1")
+                .query(UUID.class).optional().orElse(null);
+        if (org == null) {
+            org = UUID.randomUUID();
+            jdbc.sql("insert into organization(id, code, name, valid_from) values (:id, 'LOCAL-ROOT', 'المؤسسة (تهيئة أولى)', :now)")
+                    .param("id", org).param("now", Db.ts(now)).update();
+        }
+        for (String role : PLATFORM_ROLES) {
+            int current = jdbc.sql("""
+                    select count(*) from membership where person_id = :p and role_code = :r
+                      and valid_from <= :now and (valid_to is null or valid_to > :now)""")
+                    .param("p", person).param("r", role).param("now", Db.ts(now)).query(Integer.class).single();
+            if (current == 0) {
+                jdbc.sql("""
+                        insert into membership(id, person_id, organization_id, role_code, position_title, valid_from, follows_affiliation)
+                        values (:id, :p, :o, :r, 'حساب المنصة الدائم', :now, false)""")
+                        .param("id", UUID.randomUUID()).param("p", person).param("o", org).param("r", role).param("now", Db.ts(now)).update();
+                if (created == 0) {
+                    // the first grants belong to the account's creation; later ones restore a grant someone ended
+                    audit.system("PLATFORM_GRANT_RENEWED", "PERSON", person.toString(), login, Map.of("role", role));
+                }
+            }
+        }
+        return person;
+    }
+
+    /** Platform refusals are not review-list items: no access manager can link them; they are audited. */
+    private ApiException platformRefused(OidcClient.Identity id, String reason, String message) {
+        audit.system("IDENTITY_LINK_REFUSED", "IDENTITY", null, id.displayName(), Map.of("reason", reason));
+        return new ApiException(ErrorCode.IDENTITY_NOT_LINKED, message, Map.of("reason", reason));
     }
 
     /** The HR record now exists: the identity moves to it and the temporary administrator grant ends. */

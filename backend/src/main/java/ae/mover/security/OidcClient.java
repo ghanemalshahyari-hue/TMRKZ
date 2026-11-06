@@ -77,8 +77,9 @@ public class OidcClient {
     public record Started(String redirectUrl, String browserBinding) {
     }
 
+    /** {@code platformRole}: the provider states the realm role of a platform account (never true on the directory path). */
     public record Identity(String issuer, String subject, String enterpriseKey, String displayName, String username,
-                           Instant authTime, String idToken, String purpose, String returnTo, String sessionId) {
+                           Instant authTime, String idToken, String purpose, String returnTo, String sessionId, boolean platformRole) {
 
         @Override
         public String toString() {
@@ -173,9 +174,11 @@ public class OidcClient {
             Object key = "DOMAIN_ACCOUNT".equals(props.linkKey()) ? username : claims.getClaim(props.enterpriseKeyClaim());
             String enterpriseKey = key instanceof List<?> l ? (l.size() == 1 ? String.valueOf(l.get(0)) : null)
                     : key == null ? null : String.valueOf(key).trim();
+            Object roles = claims.getClaim(OidcProperties.ROLES_CLAIM);
+            boolean platform = roles instanceof List<?> r ? r.contains(OidcProperties.PLATFORM_ROLE) : OidcProperties.PLATFORM_ROLE.equals(roles);
             return new Identity(claims.getIssuer(), claims.getSubject(), enterpriseKey == null || enterpriseKey.isEmpty() ? null : enterpriseKey,
                     name, username, at, idToken, (String) attempt.get("purpose"), (String) attempt.get("return_to"),
-                    (String) attempt.get("session_id"));
+                    (String) attempt.get("session_id"), platform);
         } catch (java.text.ParseException e) {
             throw failed("رمز الهوية يحمل بيانات غير صالحة.");
         }

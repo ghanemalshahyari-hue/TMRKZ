@@ -80,6 +80,9 @@ tmrkz:
     reauth-max-age-seconds: ${TMRKZ_REAUTH_MAX_AGE_SECONDS:300}
     # Sent as max_age on every sign-in, so the provider must state auth_time (equals the 12-hour session limit).
     login-max-age-seconds: ${TMRKZ_LOGIN_MAX_AGE_SECONDS:43200}
+    # Lasting platform accounts (V21): logins that, holding the provider's realm role tmrkz-platform, sign in as local
+    # administrators that HR and the directory never disable. Empty: none. Created by ops/platform-accounts.sh.
+    platform-accounts: ${TMRKZ_PLATFORM_ACCOUNTS:}
   ldap:
     # Manual sign-in (username and password verified by the directory); the same values configure Keycloak.
     url: ${LDAP_URL:}
