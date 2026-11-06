@@ -1,0 +1,97 @@
+{
+  "ui": "http://localhost:5197",
+  "at": "2026-11-06T07:16:42.424Z",
+  "draft": "RS-2026-0002",
+  "results": [
+    {
+      "id": "SITE-A",
+      "pass": true,
+      "what": "the footprint itself is dragged to its destination; the connector says «المسافة … — للعلم فقط»; no ring",
+      "detail": "826 m · «المسافة: 826 م — للعلم فقط»"
+    },
+    {
+      "id": "SITE-B",
+      "pass": true,
+      "what": "«تحديد الموقع على الخريطة»: one click far away moves the same MultiPolygon there, both parts together, its centre on the point; the distance is information only",
+      "detail": "11450 m; parts differ by 0.165 m; centre 18 m from the click · «المسافة: 11.45 كم — للعلم فقط»"
+    },
+    {
+      "id": "SITE-B-EDITABLE",
+      "pass": true,
+      "what": "after the click-move the proposal is still edited on the map (تعديل الرؤوس, undo …)",
+      "detail": ""
+    },
+    {
+      "id": "PRIMARY-A-CLICK",
+      "pass": true,
+      "what": "«تحديد المنطقة على الخريطة» (الرئيسية): one click places the initial area there, it is dragged like the site, and the connector from the re-stationing site updates — distance, allowed range, verdict; no ring",
+      "detail": "«6.4 كم · المسموح 5–8 كم · ضمن النطاق» → «9.5 كم · المسموح 5–8 كم · خارج النطاق» · 89,814 م² · range from the server: «المسموح 5–8 كم» · الشكل الابتدائي من سياسة التمركز (النسخة 2): مربع 90,000 م² (300 م × 300 م) — DEV-3D · قيمة قبول تجريبية — ليست قيمة إنتاجية معتمدة"
+    },
+    {
+      "id": "PRIMARY-B-DRAW",
+      "pass": true,
+      "what": "«رسم حدود المنطقة» (الرئيسية): five clicks with «عدد الرؤوس» 5 close the area — numbered vertices, side lengths — and the connector shows distance, range (terrain allowance as the server's leg), verdict",
+      "detail": "«6.6 كم · المسموح 5–8 كم · ضمن النطاق» · server range «المسموح 5–8 كم»"
+    },
+    {
+      "id": "ALTERNATIVE-A-CLICK",
+      "pass": true,
+      "what": "«تحديد المنطقة على الخريطة» (البديلة): one click places the initial area there, it is dragged like the site, and the connector from the primary area updates — distance, allowed range, verdict; no ring",
+      "detail": "«4 كم · المسموح 3–5 كم (حتى 6.5 كم مع طبيعة الأرض) · ضمن النطاق» → «4.3 كم · المسموح 3–5 كم (حتى 6.5 كم مع طبيعة الأرض) · ضمن النطاق» · 89,815 م² · range from the server: «المسموح 3–5 كم (حتى 6.5 كم مع طبيعة الأرض)» · الشكل الابتدائي من سياسة التمركز (النسخة 2): مربع 90,000 م² (300 م × 300 م) — DEV-3D · قيمة قبول تجريبية — ليست قيمة إنتاجية معتمدة"
+    },
+    {
+      "id": "ALTERNATIVE-B-DRAW",
+      "pass": true,
+      "what": "«رسم حدود المنطقة» (البديلة): five clicks with «عدد الرؤوس» 5 close the area — numbered vertices, side lengths — and the connector shows distance, range (terrain allowance as the server's leg), verdict",
+      "detail": "«4.2 كم · المسموح 3–5 كم (حتى 6.5 كم مع طبيعة الأرض) · ضمن النطاق» · server range «المسموح 3–5 كم (حتى 6.5 كم مع طبيعة الأرض)»"
+    },
+    {
+      "id": "NO-WRITE",
+      "pass": false,
+      "what": "clicks, drags and drawings of the site and both areas saved nothing: no write, no new request",
+      "detail": "writes 26; requests 2 → 2"
+    },
+    {
+      "id": "NET",
+      "pass": true,
+      "what": "no request leaves the application",
+      "detail": ""
+    },
+    {
+      "id": "CONSOLE",
+      "pass": true,
+      "what": "no console error",
+      "detail": ""
+    }
+  ],
+  "writes": [
+    "site-A-drag: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "site-A-drag: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "site-B-pick-destination: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "site-B-pick-destination: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "primary-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-A-click: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "alternative-B-draw: POST http://localhost:5197/api/v1/stationing/terrain/assess"
+  ],
+  "external": [],
+  "consoleErrors": []
+}

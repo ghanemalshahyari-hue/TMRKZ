@@ -1,0 +1,63 @@
+{
+  "when": "2026-11-06T07:09:59.575Z",
+  "ui": "http://localhost:5197",
+  "results": [
+    {
+      "id": "R1",
+      "pass": true,
+      "what": "deployment area dragged in 3D from a mountain flank to a plain at the same distance: class, allowance, effective maximum and verdict follow the ground",
+      "detail": "5.80 km → 5.81 km; class MOUNTAINOUS → FLAT; allowance 2000 → 0 m; effective max 7000 → 5000 m; verdict OK → OUT_OF_RANGE; heights 418–522 → 361–367 m; chip «5.79 كم · الفعّال 3–5 كم · خارج النطاق ✕»"
+    },
+    {
+      "id": "R1b",
+      "pass": true,
+      "what": "«الانحدار»: the policy's five slope classes coloured over the terrain (display only), above the tint and shade",
+      "detail": "{\"layer\":true,\"visible\":true,\"loaded\":true,\"last\":\"terrain3d-slope\"}"
+    },
+    {
+      "id": "R2",
+      "pass": true,
+      "what": "draped on slopes, seen from two bearings: proposed site and occupied ground span real height differences",
+      "detail": "proposed/current/primary height spans CURRENT 9 m, SITE 288 m, PRIMARY 8 m; occupied sites 7 m, 2 m, 0 m, 179 m, 1 m, 1 m, 120 m, 126 m, 61 m; bearing 0° → 120°"
+    },
+    {
+      "id": "R4",
+      "pass": true,
+      "what": "«رسم حدود جديدة» in 3D: numbered vertices, live edges with lengths and rubber line, closed on the first vertex",
+      "detail": "vertices 1,2,3,4; sides 2.55 كم / 3.16 كم / 2.23 كم / 3.15 كم; layers shape,edges,rubber; closed ring 4 vertices on terrain 400, 485, 461, 385 m"
+    },
+    {
+      "id": "R4b",
+      "pass": true,
+      "what": "vertex 3 edited on the terrain (others unchanged); undo, redo and reset restore exact coordinates",
+      "detail": ""
+    },
+    {
+      "id": "R3",
+      "pass": true,
+      "what": "two-part MultiPolygon in 3D: a press on part 2 moves the whole site; both parts drape where they land; part order and stored 2D geometry unchanged",
+      "detail": "move 1807 m, parts differ by 0.096 m; terrain under part 1 469–552 m, part 2 378–456 m; rendered parts 0,1; 2D geometry identical: true"
+    },
+    {
+      "id": "W",
+      "pass": true,
+      "what": "zero request writes (the only POSTs are the read-only terrain analysis)",
+      "detail": ""
+    },
+    {
+      "id": "X",
+      "pass": true,
+      "what": "zero external requests",
+      "detail": ""
+    },
+    {
+      "id": "C",
+      "pass": true,
+      "what": "zero console errors",
+      "detail": ""
+    }
+  ],
+  "external": [],
+  "consoleErrors": [],
+  "writes": []
+}

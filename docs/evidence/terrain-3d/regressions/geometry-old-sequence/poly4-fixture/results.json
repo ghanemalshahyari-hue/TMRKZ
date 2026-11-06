@@ -1,0 +1,64 @@
+{
+  "ui": "http://localhost:5197",
+  "at": "2026-11-06T07:03:41.963Z",
+  "site": "موقع اختبار الانحدار — مضلع رباعي (وهمي)",
+  "results": [
+    {
+      "id": "S4",
+      "pass": true,
+      "what": "بدء الاقتراح: نسخة من الحدود ورمز «مقترح»، والموقع الحالي ورمزه باقيان",
+      "detail": "النسخة 60,308 م² = الحالية 60,308 م²"
+    },
+    {
+      "id": "S5",
+      "pass": true,
+      "what": "سحب الرمز ثم سحب المساحة نفسها: الحدود تنتقل جسماً واحداً والمساحة ثابتة",
+      "detail": "من الرمز 378 م ثم من المساحة 96 م · فرق المساحة 0٪ / 0٪ · المسافة 378 م"
+    },
+    {
+      "id": "S6",
+      "pass": true,
+      "what": "تعديل رأس مرقّم على الخريطة، ثم تراجع وإعادة",
+      "detail": "4 رؤوس و4 أضلاع · قبل 60,308 م² ← بعد 61,681 م² · التراجع 60,308 م² · الإعادة 61,681 م²"
+    },
+    {
+      "id": "S7",
+      "pass": true,
+      "what": "رسم حدود جديدة باختيار عدد الرؤوس 5 بالنقر على الخريطة",
+      "detail": "5 رؤوس مرقمة · 5 أطوال أضلاع · المساحة 456,172 م² · ✓ صالح"
+    },
+    {
+      "id": "S9",
+      "pass": true,
+      "what": "مقارنة الموقع الحالي بالمقترح في عرض واحد",
+      "detail": "الحالي بالأزرق والمقترح بالأخضر وخط المسافة · 1.49 كم"
+    },
+    {
+      "id": "NO-DRAFT",
+      "pass": false,
+      "what": "النسخ والسحب وتعديل الرؤوس والرسم والمقارنة لم تُنشئ مسودة: لا كتابة إطلاقاً",
+      "detail": "writes 5; requests 0 → 0"
+    },
+    {
+      "id": "NET",
+      "pass": true,
+      "what": "لا طلب يخرج من التطبيق",
+      "detail": ""
+    },
+    {
+      "id": "CONSOLE",
+      "pass": true,
+      "what": "لا خطأ في وحدة التحكم",
+      "detail": ""
+    }
+  ],
+  "writes": [
+    "POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "POST http://localhost:5197/api/v1/stationing/terrain/assess",
+    "POST http://localhost:5197/api/v1/stationing/terrain/assess"
+  ],
+  "external": [],
+  "consoleErrors": []
+}

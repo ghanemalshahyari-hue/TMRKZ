@@ -1,0 +1,85 @@
+{
+  "ui": "http://localhost:5197",
+  "at": "2026-11-06T07:25:45.789Z",
+  "sites": {
+    "B": "موقع اختبار الانحدار من جزأين (وهمي)",
+    "C": "موقع اختبار الانحدار — علامة فقط (وهمي)"
+  },
+  "results": [
+    {
+      "id": "B1-COPY",
+      "pass": true,
+      "what": "the current MultiPolygon stays; the proposal copy appears over it, both parts in their places, one «مقترح» symbol, equal areas",
+      "detail": "2 parts · 105,254 م²"
+    },
+    {
+      "id": "B2-SYMBOL-DRAG",
+      "pass": true,
+      "what": "dragging the proposal symbol moves BOTH parts by the same vector; the map does not pan; area difference 0٪",
+      "detail": "408 m; parts differ by 0.006 m"
+    },
+    {
+      "id": "B3-BODY-DRAG",
+      "pass": true,
+      "what": "dragging the body of the SECOND part moves both parts together; the map does not pan; area difference 0٪",
+      "detail": "233 m; parts differ by 0.003 m"
+    },
+    {
+      "id": "B4-PART-VERTEX",
+      "pass": true,
+      "what": "«تعديل الرؤوس» shows the selected part’s numbered vertices and side lengths; one vertex of part 2 moved changes part 2 only — part 1 byte-identical",
+      "detail": "part 1: 4 vertices, part 2: 4; 105,254 م² → 104,659 م²"
+    },
+    {
+      "id": "B5-UNDO-REDO-RESET",
+      "pass": true,
+      "what": "undo restores the part, redo reapplies it, reset returns both parts to the copy over the current site",
+      "detail": ""
+    },
+    {
+      "id": "B6-COMPARE",
+      "pass": true,
+      "what": "«⇆ مقارنة الموقعين» frames the current MultiPolygon and the proposal together",
+      "detail": ""
+    },
+    {
+      "id": "C2-GROWING",
+      "pass": true,
+      "what": "each click adds the next numbered vertex; the open line and its side lengths grow (4 of 5 here)",
+      "detail": "vertices 1 → 2 → 3 → 4"
+    },
+    {
+      "id": "C3-CLOSED",
+      "pass": true,
+      "what": "a Point-only current site: «ب · رسم حدود جديدة», «عدد الرؤوس» 5 — the fifth click closes the shape: five numbered vertices, five side lengths, area, validity (no fixed square)",
+      "detail": "385,208 م² · ✓ صالح"
+    },
+    {
+      "id": "C4-EDIT-UNDO-REDO-RESET",
+      "pass": true,
+      "what": "after closing, a numbered vertex drags on the map; undo, redo and reset work",
+      "detail": "385,208 م² → 408,737 م²"
+    },
+    {
+      "id": "NO-DRAFT",
+      "pass": true,
+      "what": "copy, drags, vertex edits, drawing, undo, redo, reset and compare created no draft: no write at all",
+      "detail": "writes 0; requests 2 → 2"
+    },
+    {
+      "id": "NET",
+      "pass": true,
+      "what": "no request leaves the application",
+      "detail": ""
+    },
+    {
+      "id": "CONSOLE",
+      "pass": true,
+      "what": "no console error",
+      "detail": ""
+    }
+  ],
+  "writes": [],
+  "external": [],
+  "consoleErrors": []
+}

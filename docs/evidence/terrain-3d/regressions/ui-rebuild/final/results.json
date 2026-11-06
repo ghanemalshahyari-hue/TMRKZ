@@ -1,0 +1,285 @@
+{
+  "ui": "http://localhost:5197",
+  "at": "2026-11-06T07:37:43.680Z",
+  "draft": "2683e5c7-fc7d-4db3-9bea-9e77a96bc241",
+  "results": [
+    {
+      "id": "SHELL-desktop",
+      "pass": true,
+      "what": "RTL shell at 1920×1080: brand on the right, no horizontal scroll",
+      "detail": "dir=rtl, brand x=1797"
+    },
+    {
+      "id": "LAYOUT-desktop",
+      "pass": true,
+      "what": "three-column console: context panel right, map centre (dominant), action panel left",
+      "detail": "map 1222px of 1920; context x 1558, rail x 12"
+    },
+    {
+      "id": "STRIP-VISIBLE-desktop",
+      "pass": true,
+      "what": "the approval strip sits along the bottom of the map, inside the screen",
+      "detail": "strip y 930"
+    },
+    {
+      "id": "SHELL-laptop",
+      "pass": true,
+      "what": "RTL shell at 1366×768: brand on the right, no horizontal scroll",
+      "detail": "dir=rtl, brand x=1243"
+    },
+    {
+      "id": "LAYOUT-laptop",
+      "pass": true,
+      "what": "three-column console: context panel right, map centre (dominant), action panel left",
+      "detail": "map 746px of 1366; context x 1036, rail x 10"
+    },
+    {
+      "id": "STRIP-VISIBLE-laptop",
+      "pass": true,
+      "what": "the approval strip sits along the bottom of the map, inside the screen",
+      "detail": "strip y 620"
+    },
+    {
+      "id": "SHELL-tablet",
+      "pass": true,
+      "what": "RTL shell at 1024×768: brand on the right, no horizontal scroll",
+      "detail": "dir=rtl, brand x=901"
+    },
+    {
+      "id": "TABLET",
+      "pass": true,
+      "what": "tablet: compact action rail; the context panel collapses and the map widens",
+      "detail": "rail 70px; map 614 → 924px"
+    },
+    {
+      "id": "SHELL-mobile",
+      "pass": true,
+      "what": "RTL shell at 390×844: brand on the right, no horizontal scroll",
+      "detail": "dir=rtl, brand x=252"
+    },
+    {
+      "id": "MOBILE",
+      "pass": true,
+      "what": "phone: map first; details and requests open as bottom sheets",
+      "detail": "map top 54px"
+    },
+    {
+      "id": "NO-AUTO-OPEN",
+      "pass": true,
+      "what": "«إعادة التمركز» opens no request by itself: the start view waits for a choice",
+      "detail": "hash #restationing, summary cards 0, hint true"
+    },
+    {
+      "id": "REF-SITES-START",
+      "pass": true,
+      "what": "the registered sites are drawn on the re-stationing start map",
+      "detail": "23 sites"
+    },
+    {
+      "id": "REF-SITES-REQUEST",
+      "pass": true,
+      "what": "the registered sites are drawn as a reference layer on the request map",
+      "detail": "23 sites"
+    },
+    {
+      "id": "REF-CLICK",
+      "pass": true,
+      "what": "a click on a registered site shows its information only; the request is unchanged (server, before and after)",
+      "detail": "«موقع مرجعي لاختبار الانحدار (وهمي)»; request unchanged true"
+    },
+    {
+      "id": "STEP1",
+      "pass": false,
+      "what": "a new request opens MAP FIRST: «الخطوة 1 من 6 · اختر الموقع الحالي · اضغط على أحد المواقع في الخريطة», registered sites on the map, the context waiting; no list, no selected site, no ring, no route",
+      "detail": "23 sites drawn; lists 0; bands 0; strip 0"
+    },
+    {
+      "id": "SEARCH-ZOOM",
+      "pass": true,
+      "what": "a search result flies the map to the site, highlights it and opens the same card",
+      "detail": "zoom 9.8 → 15.0; offset 0% / 0%"
+    },
+    {
+      "id": "CLICK-SELECT",
+      "pass": false,
+      "what": "a click on the map shows the site’s context (nothing starts); «اختيار هذا الموقع» makes it the current site",
+      "detail": "«موقع اختبار الانحدار — علامة فقط (وهمي)»"
+    },
+    {
+      "id": "UNITS-AT-SITE",
+      "pass": true,
+      "what": "only the units stationed at the chosen site are offered (the register), none chosen by itself",
+      "detail": "قسم النقل والحركة الإدارية (وهمي) (register: قسم النقل والحركة الإدارية (وهمي))"
+    },
+    {
+      "id": "CONTEXT",
+      "pass": true,
+      "what": "the context shows the site, the units there and each moving unit in its ancestry with the derived requesting unit",
+      "detail": "الهيكل التنظيميالمؤسسة ‹ الخدمات المشتركة ‹ قسم النقل والحركة الإدارية (وهمي)الوحدة الطالبة (يبدأ منها مسار الاعتماد): الخدمات المشتركة"
+    },
+    {
+      "id": "NO-RING-NEW-SITE",
+      "pass": true,
+      "what": "type comes before the new site; choosing the new site draws no deployment ring and shows no distance limit",
+      "detail": "bands 0 → 0"
+    },
+    {
+      "id": "NO-RING-BEFORE-DEPLOY",
+      "pass": true,
+      "what": "no deployment ring before the deployment step",
+      "detail": "deployment step open false"
+    },
+    {
+      "id": "SITES-PAGE",
+      "pass": true,
+      "what": "«المواقع» lists and draws every site the server returns and shows the chosen site’s record",
+      "detail": "23 listed, 23 drawn of 23; «موقع اختبار الانحدار — علامة فقط (وهمي)»"
+    },
+    {
+      "id": "SITES-NO-FLOW",
+      "pass": true,
+      "what": "the Sites page has no re-stationing flow and no «النطاق المسموح» rule",
+      "detail": "flow elements 0"
+    },
+    {
+      "id": "SITES-TO-RESTATIONING",
+      "pass": true,
+      "what": "«طلب إعادة تمركز من هذا الموقع» opens «إعادة التمركز» with that site as the current site and only its units offered",
+      "detail": "#restationing/new?site=df9c90a4-4926-33fe-04bb-98f55ac2e658; قسم النقل والحركة الإدارية (وهمي)"
+    },
+    {
+      "id": "NOTHING-SAVED",
+      "pass": true,
+      "what": "choosing site, units, type and drawing a boundary saved nothing (the draft is created only by an explicit action at the new-site step)",
+      "detail": "writes 0; requests 2 → 2"
+    },
+    {
+      "id": "G-AUTO-COPY",
+      "pass": true,
+      "what": "step 4 («أ · نقل الحدود الحالية») shows the current MultiPolygon copied whole at once (no save), with its «مقترح» symbol; the current site and its symbol stay; equal areas; no ring",
+      "detail": "2 parts"
+    },
+    {
+      "id": "G-GROUP-DRAG",
+      "pass": true,
+      "what": "a drag of one part moves all parts by the same vector; area difference 0٪",
+      "detail": "700 m; parts differ by 0.007 m"
+    },
+    {
+      "id": "G-PART-EDIT",
+      "pass": true,
+      "what": "a numbered vertex of one part dragged on the map changes that part only (the other is byte-identical) and the area",
+      "detail": "105,254 م² → 108,411 م²"
+    },
+    {
+      "id": "G-UNDO-REDO-RESET",
+      "pass": true,
+      "what": "undo restores, redo reapplies, reset returns to the starting copy (geometry equality)",
+      "detail": ""
+    },
+    {
+      "id": "G-OCCUPIED",
+      "pass": true,
+      "what": "occupied ground is drawn in red while placing; a boundary over it warns at once (the server still decides on save)",
+      "detail": "✕ يتداخل مع أرض مشغولة: موقع السهل الغربي (وهمي)"
+    },
+    {
+      "id": "G-DRAW-ENTER",
+      "pass": true,
+      "what": "a marker-only current site starts drawing at once; four clicks (of five chosen), Enter finishes a DRAWN polygon of four vertices (no fixed square)",
+      "detail": "vertices 4; DRAWN"
+    },
+    {
+      "id": "G-DRAW-COUNT",
+      "pass": true,
+      "what": "«ب · رسم حدود جديدة» with «عدد الرؤوس» 3: the third map click closes the shape, its three numbered vertices stay on",
+      "detail": ""
+    },
+    {
+      "id": "G-NO-RING",
+      "pass": true,
+      "what": "no deployment ring and no distance limit while the new site is placed",
+      "detail": ""
+    },
+    {
+      "id": "G-NO-DRAFT",
+      "pass": true,
+      "what": "copy/draw/drag does not create a draft: copy, drag, vertex edit, undo, redo, reset and drawing wrote nothing",
+      "detail": "writes 0; requests 2 → 2"
+    },
+    {
+      "id": "GEOMETRY",
+      "pass": true,
+      "what": "geometry editing still works in the new workspace: copy whole, drag, saved by the server; the move distance is information only",
+      "detail": "MultiPolygon, moved 476 m; المسافة من الموقع الحالي (للعلم فقط)1.90 كم"
+    },
+    {
+      "id": "DEPLOY-PRIMARY",
+      "pass": true,
+      "what": "primary deployment: the card shows the server’s leg-1 distance and the policy range",
+      "detail": "OK; منطقة الانتشار الرئيسيةضمن 5–8 كم (حتى 8.5 كم مع الأرض)المسافة من مركز موقع التمركز6.2 كمنطاق السياسة5–8 كمطبيعة الأرضمتموّج +0.5 كمالحد الأقصى الفعلي8.5 كم"
+    },
+    {
+      "id": "DEPLOY-ALTERNATIVE",
+      "pass": true,
+      "what": "alternative deployment: the card shows the server’s leg-2 distance (from the primary area) and its policy range",
+      "detail": "OK; منطقة الانتشار البديلةضمن 3–5 كم (حتى 7 كم مع الأرض)المسافة من مركز منطقة الانتشار الرئيسية4 كمنطاق السياسة3–5 كمطبيعة الأرضجبلي / شديد التضرس +2 كمالحد الأقصى "
+    },
+    {
+      "id": "NO-RESTATIONING-RULE",
+      "pass": true,
+      "what": "no distance rule on the re-stationing move and no ring anywhere: checks and leg connectors exist only for the two deployment legs",
+      "detail": "مفتاح الخريطة موقع مسجّل (للمرجع فقط) الموقع الحالي موقع إعادة التمركز أرض مشغولة (وحدات أخرى) منطقة الانتشار الرئيسية منطقة الانتشار البديلة مسافة الانتشار من مركز إلى مركز (مع النطاق المسموح) الانتقال إلى موقع إعادة التمركز (المسافة للعلم — لا قيد)"
+    },
+    {
+      "id": "ROUTE",
+      "pass": true,
+      "what": "approval strip = the request's actual route, the current stage marked",
+      "detail": "مقدم الطلب ← اعتماد الإدارة ← الاعتماد النهائي ← التفعيل"
+    },
+    {
+      "id": "TERRAIN",
+      "pass": true,
+      "what": "street → terrain (GLO-30 hillshade from the local package) → street on the same map",
+      "detail": "street → terrain → street; hillshade fetched true"
+    },
+    {
+      "id": "HIERARCHY",
+      "pass": true,
+      "what": "the hierarchy panel shows the server's tree in its order, the requesting unit highlighted",
+      "detail": "المؤسسة / الخدمات المشتركة"
+    },
+    {
+      "id": "PERM-REQUESTER",
+      "pass": true,
+      "what": "a requester is offered no permissions, audit or policy page, and #permissions answers «outside your rights»",
+      "detail": "{\"nav\":[\"#home\",\"#restationing\",\"#stationing\",\"#org\",\"#calendar\"],\"more\":[\"#requests\",\"#docs\"],\"quick\":[\"تفاصيل الموقع\",\"تفاصيل الوحدة\"]}"
+    },
+    {
+      "id": "PERM-AUDITOR",
+      "pass": true,
+      "what": "an auditor gets the audit report and «سجل التدقيق», not «الصلاحيات»",
+      "detail": "{\"nav\":[\"#home\",\"#restationing\",\"#stationing\",\"#org\",\"#audit\"],\"quick\":[\"سجل التدقيق\",\"تفاصيل الموقع\",\"تفاصيل الوحدة\"]}"
+    },
+    {
+      "id": "PERM-MANAGER",
+      "pass": true,
+      "what": "a unit manager with MANAGE_ACCESS gets «الصلاحيات», not the audit log",
+      "detail": "{\"quick\":[\"الصلاحيات\",\"تفاصيل الموقع\",\"تفاصيل الوحدة\"]}"
+    },
+    {
+      "id": "NET",
+      "pass": true,
+      "what": "no request leaves the application (offline map, local font)",
+      "detail": ""
+    },
+    {
+      "id": "CONSOLE",
+      "pass": true,
+      "what": "no console error on any page and size",
+      "detail": ""
+    }
+  ],
+  "external": [],
+  "consoleErrors": []
+}

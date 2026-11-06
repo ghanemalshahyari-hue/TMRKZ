@@ -1,0 +1,197 @@
+{
+  "when": "2026-11-06T07:41:33.540Z",
+  "ui": "http://localhost:5197",
+  "auth": "http://localhost:8097",
+  "package": "tmrkz-map-2026.11.2",
+  "marks": {
+    "E": {
+      "start": 24.716,
+      "end": 42.332
+    },
+    "F": {
+      "start": 53.171,
+      "end": 61.874
+    },
+    "G": {
+      "start": 65.997,
+      "end": 83.65
+    }
+  },
+  "timings": [
+    {
+      "site": "موقع من جزأين على السهل (وهمي)",
+      "parts": 2,
+      "vertices": 11,
+      "long": 0,
+      "longMax": 0,
+      "p50": 13.300000000001091,
+      "p95": 13.5,
+      "max": 22.100000000000364
+    },
+    {
+      "site": "موقع من أربعة أجزاء (وهمي)",
+      "parts": 4,
+      "vertices": 20,
+      "long": 0,
+      "longMax": 0,
+      "p50": 13.300000000001091,
+      "p95": 13.400000000001455,
+      "max": 26.600000000000364
+    },
+    {
+      "site": "موقع كثيف الرؤوس (وهمي)",
+      "parts": 1,
+      "vertices": 1501,
+      "long": 1,
+      "longMax": 56,
+      "p50": 13.300000000001091,
+      "p95": 26.600000000000364,
+      "max": 53.29999999999927
+    }
+  ],
+  "results": [
+    {
+      "id": "T01",
+      "pass": true,
+      "what": "3D available from the installed package",
+      "detail": "tmrkz-map-2026.11.2, component terrain-3d, switch enabled"
+    },
+    {
+      "id": "T02",
+      "pass": true,
+      "what": "proposed site placed on the mountain (one click, same shape)",
+      "detail": "centre 56.07465, 24.77002"
+    },
+    {
+      "id": "T03",
+      "pass": true,
+      "what": "MapLibre terrain on, exaggeration 1, tilted camera",
+      "detail": "{\"pitch\":55.00000000000001,\"bearing\":0,\"zoom\":11.886905394529425,\"terrain\":{\"source\":\"terrain3d\",\"exaggeration\":1}}"
+    },
+    {
+      "id": "T04",
+      "pass": true,
+      "what": "the camera rotates over the terrain (right-button drag)",
+      "detail": "bearing 0.0° → 151.8°"
+    },
+    {
+      "id": "T05",
+      "pass": true,
+      "what": "current, proposed, primary and alternative rendered as draped fills in 3D",
+      "detail": "{\"roles\":[\"SITE\",\"CURRENT\",\"PRIMARY\"],\"edited\":1,\"types\":[\"fill\",\"fill\",\"line\",\"fill\",\"line\",\"fill\"]}"
+    },
+    {
+      "id": "T06",
+      "pass": true,
+      "what": "occupied ground (another unit's site) rendered as a draped fill in 3D",
+      "detail": "2 features"
+    },
+    {
+      "id": "T07",
+      "pass": true,
+      "what": "the proposed site spans the mountain: its vertices lie at different terrain heights",
+      "detail": "CURRENT 375–384 m, SITE 602–897 m, PRIMARY 320–330 m, EDITED 435–533 m"
+    },
+    {
+      "id": "T08",
+      "pass": true,
+      "what": "four cards, each on a 58 px stem from its ground point at the terrain height",
+      "detail": "CURRENT 0.6 px, 379 m · SITE 0.4 px, 706 m · PRIMARY 0.3 px, 329 m · ALTERNATIVE 0.5 px, 510 m"
+    },
+    {
+      "id": "T09",
+      "pass": true,
+      "what": "three connectors: move (information only, no verdict), site → primary, primary → alternative",
+      "detail": "move: 8.86 كم — للعلم فقط | primary: 7.94 كم ✓ | alternative: 4.51 كم · الفعّال 3–7 كم · ضمن النطاق ✓"
+    },
+    {
+      "id": "T10",
+      "pass": true,
+      "what": "arrowheads point the leg's way: primary → alternative from the primary area (not from the site)",
+      "detail": "edited-leg head 42.1°, expected ≈42.2°; RequestMap heads [{\"leg\":\"primary\",\"rotate\":39.63282202409954}]"
+    },
+    {
+      "id": "T11",
+      "pass": true,
+      "what": "proposed site: server class, real heights, NO range verdict (distance for information only)",
+      "detail": "class MOUNTAINOUS, 585–936 m, centre 714 m"
+    },
+    {
+      "id": "T12",
+      "pass": true,
+      "what": "deployment legs: allowance and effective maximum are exactly the policy in force for the server class of each area",
+      "detail": "primary HILLY +1500 m → max 9500 m OK; alternative MOUNTAINOUS +2000 m → max 7000 m OK; chip «4.51 كم · الفعّال 3–7 كم · ضمن النطاق ✓»"
+    },
+    {
+      "id": "T13",
+      "pass": true,
+      "what": "elevation profile of the selected leg drawn from the elevation tiles",
+      "detail": "أعلى نقطة: 514 م أدنى نقطة: 321 م فرق الارتفاع بين الطرفين: 174 م أقصى انحدار على المسار: 54.6٪"
+    },
+    {
+      "id": "T14",
+      "pass": true,
+      "what": "2D → 3D → 2D leaves every coordinate, part order and the undo history exactly as they were",
+      "detail": "pitch 0, terrain null"
+    },
+    {
+      "id": "T15",
+      "pass": true,
+      "what": "drag in 3D: the site settles on the plain, and its terrain class and heights are read again",
+      "detail": "class MOUNTAINOUS → FLAT; heights 585–936 m → 371–379 m; terrain under the dropped vertices 371–378 m"
+    },
+    {
+      "id": "T16",
+      "pass": true,
+      "what": "drawing in 3D: four vertices placed on the terrain exactly where it was clicked",
+      "detail": "vertices = click points: true; back-projection 0.00, 0.00, 0.00, 0.00 px; terrain heights at the clicks 393, 497, 503, 462 m"
+    },
+    {
+      "id": "T17",
+      "pass": true,
+      "what": "editing in 3D: a vertex dragged on the terrain; undo, redo and reset restore exact coordinates",
+      "detail": "terrain under the drawn vertices 393, 497, 503, 462 m"
+    },
+    {
+      "id": "T18",
+      "pass": true,
+      "what": "a two-part MultiPolygon proposed site is drawn with both parts on the 3D terrain",
+      "detail": "{\"parts\":2,\"terrain\":true,\"vertices\":11}"
+    },
+    {
+      "id": "T19",
+      "pass": true,
+      "what": "3D drag timings (headless Edge on the GPU, ANGLE Direct3D 11; long tasks recorded, not hidden)",
+      "detail": "2 part(s)/11 vertices: p50 13 ms, p95 14 ms, max 22 ms, long tasks 0 (max 0 ms) · 4 part(s)/20 vertices: p50 13 ms, p95 13 ms, max 27 ms, long tasks 0 (max 0 ms) · 1 part(s)/1501 vertices: p50 13 ms, p95 27 ms, max 53 ms, long tasks 1 (max 56 ms)"
+    },
+    {
+      "id": "T20",
+      "pass": true,
+      "what": "zero request writes: the only POSTs are the read-only terrain analysis",
+      "detail": "other writes 0; terrain analyses 13; rows (requests/revisions/stationings) 2/1/17 → 2/1/17"
+    },
+    {
+      "id": "T21",
+      "pass": true,
+      "what": "zero external requests (all outside traffic refused and counted)",
+      "detail": ""
+    },
+    {
+      "id": "T22",
+      "pass": true,
+      "what": "the elevation tiles come from the installed offline package only",
+      "detail": "133 range requests to /map-data/terrain/glo30/visualization-3d/terrain-rgb.pmtiles"
+    },
+    {
+      "id": "T23",
+      "pass": true,
+      "what": "zero console errors",
+      "detail": ""
+    }
+  ],
+  "external": [],
+  "consoleErrors": [],
+  "writes": [],
+  "assessCalls": 13,
+  "demRequests": 133
+}
