@@ -106,7 +106,7 @@ try {
   await it.getByRole('button', { name: 'اعتماد وتفعيل', exact: true }).click();
   await it.waitFor({ state: 'detached', timeout: 10000 });
   ok(live('p18.new') === 'CHAIN_APPROVER,POSTURE_VIEWER', 'SCOPE-02', 'مُنح المطلوب وإضافة المدير', live('p18.new'));
-  const targets = sql(`select count(distinct t.organization_id) from membership_scope_target t join membership m on m.id = t.membership_id where m.person_id = '${person('p18.new')}' and m.role_code = 'POSTURE_VIEWER'`);
+  const targets = sql(`select count(distinct t.target_id) from membership_scope_target t join membership m on m.id = t.membership_id where m.person_id = '${person('p18.new')}' and m.role_code = 'POSTURE_VIEWER'`);
   ok(targets === '2', 'SCOPE-03', 'النطاق المحفوظ وحدتان بالضبط', targets);
   const seen = (await (await apiSession('p18.new')).get('/operational-posture')).body.units.map((u) => u.id);
   ok(seen.includes(org('N-A113')) && seen.includes(org('N-A115')), 'SCOPE-04', 'الخادم يعرض الوحدتين المختارتين');
@@ -129,7 +129,7 @@ try {
   await it.getByRole('button', { name: 'اعتماد وتفعيل', exact: true }).click();
   await it.waitFor({ state: 'detached', timeout: 10000 });
   ok(live('p19.new') === 'FYI_RECEIVER', 'SCOPE-06', 'ما أزاله المعتمد النهائي لا يُمنح', live('p19.new'));
-  const siteTarget = sql(`select count(*) from membership_scope_target t join membership m on m.id = t.membership_id where m.person_id = '${person('p19.new')}' and t.site_id = '${site('SITE-05')}'`);
+  const siteTarget = sql(`select count(*) from membership_scope_target t join membership m on m.id = t.membership_id where m.person_id = '${person('p19.new')}' and t.kind = 'SITE' and t.target_id = '${site('SITE-05')}'`);
   ok(siteTarget === '1', 'SCOPE-07', 'النطاق المحفوظ هو الموقع المختار', siteTarget);
 
   // ---- this path has no deadline -----------------------------------------------------------------------------------------------
