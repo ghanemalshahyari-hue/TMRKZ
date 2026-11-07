@@ -3,8 +3,7 @@
 // unless ops/verify-backup.sh passes on the backup named as the first argument.
 //   sh ops/acceptance-main/provision.sh backups/<dir>
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { CURRENT, DB, GEN, LDAP, ROOT, USERS, dockerRun, fingerprintAll, ldapAdmin, loaded, manifestFile, password, psql, tupleCounts, waitAuthzDrained, writeJson } from './lib.mjs';
+import { CURRENT, LDAP, ROOT, USERS, directoryEntries, dockerRun, fingerprintAll, ldapAdmin, loaded, manifestFile, psql, seedText, tupleCounts, waitAuthzDrained, writeJson } from './lib.mjs';
 
 const backup = process.argv[2];
 if (!backup) throw new Error('name the backup taken just before this run');
@@ -36,20 +35,11 @@ writeJson(CURRENT, { id, ns, prefix });
 console.log('[acceptance] pausing the HR sync: it would retire these fictional units within the hour');
 psql(`update hr_source set enabled = false where enabled`);
 
-const employee = (u) => 'P' + u.slice(1, 3);
-const ldif = USERS.map((u) => `dn: uid=${u},ou=people,dc=tmrkz,dc=local
-objectClass: inetOrgPerson
-uid: ${u}
-cn: ${u} اختبار قبول وهمي
-sn: ACCEPTANCE
-employeeNumber: ${prefix}${employee(u)}
-userPassword: ${password()}
-`).join('\n');
+const ldif = directoryEntries(prefix);
 dockerRun(['exec', '-i', LDAP, 'ldapadd', '-c', '-x', '-H', 'ldap://localhost', '-D', 'cn=admin,dc=tmrkz,dc=local', '-w', ldapAdmin()], ldif);
 
 console.log('[acceptance] organisations, people, sites and test holders');
-const seed = readFileSync(new URL('./seed.sql', import.meta.url), 'utf8').replaceAll('__NS__', ns).replaceAll('__PFX__', prefix);
-psql(seed);
+psql(seedText({ ns, prefix }));
 waitAuthzDrained();
 
 manifest.roots = {

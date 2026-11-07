@@ -9,8 +9,21 @@ mkdirSync(GEN, { recursive: true });
 export const DB = 'tmrkz-mover-db-1';
 export const LDAP = 'tmrkz-mover-openldap-1';
 export const KEYCLOAK = 'tmrkz-mover-keycloak-1';
-export const USERS = ['p01.new', 'p02.access', 'p03.final', 'p04.sites', 'p05.req', 'p06.h1', 'p07.h2', 'p08.ops', 'p09.fin', 'p10.fyi', 'p11.act', 'p12.view', 'p13.other', 'p14.admin', 'p15.fyi', 'p16.branch', 'p17.new'];
+export const USERS = ['p01.new', 'p02.access', 'p03.final', 'p04.sites', 'p05.req', 'p06.h1', 'p07.h2', 'p08.ops', 'p09.fin', 'p10.fyi', 'p11.act', 'p12.view', 'p13.other', 'p14.admin', 'p15.fyi', 'p16.branch', 'p17.new', 'p18.new', 'p19.new'];
 export const CURRENT = GEN + 'current-run.json';
+
+export const MARK = ' — اختبار قبول — وهمي';
+/** The acceptance seed for one batch. dy moves a further batch north, so that its sites stand on free ground. */
+export const seedText = ({ ns, prefix, up = '', sfx = MARK, dy = 0, file = './seed.sql' }) =>
+  readFileSync(new URL(file, import.meta.url), 'utf8').replaceAll('__NS__', ns).replaceAll('__PFX__', prefix).replaceAll('__UP__', up).replaceAll('__SFX__', sfx).replaceAll('__DY__', String(dy));
+export const directoryEntries = (prefix, up = '') => USERS.map((u) => `dn: uid=${up}${u},ou=people,dc=tmrkz,dc=local
+objectClass: inetOrgPerson
+uid: ${up}${u}
+cn: ${up}${u} اختبار قبول وهمي
+sn: ACCEPTANCE
+employeeNumber: ${prefix}P${u.slice(1, 3)}
+userPassword: ${password()}
+`).join('\n');
 
 const run = (args, input) => execFileSync('docker', args, { encoding: 'utf8', input, maxBuffer: 1 << 30, stdio: ['pipe', 'pipe', 'pipe'] });
 /** One SQL script on the application's database, stopping at the first error; returns its output. */

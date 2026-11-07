@@ -106,3 +106,8 @@ body { transition: background-color 0.15s; }
 
 /* the home and console ground: plain sand, without the dark theme's glow */
 :root[data-theme='light'] .tz-app.is-console { background: #f9f7ed; }
+
+/* Text on a strong colour stays white in the sand theme: the active 2D/3D button, and a trial's result on «مسار الموافقات». */
+:root[data-theme='light'] .tz-view-switch button.on,
+:root[data-theme='light'] .fs-outcome { color: #fff; }
+.fs-outcome.ok { background: #157a38; }

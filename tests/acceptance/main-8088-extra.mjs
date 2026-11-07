@@ -32,6 +32,23 @@ const go = async (p, hash) => {
   ok(new URL(p.url()).origin === 'http://localhost:8088', 'URL', 'الصفحة على localhost:8088', p.url());
 };
 const button = (p, name) => p.getByRole('button', { name, exact: true });
+/** WCAG contrast of an element's text on its own background. */
+const contrast = (loc) => loc.evaluate((e) => {
+  const parse = (c) => { const p = c.match(/[\d.]+/g).map(Number); return { r: p[0], g: p[1], b: p[2] }; };
+  const lum = ({ r, g, b }) => { const f = (v) => { const s = v / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+  const st = getComputedStyle(e);
+  const [a, b] = [lum(parse(st.color)), lum(parse(st.backgroundColor))].sort((x, y) => y - x);
+  return Math.round(((a + 0.05) / (b + 0.05)) * 100) / 100;
+});
+const inThemes = async (page, id, what, loc) => {
+  for (const theme of ['light', 'dark']) {
+    const was = await page.evaluate((t) => { const w = document.documentElement.dataset.theme; document.documentElement.dataset.theme = t; return w; }, theme);
+    await page.waitForTimeout(200);
+    const c = await contrast(loc);
+    await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, was);
+    ok(c >= 4.5, `${id}-${theme}`, what, `${c}:1`);
+  }
+};
 try {
   // ---- the catalogue ----------------------------------------------------------------------------------------------------
   const admin = await as('p14.admin');
@@ -67,6 +84,7 @@ try {
   await admin.getByTestId('route-tried').waitFor({ timeout: 15000 });
   const tried = (await admin.getByTestId('route-tried').innerText()).replace(/\s+/g, ' ');
   ok(tried.includes('اعتماد المستوى L7') && tried.includes('الاعتماد النهائي'), 'PATH-02', 'التجربة تعرض المراحل ومن يحملها', tried.slice(0, 220));
+  await inThemes(admin, 'CONTRAST-RESULT', 'وضوح نتيجة التجربة في مسار الموافقات', admin.locator('.fs-outcome'));
   ok((await admin.getByTestId('route-publish').isDisabled()), 'PATH-03', 'لا تفعيل قبل الحفظ والسبب');
   ok((await admin.locator('.react-flow__node').count()) >= 3 && !(await admin.locator('.fs-tile').count()), 'PATH-04', 'المخطط من الإعدادات، بلا سحب بطاقات');
   await admin.screenshot({ path: OUT + 'path-of-a-type.png' });
@@ -105,6 +123,7 @@ try {
   await view.waitForTimeout(5000);
   const camera = await view.evaluate(() => { const m = document.querySelector('.tz-mapframe .tz-map-layer').tmrkzMap; return { terrain: !!m.getTerrain(), pitch: m.getPitch() }; });
   ok(camera.terrain && camera.pitch > 0, 'POSTURE-3D', 'الموقف في 3D على تضاريس حقيقية', JSON.stringify(camera));
+  await inThemes(view, 'CONTRAST-3D', 'وضوح زر 3D المفعّل', view.locator('.tz-view-switch button.on'));
   await view.screenshot({ path: OUT + 'posture-3d.png' });
   await view.locator(`[data-unit="${org('N-A112')}"]`).click();
   await view.waitForTimeout(2500);

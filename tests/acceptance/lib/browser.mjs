@@ -16,6 +16,9 @@ export const PASSWORD =
     }
   })();
 
+// a further acceptance batch on the one application has its own accounts (ops/acceptance-main/add-batch.mjs)
+const account = (user) => (process.env.ACC_USER_PREFIX ?? '') + user;
+
 export const external = [];
 export const consoleErrors = [];
 
@@ -69,7 +72,7 @@ export async function signInAutomatic(page, user) {
 export async function signInManual(page, user) {
   await page.goto(BASE + '/');
   await page.getByText('إدخال اسم المستخدم وكلمة المرور يدوياً').click();
-  await page.locator('#tm-username').fill(user);
+  await page.locator('#tm-username').fill(account(user));
   await page.locator('#tm-password').fill(PASSWORD);
   await page.getByRole('button', { name: 'تسجيل الدخول' }).click();
   await page.waitForSelector('main#main', { timeout: 30000 });
@@ -80,7 +83,7 @@ export async function apiSession(user) {
   const res = await fetch(BASE + '/api/v1/auth/directory/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'mover' },
-    body: JSON.stringify({ username: user, password: PASSWORD }),
+    body: JSON.stringify({ username: account(user), password: PASSWORD }),
   });
   const cookie = res.headers.getSetCookie().find((c) => c.startsWith('MOVER_SESSION='))?.split(';')[0];
   if (!cookie) throw new Error('setup sign-in failed for ' + user + ': ' + res.status);

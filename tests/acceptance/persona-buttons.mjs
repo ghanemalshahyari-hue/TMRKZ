@@ -11,6 +11,7 @@ import { apiSession, BASE, consoleErrors, external, launch, newContext, signInMa
 // On the one application (ops/acceptance-main): ACC_NS and ACC_PREFIX name the loaded run; ACC_EVIDENCE keeps evidence out of Git,
 // because pages on :8088 can show real units. Defaults keep the separate fictional environments working.
 const NS = process.env.ACC_NS ?? 't';
+const Y = (lat) => lat + Number(process.env.ACC_DY ?? 0);
 const PFX = process.env.ACC_PREFIX ?? '';
 // the button matrix's own new person and unit, so it can run after the journeys on the same load
 const NEW = process.env.PB_NEW ?? 'p01.new';
@@ -79,7 +80,7 @@ try {
   const a05 = await apiSession('p05.req');
   await check('p04.sites', 'مدير المواقع', 'تهيئة المواقع والتمركز', '#siteSetup', ['＋ إضافة موقع'], [...ALL, 'اعتماد وتفعيل', 'إرسال التوصية']);
   await check('p05.req', 'مقدم الطلبات', 'طلب جديد', '#newRequest', ['طلب منطقة انتشار', 'طلب تمركز أولي', 'طلب إعادة تمركز'], [...ALL, 'اعتماد وتفعيل', 'إرسال التوصية', '＋ إضافة موقع']);
-  const made = await a05.post('/restationing-requests', { requestingUnitId: org(UNIT), purpose: 'DEPLOYMENT_AREAS', content: { kind: 'PERMANENT', scope: [org(UNIT)], primary: square(56.1195, 24.86), alternative: square(56.1195, 24.8965), reason: 'منطقتا الانتشار لفحص الأزرار' } });
+  const made = await a05.post('/restationing-requests', { requestingUnitId: org(UNIT), purpose: 'DEPLOYMENT_AREAS', content: { kind: 'PERMANENT', scope: [org(UNIT)], primary: square(56.1195, Y(24.86)), alternative: square(56.1195, Y(24.8965)), reason: 'منطقتا الانتشار لفحص الأزرار' } });
   if (made.status !== 200) throw new Error('draft: ' + JSON.stringify(made.body));
   const id = made.body.id;
   const sub = await a05.post(`/restationing-requests/${id}/submit`, {});
