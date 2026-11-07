@@ -177,7 +177,7 @@ def install(package: Path, root: Path, confirm: str | None, expect_sha: str | No
     say("plan")
     print(f"  map root        : {root}")
     print(f"  package         : {m['packageId']} ({m['totals']['files']} files, {need} bytes, contentSha256 {m['contentSha256']})")
-    print(f"  active now      : {cm['packageId'] + ' (' + cm['contentSha256'] + ')' if cm else 'none'}")
+    print(f"  active now      : {cm.get('packageId', '?') + ' (' + cm.get('contentSha256', 'not a package') + ')' if cm else 'none'}")
     print(f"  kept now        : {pm['packageId'] if pm else 'none'}")
     if cm and cm.get("contentSha256") == m["contentSha256"]:
         q = pf.verify(cur, full=True, deep=False)
@@ -231,11 +231,11 @@ def install(package: Path, root: Path, confirm: str | None, expect_sha: str | No
         if not after.ok or slot_manifest(cur)["contentSha256"] != m["contentSha256"]:
             raise Refused("the installed package does not match after the swap; restore with restore-previous")
         log(root, {"at": now(), "action": "install", "packageId": m["packageId"], "contentSha256": m["contentSha256"],
-                   "manifestSha256": pf.sha256_file(cur / "manifest.json"), "previous": cm["packageId"] if cm else None,
-                   "previousContentSha256": cm["contentSha256"] if cm else None, "from": str(package),
+                   "manifestSha256": pf.sha256_file(cur / "manifest.json"), "previous": cm.get("packageId") if cm else None,
+                   "previousContentSha256": cm.get("contentSha256") if cm else None, "from": str(package),
                    "archiveSha256": expect_sha, "manifestCopy": kept, "replacedManifestCopy": replaced,
                    "seconds": round(time.time() - started, 1)})
-    say(f"installed {m['packageId']} at {cur}" + (f"; {cm['packageId']} kept at {prev}" if cm else "")
+    say(f"installed {m['packageId']} at {cur}" + (f"; {cm.get('packageId')} kept at {prev}" if cm else "")
         + f" ({time.time() - started:.0f} s)")
     return 0
 
