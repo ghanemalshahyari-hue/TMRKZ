@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, type PostureUnit } from '../api/client';
 import type { GeoPolygon, RestationingRequest, SiteGeometry } from '../api/types';
-import { installedTerrain3d, type MapView } from '../components/map/maplibre';
+import type { Map as MlMap } from 'maplibre-gl';
+import { PITCH_3D, installedTerrain3d, type MapView } from '../components/map/maplibre';
 import type { BasemapMode, Terrain3dSource } from '../components/map/maplibre/offlineStyle';
 import { Icon } from '../components/ui';
 import { MapFrame, MapLegend } from '../components/workspace/MapFrame';
@@ -36,6 +37,11 @@ export function PosturePage() {
   const [view, setView] = useState<MapView>('2d');
   const [terrain3d, setTerrain3d] = useState<Terrain3dSource | null | undefined>(undefined);
   const [fit, setFit] = useState(0);
+  const [map, setMap] = useState<MlMap | null>(null);
+  // 3D looks from the side, as on the request's map; 2D from above
+  useEffect(() => {
+    map?.easeTo({ pitch: view === '3d' ? PITCH_3D : 0, duration: 500 });
+  }, [map, view]);
   useEffect(() => {
     installedTerrain3d().then(setTerrain3d);
     api.operationalPosture().then((p) => {
@@ -104,7 +110,7 @@ export function PosturePage() {
           onFit={() => setFit((k) => k + 1)}
           legend={<MapLegend stage="full" fold />}
         >
-          {terrain3d !== undefined && req && <RequestMap view={view} terrain3d={terrain3d} request={req} checks={null} mode={mode} fitMaxZoom={13} hideSite fit fitKey={fit} referenceInteractive={false} />}
+          {terrain3d !== undefined && req && <RequestMap view={view} terrain3d={terrain3d} request={req} checks={null} mode={mode} fitMaxZoom={13} hideSite fit fitKey={fit} referenceInteractive={false} onMap={setMap} />}
         </MapFrame>
       }
     />

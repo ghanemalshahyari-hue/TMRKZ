@@ -83,7 +83,7 @@ try {
   const box = await sites.locator('.tz-mapframe .tz-map-layer canvas').first().boundingBox();
   await sites.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.25);
   await sites.waitForTimeout(800);
-  const code = PFX + 'SITE-POINT-1';
+  const code = PFX + 'SITE-POINT-' + Date.now().toString(36);
   await sites.getByLabel('اسم الموقع').fill('موقع نقطة من الصفحة — اختبار قبول — وهمي');
   await sites.getByLabel('رمز الموقع').fill(code);
   await sites.getByLabel('سبب تسجيل الموقع').fill('تسجيل موقع نقطة في اختبار القبول');
@@ -106,6 +106,10 @@ try {
   const camera = await view.evaluate(() => { const m = document.querySelector('.tz-mapframe .tz-map-layer').tmrkzMap; return { terrain: !!m.getTerrain(), pitch: m.getPitch() }; });
   ok(camera.terrain && camera.pitch > 0, 'POSTURE-3D', 'الموقف في 3D على تضاريس حقيقية', JSON.stringify(camera));
   await view.screenshot({ path: OUT + 'posture-3d.png' });
+  await view.locator(`[data-unit="${org('N-A112')}"]`).click();
+  await view.waitForTimeout(2500);
+  const kept = await view.evaluate(() => { const m = document.querySelector('.tz-mapframe .tz-map-layer').tmrkzMap; return { terrain: !!m.getTerrain(), pitch: m.getPitch() }; });
+  ok(kept.terrain && kept.pitch > 0, 'POSTURE-3D-2', 'يبقى 3D عند اختيار وحدة أخرى', JSON.stringify(kept));
   ok(!(await button(view, 'حفظ').count()) && !(await button(view, 'تعديل الحدود').count()), 'POSTURE-3D-RO', 'لا أدوات تعديل في 3D');
   await button(view, '2D').click();
   await view.waitForTimeout(1500);
