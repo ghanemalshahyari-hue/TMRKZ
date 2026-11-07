@@ -9,9 +9,12 @@ import type {
   StationingPolicyVersion,
   TerrainDatasetView,
 } from '../api/types';
+import { NumberField } from '../components/NumberField';
+import { TerrainExtraField, type ExtraUnit } from '../components/TerrainExtraField';
 import { Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
+import { INITIAL_SLOPE_LIMITS } from '../lib/terrainRgb';
 import './restationing.css';
 
 const FACTS: [StationingFact, string][] = [
@@ -23,18 +26,21 @@ const FACTS: [StationingFact, string][] = [
   ['AVAILABILITY', 'الإتاحة'],
 ];
 const AUTHORITIES: [StationingPolicyValues['crossBranch']['authorities'][number], string][] = [
-  ['OTHER_UNIT', 'موافقة الوحدة من الفرع الآخر'],
-  ['OTHER_UNIT_PARENT', 'موافقة أب الوحدة من الفرع الآخر'],
-  ['SITE_RESPONSIBLE', 'موافقة المسؤول عن موقعها'],
+  ['OTHER_UNIT', 'موافقة الوحدة المضافة'],
+  ['OTHER_UNIT_PARENT', 'موافقة الجهة الأعلى للوحدة المضافة'],
+  ['SITE_RESPONSIBLE', 'موافقة المسؤول عن موقع الوحدة المضافة'],
 ];
+
+const DISTANCE_UNITS: ExtraUnit[] = [{ id: 'km', word: 'كم', factor: 1000 }, { id: 'm', word: 'م', factor: 1 }];
+const AREA_UNITS: ExtraUnit[] = [{ id: 'km2', word: 'كم²', factor: 1_000_000 }, { id: 'm2', word: 'م²', factor: 1 }];
 
 /** A blank starting point: the owner-approved initial slope classes (decision 2) and nothing else assumed. */
 function blank(classes: StationingPolicyValues['terrainSlopeClassification']['classes'], dataset: TerrainDatasetView | undefined, levels: HierarchyLevel[]): StationingPolicyValues {
   return {
     maxFootprintAreaM2: 0,
     deploymentRequirement: null,
-    primary: { minM: 0, maxM: 0, terrainApplies: true },
-    alternative: { minM: 0, maxM: 0, terrainApplies: true },
+    primary: { minM: 0, maxM: 0, terrainApplies: false },
+    alternative: { minM: 0, maxM: 0, terrainApplies: false },
     terrainSlopeClassification: { datasetCode: dataset?.code ?? '', datasetVersion: dataset?.version ?? '', classes },
     terrainAllowancesM: {},
     terrainClassPriority: [],
@@ -65,6 +71,8 @@ export function StationingPolicyPage() {
   const [check, setCheck] = useState<{ ok: boolean; problems: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [distUnit, setDistUnit] = useState<'km' | 'm'>('km');
+  const [areaUnit, setAreaUnit] = useState<'km2' | 'm2'>('km2');
 
   const load = async () => {
     const [ov, hist, lv, ds] = await Promise.all([api.stationingPolicy(), api.stationingPolicyVersions(), api.hierarchyLevels(), api.terrainDatasets()]);
@@ -86,6 +94,7 @@ export function StationingPolicyPage() {
     setCheck(null);
   };
   const classes = values.terrainSlopeClassification.classes;
+  const slopeLimits = values.slopeDisplay ?? INITIAL_SLOPE_LIMITS;
   const setLevel = (i: number, patch: Partial<RoutingLevelValue>) =>
     set({ routing: { ...values.routing, levels: values.routing.levels.map((l, j) => (j === i ? { ...l, ...patch } : l)) } });
 
@@ -138,9 +147,17 @@ export function StationingPolicyPage() {
     }
   };
 
-  const km = (m: number) => (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 2 }) + ' كم';
-  const num = (v: string) => (v === '' ? 0 : Number(v));
+  // typed in the chosen unit; always stored in metres and square metres, as the rules read them
+  const distFactor = distUnit === 'km' ? 1000 : 1;
+  const distWord = distUnit === 'km' ? 'كم' : 'م';
+  const toDist = (m: number) => m / distFactor;
+  const fromDist = (v: number | null) => (v == null ? null : Math.round(v * distFactor));
+  const areaFactor = areaUnit === 'km2' ? 1_000_000 : 1;
+  const areaWord = areaUnit === 'km2' ? 'كم²' : 'م²';
+  const toArea = (m: number) => m / areaFactor;
+  const fromArea = (v: number | null) => Math.round((v ?? 0) * areaFactor);
   const areaDefault = values.deploymentAreaDefault ?? null;
+  const metres2 = (m: number) => m.toLocaleString('ar-AE', { maximumFractionDigits: 0 }) + ' م²';
   const metres = (m: number) => m.toLocaleString('ar-AE', { maximumFractionDigits: 0 }) + ' م';
 
   return (
@@ -170,24 +187,66 @@ export function StationingPolicyPage() {
 
         <section className="card rs-form">
           <h3>منطقتا الانتشار والمسافات (من المركز إلى المركز)</h3>
+          <fieldset className="rs-inline" data-testid="policy-units">
+            <legend>وحدة الإدخال</legend>
+            <label>
+              المسافات
+              <select aria-label="وحدة المسافات" value={distUnit} onChange={(e) => setDistUnit(e.target.value as 'km' | 'm')}>
+                <option value="km">كيلومتر</option>
+                <option value="m">متر</option>
+              </select>
+            </label>
+            <label>
+              المساحات
+              <select aria-label="وحدة المساحات" value={areaUnit} onChange={(e) => setAreaUnit(e.target.value as 'km2' | 'm2')}>
+                <option value="km2">كيلومتر مربع</option>
+                <option value="m2">متر مربع</option>
+              </select>
+            </label>
+          </fieldset>
           <fieldset className="rs-inline">
             <legend>هل منطقتا الانتشار مطلوبتان؟</legend>
             <label><input type="radio" checked={values.deploymentRequirement === 'REQUIRED'} onChange={() => set({ deploymentRequirement: 'REQUIRED' })} /> مطلوبتان (الموقع والرئيسية والبديلة)</label>
             <label><input type="radio" checked={values.deploymentRequirement === 'OPTIONAL'} onChange={() => set({ deploymentRequirement: 'OPTIONAL' })} /> اختياريتان (لا شيء أو المنطقتان معاً)</label>
           </fieldset>
+          <fieldset className="rs-inline" data-testid="policy-stages">
+            <legend>مراحل ما بعد التسلسل الهرمي (من يحملها يُحدَّد بالصلاحيات، لا هنا)</legend>
+            {([['unitOperations', 'اعتماد عمليات الوحدة'], ['finalByPermission', 'الاعتماد النهائي مرحلة مستقلة'], ['fyiBeforeActivation', 'تحديد وحدات العلم قبل التفعيل']] as const).map(([k, label]) => (
+              <label key={k}><input type="checkbox" data-stage={k} checked={!!values.approvalStages?.[k]} onChange={(e) => set({ approvalStages: { unitOperations: false, finalByPermission: false, fyiBeforeActivation: false, ...values.approvalStages, [k]: e.target.checked } })} /> {label}</label>
+            ))}
+          </fieldset>
           {(['primary', 'alternative'] as const).map((leg) => (
             <fieldset key={leg} className="rs-inline">
               <legend>{leg === 'primary' ? 'الموقع ← منطقة الانتشار الرئيسية' : 'الرئيسية ← منطقة الانتشار البديلة'}</legend>
-              <label>من (م) <input type="number" min={0} value={values[leg].minM} onChange={(e) => set({ [leg]: { ...values[leg], minM: num(e.target.value) } })} /></label>
-              <label>إلى (م) <input type="number" min={0} value={values[leg].maxM} onChange={(e) => set({ [leg]: { ...values[leg], maxM: num(e.target.value) } })} /></label>
-              <span className="muted">{km(values[leg].minM)}–{km(values[leg].maxM)}</span>
-              <label><input type="checkbox" checked={values[leg].terrainApplies} onChange={(e) => set({ [leg]: { ...values[leg], terrainApplies: e.target.checked } })} /> إضافة الأرض تنطبق</label>
+              <label>من ({distWord}) <NumberField value={toDist(values[leg].minM)} onChange={(v) => set({ [leg]: { ...values[leg], minM: fromDist(v) ?? 0 } })} /></label>
+              <label>إلى ({distWord}) <NumberField value={toDist(values[leg].maxM)} onChange={(v) => set({ [leg]: { ...values[leg], maxM: fromDist(v) ?? 0 } })} /></label>
+              <TerrainExtraField
+                on={values[leg].terrainApplies}
+                extra={values[leg].terrainExtra ?? null}
+                units={DISTANCE_UNITS}
+                label={leg === 'primary' ? 'الرئيسية' : 'البديلة'}
+                onChange={(on, terrainExtra) => set({ [leg]: { ...values[leg], terrainApplies: on, terrainExtra } })}
+              />
             </fieldset>
           ))}
           <label>
-            الحد الأقصى لمساحة الموقع المقترح (م²)
-            <input type="number" min={0} value={values.maxFootprintAreaM2} onChange={(e) => set({ maxFootprintAreaM2: num(e.target.value) })} />
+            الحد الأقصى لمساحة الموقع المقترح ({areaWord})
+            <NumberField label="الحد الأقصى لمساحة الموقع المقترح" value={toArea(values.maxFootprintAreaM2)} onChange={(v) => set({ maxFootprintAreaM2: fromArea(v) })} />
+            {values.maxFootprintAreaM2 > 0 && (
+              <span className="muted" data-testid="max-footprint-m2">
+                = {metres2(values.maxFootprintAreaM2)}: لا يُقبل موقع مقترح أكبر من هذه المساحة
+              </span>
+            )}
           </label>
+          <fieldset className="rs-inline" data-testid="footprint-terrain">
+            <TerrainExtraField
+              on={!!values.footprintTerrainExtra}
+              extra={values.footprintTerrainExtra ?? null}
+              units={AREA_UNITS}
+              label="المساحة"
+              onChange={(on, footprintTerrainExtra) => set({ footprintTerrainExtra: on ? footprintTerrainExtra : null })}
+            />
+          </fieldset>
           {/* no size is assumed: «غير محددة» until the administrator enters one; the server checks it (0 < area ≤ 25 كم²) */}
           <fieldset className="rs-inline">
             <legend>المنطقة الابتدائية لمنطقة الانتشار (عند وضعها بنقرة)</legend>
@@ -199,7 +258,7 @@ export function StationingPolicyPage() {
                 <option value="CIRCLE">دائرة</option>
               </select>
             </label>
-            <label>المساحة (م²) <input type="number" min={0} disabled={!areaDefault} value={areaDefault?.areaM2 ?? ''} placeholder="—" onChange={(e) => areaDefault && set({ deploymentAreaDefault: { ...areaDefault, areaM2: num(e.target.value) } })} /></label>
+            <label>المساحة ({areaWord}) <NumberField disabled={!areaDefault} value={areaDefault ? toArea(areaDefault.areaM2) : null} placeholder="—" onChange={(v) => areaDefault && set({ deploymentAreaDefault: { ...areaDefault, areaM2: fromArea(v) } })} /></label>
             {areaDefault && areaDefault.areaM2 > 0 && (
               <span className="muted">
                 {/* the circle is drawn as a regular 16-vertex polygon of this area: its centre-to-vertex distance */}
@@ -230,7 +289,7 @@ export function StationingPolicyPage() {
           </label>
           <table className="rs-table">
             <thead>
-              <tr><th>الفئة</th><th>التسمية</th><th>من ٪</th><th>إلى ٪</th><th>الإضافة (م)</th></tr>
+              <tr><th>الفئة</th><th>التسمية</th><th>من ٪</th><th>إلى ٪</th></tr>
             </thead>
             <tbody>
               {classes.map((c, i) => (
@@ -239,24 +298,22 @@ export function StationingPolicyPage() {
                   <td><input value={c.label} onChange={(e) => set({ terrainSlopeClassification: { ...values.terrainSlopeClassification, classes: classes.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) } })} /></td>
                   <td>{c.fromPct}</td>
                   <td>{c.toPct ?? '∞'}</td>
-                  <td>
-                    <input
-                      type="number"
-                      min={0}
-                      value={values.terrainAllowancesM[c.code] ?? ''}
-                      placeholder="—"
-                      onChange={(e) => {
-                        const a = { ...values.terrainAllowancesM };
-                        if (e.target.value === '') delete a[c.code];
-                        else a[c.code] = Number(e.target.value);
-                        set({ terrainAllowancesM: a });
-                      }}
-                    />
-                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <fieldset className="rs-inline" data-testid="slope-limits">
+            <legend>ألوان الانحدار على الخريطة (للعرض فقط، لا تدخل في أي قاعدة)</legend>
+            <label>
+              أخضر أقل من ٪
+              <NumberField label="أخضر أقل من" value={slopeLimits.greenBelowPct} onChange={(v) => set({ slopeDisplay: { ...slopeLimits, greenBelowPct: v ?? 0 } })} />
+            </label>
+            <label>
+              أحمر من ٪
+              <NumberField label="أحمر من" value={slopeLimits.redFromPct} onChange={(v) => set({ slopeDisplay: { ...slopeLimits, redFromPct: v ?? 0 } })} />
+            </label>
+            <span className="tz-muted">بينهما برتقالي. تظهر داخل الموقع ومنطقتي الانتشار أثناء وضعها في الطلب.</span>
+          </fieldset>
           <div>
             <b>ترتيب الأولوية عند تعادل أكبر مساحة (الأعلى أولاً):</b>
             <ol className="rs-priority">
@@ -275,15 +332,15 @@ export function StationingPolicyPage() {
         </section>
 
         <section className="card rs-form">
-          <h3>استثناء المسافة (O-17) والضم من فرع آخر (O-03)</h3>
+          <h3>تجاوز المسافة المسموحة، وإضافة وحدة من فرع آخر</h3>
           <fieldset className="rs-inline">
-            <legend>استثناء مسافة الانتشار</legend>
-            <label><input type="checkbox" checked={values.exception.allowed} onChange={(e) => set({ exception: { ...values.exception, allowed: e.target.checked } })} /> مسموح بمرحلة اعتماد منفصلة</label>
-            <label>أقصى زيادة (م) <input type="number" min={0} disabled={!values.exception.allowed} value={values.exception.maxExtraM} onChange={(e) => set({ exception: { ...values.exception, maxExtraM: num(e.target.value) } })} /></label>
+            <legend>تجاوز مسافة الانتشار المسموحة</legend>
+            <label><input type="checkbox" checked={values.exception.allowed} onChange={(e) => set({ exception: { ...values.exception, allowed: e.target.checked } })} /> مسموح، بعد موافقة منفصلة</label>
+            <label>أقصى زيادة ({distWord}) <NumberField disabled={!values.exception.allowed} value={toDist(values.exception.maxExtraM)} onChange={(v) => set({ exception: { ...values.exception, maxExtraM: fromDist(v) ?? 0 } })} /></label>
           </fieldset>
           <fieldset>
-            <legend>الضم من فرع آخر</legend>
-            <label className="rs-check"><input type="checkbox" checked={values.crossBranch.allowed} onChange={(e) => set({ crossBranch: { ...values.crossBranch, allowed: e.target.checked } })} /> مسموح (صريحاً ومُدقَّقاً، لا نقل تلقائي)</label>
+            <legend>إضافة وحدة من فرع آخر إلى الطلب</legend>
+            <label className="rs-check"><input type="checkbox" checked={values.crossBranch.allowed} onChange={(e) => set({ crossBranch: { ...values.crossBranch, allowed: e.target.checked } })} /> مسموح (باختيار مقدم الطلب، ولا تنتقل أي وحدة تلقائياً)</label>
             {AUTHORITIES.map(([a, label]) => (
               <label key={a} className="rs-check">
                 <input
@@ -295,32 +352,32 @@ export function StationingPolicyPage() {
                 {label}
               </label>
             ))}
-            <label className="rs-check"><input type="checkbox" disabled={!values.crossBranch.allowed} checked={values.crossBranch.independent} onChange={(e) => set({ crossBranch: { ...values.crossBranch, independent: e.target.checked } })} /> موافقات مستقلة بإنسان مختلف (O-03b)</label>
+            <label className="rs-check"><input type="checkbox" disabled={!values.crossBranch.allowed} checked={values.crossBranch.independent} onChange={(e) => set({ crossBranch: { ...values.crossBranch, independent: e.target.checked } })} /> كل موافقة منفصلة، ومن شخص مختلف</label>
           </fieldset>
         </section>
 
         <section className="card rs-form">
-          <h3>مسار الاعتماد (من الوحدة الطالبة صعوداً في هيكل Oracle)</h3>
+          <h3>مسار الاعتماد (من الوحدة الطالبة صعوداً في الهيكل التنظيمي)</h3>
           <fieldset className="rs-inline">
             <legend>المرحلة الأولى</legend>
             <label><input type="radio" checked={values.routing.startAt === 'SELF'} onChange={() => set({ routing: { ...values.routing, startAt: 'SELF' } })} /> معتمد الوحدة الطالبة</label>
-            <label><input type="radio" checked={values.routing.startAt === 'PARENT'} onChange={() => set({ routing: { ...values.routing, startAt: 'PARENT' } })} /> أبوها</label>
+            <label><input type="radio" checked={values.routing.startAt === 'PARENT'} onChange={() => set({ routing: { ...values.routing, startAt: 'PARENT' } })} /> الجهة الأعلى للوحدة الطالبة</label>
           </fieldset>
           <table className="rs-table">
             <thead>
-              <tr><th>المستوى</th><th>في الهيكل</th><th>يعتمد</th><th>التسمية</th><th>نهائي</th><th>تقوم المرحلة على (تُعاد إن تغيّر)</th><th /></tr>
+              <tr><th>المستوى</th><th>في الهيكل</th><th>يعتمد</th><th>التسمية</th><th>نهائي</th><th>تُعاد الموافقة إذا تغيّر</th><th /></tr>
             </thead>
             <tbody>
               {values.routing.levels.map((l, i) => (
                 <tr key={i}>
-                  <td><input type="number" value={l.level} onChange={(e) => setLevel(i, { level: num(e.target.value) })} style={{ width: 60 }} /></td>
+                  <td><NumberField value={l.level} onChange={(v) => setLevel(i, { level: Math.trunc(v ?? 0) })} /></td>
                   <td className="muted">{levels.find((x) => x.level === l.level)?.examples.join('، ') ?? '—'}</td>
                   <td><input type="checkbox" checked={l.approves} onChange={(e) => setLevel(i, { approves: e.target.checked })} /></td>
                   <td><input value={l.label} placeholder="مثل: اعتماد الإدارة" onChange={(e) => setLevel(i, { label: e.target.value })} /></td>
                   <td><input type="radio" name="final" checked={l.finalStage} onChange={() => set({ routing: { ...values.routing, levels: values.routing.levels.map((x, j) => ({ ...x, finalStage: j === i })) } })} /></td>
                   <td className="rs-facts-cell">
                     {l.finalStage ? (
-                      <span className="muted">كل الحقائق (النهائي)</span>
+                      <span className="muted">أي تغيير (المرحلة النهائية)</span>
                     ) : (
                       FACTS.map(([f, label]) => (
                         <label key={f} className="rs-check">
@@ -335,7 +392,7 @@ export function StationingPolicyPage() {
             </tbody>
           </table>
           <button className="button" onClick={() => set({ routing: { ...values.routing, levels: [...values.routing.levels, { level: 0, approves: false, label: '', finalStage: false, dependsOn: [] }] } })}>＋ مستوى</button>
-          <small className="muted">المستويات من Oracle: {levels.map((l) => `L${l.level} (${l.units})`).join('، ') || '—'}. المستوى بلا صف لا يعتمد؛ والمسار يقف عند المستوى النهائي.</small>
+          <small className="muted">المستويات في الهيكل التنظيمي: {levels.map((l) => `L${l.level} (${l.units})`).join('، ') || 'تظهر بعد استيراد الوحدات'}. المستوى بلا صف لا يعتمد؛ والمسار يقف عند المستوى النهائي.</small>
         </section>
 
         <section className="card rs-form">

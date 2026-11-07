@@ -31,9 +31,11 @@ public class TaskSync {
     private final TaskService taskService;
     private final RuntimeService runtimeService;
     private final Clock clock;
+    private final PlaceResolver places;
     private final TaskRealignment realignment;
 
-    public TaskSync(JdbcClient jdbc, TaskService taskService, RuntimeService runtimeService, Clock clock, TaskRealignment realignment) {
+    public TaskSync(JdbcClient jdbc, TaskService taskService, RuntimeService runtimeService, Clock clock, TaskRealignment realignment, PlaceResolver places) {
+        this.places = places;
         this.jdbc = jdbc;
         this.taskService = taskService;
         this.runtimeService = runtimeService;
@@ -58,16 +60,26 @@ public class TaskSync {
             Stage stage = def.stage(stageKey).orElseThrow();
             String[] parts = slot.split("\\|", 2);
             UUID targetOrg = "*".equals(parts[1]) ? null : UUID.fromString(parts[1]);
+            // found by a grant's scope, not bound to a unit's own holders; and nobody who approved earlier decides it (ADR-042)
+            boolean byScope = def.graph() != null && stage.assignees().stream().anyMatch(a -> a.role().equals(parts[0]) && "BY_SCOPE".equals(a.orgFrom()));
+            boolean independent = def.graph() != null && (byScope || stage.finalStage());
+            // the routed units are pinned here: a later edit of the periods affects new requests only
+            List<UUID> routed = byScope && targetOrg != null ? places.scope(parts[0], targetOrg).routed() : null;
+            String pinned = routed == null ? null : Db.ids(routed);
             UUID id = UUID.randomUUID();
             created.add(id);
             jdbc.sql("""
                     insert into task_assignment(id, request_id, revision, flowable_task_id, process_instance_id, stage_key,
-                        stage_name, role_code, target_org_id, final, requires_signature, status, created_at, due_at)
-                    values (:id, :req, :rev, :tid, :pid, :sk, :sn, :role, :org, :fin, :sig, 'OPEN', :now, :due)""")
+                        stage_name, role_code, target_org_id, final, requires_signature, status, created_at, due_at, strict_place,
+                        by_scope, independent_of_earlier, scope_orgs)
+                    values (:id, :req, :rev, :tid, :pid, :sk, :sn, :role, :org, :fin, :sig, 'OPEN', :now, :due, :strict, :scope, :indep,
+                            string_to_array(:pinned, ',')::uuid[])""")
                     .param("id", id).param("req", requestId).param("rev", revision).param("tid", t.getId())
                     .param("pid", processInstanceId).param("sk", stageKey).param("sn", stage.name()).param("role", parts[0])
                     .param("org", targetOrg).param("fin", stage.finalStage()).param("sig", stage.requiresSignature())
                     .param("now", Db.ts(now)).param("due", Db.ts(now.plus(Duration.ofDays(stage.slaDays()))))
+                    .param("strict", def.graph() != null && targetOrg != null && !byScope)
+                    .param("scope", byScope).param("indep", independent).param("pinned", pinned)
                     .update();
         }
         // Tasks Flowable removed (e.g. remaining instances of an "ANY" stage) are closed by policy.

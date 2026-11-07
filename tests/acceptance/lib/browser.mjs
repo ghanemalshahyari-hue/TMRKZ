@@ -21,7 +21,9 @@ export const consoleErrors = [];
 
 export async function launch() {
   // HEADED=1 shows the windows; SLOWMO=<ms> slows each action so a person can follow it
-  return chromium.launch({ channel: process.env.BROWSER_CHANNEL ?? 'msedge', headless: process.env.HEADED ? false : true, slowMo: Number(process.env.SLOWMO ?? 0) });
+  // BROWSER_PATH runs a browser at a given path, for a machine with no installed Edge
+  const browser = process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH } : { channel: process.env.BROWSER_CHANNEL ?? 'msedge' };
+  return chromium.launch({ ...browser, headless: process.env.HEADED ? false : true, slowMo: Number(process.env.SLOWMO ?? 0) });
 }
 
 /** A fresh browser profile (one person). External requests are blocked and recorded. */
@@ -60,7 +62,7 @@ export async function signInAutomatic(page, user) {
   await page.locator('#username').fill(user);
   await page.locator('#password').fill(PASSWORD);
   await page.locator('#kc-login').click();
-  await page.waitForSelector('.app-shell', { timeout: 30000 });
+  await page.waitForSelector('main#main', { timeout: 30000 });
 }
 
 /** Manual path of the same sign-in page: username and password checked by the directory. */
@@ -70,7 +72,7 @@ export async function signInManual(page, user) {
   await page.locator('#tm-username').fill(user);
   await page.locator('#tm-password').fill(PASSWORD);
   await page.getByRole('button', { name: 'تسجيل الدخول' }).click();
-  await page.waitForSelector('.app-shell', { timeout: 30000 });
+  await page.waitForSelector('main#main', { timeout: 30000 });
 }
 
 /** API session for test-data setup only (reported separately from browser steps). */

@@ -72,6 +72,8 @@ import type {
   RequestBoundaries,
   RequestDetail,
   RequestListItem,
+  Responsibility,
+  RequestStatus,
   RequestType,
   Resource,
   ReservationItem,
@@ -204,6 +206,7 @@ const get = <T>(path: string, opts?: RequestOptions) => call<T>('GET', path, opt
 const post = <T>(path: string, body?: unknown, idempotencyKey?: string) => call<T>('POST', path, { body: body ?? {}, idempotencyKey });
 const put = <T>(path: string, body: unknown) => call<T>('PUT', path, { body });
 const patch = <T>(path: string, body: unknown) => call<T>('PATCH', path, { body });
+const del = <T>(path: string) => call<T>('DELETE', path);
 
 /** URL helpers for direct downloads (browser navigation keeps the session cookie). */
 export const urls = {
@@ -232,6 +235,66 @@ export type FeatureQuery = {
 export function isAbort(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError';
 }
+
+type RoleName = { code: string; name: string };
+export type AccessMine = {
+  unit: string | null;
+  available: boolean;
+  requestable: RoleName[];
+  scopeUnits?: { id: string; name: string; depth: number }[];
+  scopeSites?: { id: string; name: string }[];
+  held: string[];
+  requests: { statusLabel?: string; scope?: AccessScope | null; id: string; number: string; status: string; note: string | null; submittedAt: string; reason: string; unit: string; requested: RoleName[]; granted: RoleName[]; waiting: string | null }[];
+};
+export type AccessInboxItem = {
+  taskId: string;
+  requestId: string;
+  number: string;
+  stage: string;
+  final: boolean;
+  person: string;
+  employeeNo: string;
+  unit: string;
+  movedTo: string | null;
+  reason: string;
+  submittedAt: string;
+  requested: RoleName[];
+  recommended: RoleName[] | null;
+  reviewedBy: string | null;
+  offered: RoleName[];
+  extras: RoleName[];
+  recommendReject: boolean;
+  reviewNote: string | null;
+  personActive: boolean;
+  scope: AccessScope | null;
+  proposedScope: AccessScope | null;
+  scopeNames: string[];
+  scopeUnits: { id: string; name: string; depth: number }[];
+  scopeSites: { id: string; name: string }[];
+};
+/** Where a permission reaches; the whole system is never asked for (ADR-045). */
+export type AccessScope = { mode: 'UNIT' | 'UNIT_TREE' | 'UNITS' | 'SITES' | 'ALL'; ids: string[] };
+export type HubAction = { action: string; allowed: boolean; reason: string | null; openRequest: string | null };
+export type HubUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; state: string; site: { id: string; name: string; lat: number | null; lng: number | null; geometry: { type: string; coordinates: unknown } | null } | null; actions: HubAction[] };
+export type RequestHub = { actions: HubAction[]; units: HubUnit[]; unitsTotal: number };
+export type HubSite = { id: string; code: string; name: string; lat: number | null; lng: number | null; geometry: { type: string; coordinates: unknown } | null; linked: boolean };
+export type OverviewItem = { id: string; number: string; type: string; state: string; stateLabel?: string; updatedAt?: string; requestingUnit?: { name: string }; person?: string; mine?: boolean; myTurn?: boolean; currentStage?: string; currentStageKind?: string; fyi?: boolean; fyiPending?: boolean; activatable?: boolean };
+export type HomeCard = { key: string; label: string; value: number; href: string };
+export type PostureUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; state: string; site?: { id: string; name: string; geometry: { type: string; coordinates: unknown } | null } | null; kind?: string; plannedEnd?: string | null; primary?: unknown; alternative?: unknown; otherUnitsAtSite?: number; request?: { purpose: string; state: string } | null };
+export type SiteOccupants = { stationed: { orgId: string; orgName: string }[]; linked: { id: string; orgId: string; orgName: string; reason: string }[]; otherStationed: number };
+export type AccessOfferRow = { code: string; name: string; audience: string | null };
+
+export type UnitOpsRoute = { id: string; name: string; from: string; to: string; days: number[]; active: boolean; targets: { id: string; name: string }[] };
+
+export type GrantBody = {
+  personId: string;
+  organizationId: string;
+  roleCode: string;
+  positionTitle?: string;
+  validFrom: string;
+  validTo?: string | null;
+  scope: GrantScopeInput;
+};
 
 export const api = {
   // session
@@ -277,15 +340,28 @@ export const api = {
   policyRestore: (id: string, note: string) => post<AccessPolicyVersion>(`/access/policy/versions/${id}/restore`, { note }),
   accessGrants: (organizationId: string, includeEnded = false) =>
     get<GrantView[]>('/access/grants' + query({ organizationId, includeEnded: includeEnded || undefined })),
-  createGrant: (body: {
-    personId: string;
-    organizationId: string;
-    roleCode: string;
-    positionTitle?: string;
-    validFrom: string;
-    validTo?: string | null;
-    scope: GrantScopeInput;
-  }) => post<{ id: string; scopeText: string }>('/memberships', body),
+  createGrant: (body: GrantBody) => post<{ id: string; scopeText: string }>('/memberships', body),
+  accessMine: () => get<AccessMine>('/access-requests/mine'),
+  submitAccessRequest: (body: { roles: string[]; reason: string; scope?: AccessScope }) => post<{ id: string; number: string }>('/access-requests', body),
+  resubmitAccessRequest: (id: string, body: { roles: string[]; reason: string; scope?: AccessScope }) => post<{ id: string; number: string }>(`/access-requests/${id}/resubmit`, body),
+  accessInbox: () => get<AccessInboxItem[]>('/access-requests/inbox'),
+  accessOffer: () => get<AccessOfferRow[]>('/access-requests/offer'),
+  saveAccessOffer: (audiences: Record<string, string>) => put<AccessOfferRow[]>('/access-requests/offer', audiences),
+  decideAccessRequest: (id: string, body: { taskId: string; decision: string; roles: string[]; note?: string; scope?: AccessScope; recommendReject?: boolean }) =>
+    post<{ status: string }>(`/access-requests/${id}/decision`, body),
+  scopePreview: (organizationId: string, descendants: boolean, levels?: number[]) =>
+    get<{ units: number }>('/access/scope-preview' + query({ organizationId, descendants, levels: levels?.length ? levels.join(',') : undefined })),
+  grantRoots: () => get<OrgBranch[]>('/access/grant-roots'),
+  unitMatrix: (organizationId: string, q?: string, page?: number) =>
+    get<{ total: number; people: { id: string; displayName: string; employeeNo: string; grants: GrantView[] }[] }>('/access/unit-matrix' + query({ organizationId, q, page })),
+  replaceGrant: (id: string, grant: GrantBody, reason?: string) =>
+    post<{ id: string; scopeText: string }>(`/access/grants/${id}/replace`, { grant, reason }),
+  unitOpsRoutes: (commandId: string) => get<UnitOpsRoute[]>('/access/unit-ops-routes' + query({ commandId })),
+  saveUnitOpsRoutes: (commandId: string, routes: { name: string; from: string; to: string; days: number[]; active: boolean; targets: string[] }[]) =>
+    put<UnitOpsRoute[]>('/access/unit-ops-routes' + query({ commandId }), routes),
+  fyiMains: () => get<{ id: string; name: string }[]>('/access/fyi-mains'),
+  addFyiMain: (id: string) => put<void>(`/access/fyi-mains/${id}`, {}),
+  removeFyiMain: (id: string) => del<void>(`/access/fyi-mains/${id}`),
   explainAccess: (q: { personId: string; organizationId?: string; siteId?: string; resourceId?: string }) =>
     get<AccessExplain>('/access/explain' + query(q)),
 
@@ -304,10 +380,27 @@ export const api = {
     name: string;
     kind: string;
     parentId?: string | null;
-    responsibleOrgId: string;
+    responsibleOrgId: string | null;
     capacity?: number | null;
     location: { lat: number; lng: number };
+    notes?: string | null;
+    reason?: string;
   }) => post<Site>('/sites', body),
+  updateSite: (id: string, body: { code: string; name: string; kind: string; parentId: string | null; responsibleOrgId?: string | null; capacity: number | null; location: { lat: number; lng: number } | null; notes?: string | null; reason: string }) => put<Site>(`/sites/${id}`, body),
+  saveSiteGeometry: (id: string, body: { geometry: SiteGeometry; crs: string; expectedVersion: number; reason: string; method: string }) => post<unknown>(`/sites/${id}/geometry`, body),
+  siteOccupants: (id: string) => get<SiteOccupants>(`/sites/${id}/occupants`),
+  createSiteLink: (body: { siteId: string; organizationId: string; reason: string }) => post<unknown>('/site-links', body),
+  endSiteLink: (id: string, reason: string) => post<unknown>(`/site-links/${id}/end`, { reason }),
+  correctStationing: (body: { organizationId: string; siteId: string; reason: string }) => post<unknown>('/stationing/corrections', body),
+  requestHub: () => get<RequestHub>('/request-hub'),
+  hubUnit: (id: string) => get<HubUnit>(`/request-hub/units/${id}`),
+  hubSites: (unit: string) => get<HubSite[]>(`/request-hub/units/${unit}/sites`),
+  requestOverview: (filter: string) => get<OverviewItem[]>('/request-hub/overview' + query({ filter })),
+  homeCards: () => get<HomeCard[]>('/request-hub/home-cards'),
+  operationalPosture: () => get<{ units: PostureUnit[]; unitsTotal: number }>('/operational-posture'),
+  fyiOptions: (id: string) => get<RestationingUnit[]>(`/restationing-requests/${id}/fyi-options`),
+  endFyi: (id: string, unit: string, reason: string) => post<RestationingRequest>(`/restationing-requests/${id}/fyi/${unit}/end`, { reason }),
+  distributeFyi: (id: string, units: string[], note?: string) => post<RestationingRequest>(`/restationing-requests/${id}/fyi`, { units, note }),
   moveSiteMarker: (id: string, body: { location: { lat: number; lng: number }; reason: string }) => post<Site>(`/sites/${id}/location`, body),
   createResource: (body: {
     siteId: string;
@@ -358,8 +451,11 @@ export const api = {
 
   // requests
   requestTypes: () => get<RequestType[]>('/request-types'),
-  requests: (p: { status?: string; q?: string; page?: number; size?: number; excludeDrafts?: boolean } = {}) =>
+  createRequestType: (body: { name: string; kind: string }) => post<{ code: string; name: string }>('/request-types', body),
+  removeRequestType: (code: string) => del<void>(`/request-types/${code}`),
+  requests: (p: { status?: string; q?: string; page?: number; size?: number; excludeDrafts?: boolean; mine?: boolean; type?: string; from?: string; to?: string; sort?: string; dir?: string } = {}) =>
     get<Page<RequestListItem>>('/requests' + query({ size: 100, ...p })),
+  requestCounts: (p: { q?: string; mine?: boolean; type?: string; from?: string; to?: string } = {}) => get<Partial<Record<RequestStatus, number>>>('/requests/counts' + query(p)),
   request: (id: string) => get<RequestDetail>(`/requests/${id}`),
   createRequest: (body: DraftInput) => post<RequestDetail>('/requests', body),
   updateDraft: (id: string, body: DraftInput & { expectedVersion: number }) => patch<RequestDetail>(`/requests/${id}/draft`, body),
@@ -447,6 +543,10 @@ export const api = {
   workflowVersion: (id: string) => get<WorkflowVersion>(`/workflow-versions/${id}`),
   saveWorkflowDraft: (workflowId: string, definition: WorkflowDefinition) => post<WorkflowVersion>(`/workflows/${workflowId}/drafts`, { definition }),
   simulateWorkflow: (versionId: string, facts?: Record<string, unknown>) => post<SimulationResult>(`/workflow-versions/${versionId}/simulate`, { facts }),
+  responsibilities: () => get<Responsibility[]>('/responsibilities'),
+  addResponsibility: (name: string) => post<Responsibility[]>('/responsibilities', { name }),
+  setResponsibilityRule: (code: string, scope: string, responsibleOrgId: string) => put<Responsibility[]>(`/responsibilities/${code}/rules/${scope}`, { responsibleOrgId }),
+  removeResponsibilityRule: (code: string, scope: string) => del<Responsibility[]>(`/responsibilities/${code}/rules/${scope}`),
   publishWorkflow: (versionId: string) => post<WorkflowVersion>(`/workflow-versions/${versionId}/publish`),
 
   // policies, integrations, system
@@ -491,8 +591,8 @@ export const api = {
     post<RestationingRequest>(`/restationing-requests/${id}/actions/${action}/decision`, { decision, reason: reason || undefined }),
   createRestationingExtension: (id: string, end: string, reason: string) =>
     post<RestationingRequest>(`/restationing-requests/${id}/extensions`, { end, reason }),
-  createRestationing: (requestingUnitId: string, content: RestationingContent) =>
-    post<RestationingRequest>('/restationing-requests', { requestingUnitId, content }),
+  createRestationing: (requestingUnitId: string, content: RestationingContent, purpose?: string) =>
+    post<RestationingRequest>('/restationing-requests', { requestingUnitId, content, purpose }),
   editRestationing: (id: string, content: RestationingContent) => put<RestationingRequest>(`/restationing-requests/${id}/content`, content),
   restationingChecks: (id: string) => get<RestationingChecks>(`/restationing-requests/${id}/checks`),
   submitRestationing: (id: string, reason?: string) => post<RestationingRequest>(`/restationing-requests/${id}/submit`, { reason }),

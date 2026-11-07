@@ -1,5 +1,5 @@
 {
-  "run": "2026-10-29T09:00:43.791Z",
+  "run": "2026-11-06T14:29:14.452Z",
   "results": [
     {
       "id": "RULES-01",
@@ -15,9 +15,9 @@
     },
     {
       "id": "RULES-03",
-      "title": "A stage made conditional by clicks; the simulation skips or runs it by sample values",
+      "title": "A question on the flow chart built by clicks; trying it takes yes or no by sample values",
       "result": "PASS",
-      "detail": "موارد 1 ← المرحلة الأولى تُتخطى · موارد 2 ← تُنفذ"
+      "detail": "موارد 1 ← لا، بلا الموافقة الإضافية · موارد 2 ← نعم، معها"
     },
     {
       "id": "RULES-04",

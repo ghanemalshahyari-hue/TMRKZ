@@ -47,14 +47,23 @@ public record RawGrant(
             List<GrantTarget> orgs = new ArrayList<>();
             List<GrantTarget> sites = new ArrayList<>();
             List<UUID> resources = new ArrayList<>();
+            boolean orgLimit = false;
             for (GrantTarget t : targets) {
                 switch (t.kind()) {
-                    case GrantTarget.ORGANIZATION -> orgs.add(t);
+                    case GrantTarget.ORGANIZATION -> {
+                        orgLimit = true;
+                        if (t.limited()) {
+                            // the units its levels find today, one by one: everything that reads a scope sees plain units
+                            t.reached().forEach(id -> orgs.add(new GrantTarget(GrantTarget.ORGANIZATION, id, false)));
+                        } else {
+                            orgs.add(t);
+                        }
+                    }
                     case GrantTarget.SITE -> sites.add(t);
                     default -> resources.add(t.id());
                 }
             }
-            return new Spec(false, andCombine, orgs, sites, resources, !orgs.isEmpty(), !sites.isEmpty() || !resources.isEmpty());
+            return new Spec(false, andCombine, orgs, sites, resources, orgLimit, !sites.isEmpty() || !resources.isEmpty());
         }
         return switch (roleScope) {
             case "ALL" -> new Spec(true, true, List.of(), List.of(), List.of(), false, false);

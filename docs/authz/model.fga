@@ -58,6 +58,20 @@ type system
     define decide_early_return_any: [grant#holder]
     define decide_before_start_cancellation: [grant#holder]
     define decide_before_start_cancellation_any: [grant#holder]
+    define create_initial_stationing: [grant#holder]
+    define create_initial_stationing_any: [grant#holder]
+    define create_deployment_request: [grant#holder]
+    define create_deployment_request_any: [grant#holder]
+    define request_site_registration: [grant#holder]
+    define request_site_registration_any: [grant#holder]
+    define decide_unit_operations: [grant#holder]
+    define decide_unit_operations_any: [grant#holder]
+    define final_approve_stationing: [grant#holder]
+    define final_approve_stationing_any: [grant#holder]
+    define manage_fyi_distribution: [grant#holder]
+    define manage_fyi_distribution_any: [grant#holder]
+    define view_operational_posture: [grant#holder]
+    define view_operational_posture_any: [grant#holder]
 
 type organization
   relations
@@ -160,6 +174,34 @@ type organization
     define decide_before_start_cancellation_tree: [grant#holder]
     define decide_before_start_cancellation_inh: decide_before_start_cancellation_tree or decide_before_start_cancellation_inh from parent
     define decide_before_start_cancellation: decide_before_start_cancellation_here or decide_before_start_cancellation_inh or decide_before_start_cancellation from system
+    define create_initial_stationing_here: [grant#holder]
+    define create_initial_stationing_tree: [grant#holder]
+    define create_initial_stationing_inh: create_initial_stationing_tree or create_initial_stationing_inh from parent
+    define create_initial_stationing: create_initial_stationing_here or create_initial_stationing_inh or create_initial_stationing from system
+    define create_deployment_request_here: [grant#holder]
+    define create_deployment_request_tree: [grant#holder]
+    define create_deployment_request_inh: create_deployment_request_tree or create_deployment_request_inh from parent
+    define create_deployment_request: create_deployment_request_here or create_deployment_request_inh or create_deployment_request from system
+    define request_site_registration_here: [grant#holder]
+    define request_site_registration_tree: [grant#holder]
+    define request_site_registration_inh: request_site_registration_tree or request_site_registration_inh from parent
+    define request_site_registration: request_site_registration_here or request_site_registration_inh or request_site_registration from system
+    define decide_unit_operations_here: [grant#holder]
+    define decide_unit_operations_tree: [grant#holder]
+    define decide_unit_operations_inh: decide_unit_operations_tree or decide_unit_operations_inh from parent
+    define decide_unit_operations: decide_unit_operations_here or decide_unit_operations_inh or decide_unit_operations from system
+    define final_approve_stationing_here: [grant#holder]
+    define final_approve_stationing_tree: [grant#holder]
+    define final_approve_stationing_inh: final_approve_stationing_tree or final_approve_stationing_inh from parent
+    define final_approve_stationing: final_approve_stationing_here or final_approve_stationing_inh or final_approve_stationing from system
+    define manage_fyi_distribution_here: [grant#holder]
+    define manage_fyi_distribution_tree: [grant#holder]
+    define manage_fyi_distribution_inh: manage_fyi_distribution_tree or manage_fyi_distribution_inh from parent
+    define manage_fyi_distribution: manage_fyi_distribution_here or manage_fyi_distribution_inh or manage_fyi_distribution from system
+    define view_operational_posture_here: [grant#holder]
+    define view_operational_posture_tree: [grant#holder]
+    define view_operational_posture_inh: view_operational_posture_tree or view_operational_posture_inh from parent
+    define view_operational_posture: view_operational_posture_here or view_operational_posture_inh or view_operational_posture from system
 
 type site
   relations
@@ -334,6 +376,55 @@ type site
     define decide_before_start_cancellation_direct: decide_before_start_cancellation_here or decide_before_start_cancellation_inh
     define decide_before_start_cancellation_req: decide_before_start_cancellation_direct or decide_before_start_cancellation from responsible
     define decide_before_start_cancellation: decide_before_start_cancellation_req or decide_before_start_cancellation_contains or decide_before_start_cancellation from system
+    define create_initial_stationing_here: [grant#holder]
+    define create_initial_stationing_tree: [grant#holder]
+    define create_initial_stationing_contains: [grant#holder]
+    define create_initial_stationing_inh: create_initial_stationing_tree or create_initial_stationing_inh from parent
+    define create_initial_stationing_direct: create_initial_stationing_here or create_initial_stationing_inh
+    define create_initial_stationing_req: create_initial_stationing_direct or create_initial_stationing from responsible
+    define create_initial_stationing: create_initial_stationing_req or create_initial_stationing_contains or create_initial_stationing from system
+    define create_deployment_request_here: [grant#holder]
+    define create_deployment_request_tree: [grant#holder]
+    define create_deployment_request_contains: [grant#holder]
+    define create_deployment_request_inh: create_deployment_request_tree or create_deployment_request_inh from parent
+    define create_deployment_request_direct: create_deployment_request_here or create_deployment_request_inh
+    define create_deployment_request_req: create_deployment_request_direct or create_deployment_request from responsible
+    define create_deployment_request: create_deployment_request_req or create_deployment_request_contains or create_deployment_request from system
+    define request_site_registration_here: [grant#holder]
+    define request_site_registration_tree: [grant#holder]
+    define request_site_registration_contains: [grant#holder]
+    define request_site_registration_inh: request_site_registration_tree or request_site_registration_inh from parent
+    define request_site_registration_direct: request_site_registration_here or request_site_registration_inh
+    define request_site_registration_req: request_site_registration_direct or request_site_registration from responsible
+    define request_site_registration: request_site_registration_req or request_site_registration_contains or request_site_registration from system
+    define decide_unit_operations_here: [grant#holder]
+    define decide_unit_operations_tree: [grant#holder]
+    define decide_unit_operations_contains: [grant#holder]
+    define decide_unit_operations_inh: decide_unit_operations_tree or decide_unit_operations_inh from parent
+    define decide_unit_operations_direct: decide_unit_operations_here or decide_unit_operations_inh
+    define decide_unit_operations_req: decide_unit_operations_direct or decide_unit_operations from responsible
+    define decide_unit_operations: decide_unit_operations_req or decide_unit_operations_contains or decide_unit_operations from system
+    define final_approve_stationing_here: [grant#holder]
+    define final_approve_stationing_tree: [grant#holder]
+    define final_approve_stationing_contains: [grant#holder]
+    define final_approve_stationing_inh: final_approve_stationing_tree or final_approve_stationing_inh from parent
+    define final_approve_stationing_direct: final_approve_stationing_here or final_approve_stationing_inh
+    define final_approve_stationing_req: final_approve_stationing_direct or final_approve_stationing from responsible
+    define final_approve_stationing: final_approve_stationing_req or final_approve_stationing_contains or final_approve_stationing from system
+    define manage_fyi_distribution_here: [grant#holder]
+    define manage_fyi_distribution_tree: [grant#holder]
+    define manage_fyi_distribution_contains: [grant#holder]
+    define manage_fyi_distribution_inh: manage_fyi_distribution_tree or manage_fyi_distribution_inh from parent
+    define manage_fyi_distribution_direct: manage_fyi_distribution_here or manage_fyi_distribution_inh
+    define manage_fyi_distribution_req: manage_fyi_distribution_direct or manage_fyi_distribution from responsible
+    define manage_fyi_distribution: manage_fyi_distribution_req or manage_fyi_distribution_contains or manage_fyi_distribution from system
+    define view_operational_posture_here: [grant#holder]
+    define view_operational_posture_tree: [grant#holder]
+    define view_operational_posture_contains: [grant#holder]
+    define view_operational_posture_inh: view_operational_posture_tree or view_operational_posture_inh from parent
+    define view_operational_posture_direct: view_operational_posture_here or view_operational_posture_inh
+    define view_operational_posture_req: view_operational_posture_direct or view_operational_posture from responsible
+    define view_operational_posture: view_operational_posture_req or view_operational_posture_contains or view_operational_posture from system
 
 type resource
   relations
@@ -386,6 +477,20 @@ type resource
     define decide_early_return: decide_early_return_here or decide_early_return from system
     define decide_before_start_cancellation_here: [grant#holder]
     define decide_before_start_cancellation: decide_before_start_cancellation_here or decide_before_start_cancellation from system
+    define create_initial_stationing_here: [grant#holder]
+    define create_initial_stationing: create_initial_stationing_here or create_initial_stationing from system
+    define create_deployment_request_here: [grant#holder]
+    define create_deployment_request: create_deployment_request_here or create_deployment_request from system
+    define request_site_registration_here: [grant#holder]
+    define request_site_registration: request_site_registration_here or request_site_registration from system
+    define decide_unit_operations_here: [grant#holder]
+    define decide_unit_operations: decide_unit_operations_here or decide_unit_operations from system
+    define final_approve_stationing_here: [grant#holder]
+    define final_approve_stationing: final_approve_stationing_here or final_approve_stationing from system
+    define manage_fyi_distribution_here: [grant#holder]
+    define manage_fyi_distribution: manage_fyi_distribution_here or manage_fyi_distribution from system
+    define view_operational_posture_here: [grant#holder]
+    define view_operational_posture: view_operational_posture_here or view_operational_posture from system
 
 type request
   relations
@@ -443,6 +548,20 @@ type request
     define decide_early_return_task: decide_early_return from related_org or decide_early_return_direct from site or decide_early_return from resource or decide_early_return from system
     define decide_before_start_cancellation: decide_before_start_cancellation from related_org or decide_before_start_cancellation_req from site or decide_before_start_cancellation from resource or decide_before_start_cancellation from system
     define decide_before_start_cancellation_task: decide_before_start_cancellation from related_org or decide_before_start_cancellation_direct from site or decide_before_start_cancellation from resource or decide_before_start_cancellation from system
+    define create_initial_stationing: create_initial_stationing from related_org or create_initial_stationing_req from site or create_initial_stationing from resource or create_initial_stationing from system
+    define create_initial_stationing_task: create_initial_stationing from related_org or create_initial_stationing_direct from site or create_initial_stationing from resource or create_initial_stationing from system
+    define create_deployment_request: create_deployment_request from related_org or create_deployment_request_req from site or create_deployment_request from resource or create_deployment_request from system
+    define create_deployment_request_task: create_deployment_request from related_org or create_deployment_request_direct from site or create_deployment_request from resource or create_deployment_request from system
+    define request_site_registration: request_site_registration from related_org or request_site_registration_req from site or request_site_registration from resource or request_site_registration from system
+    define request_site_registration_task: request_site_registration from related_org or request_site_registration_direct from site or request_site_registration from resource or request_site_registration from system
+    define decide_unit_operations: decide_unit_operations from related_org or decide_unit_operations_req from site or decide_unit_operations from resource or decide_unit_operations from system
+    define decide_unit_operations_task: decide_unit_operations from related_org or decide_unit_operations_direct from site or decide_unit_operations from resource or decide_unit_operations from system
+    define final_approve_stationing: final_approve_stationing from related_org or final_approve_stationing_req from site or final_approve_stationing from resource or final_approve_stationing from system
+    define final_approve_stationing_task: final_approve_stationing from related_org or final_approve_stationing_direct from site or final_approve_stationing from resource or final_approve_stationing from system
+    define manage_fyi_distribution: manage_fyi_distribution from related_org or manage_fyi_distribution_req from site or manage_fyi_distribution from resource or manage_fyi_distribution from system
+    define manage_fyi_distribution_task: manage_fyi_distribution from related_org or manage_fyi_distribution_direct from site or manage_fyi_distribution from resource or manage_fyi_distribution from system
+    define view_operational_posture: view_operational_posture from related_org or view_operational_posture_req from site or view_operational_posture from resource or view_operational_posture from system
+    define view_operational_posture_task: view_operational_posture from related_org or view_operational_posture_direct from site or view_operational_posture from resource or view_operational_posture from system
     define view_full: creator or view
     define view_any: view_full or view_summary
     define info_view: info_member from info_org

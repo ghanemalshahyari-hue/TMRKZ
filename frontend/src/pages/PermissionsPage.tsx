@@ -3,15 +3,18 @@ import { AuthzStatusPanel } from '../components/access/AuthzStatusPanel';
 import { ExplainPanel } from '../components/access/ExplainPanel';
 import { GrantsStudio } from '../components/access/GrantsStudio';
 import { PolicyStudio } from '../components/access/PolicyStudio';
+import { UnitMatrix } from '../components/access/UnitMatrix';
 import { IdentityIssues } from '../components/IdentityIssues';
 import { TaskRoutings } from '../components/TaskRoutings';
+import { AccessOfferDialog } from '../components/access/AccessOfferDialog';
 import { Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 
-type Tab = 'policy' | 'grants' | 'explain' | 'service' | 'identity' | 'tasks';
+type Tab = 'policy' | 'matrix' | 'grants' | 'explain' | 'service' | 'identity' | 'tasks';
 
 const TABS: [Tab, string][] = [
   ['policy', 'الأدوار والإصدارات'],
+  ['matrix', 'مصفوفة الوحدات'],
   ['grants', 'المنح والنطاقات'],
   ['explain', 'المعاينة والاختبار'],
   ['service', 'خدمة القرار'],
@@ -25,6 +28,7 @@ const TABS: [Tab, string][] = [
  */
 export function PermissionsPage() {
   const app = useApp();
+  const [offerOpen, setOfferOpen] = useState(false);
   const [tab, setTab] = useState<Tab>(() => {
     const t = location.hash.split('/')[1] as Tab | undefined;
     return TABS.some(([id]) => id === t) ? (t as Tab) : 'policy';
@@ -42,8 +46,9 @@ export function PermissionsPage() {
         en="ACCESS / POLICY STUDIO"
         title="مركز الصلاحيات"
         description="الإجراء المسموح ونطاق البيانات يُحددان بصورة مستقلة، وكل قرار يُفرض في الخادم وتؤكده خدمة قرارات الصلاحيات."
-        actions={<span className="pill">{global ? 'مدير صلاحيات عام' : 'مدير صلاحيات ضمن نطاق منحته'}</span>}
+        actions={<span className="flex" style={{ gap: 8 }}>{app.can('CONFIGURE') && <button className="button compact" data-testid="access-offer" onClick={() => setOfferOpen(true)}>الصلاحيات المعروضة للطلب</button>}<span className="pill">{global ? 'مدير صلاحيات عام' : 'مدير صلاحيات ضمن نطاق منحته'}</span></span>}
       />
+      {offerOpen && <AccessOfferDialog onClose={() => setOfferOpen(false)} />}
       <div className="tabs access-tabs" role="tablist" aria-label="أقسام مركز الصلاحيات">
         {TABS.map(([id, name]) => (
           <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => select(id)}>
@@ -53,6 +58,7 @@ export function PermissionsPage() {
       </div>
       <div role="tabpanel">
         {tab === 'policy' && <PolicyStudio global={global} />}
+        {tab === 'matrix' && <UnitMatrix />}
         {tab === 'grants' && <GrantsStudio />}
         {tab === 'explain' && <ExplainPanel />}
         {tab === 'service' && <AuthzStatusPanel global={global} />}

@@ -65,6 +65,214 @@ public class RestationingChecks {
         this.hierarchy = hierarchy;
     }
 
+    /** The checks of a request by its purpose (ADR-045): one set of rules for geometry, distance, terrain and the route. */
+    public Result evaluate(String purpose, UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now) {
+        return switch (purpose == null ? RESTATIONING : purpose) {
+            case INITIAL_STATIONING -> evaluateInitial(requestingUnit, c, policy, policyVersion, now);
+            case DEPLOYMENT_AREAS -> evaluateDeployment(requestingUnit, c, policy, policyVersion, now);
+            case SITE_REGISTRATION -> evaluateSiteRegistration(requestingUnit, c, policy, now);
+            default -> {
+                Result r = evaluate(requestingUnit, c, policy, policyVersion, now);
+                // a re-stationing starts from where the unit is: a unit stationed nowhere asks for its initial stationing
+                Map<UUID, UUID> at = currentSites(c.scope(), now);
+                List<UUID> nowhere = c.scope().stream().filter(u -> !at.containsKey(u)).toList();
+                if (nowhere.isEmpty()) {
+                    yield r;
+                }
+                List<String> problems = new ArrayList<>(r.problems());
+                problems.add("لا تمركز حالي للوحدات: " + join(nowhere, names(nowhere)) + " — ابدأ بطلب تمركز أولي.");
+                yield new Result(problems, r.siteAreaM2(), r.maxFootprintAreaM2(), r.siteConflicts(), r.legs(), r.otherBranch(), r.route(),
+                        r.needsDistanceException(), r.currentSites());
+            }
+        };
+    }
+
+    public static final String RESTATIONING = "RESTATIONING";
+    public static final String INITIAL_STATIONING = "INITIAL_STATIONING";
+    public static final String DEPLOYMENT_AREAS = "DEPLOYMENT_AREAS";
+    public static final String SITE_REGISTRATION = "SITE_REGISTRATION";
+
+    private List<RouteStage> routeOf(List<OrgUnit> path, StationingPolicy policy, boolean exception) {
+        return RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, policy.routing(), policy.crossBranch(), List.of(), exception), policy.approvalStages());
+    }
+
+    private void routeAndReason(List<RouteStage> route, RestationingContent c, List<String> problems) {
+        if (c.reason().trim().length() < 5) {
+            problems.add("سبب الطلب مطلوب (5 أحرف على الأقل).");
+        }
+        if (!RouteDerivation.complete(route)) {
+            problems.add("لم يُشتق مسار اعتماد كامل من هيكل الوحدة الطالبة والإعداد (لا مرحلة نهائية).");
+        }
+    }
+
+    /** The units of a request: explicit, known and inside the requesting unit's branch. Nothing is inferred from the tree. */
+    private Map<UUID, String> scopeInBranch(UUID requestingUnit, RestationingContent c, List<String> problems) {
+        if (c.scope().isEmpty()) {
+            problems.add("لم تُحدد أي وحدة.");
+        }
+        Map<UUID, String> names = names(c.scope());
+        if (c.scope().stream().anyMatch(u -> !names.containsKey(u))) {
+            problems.add("وحدات غير موجودة أو موقوفة في الطلب.");
+        }
+        List<UUID> outside = c.scope().stream().filter(u -> names.containsKey(u) && !under(u, requestingUnit)).toList();
+        if (!outside.isEmpty()) {
+            problems.add("وحدات خارج فرع الوحدة الطالبة: " + join(outside, names));
+        }
+        return names;
+    }
+
+    /** The register's own shape of a site as GeoJSON text: its boundary, else its marker. Null when it has neither or is retired. */
+    public String siteGeoJson(UUID site) {
+        return jdbc.sql("""
+                select coalesce(g.geojson::text, case when s.marker is not null then ST_AsGeoJSON(s.marker) end)
+                  from site s left join site_geometry_version g on g.site_id = s.id and g.version = s.geometry_version
+                 where s.id = :id and s.status = 'ACTIVE'""").param("id", site).query(String.class).optional().orElse(null);
+    }
+
+    /** طلب تمركز أولي: units stationed nowhere, on an existing site. The shared site's own ground is not a conflict. */
+    private Result evaluateInitial(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now) {
+        List<String> problems = new ArrayList<>();
+        List<OrgUnit> path = hierarchy.path(requestingUnit);
+        if (path.isEmpty()) {
+            throw ApiException.validation("الوحدة الطالبة غير موجودة.");
+        }
+        Map<UUID, String> names = scopeInBranch(requestingUnit, c, problems);
+        Map<UUID, UUID> current = currentSites(c.scope(), now);
+        if (!current.isEmpty()) {
+            problems.add("للوحدات تمركز حالي؛ يبدأ طلبها بإعادة التمركز: " + join(List.copyOf(current.keySet()), names));
+        }
+        if (c.temporary()) {
+            problems.add("التمركز الأولي دائم؛ التمركز المؤقت يحتاج تمركزاً دائماً يعود إليه.");
+        }
+        String siteGeo = c.existingSite() == null ? null : siteGeoJson(c.existingSite());
+        if (c.existingSite() == null) {
+            problems.add("اختر موقعاً مسجلاً؛ وإن لم يكن مسجلاً فابدأ بطلب اعتماد موقع.");
+        } else if (siteGeo == null) {
+            problems.add("الموقع المختار غير نشط أو بلا موقع على الخريطة.");
+        }
+        problems.addAll(DeploymentRules.pair(StationingPolicy.DeploymentRequirement.OPTIONAL, c.primary() != null, c.alternative() != null));
+        List<Leg> legs = new ArrayList<>();
+        String primaryGeo = c.primary() == null ? null : json.write(c.primary());
+        legs.add(leg("primary", "منطقة الانتشار الرئيسية", policy.primary(), siteGeo, primaryGeo, c, policy, policyVersion, now, problems));
+        legs.add(leg("alternative", "منطقة الانتشار البديلة", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
+        boolean exception = legs.stream().anyMatch(l -> l.check().status() == LegStatus.NEEDS_EXCEPTION);
+        List<RouteStage> route = routeOf(path, policy, exception);
+        routeAndReason(route, c, problems);
+        return new Result(problems, null, policy.maxFootprintAreaM2(), List.of(), legs, List.of(), route, exception, current);
+    }
+
+    /** طلب منطقة انتشار: both areas for one unit, measured from where that unit is authoritatively stationed now. */
+    private Result evaluateDeployment(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now) {
+        List<String> problems = new ArrayList<>();
+        List<OrgUnit> path = hierarchy.path(requestingUnit);
+        if (path.isEmpty()) {
+            throw ApiException.validation("الوحدة الطالبة غير موجودة.");
+        }
+        scopeInBranch(requestingUnit, c, problems);
+        if (c.scope().size() > 1) {
+            problems.add("طلب منطقة الانتشار لوحدة واحدة؛ لكل وحدة مناطقها حتى لو تشاركت الموقع.");
+        }
+        Map<UUID, UUID> current = currentSites(c.scope(), now);
+        String siteGeo = null;
+        if (!c.scope().isEmpty()) {
+            UUID unit = c.scope().get(0);
+            UUID at = current.get(unit);
+            if (at == null) {
+                problems.add("لا تمركز حالي للوحدة؛ يبدأ بطلب تمركز أولي.");
+            } else {
+                siteGeo = siteGeoJson(at);
+                if (activeAreas(unit, now) >= 2) {
+                    problems.add("للوحدة منطقتا انتشار نافذتان بالفعل.");
+                }
+            }
+        }
+        if (c.primary() == null || c.alternative() == null) {
+            problems.add("منطقتا الانتشار الرئيسية والبديلة مطلوبتان في هذا الطلب.");
+        }
+        List<Leg> legs = new ArrayList<>();
+        String primaryGeo = c.primary() == null ? null : json.write(c.primary());
+        legs.add(leg("primary", "منطقة الانتشار الرئيسية", policy.primary(), siteGeo, primaryGeo, c, policy, policyVersion, now, problems));
+        legs.add(leg("alternative", "منطقة الانتشار البديلة", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
+        boolean exception = legs.stream().anyMatch(l -> l.check().status() == LegStatus.NEEDS_EXCEPTION);
+        List<RouteStage> route = routeOf(path, policy, exception);
+        routeAndReason(route, c, problems);
+        return new Result(problems, null, policy.maxFootprintAreaM2(), List.of(), legs, List.of(), route, exception, current);
+    }
+
+    /** طلب اعتماد موقع: a physical site registered once. An overlap with a registered site is reported and blocks, never merged. */
+    private Result evaluateSiteRegistration(UUID requestingUnit, RestationingContent c, StationingPolicy policy, Instant now) {
+        List<String> problems = new ArrayList<>();
+        List<OrgUnit> path = hierarchy.path(requestingUnit);
+        if (path.isEmpty()) {
+            throw ApiException.validation("الوحدة الطالبة غير موجودة.");
+        }
+        RestationingContent.SiteInfo info = c.siteInfo();
+        if (info == null || blank(info.name()) || blank(info.code()) || blank(info.kind())) {
+            problems.add("أكمل اسم الموقع ورمزه وتصنيفه.");
+        } else if (jdbc.sql("select count(*) from site where code = :c").param("c", info.code().trim()).query(Long.class).single() > 0) {
+            problems.add("رمز الموقع مستخدم لموقع مسجل.");
+        }
+        List<String> duplicates = List.of();
+        if (c.site() == null || c.site().geometry() == null) {
+            problems.add("حدد الموقع على الخريطة.");
+        } else {
+            String g = json.write(c.site().geometry());
+            String shape = "Point".equals(c.site().geometry().get("type")) ? pointProblem(g) : siteProblem(g);
+            if (shape != null) {
+                problems.add("حدود الموقع: " + shape);
+            } else {
+                duplicates = overlappingSites(g, info == null ? null : info.parentId());
+                if (!duplicates.isEmpty()) {
+                    problems.add("يتداخل مع موقع مسجل: " + String.join("، ", duplicates) + " — استخدم الموقع المسجل أو اطلب ربط وحدتك به، بدل تسجيله مرة أخرى.");
+                }
+            }
+        }
+        List<RouteStage> route = routeOf(path, policy, false);
+        routeAndReason(route, c, problems);
+        return new Result(problems, null, policy.maxFootprintAreaM2(), duplicates, List.of(), List.of(), route, false, Map.of());
+    }
+
+    private static boolean blank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    private String pointProblem(String geoJson) {
+        try {
+            return "POINT".equals(jdbc.sql("select GeometryType(" + GEOM.formatted(":g") + ")").param("g", geoJson).query(String.class).single())
+                    ? null : "نقطة غير صالحة.";
+        } catch (RuntimeException e) {
+            return "هندسة غير مقروءة.";
+        }
+    }
+
+    /** Registered active sites a geometry overlaps, leaving out its chosen parent and the parent's own parents. */
+    public List<String> overlappingSites(String geoJson, UUID parent) {
+        return jdbc.sql("""
+                with recursive up(id, parent_id) as (
+                  select id, parent_id from site where id = cast(:parent as uuid)
+                  union all select s.id, s.parent_id from site s join up on s.id = up.parent_id)
+                select s.name from site s
+                  left join site_geometry_version g on g.site_id = s.id and g.version = s.geometry_version
+                 where s.status = 'ACTIVE' and s.id not in (select id from up) and coalesce(g.geom, s.marker) is not null
+                   and ST_Intersects(coalesce(g.geom, s.marker), """ + GEOM.formatted(":g") + """
+                ) order by s.name""").param("parent", parent == null ? null : parent.toString()).param("g", geoJson).query(String.class).list();
+    }
+
+    /** The record through which a unit is stationed now (an active temporary overlays the permanent), or null. */
+    public UUID effectiveStationing(UUID unit, Instant now) {
+        return jdbc.sql("""
+                select id from org_stationing where organization_id = :u and valid_from <= :now and (valid_to is null or valid_to > :now)
+                   and start_held_at is null order by case kind when 'TEMPORARY' then 0 else 1 end limit 1""")
+                .param("u", unit).param("now", Db.ts(now)).query(UUID.class).optional().orElse(null);
+    }
+
+    /** How many deployment areas are in force for where a unit is stationed now. */
+    public long activeAreas(UUID unit, Instant now) {
+        UUID st = effectiveStationing(unit, now);
+        return st == null ? 0 : jdbc.sql("select count(*) from deployment_area where stationing_id = :s and state = 'ACTIVE'")
+                .param("s", st).query(Long.class).single();
+    }
+
     public Result evaluate(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now) {
         List<String> problems = new ArrayList<>();
         List<OrgUnit> path = hierarchy.path(requestingUnit);
@@ -112,6 +320,7 @@ public class RestationingChecks {
         }
         // the one proposed site
         Double area = null;
+        double maxFootprint = policy.maxFootprintAreaM2();
         List<String> siteConflicts = List.of();
         String siteGeo = null;
         if (c.site() == null || c.site().geometry() == null) {
@@ -124,9 +333,10 @@ public class RestationingChecks {
                 siteGeo = null;
             } else {
                 area = geo.areaM2(siteGeo);
-                if (!DeploymentRules.footprintWithin(area, policy)) {
+                maxFootprint = maxFootprintFor(siteGeo, policy, policyVersion);
+                if (area > maxFootprint) {
                     problems.add("مساحة الموقع المقترح (" + Math.round(area) + " م²) تتجاوز الحد الأقصى المعتمد ("
-                            + Math.round(policy.maxFootprintAreaM2()) + " م²).");
+                            + Math.round(maxFootprint) + " م²).");
                 }
                 siteConflicts = occupiedIntersecting(siteGeo, c.scope(), now);
                 if (!siteConflicts.isEmpty()) {
@@ -156,11 +366,11 @@ public class RestationingChecks {
         }
         // the route from the requesting unit (O-07, O-09) must reach the configured final stage
         List<CrossBranchInclusion> inclusions = included.stream().map(u -> inclusion(u, names.get(u), current.get(u), now)).toList();
-        List<RouteStage> route = RouteDerivation.derive(path, policy.routing(), policy.crossBranch(), inclusions, exception);
+        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, policy.routing(), policy.crossBranch(), inclusions, exception), policy.approvalStages());
         if (!RouteDerivation.complete(route)) {
             problems.add("لم يُشتق مسار اعتماد كامل من هيكل الوحدة الطالبة والإعداد (لا مرحلة نهائية).");
         }
-        return new Result(problems, area, policy.maxFootprintAreaM2(), siteConflicts, legs, others, route, exception, current);
+        return new Result(problems, area, maxFootprint, siteConflicts, legs, others, route, exception, current);
     }
 
     /**
@@ -184,7 +394,7 @@ public class RestationingChecks {
         if (c.reason().trim().length() < 5) {
             problems.add("سبب التمديد مطلوب (5 أحرف على الأقل).");
         }
-        List<RouteStage> route = RouteDerivation.derive(path, policy.routing(), policy.crossBranch(), List.of(), false);
+        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, policy.routing(), policy.crossBranch(), List.of(), false), policy.approvalStages());
         if (!RouteDerivation.complete(route)) {
             problems.add("لم يُشتق مسار اعتماد كامل من هيكل الوحدة الطالبة والإعداد (لا مرحلة نهائية).");
         }
@@ -382,6 +592,22 @@ public class RestationingChecks {
         jdbc.sql("select id, name from organization where id = any(string_to_array(:ids, ',')::uuid[]) and status = 'ACTIVE'")
                 .param("ids", Db.ids(units)).query((rs, n) -> out.put(Db.uuid(rs, "id"), rs.getString("name"))).list();
         return out;
+    }
+
+    /**
+     * The largest footprint at the proposed place: more on ground that is not flat when the policy says so. Without a
+     * terrain answer for the place (no dataset, or an unresolved tie) it is the base maximum: nothing is assumed.
+     */
+    private double maxFootprintFor(String siteGeo, StationingPolicy policy, Integer policyVersion) {
+        if (policy.footprintTerrainExtra() == null) {
+            return policy.maxFootprintAreaM2();
+        }
+        try {
+            var t = terrain.assess(siteGeo, policy, policyVersion);
+            return t.resolved() ? policy.maxFootprintOn(t.controllingClass()) : policy.maxFootprintAreaM2();
+        } catch (ApiException e) {
+            return policy.maxFootprintAreaM2();
+        }
     }
 
     private static String join(List<UUID> units, Map<UUID, String> names) {

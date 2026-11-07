@@ -23,7 +23,7 @@ export type RefSite = {
   onMap: boolean;
 };
 
-export type SiteRefProps = { role: 'REF_SITE' | 'REF_MARKER' | 'REF_LABEL'; siteId: string; name: string; label: string; selected: boolean; related: boolean };
+export type SiteRefProps = { role: 'REF_SITE' | 'REF_MARKER' | 'REF_LABEL'; siteId: string; name: string; label: string; sub: string; selected: boolean; related: boolean };
 export type SiteRefFeature = GeoJSON.Feature<GeoJSON.Geometry, SiteRefProps>;
 
 const shape = (g: GeoJsonGeometry | null | undefined) => !!g && (g.type === 'Polygon' || g.type === 'MultiPolygon');
@@ -56,7 +56,11 @@ export function registeredSites(features: MapFeature[], current: StationingRecor
 /** «وحدة واحدة», «وحدتان», «3 وحدات»: the small count beside a site's name. */
 export const unitCount = (n: number) => (n === 1 ? 'وحدة واحدة' : n === 2 ? 'وحدتان' : `${n} وحدات`);
 
-export function siteReferenceFeatures(sites: RefSite[], selectedId: string | null = null, units: Map<string, number> = new Map()): GeoJSON.FeatureCollection<GeoJSON.Geometry, SiteRefProps> {
+/**
+ * {@code currentIds}: the sites a request draws itself as its current site. Each stays ONE object on the map: the request
+ * draws its boundary, and this layer its symbol and its one name, saying «الموقع الحالي».
+ */
+export function siteReferenceFeatures(sites: RefSite[], selectedId: string | null = null, units: Map<string, number> = new Map(), currentIds: ReadonlySet<string> = new Set()): GeoJSON.FeatureCollection<GeoJSON.Geometry, SiteRefProps> {
   const out: SiteRefFeature[] = [];
   // the selected site's family (the site it belongs to and its sub-sites) is marked on the map with it
   const family = selectedId ? familyOf(sites, selectedId) : null;
@@ -64,10 +68,12 @@ export function siteReferenceFeatures(sites: RefSite[], selectedId: string | nul
   for (const s of sites) {
     if (!s.onMap) continue;
     const n = units.get(s.siteId) ?? 0;
-    const props = { siteId: s.siteId, name: s.name, label: n ? `${s.name} · ${unitCount(n)}` : s.name, selected: s.siteId === selectedId, related: related.has(s.siteId) };
+    const isCurrent = currentIds.has(s.siteId);
+    const sub = [isCurrent ? 'الموقع الحالي' : '', n ? unitCount(n) : ''].filter(Boolean).join(' · ');
+    const props = { siteId: s.siteId, name: s.name, label: n ? `${s.name} · ${unitCount(n)}` : s.name, sub, selected: s.siteId === selectedId, related: related.has(s.siteId) };
     if (shape(s.geometry)) {
       const g = s.geometry as unknown as SiteGeometry;
-      out.push({ type: 'Feature', geometry: g as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: { role: 'REF_SITE', ...props } });
+      if (!isCurrent) out.push({ type: 'Feature', geometry: g as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: { role: 'REF_SITE', ...props } });
       const p = labelPoint(g);
       out.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [p.lng, p.lat] }, properties: { role: 'REF_LABEL', ...props } });
     } else if (s.lat != null && s.lng != null) {

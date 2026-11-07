@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@geoman-io/leaflet-geoman-free": "2.20.2",
+    "@xyflow/react": "12.10.1",
     "leaflet": "1.9.4",
     "maplibre-gl": "6.15.0",
     "milsymbol": "3.0.4",

@@ -106,7 +106,7 @@ class StationingRulesTest {
             var r = RouteDerivation.derive(h.path(h.id("800")), policy.routing(), cb, List.of(networks), false);
             assertThat(r).extracting(RouteStage::unit).containsExactly(h.id("800"), h.id("700"), h.id("802"), h.id("600"));
             assertThat(r.get(0).satisfies()).extracting(RouteDerivation.Requirement::label)
-                    .containsExactly("اعتماد هرمي", "موافقة المسؤول عن موقعها (ضم قسم الشبكات)");
+                    .containsExactly("اعتماد هرمي", "موافقة المسؤول عن موقع الوحدة المضافة (ضم قسم الشبكات)");
         }
 
         @Test
@@ -213,6 +213,57 @@ class StationingRulesTest {
             TerrainDecision t = TerrainRule.decide(List.of(new TerrainShare("HILLY", 500_000), new TerrainShare("FLAT", 500_000)), partial);
             assertThat(t.resolved()).isFalse();
             assertThat(DeploymentRules.leg(partial.primary(), partial, 6000.0, t).status()).isEqualTo(LegStatus.TERRAIN_TIE_UNRESOLVED);
+        }
+
+        @Test
+        void oneTerrainValueAddsOnGroundThatIsNotFlatAndNeverLess() {
+            var cls = policy.terrainSlopeClassification();
+            java.util.function.BiFunction<StationingPolicy.Leg, StationingPolicy.TerrainExtra, StationingPolicy> with = (l, f) -> new StationingPolicy(policy.maxFootprintAreaM2(),
+                    policy.deploymentRequirement(), l, l, cls, Map.of(), policy.terrainClassPriority(), policy.terrainAppliesTo(), policy.exception(),
+                    policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault(), null, f);
+            var km = new StationingPolicy.Leg(5000, 8000, true, new StationingPolicy.TerrainExtra(StationingPolicy.TerrainExtra.Kind.ABSOLUTE, 2000));
+            var pct = new StationingPolicy.Leg(5000, 8000, true, new StationingPolicy.TerrainExtra(StationingPolicy.TerrainExtra.Kind.PERCENT, 20));
+            var off = new StationingPolicy.Leg(5000, 8000, false, new StationingPolicy.TerrainExtra(StationingPolicy.TerrainExtra.Kind.PERCENT, 20));
+            String flat = cls.classes().get(0).code();
+            String steep = cls.classes().get(cls.classes().size() - 1).code();
+            java.util.function.BiFunction<StationingPolicy.Leg, String, Double> max = (l, code) -> {
+                var p = with.apply(l, null);
+                return DeploymentRules.leg(l, p, 6000.0, TerrainRule.decide(List.of(new TerrainShare(code, 1)), p)).effectiveMaxM();
+            };
+            assertThat(max.apply(km, flat)).isEqualTo(8000);
+            assertThat(max.apply(km, steep)).isEqualTo(10_000);
+            assertThat(max.apply(pct, flat)).isEqualTo(8000);
+            assertThat(max.apply(pct, steep)).isEqualTo(9600);
+            assertThat(max.apply(off, steep)).isEqualTo(8000);
+            // the minimum never moves
+            var p = with.apply(pct, null);
+            assertThat(DeploymentRules.leg(pct, p, 6000.0, TerrainRule.decide(List.of(new TerrainShare(steep, 1)), p)).effectiveMinM()).isEqualTo(5000);
+            // no allowance per class is asked for when each leg has its own value
+            assertThat(p.problems()).noneMatch(x -> x.contains("لم تُهيأ إضافة فئة الأرض"));
+            assertThat(with.apply(new StationingPolicy.Leg(5000, 8000, true, new StationingPolicy.TerrainExtra(StationingPolicy.TerrainExtra.Kind.ABSOLUTE, 0)), null).problems())
+                    .anyMatch(x -> x.contains("إضافة طبيعة الأرض"));
+            // the footprint: more area on ground that is not flat, the base on flat ground or when not known
+            var area = with.apply(off, new StationingPolicy.TerrainExtra(StationingPolicy.TerrainExtra.Kind.PERCENT, 50));
+            assertThat(area.maxFootprintOn(flat)).isEqualTo(policy.maxFootprintAreaM2());
+            assertThat(area.maxFootprintOn(null)).isEqualTo(policy.maxFootprintAreaM2());
+            assertThat(area.maxFootprintOn(steep)).isEqualTo(policy.maxFootprintAreaM2() * 1.5);
+        }
+
+        @Test
+        void slopeColourLimitsAreCheckedAndChangeNoRule() {
+            java.util.function.Function<StationingPolicy.SlopeDisplay, StationingPolicy> with = d -> new StationingPolicy(policy.maxFootprintAreaM2(),
+                    policy.deploymentRequirement(), policy.primary(), policy.alternative(), policy.terrainSlopeClassification(), policy.terrainAllowancesM(),
+                    policy.terrainClassPriority(), policy.terrainAppliesTo(), policy.exception(), policy.crossBranch(), policy.routing(), policy.deploymentAreaDefault(), d);
+            assertThat(with.apply(null).problems()).isEqualTo(policy.problems());
+            assertThat(with.apply(new StationingPolicy.SlopeDisplay(5, 15)).problems()).isEqualTo(policy.problems());
+            assertThat(with.apply(new StationingPolicy.SlopeDisplay(10, 10)).problems()).isEqualTo(policy.problems());
+            for (var bad : List.of(new StationingPolicy.SlopeDisplay(0, 30), new StationingPolicy.SlopeDisplay(30, 10), new StationingPolicy.SlopeDisplay(10, 700))) {
+                assertThat(with.apply(bad).problems()).anyMatch(p -> p.contains("ألوان الانحدار"));
+            }
+            var t = TerrainRule.decide(List.of(new TerrainShare("HILLY", 1)), policy);
+            var changed = with.apply(new StationingPolicy.SlopeDisplay(1, 2));
+            assertThat(DeploymentRules.leg(changed.primary(), changed, 6000.0, TerrainRule.decide(List.of(new TerrainShare("HILLY", 1)), changed)).effectiveMaxM())
+                    .isEqualTo(DeploymentRules.leg(policy.primary(), policy, 6000.0, t).effectiveMaxM());
         }
 
         @Test

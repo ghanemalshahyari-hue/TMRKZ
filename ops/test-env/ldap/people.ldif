@@ -109,3 +109,147 @@ sn: Unlinked
 givenName: Test
 employeeNumber: T-0999
 userPassword: __PASSWORD__
+
+dn: uid=p01.new,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p01.new
+cn: New User
+sn: User
+givenName: New
+employeeNumber: T-P01
+userPassword: __PASSWORD__
+
+dn: uid=p02.access,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p02.access
+cn: Access Manager
+sn: Manager
+givenName: Access
+employeeNumber: T-P02
+userPassword: __PASSWORD__
+
+dn: uid=p03.final,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p03.final
+cn: Final Access
+sn: Access
+givenName: Final
+employeeNumber: T-P03
+userPassword: __PASSWORD__
+
+dn: uid=p04.sites,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p04.sites
+cn: Site Admin
+sn: Admin
+givenName: Site
+employeeNumber: T-P04
+userPassword: __PASSWORD__
+
+dn: uid=p05.req,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p05.req
+cn: Requester
+sn: Requester
+givenName: Requester
+employeeNumber: T-P05
+userPassword: __PASSWORD__
+
+dn: uid=p06.h1,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p06.h1
+cn: Hierarchy One
+sn: One
+givenName: Hierarchy
+employeeNumber: T-P06
+userPassword: __PASSWORD__
+
+dn: uid=p07.h2,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p07.h2
+cn: Hierarchy Two
+sn: Two
+givenName: Hierarchy
+employeeNumber: T-P07
+userPassword: __PASSWORD__
+
+dn: uid=p08.ops,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p08.ops
+cn: Unit Operations
+sn: Operations
+givenName: Unit
+employeeNumber: T-P08
+userPassword: __PASSWORD__
+
+dn: uid=p09.fin,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p09.fin
+cn: Final Stationing
+sn: Stationing
+givenName: Final
+employeeNumber: T-P09
+userPassword: __PASSWORD__
+
+dn: uid=p10.fyi,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p10.fyi
+cn: FYI Holder
+sn: Holder
+givenName: FYI
+employeeNumber: T-P10
+userPassword: __PASSWORD__
+
+dn: uid=p11.act,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p11.act
+cn: Activator
+sn: Activator
+givenName: Activator
+employeeNumber: T-P11
+userPassword: __PASSWORD__
+
+dn: uid=p12.view,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p12.view
+cn: Posture Viewer
+sn: Viewer
+givenName: Posture
+employeeNumber: T-P12
+userPassword: __PASSWORD__
+
+dn: uid=p13.other,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p13.other
+cn: Other Branch
+sn: Branch
+givenName: Other
+employeeNumber: T-P13
+userPassword: __PASSWORD__
+
+dn: uid=p14.admin,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p14.admin
+cn: Platform Admin
+sn: Admin
+givenName: Platform
+employeeNumber: T-P14
+userPassword: __PASSWORD__
+
+dn: uid=p15.fyi,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p15.fyi
+cn: FYI Member
+sn: Member
+givenName: FYI
+employeeNumber: T-P15
+userPassword: __PASSWORD__
+
+dn: uid=p16.branch,ou=people,dc=tmrkz,dc=test
+objectClass: inetOrgPerson
+uid: p16.branch
+cn: Branch Member
+sn: Member
+givenName: Branch
+employeeNumber: T-P16
+userPassword: __PASSWORD__

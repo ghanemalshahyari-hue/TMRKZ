@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { NavigationControl, ScaleControl, type MapLayerMouseEvent, type MapLayerTouchEvent, type Map as MlMap, type MapMouseEvent } from 'maplibre-gl';
-import { api } from '../api/client';
+import { Marker, NavigationControl, ScaleControl, type MapLayerMouseEvent, type MapLayerTouchEvent, type Map as MlMap, type MapMouseEvent } from 'maplibre-gl';
+import { api, type HubSite, type HubUnit } from '../api/client';
 import type { GeoPolygon, RestationingChecks, RestationingContent, RestationingLeg, RestationingRequest, RestationingUnit, SiteGeometry, StationingPolicyValues } from '../api/types';
-import { DemSampler, SITE_LOOK, SiteEditor, addOverlayLayer, frame, installedTerrain3d, showSlope, type EditorLook, type MapView, type SiteLive } from '../components/map/maplibre';
+import { DemSampler, SITE_LOOK, SiteEditor, SlopeInside, addOverlayLayer, frame, installedTerrain3d, type EditorLook, type MapView, type SiteLive } from '../components/map/maplibre';
 import type { BasemapMode, Terrain3dSource } from '../components/map/maplibre/offlineStyle';
 import { Icon } from '../components/ui';
 import { ApprovalRouteStrip } from '../components/workspace/ApprovalRouteStrip';
@@ -22,14 +22,23 @@ import { describeAreaDefault, initialArea, resolveAreaDefault, type AreaDefault 
 import { legText } from '../lib/requestMap';
 import { distanceM, type LatLng } from '../lib/geo';
 import { anchorOf, labelPoint, partsOf, validateSite } from '../lib/siteGeometry';
-import { VERDICT, connectors, discrepancy, previewLeg, serverLegFor, type Connector, type ConnectorKind } from '../lib/terrainAnalysis';
+import { INITIAL_SLOPE_LIMITS } from '../lib/terrainRgb';
+import { VERDICT, connectors, discrepancy, maxFootprintOn, previewLeg, serverLegFor, type Connector, type ConnectorKind } from '../lib/terrainAnalysis';
 import { renderSymbol } from '../lib/unitSymbols';
 import { canOpen as flowCanOpen, completed, deriveRequesting, firstOpen, unitsAtSite, type FlowInput, type FlowStep } from '../lib/newRequestFlow';
 import { occupiedFeatures, occupiedSites, overlapsOccupied } from '../lib/occupied';
 import type { RefSite } from '../lib/sitesLayer';
 import { DRAW_NEW_BOUNDARY } from '../lib/stationingV3';
+import { PURPOSE_TITLE, PURPOSE_WRITES, newRequestHashFor, type Purpose } from '../lib/requestPurpose';
 
-type Placing = 'site' | 'primary' | 'alternative' | null;
+type Placing = 'site' | 'primary' | 'alternative' | 'point' | null;
+
+/** The centre of a site that is only a marker, as a footprint of about a metre. */
+const tinySquare = (lat: number, lng: number) => {
+  const d = 0.000005;
+  return { type: 'Polygon', coordinates: [[[lng - d, lat - d], [lng + d, lat - d], [lng + d, lat + d], [lng - d, lat + d], [lng - d, lat - d]]] } as unknown as SiteGeometry;
+};
+const isShape = (g: unknown): g is SiteGeometry => !!g && ['Polygon', 'MultiPolygon'].includes((g as { type?: string }).type ?? '');
 
 /** A deployment area is edited on the map with the site's own editor (owner, 5 Nov 2026), in its own colour and tag. */
 const AREA_LOOK: Record<'primary' | 'alternative', EditorLook> = {
@@ -49,6 +58,13 @@ const ROLE_OF_LEG_KIND = { primary: 'PRIMARY', alternative: 'ALTERNATIVE' } as c
 /** The connectors a moving shape changes: the one ending at it and the one leaving it. */
 const TOUCHES: Record<CardRole, ConnectorKind[]> = { CURRENT: ['move'], SITE: ['move', 'primary'], PRIMARY: ['primary', 'alternative'], ALTERNATIVE: ['alternative'] };
 const dayStart = (d: string) => (d ? new Date(d + 'T00:00:00+04:00').toISOString() : null);
+/** The question of each step of the other requests (ADR-045). */
+const PURPOSE_QUESTION: Record<Purpose, Partial<Record<FlowStep, string>>> = {
+  RESTATIONING: {},
+  INITIAL_STATIONING: { 1: 'اختر موقعاً مسجلاً للوحدة', 6: 'الفحص والمراجعة' },
+  DEPLOYMENT_AREAS: { 5: 'منطقتا الانتشار: الرئيسية والبديلة', 6: 'الفحص والمراجعة' },
+  SITE_REGISTRATION: { 4: 'حدد الموقع على الخريطة وأدخل بياناته', 6: 'الفحص والمراجعة' },
+};
 /** The question of each step, in the left panel. */
 const QUESTION: Record<FlowStep, string> = {
   1: 'اختر الموقع الحالي من الخريطة',
@@ -77,8 +93,10 @@ const MAP_SAYS: Record<FlowStep, string> = {
  * created on the server only when the person acts at the new-site step; the unit the request comes from is derived
  * from the person's options and shown, not asked.
  */
-export function RestationingEditor({ requestId, preselectUnit = null, preselectSite = null, onClose, historyOpen, setHistoryOpen }: {
+export function RestationingEditor({ requestId, purpose: purposeProp = null, preselectUnit = null, preselectSite = null, onClose, historyOpen, setHistoryOpen }: {
   requestId: string | null;
+  /** The request being made (ADR-045): one editor and one set of rules for all four; re-stationing when not named. */
+  purpose?: Purpose | null;
   /** #restationing/new?unit=: that unit's current site is located on the map for the person to confirm. */
   preselectUnit?: string | null;
   /** #restationing/new?site=: that site is the current site (from the Sites page). */
@@ -91,9 +109,18 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   const registered = useRegisteredSites();
   const [id, setId] = useState<string | null>(requestId);
   const [loaded, setLoaded] = useState<RestationingRequest | null>(null);
+  const purpose: Purpose = loaded?.purpose ?? purposeProp ?? 'RESTATIONING';
+  const plain = purpose === 'RESTATIONING';
+  // where the requesting unit stands, and the registered sites it may be stationed at: the server's answers
+  const [hubUnit, setHubUnit] = useState<HubUnit | null>(null);
+  const [hubSites, setHubSites] = useState<HubSite[] | null>(null);
+  const [hubUnits, setHubUnits] = useState<HubUnit[]>([]);
+  const [point, setPoint] = useState<{ lat: number; lng: number } | null>(null);
+  const pointMarker = useRef<Marker | null>(null);
   const [content, setContent] = useState<RestationingContent>({ kind: 'PERMANENT', scope: [], site: null, primary: null, alternative: null, reason: '', exceptions: {}, occupants: {} });
-  const [step, setStep] = useState<FlowStep>(preselectSite ? 2 : 1);
-  const [currentSite, setCurrentSite] = useState<string | null>(preselectSite);
+  const startPurpose: Purpose = purposeProp ?? 'RESTATIONING';
+  const [step, setStep] = useState<FlowStep>(startPurpose === 'DEPLOYMENT_AREAS' ? 5 : startPurpose === 'SITE_REGISTRATION' ? 4 : startPurpose === 'INITIAL_STATIONING' ? 1 : preselectSite ? 2 : 1);
+  const [currentSite, setCurrentSite] = useState<string | null>(startPurpose === 'RESTATIONING' ? preselectSite : null);
   const [picked, setPicked] = useState<string | null>(null);
   // the sites that share the last clicked point (a main site and its sub-site), when more than one
   const [stack, setStack] = useState<string[] | null>(null);
@@ -119,6 +146,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   // the proposed site is edited on the map by SiteEditor: one grouped move, or (advanced) one vertex of one part
   const editorRef = useRef<SiteEditor | null>(null);
   const liveListeners = useRef(new Set<(l: SiteLive) => void>());
+  const slopeInsideRef = useRef<SlopeInside | null>(null);
   const [siteOk, setSiteOk] = useState(true);
   const [mapReady, setMapReady] = useState(false);
   const [drawingNow, setDrawingNow] = useState(false);
@@ -156,9 +184,12 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   const areaDefault = resolveAreaDefault(policyAreaDefault);
   const areaDefaultRef = useRef(areaDefault);
   areaDefaultRef.current = areaDefault;
-  const maxAreaM2 = checks?.maxFootprintAreaM2 ?? policyMaxArea;
+  // on ground that is not flat the policy may allow more: the server's class of the site where it now is
+  const [siteClass, setSiteClass] = useState<string | null>(null);
+  const maxAreaM2 = policyValues ? maxFootprintOn(policyValues, siteClass) : checks?.maxFootprintAreaM2 ?? policyMaxArea;
   const maxAreaRef = useRef(maxAreaM2);
-  maxAreaRef.current = maxAreaM2;
+  // the maximum footprint is a rule of re-stationing; a site asked to be registered has none, as on the server
+  maxAreaRef.current = plain ? maxAreaM2 : null;
   // the units this person may request for (the server's own list): the requesting unit is derived from them
   const [units, setUnits] = useState<RestationingUnit[]>([]);
   useEffect(() => {
@@ -173,7 +204,9 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
       setContent({ ...r.content, exceptions: r.content.exceptions ?? {}, occupants: r.content.occupants ?? {} });
       setCurrentSite(r.currentSites[0]?.site.id ?? null);
       const s = firstOpen({ site: true, units: r.content.scope.length, kind: r.content.kind, start: r.content.start, end: r.content.end, proposed: !!r.content.site, primary: !!r.content.primary, alternative: !!r.content.alternative });
-      setStep(Math.max(4, s) as FlowStep);
+      const p = r.purpose ?? 'RESTATIONING';
+      setStep(p === 'DEPLOYMENT_AREAS' ? 5 : p === 'SITE_REGISTRATION' ? 4 : p === 'INITIAL_STATIONING' ? 6 : (Math.max(4, s) as FlowStep));
+      if (p === 'INITIAL_STATIONING') api.hubSites(r.requestingUnit.id).then(setHubSites).catch(() => setHubSites([]));
       // a reopened draft is a new editing session from the saved geometry
       editorRef.current?.load(r.content.site?.geometry ?? null);
     });
@@ -183,7 +216,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   // from a unit: its authoritative current site is located and its card opened; the person confirms before starting
   const located = useRef(false);
   useEffect(() => {
-    if (requestId || !preselectUnit || located.current || !registered.loaded) return;
+    if (!plain || requestId || !preselectUnit || located.current || !registered.loaded) return;
     located.current = true;
     const rec = registered.current.find((c) => c.orgId === preselectUnit);
     if (!rec) return app.toast('لا تمركز حالي ظاهر لك لهذه الوحدة؛ اختر الموقع الحالي من الخريطة.');
@@ -191,16 +224,56 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     setFocus({ siteId: rec.siteId, key: Date.now() });
   }, [registered.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // a deployment request starts from the unit's authoritative site; an initial stationing from the unit asked for
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (plain || requestId || !preselectUnit || seeded.current) return;
+    seeded.current = true;
+    api.hubUnit(preselectUnit).then((u) => {
+      setHubUnit(u);
+      if (purpose === 'DEPLOYMENT_AREAS' && u.site) {
+        // a site that is only a marker still measures from its point: a footprint of a metre carries that centre (the server measures from the register)
+        const g = u.site.geometry && (u.site.geometry.type === 'Polygon' || u.site.geometry.type === 'MultiPolygon')
+          ? (u.site.geometry as unknown as SiteGeometry)
+          : u.site.lat != null && u.site.lng != null ? tinySquare(u.site.lat, u.site.lng) : null;
+        setContent((c) => ({ ...c, kind: 'PERMANENT', scope: [u.id], site: g ? { geometry: g, copiedFrom: u.site!.id, shape: 'COPY' } : null }));
+      } else if (purpose !== 'DEPLOYMENT_AREAS') {
+        setContent((c) => ({ ...c, kind: 'PERMANENT', scope: [u.id] }));
+      }
+    }).catch((e: Error) => app.toast(e.message));
+    if (purpose === 'INITIAL_STATIONING') {
+      api.hubSites(preselectUnit).then(setHubSites).catch(() => setHubSites([]));
+      api.requestHub().then((h) => setHubUnits(h.units)).catch(() => setHubUnits([]));
+    }
+  }, [plain, requestId, preselectUnit, purpose]); // eslint-disable-line react-hooks/exhaustive-deps
+  const chosenHubSite = hubSites?.find((s) => s.id === content.existingSite) ?? null;
+  /** A registered site may be outside what the map's reference layer shows this person: the map goes to it all the same. */
+  const frameGeometry = (s: HubSite) => {
+    const m = mapInst.current;
+    const pts = isShape(s.geometry) ? partsOf(s.geometry).flatMap((p) => p[0]) : s.lat != null && s.lng != null ? [{ lat: s.lat, lng: s.lng }] : [];
+    if (m && pts.length) frame(m, pts, viewRef.current, { maxZoom: 14, duration: 500 });
+  };
+  // the units that may join: stationed nowhere, under the unit asked for, each chosen by hand
+  const joinable = useMemo(() => {
+    if (!preselectUnit) return [];
+    const under = new Set([preselectUnit]);
+    const out: HubUnit[] = [];
+    for (const u of hubUnits) {
+      if (u.parentId && under.has(u.parentId)) under.add(u.id);
+      if (under.has(u.id) && u.id !== preselectUnit && u.state === 'NO_STATIONING' && u.actions.some((a) => a.action === 'INITIAL_STATIONING' && a.allowed)) out.push(u);
+    }
+    return out;
+  }, [hubUnits, preselectUnit]);
   const set = (patch: Partial<RestationingContent>) => setContent((c) => ({ ...c, ...patch }));
   const here = useMemo(() => unitsAtSite(registered.current, currentSite, units), [registered.current, currentSite, units]);
   const siteOf = (sid: string | null) => (sid ? registered.all.find((s) => s.siteId === sid) ?? null : null);
   const current = siteOf(currentSite);
   const pickedSite = siteOf(picked);
-  const requestingId = loaded?.requestingUnit.id ?? deriveRequesting(units, content.scope);
+  const requestingId = loaded?.requestingUnit.id ?? (plain ? deriveRequesting(units, content.scope) : preselectUnit);
   const requesting = loaded?.requestingUnit ?? (requestingId ? { id: requestingId, name: units.find((u) => u.id === requestingId)?.name ?? '' } : null);
   const flow: FlowInput = { site: !!currentSite, units: content.scope.length, kind: content.kind, start: content.start, end: content.end, proposed: !!content.site, primary: !!content.primary, alternative: !!content.alternative };
   const done = completed(flow);
-  const may = (s: FlowStep) => flowCanOpen(flow, s);
+  const may = (s: FlowStep) => (plain ? flowCanOpen(flow, s) : true);
   const go = (s: FlowStep) => {
     if (!may(s)) return;
     setPlacing(null);
@@ -218,6 +291,8 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   /** A committed change on the map (drop of a drag, undo, redo, reset): the content follows; a moved copy stays COPY. */
   const onSite = (live: SiteLive, final: boolean) => {
     liveListeners.current.forEach((l) => l(live));
+    // the colours inside the edited shape follow it on every frame (a boundary being drawn: onDrawShape below)
+    if (live.mode !== 'draw') slopeInsideRef.current?.update(editTargetRef.current, live.geometry ? partsOf(live.geometry) : null, !final);
     const nowDrawing = live.mode === 'draw';
     if (drawingRef.current !== nowDrawing) {
       drawingRef.current = nowDrawing;
@@ -249,7 +324,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     m.addControl(new ScaleControl({ unit: 'metric', maxWidth: 110 }), 'bottom-right');
     m.on('click', (e) => clickRef.current(e));
     // the maximum footprint is the site's rule; a deployment area has none
-    editorRef.current = new SiteEditor(m, { onChange: (l, f) => onSiteRef.current(l, f), maxAreaM2: () => (editTargetRef.current === 'site' ? maxAreaRef.current : null) });
+    editorRef.current = new SiteEditor(m, { onChange: (l, f) => onSiteRef.current(l, f), maxAreaM2: () => (editTargetRef.current === 'site' ? maxAreaRef.current : null), onDrawShape: (shape) => slopeInsideRef.current?.update(editTargetRef.current, shape ? [[shape]] : null, true) });
     editorRef.current.load(contentRef.current.site?.geometry ?? null);
     loadedTarget.current = 'site';
     // the current site stays visible as reference above the copy that starts exactly on it
@@ -357,7 +432,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   // the server's maximum footprint arrives with the checks: validate the site against it
   useEffect(() => {
     editorRef.current?.refresh();
-  }, [checks?.maxFootprintAreaM2]);
+  }, [maxAreaM2]);
   const toggle = (org: string) => set({ scope: content.scope.includes(org) ? content.scope.filter((x) => x !== org) : [...content.scope, org] });
 
   const chooseSite = (sid: string) => {
@@ -376,7 +451,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     }
     setBusy(true);
     try {
-      const r = id ? await api.editRestationing(id, content) : await api.createRestationing(requestingId!, content);
+      const r = id ? await api.editRestationing(id, content) : await api.createRestationing(requestingId!, content, purpose);
       setId(r.id);
       setLoaded(r);
       setChecks(await api.restationingChecks(r.id));
@@ -410,6 +485,14 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     const { lng, lat } = e.lngLat;
     setPlacing(null);
     if (p === 'site') return editorRef.current?.moveTo({ lat, lng });
+    if (p === 'point') {
+      editorRef.current?.load(null, false);
+      setPoint({ lat, lng });
+      setContent((c) => ({ ...c, site: { geometry: { type: 'Point', coordinates: [lng, lat] } as unknown as SiteGeometry, copiedFrom: null, shape: 'DRAWN' } }));
+      pointMarker.current?.remove();
+      if (mapInst.current) pointMarker.current = new Marker({ color: '#2f9e6e' }).setLngLat([lng, lat]).addTo(mapInst.current);
+      return;
+    }
     const d = areaDefaultRef.current.value;
     if (p === editTargetRef.current && d) editorRef.current?.load(initialArea({ lat, lng }, d), false);
   };
@@ -465,8 +548,12 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
       can: { edit: true, submit: true, decide: false, activate: false },
     }),
     // before the first save the current site is known on the page: it is drawn as «الموقع الحالي» under the copy
-    currentSites: loaded?.currentSites ?? (current && shapeOf(current.geometry) ? [{ unit: '', site: { id: current.siteId, name: current.name }, geometry: current.geometry }] : []),
+    currentSites: !plain
+      ? purpose === 'DEPLOYMENT_AREAS' && hubUnit?.site ? [{ unit: hubUnit.name, site: { id: hubUnit.site.id, name: hubUnit.site.name }, geometry: hubUnit.site.geometry }]
+        : loaded?.currentSites ?? []
+      : loaded?.currentSites ?? (current && shapeOf(current.geometry) ? [{ unit: '', site: { id: current.siteId, name: current.name }, geometry: current.geometry }] : []),
     content,
+    targetSite: purpose === 'INITIAL_STATIONING' && chosenHubSite ? { id: chosenHubSite.id, name: chosenHubSite.name, geometry: chosenHubSite.geometry } : loaded?.targetSite ?? null,
   };
   const occupied = useMemo(() => occupiedSites(registered.current, registered.all, content.scope), [registered.current, registered.all, content.scope]);
   const occupiedRef = useRef(occupied);
@@ -482,8 +569,8 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     setPickedLeg(null);
   }, [step, deployTarget]);
   const geo: Record<CardRole, SiteGeometry | null> = {
-    CURRENT: step >= 4 ? currentShape : null,
-    SITE: step >= 4 ? content.site?.geometry ?? null : null,
+    CURRENT: step >= 4 && plain ? currentShape : null,
+    SITE: step >= 4 && isShape(content.site?.geometry) ? content.site!.geometry : null,
     PRIMARY: step >= 4 ? ((content.primary as SiteGeometry | null) ?? null) : null,
     ALTERNATIVE: step >= 4 ? ((content.alternative as SiteGeometry | null) ?? null) : null,
   };
@@ -499,6 +586,8 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     PRIMARY: useAreaInsight(geo.PRIMARY, sampler, pinnedVersion),
     ALTERNATIVE: useAreaInsight(geo.ALTERNATIVE, sampler, pinnedVersion),
   };
+  const siteAssessedClass = insights.SITE?.assess?.controllingClass ?? null;
+  useEffect(() => setSiteClass(siteAssessedClass), [siteAssessedClass]);
   const conns = connectors({ current: geo.CURRENT, site: geo.SITE, primary: geo.PRIMARY, alternative: geo.ALTERNATIVE });
   /** A deployment leg's rule: the server's check when it checked exactly this geometry, otherwise the analysis preview. */
   const ruleOf = (k: 'primary' | 'alternative') => {
@@ -567,14 +656,38 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
       listeners.delete(follow);
     };
   }, []);
-  // «الانحدار»: the policy's slope classes over the ground (display only), in 2D and 3D
-  const [slopeOn, setSlopeOn] = useState(false);
-  const bands = policyValues?.terrainSlopeClassification?.classes ?? null;
+  // «الانحدار»: green, orange or red inside the site and the deployment areas being placed, and nowhere else: the current
+  // site and what is already deployed stay plain. It follows every frame (display only), in 2D and 3D.
+  const [slopeOn, setSlopeOn] = useState(true);
+  const slopeLimits = policyValues?.slopeDisplay ?? INITIAL_SLOPE_LIMITS;
+  const slopeLimitsKey = JSON.stringify(slopeLimits);
+  const [slopeInside, setSlopeInside] = useState<SlopeInside | null>(null);
+  slopeInsideRef.current = slopeInside;
   useEffect(() => {
     const m = mapInst.current;
-    if (!m || !mapReady || !terrain3d || !bands) return;
-    showSlope(m, slopeOn, mode, terrain3d.url, bands);
-  }, [slopeOn, mode, mapReady, terrain3d, bands]);
+    if (!m || !mapReady || !sampler || !slopeOn || step < 4) return;
+    const s = new SlopeInside(m, sampler, slopeLimits);
+    setSlopeInside(s);
+    return () => {
+      s.destroy();
+      setSlopeInside(null);
+    };
+  }, [mapReady, sampler, slopeLimitsKey, slopeOn, step >= 4]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    slopeInside?.setActive(editTarget);
+  }, [slopeInside, editTarget]);
+  const siteKey = geometryKey(geo.SITE);
+  const primaryKey = geometryKey(geo.PRIMARY);
+  const alternativeKey = geometryKey(geo.ALTERNATIVE);
+  useEffect(() => {
+    slopeInside?.update('site', geo.SITE ? partsOf(geo.SITE) : null, false);
+  }, [slopeInside, siteKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    slopeInside?.update('primary', geo.PRIMARY ? partsOf(geo.PRIMARY) : null, false);
+  }, [slopeInside, primaryKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    slopeInside?.update('alternative', geo.ALTERNATIVE ? partsOf(geo.ALTERNATIVE) : null, false);
+  }, [slopeInside, alternativeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   // the compass (with the tilt) while the view is 3D
   const compass = useRef<NavigationControl | null>(null);
   useEffect(() => {
@@ -649,7 +762,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
       demAvailable={!!sampler}
     />
   );
-  const PLACING: Record<Exclude<Placing, null>, string> = { site: 'موقع إعادة التمركز', primary: 'منطقة الانتشار الرئيسية', alternative: 'منطقة الانتشار البديلة' };
+  const PLACING: Record<Exclude<Placing, null>, string> = { point: 'الموقع', site: 'موقع إعادة التمركز', primary: 'منطقة الانتشار الرئيسية', alternative: 'منطقة الانتشار البديلة' };
   const KIND = content.kind === 'TEMPORARY' ? 'مؤقت' : 'دائم';
 
   /** What the earlier steps settled, one line each, with a way back to change it. */
@@ -688,15 +801,86 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
   const panel = (
     <aside className="tz-flow" aria-label="خطوات الطلب">
       <div className="tz-flow-head">
-        <h2>{id ? 'تعديل ' + (loaded?.number ?? '') : 'طلب إعادة تمركز جديد'}</h2>
-        <StepTracker step={step} done={done} canOpen={may} onOpen={go} />
+        <h2>{id ? 'تعديل ' + (loaded?.number ?? '') : plain ? 'طلب إعادة تمركز جديد' : PURPOSE_TITLE[purpose]}</h2>
+        {plain && <StepTracker step={step} done={done} canOpen={may} onOpen={go} />}
+        {!plain && hubUnit && <p className="tz-muted micro" data-testid="request-unit">الوحدة: <b>{hubUnit.name}</b>{hubUnit.site ? ' · الموقع الحالي: ' + hubUnit.site.name : ''}</p>}
       </div>
       <div className="tz-flow-body">
-        <p className="tz-flow-stepno">الخطوة {step} من 6</p>
-        <h3 className="tz-flow-q" data-testid="flow-question">{QUESTION[step]}</h3>
-        {summary}
+        {plain && <p className="tz-flow-stepno">الخطوة {step} من 6</p>}
+        <h3 className="tz-flow-q" data-testid="flow-question">{plain ? QUESTION[step] : PURPOSE_QUESTION[purpose][step] ?? QUESTION[step]}</h3>
+        {plain && summary}
 
-        {step === 1 && (
+        {purpose === 'INITIAL_STATIONING' && step === 1 && (
+          <div data-testid="initial-sites">
+            {hubSites == null && <p className="tz-muted">جارٍ التحميل…</p>}
+            {hubSites?.length === 0 && (
+              <p className="tz-muted">لا مواقع مسجلة متاحة لهذه الوحدة. <a className="link" href={newRequestHashFor('SITE_REGISTRATION', preselectUnit)}>طلب اعتماد موقع</a></p>
+            )}
+            <div className="rs-list">
+              {hubSites?.map((s) => (
+                <button key={s.id} data-site={s.code} className={'rs-item' + (content.existingSite === s.id ? ' active' : '')} onClick={() => (set({ existingSite: s.id }), setFocus({ siteId: s.id, key: Date.now() }), frameGeometry(s))}>
+                  <span className="rs-item-head"><b>{s.name}</b><small className="tz-code">{s.code}</small></span>
+                  <small>{s.linked ? 'مرتبط بوحدتك أو بجهتها' : 'موقع مسجل'}</small>
+                </button>
+              ))}
+            </div>
+            {joinable.length > 0 && (
+              <fieldset className="tz-flow-units">
+                <legend>وحدات أخرى بلا تمركز (لا تُضاف إلا باختيارك)</legend>
+                {joinable.map((u) => (
+                  <label key={u.id} className="rs-check"><input type="checkbox" data-join={u.id} checked={content.scope.includes(u.id)} onChange={() => toggle(u.id)} /> {u.name}</label>
+                ))}
+              </fieldset>
+            )}
+            <div className="rs-tools">
+              <button className="button primary" data-testid="initial-next" disabled={!content.existingSite || busy} onClick={() => saveAndGo(6)}>التالي: الفحص والمراجعة</button>
+            </div>
+          </div>
+        )}
+
+        {purpose === 'SITE_REGISTRATION' && step === 4 && (
+          <div className="tz-flow-site" data-testid="site-register-form">
+            <div className="stw-tools two" role="group" aria-label="نوع الموقع">
+              <button className={'button' + (placing === 'point' ? ' on' : '')} data-testid="reg-point" onClick={() => setPlacing(placing === 'point' ? null : 'point')}>نقطة</button>
+            </div>
+            <PlaceControls
+              editor={editorRef}
+              listeners={liveListeners}
+              setMode={(m) => editorRef.current?.setMode(m)}
+              maxAreaM2={null}
+              occupiedHits={[]}
+              shape={isShape(content.site?.geometry) ? 'DRAWN' : null}
+              markerOnly={false}
+              canCopy={false}
+              currentArea={null}
+              origin={null}
+              target={target}
+              setTarget={(n) => {
+                setTarget(n);
+                editorRef.current?.setTarget(n);
+              }}
+              onMoveTab={moveTab}
+              onDrawTab={() => (pointMarker.current?.remove(), setPoint(null), redraw())}
+              picking={placing === 'site'}
+              onPick={() => setPlacing(placing === 'site' ? null : 'site')}
+            />
+            {point && !isShape(content.site?.geometry) && <p className="tz-muted micro">نقطة: {point.lat.toFixed(5)}، {point.lng.toFixed(5)}</p>}
+            {!!occupiedHits.length && <p className="rs-bad" data-testid="reg-overlap">يتداخل مع: {occupiedHits.join('، ')} — استخدم الموقع المسجل بدل تسجيله مرة أخرى.</p>}
+            <label className="field"><span>اسم الموقع</span><input aria-label="اسم الموقع" value={content.siteInfo?.name ?? ''} onChange={(e) => set({ siteInfo: { name: e.target.value, code: content.siteInfo?.code ?? '', kind: content.siteInfo?.kind ?? 'موقع', parentId: content.siteInfo?.parentId ?? null, notes: content.siteInfo?.notes ?? null } })} /></label>
+            <label className="field"><span>رمز الموقع</span><input aria-label="رمز الموقع" value={content.siteInfo?.code ?? ''} onChange={(e) => set({ siteInfo: { name: content.siteInfo?.name ?? '', code: e.target.value, kind: content.siteInfo?.kind ?? 'موقع', parentId: content.siteInfo?.parentId ?? null, notes: content.siteInfo?.notes ?? null } })} /></label>
+            <label className="field"><span>الموقع الرئيسي (إن كان فرعياً)</span>
+              <select aria-label="الموقع الرئيسي" value={content.siteInfo?.parentId ?? ''} onChange={(e) => set({ siteInfo: { name: content.siteInfo?.name ?? '', code: content.siteInfo?.code ?? '', kind: content.siteInfo?.kind ?? 'موقع', parentId: e.target.value || null, notes: content.siteInfo?.notes ?? null } })}>
+                <option value="">— موقع رئيسي —</option>
+                {registered.all.map((s) => <option key={s.siteId} value={s.siteId}>{s.name}</option>)}
+              </select>
+            </label>
+            <div className="rs-tools">
+              <button className="button primary" data-testid="reg-next" disabled={busy || !content.site || drawingNow || !content.siteInfo?.name || !content.siteInfo?.code} onClick={() => saveAndGo(6)}>التالي: الفحص والمراجعة</button>
+            </div>
+          </div>
+        )}
+
+        {plain && step === 1 && (
           <>
             <p className="tz-flow-hint">اضغط على أحد المواقع في الخريطة</p>
             <SiteSearch sites={registered.all} current={registered.current} onPick={pickOne} />
@@ -749,7 +933,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
           </div>
         )}
 
-        {step === 4 && (
+        {plain && step === 4 && (
           <div className="tz-flow-site">
             <PlaceControls
               editor={editorRef}
@@ -813,6 +997,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
               origin={deployTarget === 'primary' ? (content.site ? anchorOf(partsOf(content.site.geometry)) : null) : content.primary ? anchorOf(partsOf(content.primary as SiteGeometry)) : null}
               leg={rules[deployTarget].leg}
               checked={leg(deployTarget)}
+              siteWord={plain ? 'موقع إعادة التمركز' : 'موقع التمركز الحالي'}
             >
               {leg(deployTarget)?.status === 'NEEDS_EXCEPTION' && (
                 <label>
@@ -833,6 +1018,9 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
         {step === 6 && (
           <div className="tz-flow-review">
             {checks && <div className={'rs-verdict ' + (checks.ok ? 'ok' : 'no')}>{checks.ok ? 'الفحوص مستوفاة — يمكن الإرسال' : 'فحوص غير مستوفاة — راجع اللوحة'}</div>}
+            {!plain && <p className="tz-muted micro">{PURPOSE_WRITES[purpose]}</p>}
+            {purpose === 'INITIAL_STATIONING' && <p className="micro">الموقع: <b>{chosenHubSite?.name ?? '—'}</b> · الوحدات: <b>{content.scope.length}</b></p>}
+            {checks && !checks.ok && !plain && <ul className="rs-bad" data-testid="review-problems">{checks.problems.map((p) => <li key={p}>{p}</li>)}</ul>}
             <label>
               سبب الطلب
               <textarea value={content.reason} onChange={(e) => set({ reason: e.target.value })} />
@@ -852,7 +1040,18 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
     </aside>
   );
 
-  const context = step === 1 ? (
+  const context = !plain && step < 4 ? (
+    <aside className="tz-context" aria-label="السياق"><div className="tz-context-body">
+      <section className="tz-card rs-summary" data-testid="initial-context">
+        <h3>{chosenHubSite?.name ?? 'لم يُختر موقع بعد'}</h3>
+        <p className="tz-muted micro">{chosenHubSite ? (chosenHubSite.linked ? 'مرتبط بوحدتك أو بجهتها. ' : '') + 'الموقع الواحد يتسع لأكثر من وحدة، ولا يغيّر ذلك الهيكل التنظيمي.' : 'اختر موقعاً من القائمة أو من الخريطة.'}</p>
+      </section>
+    </div></aside>
+  ) : !plain && step === 6 && !isShape(content.site?.geometry) ? (
+    <aside className="tz-context" aria-label="السياق"><div className="tz-context-body">
+      <section className="tz-card rs-summary"><p className="tz-muted micro">{PURPOSE_WRITES[purpose]}</p></section>
+    </div></aside>
+  ) : step === 1 ? (
     <RequestContext site={pickedSite ?? null} units={pickedSite ? unitsAtSite(registered.current, pickedSite.siteId, units) : []} moving={[]} requesting={null} fromUnit={preselectUnit} onChoose={() => pickedSite && chooseSite(pickedSite.siteId)}
       stack={stack ? stack.map(siteOf).filter((s): s is NonNullable<typeof s> => !!s) : null} sites={registered.all} onSelect={pickOne} />
   ) : (
@@ -875,8 +1074,8 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
             // the request's title and the question are the panel's; the map header says what the map shows
             <span className="tz-mapstep" data-testid="map-step">
               <Icon name="map" />
-              <span className="tz-crumb">الطلبات / {id ? 'تعديل ' + (loaded?.number ?? '') : 'طلب إعادة تمركز جديد'}</span>
-              <b>{MAP_SAYS[step]}</b>
+              <span className="tz-crumb">الطلبات / {id ? 'تعديل ' + (loaded?.number ?? '') : plain ? 'طلب إعادة تمركز جديد' : PURPOSE_TITLE[purpose]}</span>
+              <b>{plain ? MAP_SAYS[step] : PURPOSE_QUESTION[purpose][step] ?? MAP_SAYS[step]}</b>
               {step >= 2 && step <= 3 && current && <small>{current.name}</small>}
             </span>
           }
@@ -895,21 +1094,21 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
             view={view}
             terrain3d={terrain3d}
             selected={view === '3d' ? selectedRole : null}
-            request={step === 4 ? { ...preview, content: { ...preview.content, site: null } } : step === 5 ? { ...preview, content: { ...preview.content, [deployTarget]: null } } : preview}
+            request={!plain && !isShape(preview.content.site?.geometry) ? { ...preview, content: { ...preview.content, site: null } } : step === 4 ? { ...preview, content: { ...preview.content, site: null } } : step === 5 ? { ...preview, content: { ...preview.content, [deployTarget]: null } } : preview}
             // no deployment band before the deployment step, whatever a reopened draft already holds
             checks={mapChecks}
             mode={mode}
             fitMaxZoom={11.5}
-            hideSite={step !== 5}
+            hideSite={step !== 5 || !plain}
             fit={false}
             onMap={onMap}
-            referenceInteractive={step !== 4 && !placing && !drawingNow}
-            pick={step === 1 ? { selectedId: picked, onPick: (sid, here) => (setPicked(sid), setStack(here && here.length > 1 ? here : null)) } : step <= 3 ? { selectedId: currentSite, onPick: () => undefined } : null}
+            referenceInteractive={(plain && step !== 4 && !placing && !drawingNow) || (purpose === 'INITIAL_STATIONING' && step === 1)}
+            pick={!plain ? (purpose === 'INITIAL_STATIONING' && step === 1 ? { selectedId: content.existingSite ?? null, onPick: (sid) => { const s = hubSites?.find((x) => x.id === sid); if (s) set({ existingSite: s.id }); } } : null) : step === 1 ? { selectedId: picked, onPick: (sid, here) => (setPicked(sid), setStack(here && here.length > 1 ? here : null)) } : step <= 3 ? { selectedId: currentSite, onPick: () => undefined } : null}
             // under the copy the current site is drawn in coral; a marker-only current site stays highlighted
             highlight={step <= 3 || markerOnly ? currentSite : null}
             occupied={step >= 4 ? occupiedFc : null}
             focus={focus}
-            fitSites={!requestId && !preselectSite}
+            fitSites={!requestId && (!preselectSite || !plain) && purpose !== 'DEPLOYMENT_AREAS'}
           />}
           {step === 4 && mapReady && (
             <div className="stw-zoom" role="group" aria-label="أدوات الخريطة">
@@ -919,7 +1118,7 @@ export function RestationingEditor({ requestId, preselectUnit = null, preselectS
               <button title="مقارنة الموقعين" aria-label="مقارنة الموقعين" disabled={!content.site || !current} onClick={() => editorRef.current?.compare()}>⇆</button>
             </div>
           )}
-          {mapReady && step >= 4 && <SlopeControl on={slopeOn} setOn={setSlopeOn} bands={bands} available={!!terrain3d} />}
+          {mapReady && step >= 4 && <SlopeControl on={slopeOn} setOn={setSlopeOn} limits={slopeLimits} available={!!terrain3d} inside={slopeInside} />}
           {placing && (
             <div className="tz-placing" role="status">
               انقر على الخريطة لوضع «{PLACING[placing]}»
@@ -1145,7 +1344,8 @@ function PlaceControls({ editor, listeners, setMode, maxAreaM2, occupiedHits, sh
  * from the new site, the alternative from the primary — with the leg's allowed range and a verdict from the server's
  * last check (the server decides on save). No range ring.
  */
-function AreaControls({ editor, listeners, area, onArea, hasPrimary, placing, areaDefault, policyVersion, onPlace, onDraw, target, setTarget, origin, leg, checked, children }: {
+function AreaControls({ editor, listeners, area, onArea, hasPrimary, placing, areaDefault, policyVersion, onPlace, onDraw, target, setTarget, origin, leg, checked, siteWord, children }: {
+  siteWord: string;
   editor: React.RefObject<SiteEditor | null>;
   listeners: React.RefObject<Set<(l: SiteLive) => void>>;
   area: 'primary' | 'alternative';
@@ -1201,7 +1401,7 @@ function AreaControls({ editor, listeners, area, onArea, hasPrimary, placing, ar
         </button>
       </div>
       <p className="stw-hint" data-testid="area-hint">
-        {area === 'primary' ? 'تُقاس من مركز موقع إعادة التمركز. ' : 'تُقاس من مركز منطقة الانتشار الرئيسية. '}
+        {area === 'primary' ? 'تُقاس من مركز ' + siteWord + '. ' : 'تُقاس من مركز منطقة الانتشار الرئيسية. '}
         {placing
           ? 'انقر على المكان المطلوب لوضع المنطقة ثم عدّلها.'
           : open
@@ -1227,7 +1427,7 @@ function AreaControls({ editor, listeners, area, onArea, hasPrimary, placing, ar
         </div>
       )}
       <div className="stw-live stack">
-        <span>المسافة {area === 'primary' ? 'من موقع إعادة التمركز' : 'من المنطقة الرئيسية'}</span>
+        <span>المسافة {area === 'primary' ? 'من ' + siteWord : 'من المنطقة الرئيسية'}</span>
         <b className={dist ? (dist.tone === 'ok' ? 'y' : dist.tone === 'none' ? '' : 'n') : ''} data-testid="area-distance">{dist?.text ?? '—'}</b>
       </div>
       <dl className="stw-read" data-testid="area-readout">

@@ -1,0 +1,281 @@
+{
+ "at": "2026-11-06T20:36:05.126Z",
+ "results": [
+  {
+   "id": "S01",
+   "pass": true,
+   "what": "a policy draft for the approval roles",
+   "detail": "200"
+  },
+  {
+   "id": "S02",
+   "pass": true,
+   "what": "the four roles are published through the policy",
+   "detail": ""
+  },
+  {
+   "id": "U01",
+   "pass": true,
+   "what": "a role that neither approves nor is told has no button",
+   "detail": ""
+  },
+  {
+   "id": "U02",
+   "pass": true,
+   "what": "an approving role shows «تعيين»",
+   "detail": ""
+  },
+  {
+   "id": "U03",
+   "pass": true,
+   "what": "the tree starts at the main units",
+   "detail": "◂ إدارة المشاريع"
+  },
+  {
+   "id": "U04",
+   "pass": true,
+   "what": "and shows nothing outside a main unit",
+   "detail": ""
+  },
+  {
+   "id": "U05",
+   "pass": true,
+   "what": "the search stays inside them as well",
+   "detail": ""
+  },
+  {
+   "id": "U06",
+   "pass": true,
+   "what": "a newly ticked unit starts as «الوحدة فقط»",
+   "detail": "إدارة المشاريع فقط"
+  },
+  {
+   "id": "U07",
+   "pass": true,
+   "what": "with all its levels: what it covers is counted",
+   "detail": "إدارة المشاريع + 3 وحدات تابعة"
+  },
+  {
+   "id": "U08",
+   "pass": true,
+   "what": "the levels offered come from the hierarchy",
+   "detail": "5 6 7 8 9"
+  },
+  {
+   "id": "U09",
+   "pass": true,
+   "what": "chosen levels are counted too",
+   "detail": "المستوى 8 و9 — وحدتان"
+  },
+  {
+   "id": "U10",
+   "pass": true,
+   "what": "the button now reads the number of units",
+   "detail": "وحدة واحدة"
+  },
+  {
+   "id": "U11",
+   "pass": true,
+   "what": "the scope reads in words before saving",
+   "detail": "الصياغة: الجهة «إدارة المشاريع»: المستوى 8 و9"
+  },
+  {
+   "id": "U12",
+   "pass": true,
+   "what": "the grant keeps the levels, not a list of units",
+   "detail": ""
+  },
+  {
+   "id": "U13a",
+   "pass": true,
+   "what": "a final approver takes a whole unit with its levels, or every unit",
+   "detail": "الوحدة مع جميع مستوياتها"
+  },
+  {
+   "id": "U13",
+   "pass": true,
+   "what": "a final approver can be given every unit",
+   "detail": ""
+  },
+  {
+   "id": "M01",
+   "pass": true,
+   "what": "the matrix shows the unit’s people and how many units a grant covers",
+   "detail": ""
+  },
+  {
+   "id": "M02",
+   "pass": true,
+   "what": "a role not given over units is a tick",
+   "detail": ""
+  },
+  {
+   "id": "M03",
+   "pass": true,
+   "what": "a cell’s button saves at once",
+   "detail": ""
+  },
+  {
+   "id": "M04",
+   "pass": true,
+   "what": "a changed scope is a new grant, and the old one stays in history",
+   "detail": "2|1"
+  },
+  {
+   "id": "M05",
+   "pass": true,
+   "what": "the main for-information units are chosen here",
+   "detail": ""
+  },
+  {
+   "id": "M06",
+   "pass": true,
+   "what": "a period is added by its unit",
+   "detail": ""
+  },
+  {
+   "id": "M07",
+   "pass": true,
+   "what": "and removed; without periods the nearest grant decides",
+   "detail": ""
+  },
+  {
+   "id": "U14",
+   "pass": true,
+   "what": "a step can go «حسب الوحدات المعيّنة للمعتمد»",
+   "detail": ""
+  },
+  {
+   "id": "U15",
+   "pass": true,
+   "what": "and the new roles are offered",
+   "detail": ""
+  },
+  {
+   "id": "J01",
+   "pass": true,
+   "what": "the chart is saved",
+   "detail": ""
+  },
+  {
+   "id": "J02",
+   "pass": true,
+   "what": "and published",
+   "detail": ""
+  },
+  {
+   "id": "J03",
+   "pass": true,
+   "what": "a request from the lowest unit",
+   "detail": ""
+  },
+  {
+   "id": "J04",
+   "pass": true,
+   "what": "it is sent, because someone’s scope reaches its unit",
+   "detail": ""
+  },
+  {
+   "id": "J05",
+   "pass": true,
+   "what": "first level of the climb",
+   "detail": "وحدة الصيانة الإدارية"
+  },
+  {
+   "id": "J06",
+   "pass": true,
+   "what": "second level of the climb, the last below the main unit, which is never a station",
+   "detail": "وحدة الصيانة الإدارية ← قسم مشاريع المباني"
+  },
+  {
+   "id": "J07",
+   "pass": true,
+   "what": "whoever signed the climb has nothing more",
+   "detail": ""
+  },
+  {
+   "id": "J08",
+   "pass": true,
+   "what": "the unit operations step reaches the holder of the chosen levels, whose home is in another branch",
+   "detail": "اعتماد عمليات الوحدة"
+  },
+  {
+   "id": "J09",
+   "pass": true,
+   "what": "and they decide it, with OpenFGA in the loop",
+   "detail": ""
+  },
+  {
+   "id": "J10",
+   "pass": true,
+   "what": "they are not offered the final approval",
+   "detail": ""
+  },
+  {
+   "id": "J11",
+   "pass": true,
+   "what": "for information sees nothing before the final approval",
+   "detail": "404"
+  },
+  {
+   "id": "J12",
+   "pass": true,
+   "what": "a different person approves finally",
+   "detail": ""
+  },
+  {
+   "id": "J13",
+   "pass": true,
+   "what": "the request is approved",
+   "detail": ""
+  },
+  {
+   "id": "J14",
+   "pass": true,
+   "what": "for information: the holder at the main unit, and the holder of a scope covering the requesting unit",
+   "detail": "t.auditor,t.manager"
+  },
+  {
+   "id": "J15",
+   "pass": true,
+   "what": "a holder of «للعلم» in a unit this request does not concern reads nothing, even after it",
+   "detail": ""
+  },
+  {
+   "id": "J16",
+   "pass": true,
+   "what": "a holder in a unit of another branch at the same place is told as well",
+   "detail": "t.auditor,t.limited,t.manager"
+  },
+  {
+   "id": "J16a",
+   "pass": true,
+   "what": "someone else at that unit, without the role, reads nothing",
+   "detail": "404"
+  },
+  {
+   "id": "J17",
+   "pass": true,
+   "what": "and reads its summary",
+   "detail": "200 SUMMARY"
+  },
+  {
+   "id": "J18",
+   "pass": true,
+   "what": "the notice says which unit it is and its main unit",
+   "detail": "المرافق: قاعة التجربة. الوحدة: فريق مرافق الشمال — وحدتها الرئيسية: إدارة المشاريع. نسخة للعلم دون مرفقات."
+  },
+  {
+   "id": "J18a",
+   "pass": true,
+   "what": "the request records who was told and who has read it",
+   "detail": "مستخدم اطلاع محدود ✓، مدقق السجلات، مدير الخدمات المشتركة"
+  },
+  {
+   "id": "J19",
+   "pass": true,
+   "what": "no browser errors",
+   "detail": ""
+  }
+ ]
+}

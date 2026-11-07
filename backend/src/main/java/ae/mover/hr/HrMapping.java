@@ -36,6 +36,7 @@ public final class HrMapping {
             new Canonical(Entity.UNIT, "code", false, "رمز الجهة"),
             new Canonical(Entity.UNIT, "name_en", false, "الاسم بالإنجليزية"),
             new Canonical(Entity.UNIT, "level", false, "مستوى الجهة"),
+            new Canonical(Entity.UNIT, "is_main", false, "وحدة رئيسية"),
             new Canonical(Entity.PERSON, "external_person_id", true, "معرف الشخص في المصدر"),
             new Canonical(Entity.PERSON, "employee_number", true, "الرقم الوظيفي"),
             new Canonical(Entity.PERSON, "full_name", true, "الاسم الكامل"),

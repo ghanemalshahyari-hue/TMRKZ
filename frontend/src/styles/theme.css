@@ -1,0 +1,108 @@
+/* The two colour themes (owner, 6 Nov 2026). The choice is on <html data-theme>, set before the first paint (lib/theme.ts).
+   Variables are here; fixed colours of the older stylesheets are overridden in theme.generated.css. The application and the
+   sign-in pages share one palette: the sand of the sign-in page when light, navy and teal when dark.
+   Contrast (WCAG 2.2 AA) is measured on the pages by tests/acceptance/theme-contrast.mjs. */
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --ink: #2e2618;
+  --muted: #665f52;
+  --line: #e6dcc8;
+  --paper: #fffcf6;
+  --canvas: #f9f7ed;
+  --nav: #4b2a12;
+  --accent: #8b5a2b;
+  --soft: #f2ebda;
+  --green: #4b6b47;
+  --orange: #8a5f12;
+  --red: #9a2a22;
+  --blue: #4a6583;
+  --shadow: 0 12px 30px rgba(74, 59, 34, .1);
+  --tz-mark-1: #8b5a2b;
+  --tz-mark-2: #c7a46a;
+  --tz-mark-3: #4b6b47;
+
+  --tz-bg: #f9f7ed;
+  --tz-bg-2: #f4eedf;
+  --tz-panel: #fffcf6;
+  --tz-panel-2: #fbf8f0;
+  --tz-raise: rgba(74, 59, 34, 0.035);
+  --tz-line: #e6dcc8;
+  --tz-line-2: #d3c3a2;
+  --tz-text: #2e2618;
+  --tz-text-2: #4a4234;
+  --tz-muted: #665f52;
+  --tz-teal: #8b5a2b;
+  --tz-teal-2: #724518;
+  --tz-teal-soft: #f2ebda;
+  --tz-green: #4b6b47;
+  --tz-amber: #8a5f12;
+  --tz-red: #9a2a22;
+  --tz-cyan: #4a6583;
+  --tz-coral: #9a2a22;
+  --tz-shadow: 0 12px 30px rgba(74, 59, 34, .1);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ink: #e7f1f4;
+  --muted: #9db2bb;
+  --line: #28455a;
+  --paper: #0f2739;
+  --canvas: #08192a;
+  --nav: #0b2132;
+  --accent: #2bc4a8;
+  --soft: #123a45;
+  --green: #4cc98a;
+  --orange: #e9b04f;
+  --red: #ef7d74;
+  --blue: #7fb0e6;
+  --shadow: 0 14px 34px rgba(0, 10, 20, 0.35);
+  --tz-mark-1: #2bc4a8;
+  --tz-mark-2: #c9a76b;
+  --tz-mark-3: #1d8f7c;
+}
+
+body { transition: background-color 0.15s; }
+
+/* the switch */
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; min-width: 34px; padding: 0 9px; border-radius: 9px; border: 1px solid var(--tz-line); background: var(--tz-raise); color: var(--tz-text-2); cursor: pointer; }
+.theme-toggle:hover { color: var(--tz-text); border-color: var(--tz-line-2); }
+.theme-toggle svg { width: 17px; height: 17px; }
+
+/* one primary button everywhere, in both themes */
+:root[data-theme='dark'] .button.primary { background: var(--accent) !important; border-color: var(--accent) !important; }
+:root[data-theme='light'] .button.primary { background: linear-gradient(135deg, #8b5a2b 0%, #724518 62%, #4b2a12 100%) !important; border-color: #724518 !important; color: #fff !important; }
+:root[data-theme='dark'] .button.primary { color: #04221c !important; }
+
+/* the current page in the top bar */
+:root[data-theme='light'] .tz-nav-item.active { color: #5e3a18; background: #f2ebda; border-color: #d3b98a; }
+:root[data-theme='light'] .tz-nav-item.active .icon { color: #8b5a2b; }
+
+/* the ends of a chart keep their colour and white text */
+:root[data-theme] .fs-node.t-end_approved, :root[data-theme] .fs-node.t-end_rejected { color: #fff; }
+:root[data-theme] .fs-node.t-end_approved { background: #187a3a; }
+
+/* a wide table scrolls inside its card instead of widening the page */
+.settings-grid > * { min-width: 0; overflow-x: auto; }
+
+/* the studio: the map library's small credit and its controls */
+:root[data-theme] .react-flow__attribution { background: transparent; }
+:root[data-theme] .react-flow__attribution a { color: var(--muted); }
+:root[data-theme='dark'] .react-flow__controls-button { background: var(--paper); border-color: var(--line); fill: var(--ink); color: var(--ink); }
+:root[data-theme='dark'] .react-flow__edge-textbg { fill: var(--paper); }
+:root[data-theme='dark'] .react-flow__edge-text { fill: var(--ink) !important; }
+
+
+/* the person's initials on the teal avatar */
+:root[data-theme='light'] .tz-top .avatar { background: linear-gradient(135deg, #8b5a2b, #724518); color: #fff; }
+
+/* the small line of the chosen task tab */
+:root[data-theme='dark'] button.active small, :root[data-theme='dark'] [aria-selected='true'] small { color: var(--ink); }
+
+/* a chosen tab on the brown */
+:root[data-theme='light'] .tz-tab.active { color: #fff; }
+:root[data-theme='light'] .tz-tab.active small { color: #fff; }
+
+/* the home and console ground: plain sand, without the dark theme's glow */
+:root[data-theme='light'] .tz-app.is-console { background: #f9f7ed; }

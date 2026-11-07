@@ -28,6 +28,7 @@ import ae.mover.access.RawGrant;
 import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
 import ae.mover.common.Db;
+import ae.mover.common.Json;
 import ae.mover.common.Ref;
 import ae.mover.common.Times;
 
@@ -41,7 +42,7 @@ public class GrantAdminService {
     /** Actions only a global access manager may hand out, whatever the role's grantable list says. */
     private static final Set<Permission> SYSTEM_ACTIONS = EnumSet.of(Permission.CONFIGURE, Permission.VIEW_SOURCE_IDENTIFIERS);
 
-    public record TargetInput(String kind, String id, Boolean includeDescendants) {
+    public record TargetInput(String kind, String id, Boolean includeDescendants, List<Integer> levels) {
     }
 
     public record ScopeInput(String mode, Boolean all, String combine, List<TargetInput> targets) {
@@ -51,7 +52,7 @@ public class GrantAdminService {
                              String siteScopeId, String validFrom, String validTo, ScopeInput scope) {
     }
 
-    public record TargetView(String kind, String id, String name, boolean includeDescendants) {
+    public record TargetView(String kind, String id, String name, boolean includeDescendants, List<Integer> levels) {
     }
 
     public record GrantView(String id, Map<String, String> person, Map<String, String> role, Ref organization,
@@ -67,10 +68,12 @@ public class GrantAdminService {
     private final GrantSource source;
     private final DirectoryScope directory;
     private final PersonKeys keys;
+    private final Json json;
 
     public GrantAdminService(JdbcClient jdbc, Clock clock, AccessService access, AuditService audit, GrantSource source,
-                             DirectoryScope directory, PersonKeys keys) {
+                             DirectoryScope directory, PersonKeys keys, Json json) {
         this.keys = keys;
+        this.json = json;
         this.jdbc = jdbc;
         this.clock = clock;
         this.access = access;
@@ -116,9 +119,22 @@ public class GrantAdminService {
                     throw ApiException.validation("نوع هدف النطاق غير معروف: " + t.kind());
                 }
                 boolean desc = !GrantTarget.RESOURCE.equals(t.kind()) && !Boolean.FALSE.equals(t.includeDescendants());
-                GrantTarget target = new GrantTarget(t.kind(), uuid(t.id(), "هدف النطاق"), desc);
-                if (targets.stream().noneMatch(x -> x.kind().equals(target.kind()) && x.id().equals(target.id()))) {
-                    targets.add(target);
+                UUID targetId = uuid(t.id(), "هدف النطاق");
+                GrantTarget target = new GrantTarget(t.kind(), targetId, desc);
+                if (t.levels() != null && !t.levels().isEmpty()) {
+                    if (!GrantTarget.ORGANIZATION.equals(t.kind()) || !desc) {
+                        throw ApiException.validation("المستويات تُختار لجهة مع فروعها فقط.");
+                    }
+                    List<Integer> levels = t.levels().stream().distinct().sorted().toList();
+                    Set<UUID> reached = source.reach(targetId, levels);
+                    if (reached.isEmpty()) {
+                        throw ApiException.validation("لا توجد وحدات في هذه المستويات تحت الجهة المختارة.");
+                    }
+                    target = new GrantTarget(t.kind(), targetId, true, levels, reached);
+                }
+                GrantTarget chosen = target;
+                if (targets.stream().noneMatch(x -> x.kind().equals(chosen.kind()) && x.id().equals(chosen.id()))) {
+                    targets.add(chosen);
                 }
             }
             if (targets.isEmpty()) {
@@ -144,8 +160,11 @@ public class GrantAdminService {
                     .param("s", siteScope).param("f", Db.ts(from)).param("to", Db.ts(to)).param("m", mode).param("c", combine)
                     .param("a", all).param("by", ctx.personId()).update();
             for (GrantTarget t : targets) {
-                jdbc.sql("insert into membership_scope_target(membership_id, kind, target_id, include_descendants) values (:m, :k, :t, :d)")
-                        .param("m", id).param("k", t.kind()).param("t", t.id()).param("d", t.includeDescendants()).update();
+                jdbc.sql("""
+                        insert into membership_scope_target(membership_id, kind, target_id, include_descendants, levels)
+                        values (:m, :k, :t, :d, string_to_array(nullif(:l, ''), ',')::int[])""")
+                        .param("m", id).param("k", t.kind()).param("t", t.id()).param("d", t.includeDescendants())
+                        .param("l", String.join(",", t.levels().stream().map(String::valueOf).toList())).update();
             }
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             throw ApiException.validation("الشخص أو الجهة أو الدور غير موجود.");
@@ -356,7 +375,7 @@ public class GrantAdminService {
             Map<String, Object> r = rows.get(i);
             RawGrant g = raws.get(i);
             List<TargetView> tv = g.targets().stream()
-                    .map(t -> new TargetView(t.kind(), t.id().toString(), names.of(t), t.includeDescendants())).toList();
+                    .map(t -> new TargetView(t.kind(), t.id().toString(), names.of(t), t.includeDescendants(), t.levels())).toList();
             out.add(new GrantView(g.grantId().toString(),
                     Map.of("id", r.get("person_id").toString(), "displayName", (String) r.get("display_name"),
                             "employeeNo", (String) r.get("employee_no")),
@@ -387,6 +406,7 @@ public class GrantAdminService {
         Set<UUID> resources = new HashSet<>();
         for (RawGrant g : grants) {
             RawGrant.Spec s = g.spec();
+            g.targets().stream().filter(t -> GrantTarget.ORGANIZATION.equals(t.kind())).forEach(t -> orgs.add(t.id()));
             s.orgs().forEach(t -> orgs.add(t.id()));
             s.sites().forEach(t -> sites.add(t.id()));
             resources.addAll(s.resources());
@@ -403,6 +423,212 @@ public class GrantAdminService {
         return out;
     }
 
+    /** What a unit target would cover, for the page choosing it, and the main unit of a person's branch to open the tree on. */
+    public Map<String, Object> scopePreview(AccessContext ctx, UUID orgId, boolean descendants, List<Integer> levels) {
+        ctx.require(Permission.MANAGE_ACCESS);
+        int units = levels != null && !levels.isEmpty() ? source.reach(orgId, levels).size()
+                : descendants ? access.orgSubtree(orgId).size() : 1;
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("units", units);
+        return out;
+    }
+
+    /** Where the units dialog's tree starts, as in the movement programme: the main units the granter may reach. */
+    public List<Map<String, Object>> grantRoots(AccessContext ctx) {
+        ctx.require(Permission.MANAGE_ACCESS);
+        return jdbc.sql("""
+                select o.id, o.code, o.name, o.parent_id, (select count(*) from organization c where c.parent_id = o.id and c.status = 'ACTIVE') as children
+                from organization o join hr_unit h on h.external_id = o.source_external_id and h.is_main
+                  and h.snapshot_id = (select s.id from hr_snapshot s where s.status = 'PUBLISHED')
+                where o.status = 'ACTIVE' order by o.name""").query().listOfRows().stream()
+                .filter(r -> ctx.canFor(Permission.MANAGE_ACCESS, (UUID) r.get("id")))
+                .map(r -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", r.get("id").toString());
+                    m.put("code", r.get("code"));
+                    m.put("name", r.get("name"));
+                    m.put("parentId", r.get("parent_id") == null ? null : r.get("parent_id").toString());
+                    m.put("childCount", ((Number) r.get("children")).intValue());
+                    m.put("siteCount", 0);
+                    return m;
+                }).toList();
+    }
+
+    /** One unit's people and their grants, for the matrix: those posted in it, and those granted a role with it as home. */
+    public Map<String, Object> unitMatrix(AccessContext ctx, UUID orgId, String q, Integer page) {
+        ctx.require(Permission.MANAGE_ACCESS);
+        if (!ctx.canFor(Permission.MANAGE_ACCESS, orgId)) {
+            throw ApiException.notFound();
+        }
+        String like = q == null || q.isBlank() ? null : "%" + q.trim() + "%";
+        String people = """
+                from person p where p.status = 'ACTIVE'
+                  and (exists (select 1 from affiliation a where a.person_id = p.id and a.organization_id = :o and a.valid_to is null)
+                    or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and (m.valid_to is null or m.valid_to > now())))
+                  and (cast(:q as text) is null or p.display_name ilike :q or p.employee_no ilike :q)""";
+        long total = jdbc.sql("select count(*) " + people).param("o", orgId).param("q", like).query(Long.class).single();
+        int from = Math.max(0, page == null ? 0 : page) * 25;
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> p : jdbc.sql("select p.id, p.display_name, p.employee_no " + people + " order by p.display_name limit 25 offset :from")
+                .param("o", orgId).param("q", like).param("from", from).query().listOfRows()) {
+            UUID id = (UUID) p.get("id");
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", id.toString());
+            row.put("displayName", p.get("display_name"));
+            row.put("employeeNo", p.get("employee_no"));
+            row.put("grants", list(ctx, orgId, id, false));
+            rows.add(row);
+        }
+        return Map.of("total", total, "people", rows);
+    }
+
+    /**
+     * The final approval of a permission request (ADR-044): the roles granted become grants at the person's unit, each with its own
+     * default reach. The decision is the authority here, checked by the engine. A role already held there is left as it is.
+     */
+    public List<String> applyAccessRequest(AccessContext ctx, UUID requestId) {
+        Map<String, Object> a = jdbc.sql("select person_id, unit_org_id, array_to_string(granted, ',') as granted, granted_scope::text as scope from access_request where request_id = :r")
+                .param("r", requestId).query().singleRow();
+        Map<String, Object> scope = a.get("scope") == null ? null : json.map(a.get("scope").toString());
+        String mode = scope == null ? null : (String) scope.get("mode");
+        UUID person = (UUID) a.get("person_id");
+        UUID unit = (UUID) a.get("unit_org_id");
+        Instant now = clock.instant();
+        List<String> made = new ArrayList<>();
+        for (String role : a.get("granted") == null ? new String[0] : ((String) a.get("granted")).split(",")) {
+            long held = jdbc.sql("""
+                    select count(*) from membership where person_id = :p and organization_id = :o and role_code = :r
+                      and valid_from <= :now and (valid_to is null or valid_to > :now)""")
+                    .param("p", person).param("o", unit).param("r", role).param("now", Db.ts(now)).query(Long.class).single();
+            if (held > 0) {
+                continue;
+            }
+            UUID id = UUID.randomUUID();
+            jdbc.sql("""
+                    insert into membership(id, person_id, organization_id, role_code, valid_from, scope_mode, scope_combine, scope_all, granted_by)
+                    values (:id, :p, :o, :r, :f, :m, 'AND', :all, :by)""")
+                    .param("id", id).param("p", person).param("o", unit).param("r", role).param("f", Db.ts(now))
+                    .param("m", mode == null ? "ROLE" : "CUSTOM").param("all", "ALL".equals(mode)).param("by", ctx.personId()).update();
+            // what the final approver approved is what is written, through the same scope tables every grant uses
+            if ("UNIT".equals(mode) || "UNIT_TREE".equals(mode)) {
+                scopeTarget(id, GrantTarget.ORGANIZATION, unit, "UNIT_TREE".equals(mode));
+            } else if (("UNITS".equals(mode) || "SITES".equals(mode)) && scope.get("ids") instanceof List<?> ids) {
+                for (Object t : ids) {
+                    scopeTarget(id, "SITES".equals(mode) ? GrantTarget.SITE : GrantTarget.ORGANIZATION, UUID.fromString(t.toString()), false);
+                }
+            }
+            audit.recordAs(ctx.actor(), "MEMBERSHIP_CREATED", "PERSON", person.toString(), null,
+                    Map.of("organizationId", unit.toString(), "role", role, "accessRequest", requestId.toString(), "scope", mode == null ? "ROLE" : mode), null);
+            made.add(role);
+        }
+        return made;
+    }
+
+    private void scopeTarget(UUID membership, String kind, UUID target, boolean descendants) {
+        jdbc.sql("insert into membership_scope_target(membership_id, kind, target_id, include_descendants) values (:m, :k, :t, :d)")
+                .param("m", membership).param("k", kind).param("t", target).param("d", descendants).update();
+    }
+
+    /** A different scope is a new grant (V9): ends the old one and makes the new one together, or changes nothing. */
+    @Transactional
+    public Map<String, Object> replace(AccessContext ctx, UUID oldId, GrantInput in, String reason) {
+        end(ctx, oldId, null, reason == null || reason.isBlank() ? "تحديث النطاق من مصفوفة الصلاحيات" : reason);
+        return create(ctx, in);
+    }
+
+    public record RouteInput(String name, String from, String to, List<Integer> days, Boolean active, List<String> targets) {
+    }
+
+    /** The periods of a command, with their units. */
+    public List<Map<String, Object>> routes(AccessContext ctx, UUID command) {
+        if (!ctx.canFor(Permission.MANAGE_ACCESS, command)) {
+            throw ApiException.notFound();
+        }
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : jdbc.sql("""
+                select id, name, to_char(time_from, 'HH24:MI') as time_from, to_char(time_to, 'HH24:MI') as time_to,
+                       array_to_string(days, ',') as days, active from unit_ops_route where command_org_id = :c order by time_from, name""")
+                .param("c", command).query().listOfRows()) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", r.get("id").toString());
+            m.put("name", r.get("name"));
+            m.put("from", r.get("time_from"));
+            m.put("to", r.get("time_to"));
+            m.put("days", java.util.Arrays.stream(((String) r.get("days")).split(",")).map(Integer::valueOf).toList());
+            m.put("active", r.get("active"));
+            m.put("targets", jdbc.sql("""
+                    select o.id, o.name from unit_ops_route_target t join organization o on o.id = t.organization_id
+                    where t.route_id = :r order by o.name""").param("r", r.get("id"))
+                    .query((rs, n) -> Map.of("id", rs.getString(1), "name", rs.getString(2))).list());
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** Replaces a command's periods together. Every unit named must lie inside the command, as in the movement programme. */
+    @Transactional
+    public List<Map<String, Object>> saveRoutes(AccessContext ctx, UUID command, List<RouteInput> routes) {
+        if (!ctx.canFor(Permission.MANAGE_ACCESS, command)) {
+            throw ApiException.notFound();
+        }
+        Set<UUID> inside = access.orgSubtree(command);
+        jdbc.sql("delete from unit_ops_route where command_org_id = :c").param("c", command).update();
+        for (RouteInput r : routes == null ? List.<RouteInput>of() : routes) {
+            if (r.name() == null || r.name().isBlank() || r.days() == null || r.days().isEmpty() || r.targets() == null || r.targets().isEmpty()) {
+                throw ApiException.validation("حدد لكل فترة اسماً وأياماً وجهة مستلمة واحدة على الأقل.");
+            }
+            java.time.LocalTime from;
+            java.time.LocalTime to;
+            try {
+                from = java.time.LocalTime.parse(r.from());
+                to = java.time.LocalTime.parse(r.to());
+            } catch (RuntimeException e) {
+                throw ApiException.validation("وقت الفترة غير صحيح.");
+            }
+            if (from.equals(to)) {
+                throw ApiException.validation("بداية الفترة ونهايتها متساويتان.");
+            }
+            UUID id = UUID.randomUUID();
+            jdbc.sql("""
+                    insert into unit_ops_route(id, command_org_id, name, time_from, time_to, days, active, created_by)
+                    values (:id, :c, :n, cast(:f as time), cast(:t as time), string_to_array(:d, ',')::int[], :a, :by)""")
+                    .param("id", id).param("c", command).param("n", r.name().trim()).param("f", from.toString()).param("t", to.toString())
+                    .param("d", String.join(",", r.days().stream().map(String::valueOf).toList())).param("a", !Boolean.FALSE.equals(r.active()))
+                    .param("by", ctx.personId()).update();
+            for (String target : r.targets()) {
+                UUID unit = uuid(target, "الجهة المستلمة");
+                if (!inside.contains(unit)) {
+                    throw ApiException.validation("الجهة المستلمة يجب أن تكون داخل هذه الوحدة.");
+                }
+                jdbc.sql("insert into unit_ops_route_target(route_id, organization_id) values (:r, :o)").param("r", id).param("o", unit).update();
+            }
+        }
+        audit.recordAs(ctx.actor(), "UNIT_OPS_ROUTES_SAVED", "ORGANIZATION", command.toString(), null, Map.of("routes", routes == null ? 0 : routes.size()), null);
+        return routes(ctx, command);
+    }
+
+    /** «الجهات الرئيسية للعلم»: chosen explicitly and audited. Holders covering one read every finally approved request. */
+    public List<Map<String, Object>> fyiMains(AccessContext ctx) {
+        ctx.require(Permission.MANAGE_ACCESS);
+        return jdbc.sql("""
+                select f.organization_id, o.name from fyi_main_command f join organization o on o.id = f.organization_id order by o.name""")
+                .query((rs, n) -> Map.<String, Object>of("id", rs.getString(1), "name", rs.getString(2))).list();
+    }
+
+    @Transactional
+    public void setFyiMain(AccessContext ctx, UUID orgId, boolean chosen) {
+        if (!ctx.canEverywhere(Permission.MANAGE_ACCESS)) {
+            throw ApiException.forbidden("يحدد الجهات الرئيسية للعلم مسؤول الصلاحيات العام فقط.");
+        }
+        if (chosen) {
+            jdbc.sql("insert into fyi_main_command(organization_id, added_by) values (:o, :p) on conflict do nothing")
+                    .param("o", orgId).param("p", ctx.personId()).update();
+        } else {
+            jdbc.sql("delete from fyi_main_command where organization_id = :o").param("o", orgId).update();
+        }
+        audit.recordAs(ctx.actor(), chosen ? "FYI_MAIN_COMMAND_ADDED" : "FYI_MAIN_COMMAND_REMOVED", "ORGANIZATION", orgId.toString(), null, Map.of(), null);
+    }
+
     public String describe(RawGrant g) {
         return describe(g, names(List.of(g)));
     }
@@ -414,8 +640,12 @@ public class GrantAdminService {
             return "نطاق شامل: جميع الجهات والمواقع (ممنوح صراحة)";
         }
         List<String> orgParts = new ArrayList<>();
-        for (GrantTarget t : s.orgs()) {
-            orgParts.add("«" + names.of(t) + "»" + (t.includeDescendants() ? " وفروعها" : " وحدها"));
+        List<GrantTarget> named = "CUSTOM".equals(g.scopeMode())
+                ? g.targets().stream().filter(t -> GrantTarget.ORGANIZATION.equals(t.kind())).toList() : s.orgs();
+        for (GrantTarget t : named) {
+            orgParts.add("«" + names.of(t) + "»" + (t.limited()
+                    ? ": المستوى " + String.join(" و", t.levels().stream().map(String::valueOf).toList())
+                    : t.includeDescendants() ? " وفروعها" : " وحدها"));
         }
         List<String> siteParts = new ArrayList<>();
         for (GrantTarget t : s.sites()) {

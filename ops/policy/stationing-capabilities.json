@@ -1,0 +1,15 @@
+{
+  "note": "DRAFT FOR OWNER REVIEW: قدرات المواقع والتمركز (ADR-045). تعريفات أدوار فقط، لا تُمنح لأحد بنشرها.",
+  "roles": [
+    { "code": "POSTURE_VIEWER", "name": "متابعة الموقف العملياتي", "scope": "ORGANIZATION", "permissions": ["VIEW_OPERATIONAL_POSTURE"], "summaryOnly": false, "grantableRoles": [] },
+    { "code": "STATIONING_REQUESTER", "name": "إنشاء طلبات التمركز", "scope": "ORGANIZATION", "permissions": ["VIEW", "CREATE_INITIAL_STATIONING", "CREATE_DEPLOYMENT_REQUEST", "CREATE_RESTATIONING", "REQUEST_SITE_REGISTRATION"], "summaryOnly": false, "grantableRoles": [] },
+    { "code": "DEPLOYMENT_REQUESTER", "name": "إنشاء طلب منطقة انتشار", "scope": "ORGANIZATION", "permissions": ["VIEW", "CREATE_DEPLOYMENT_REQUEST"], "summaryOnly": false, "grantableRoles": [] },
+    { "code": "SITE_REGISTRATION_REQUESTER", "name": "طلب اعتماد موقع", "scope": "ORGANIZATION", "permissions": ["VIEW", "REQUEST_SITE_REGISTRATION"], "summaryOnly": false, "grantableRoles": [] },
+    { "code": "STATIONING_UNIT_APPROVER", "name": "اعتماد طلبات الوحدة", "scope": "ORGANIZATION", "permissions": ["VIEW", "APPROVE"], "summaryOnly": false, "grantableRoles": [] },
+    { "code": "STATIONING_OPS_APPROVER", "name": "اعتماد عمليات الوحدة في التمركز", "scope": "ORGANIZATION", "permissions": ["VIEW", "DECIDE_UNIT_OPERATIONS"], "summaryOnly": false, "grantableRoles": [] },
+    { "code": "STATIONING_FINAL_APPROVER", "name": "الاعتماد النهائي للتمركز", "scope": "ORGANIZATION", "permissions": ["VIEW", "FINAL_APPROVE_STATIONING"], "summaryOnly": false, "grantableRoles": [] },
+    { "code": "FYI_DISTRIBUTOR", "name": "تحديد وحدات العلم", "scope": "ORGANIZATION", "permissions": ["VIEW", "MANAGE_FYI_DISTRIBUTION"], "summaryOnly": false, "grantableRoles": [] },
+    { "code": "SITE_LINK_MANAGER", "name": "ربط الوحدات بالمواقع", "scope": "ORGANIZATION", "permissions": ["VIEW", "MANAGE_SITE_LINKS"], "summaryOnly": false, "grantableRoles": [] },
+    { "code": "SITE_SETUP_ADMIN", "name": "تهيئة المواقع والتمركز", "scope": "ALL", "permissions": ["VIEW", "MANAGE_FACILITIES", "MANAGE_SITE_LINKS", "CORRECT_STATIONING"], "summaryOnly": false, "grantableRoles": [] }
+  ]
+}

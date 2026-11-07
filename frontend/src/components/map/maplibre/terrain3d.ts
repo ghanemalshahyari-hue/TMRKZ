@@ -1,7 +1,7 @@
-import { addProtocol, type LngLatLike, type Map as MlMap } from 'maplibre-gl';
+import type { LngLatLike, Map as MlMap } from 'maplibre-gl';
 import { PMTiles } from 'pmtiles';
 import type { LatLng } from '../../../lib/geo';
-import { DEM_TILE, DEM_ZOOM, sampleTile, slopeTileImage, tileOf, tilesFor, type SlopeBand } from '../../../lib/terrainRgb';
+import { DEM_TILE, DEM_ZOOM, sampleTile, slopePctTile, tileOf, tilesFor } from '../../../lib/terrainRgb';
 import { RELIEF_3D, SHADE_3D, TERRAIN_3D_SOURCE, type BasemapMode } from './offlineStyle';
 
 /**
@@ -63,8 +63,6 @@ export function place3dLayers(map: MlMap, mode: BasemapMode, on: boolean): void 
     map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
   }
   if (map.getLayer('terrain-hillshade')) map.setPaintProperty('terrain-hillshade', 'raster-opacity', on ? 0 : 0.85);
-  // the slope classes, when shown, stay above the tint and the shade
-  if (before && map.getLayer(SLOPE_LAYER)) map.moveLayer(SLOPE_LAYER, before);
 }
 
 /**
@@ -134,6 +132,7 @@ function fit3d(map: MlMap, points: LatLng[], center: LngLatLike, zoom: number, p
 export class DemSampler {
   private readonly archive: PMTiles;
   private readonly tiles = new Map<string, Promise<Uint8ClampedArray | null>>();
+  private readonly slopes = new Map<string, Float32Array | null>();
 
   constructor(url: string) {
     this.archive = new PMTiles(new URL(url, document.baseURI).href);
@@ -171,63 +170,36 @@ export class DemSampler {
       return d ? Math.round(sampleTile(d, t.px, t.py) * 10) / 10 : null;
     });
   }
-}
 
-// ---- «الانحدار»: slope classes over the map (owner, 6 Nov 2026) -----------------------------------------------------
+  /** The tiles missing for {@link slopeAt} over these points' extent (none: {@link slopeAt} answers at once). */
+  private missingSlopes(points: LatLng[]): { x: number; y: number }[] {
+    if (!points.length) return [];
+    const a = tileOf({ lat: Math.max(...points.map((p) => p.lat)), lng: Math.min(...points.map((p) => p.lng)) });
+    const b = tileOf({ lat: Math.min(...points.map((p) => p.lat)), lng: Math.max(...points.map((p) => p.lng)) });
+    const out: { x: number; y: number }[] = [];
+    for (let y = a.y; y <= b.y; y++) for (let x = a.x; x <= b.x; x++) if (!this.slopes.has(`${x}/${y}`)) out.push({ x, y });
+    return out;
+  }
 
-export const SLOPE_SOURCE = 'terrain3d-slope';
-export const SLOPE_LAYER = 'terrain3d-slope';
-const SLOPE_PROTOCOL = 'tmrkzslope';
-let slope: { archive: PMTiles; bands: SlopeBand[] } | null = null;
-let slopeProtocol = false;
+  slopesReady = (points: LatLng[]) => this.missingSlopes(points).length === 0;
 
-/**
- * Slope classes over the map, green (flat) to red (steepest), with the classes and thresholds of the Stationing policy
- * in force (owner request of 6 Nov 2026: judge the ground while choosing where to draw). DISPLAY ONLY: computed in the
- * browser from the 3D view's elevation tiles (finest zoom, about 35 m a pixel), never sent anywhere and never a rule;
- * the class the rules use for a drawn area is the server's, from the native slope analysis. Drawn below roads and every
- * request geometry, in 2D and 3D, from map zoom 11 (coarser tiles would flatten the slopes).
- */
-export function showSlope(map: MlMap, on: boolean, mode: BasemapMode, demUrl: string, bands: SlopeBand[]): void {
-  if (!slopeProtocol) {
-    addProtocol(SLOPE_PROTOCOL, async (params) => {
-      const m = /:\/\/(\d+)\/(\d+)\/(\d+)/.exec(params.url);
-      const s = slope;
-      const blank = async () => ({ data: await createImageBitmap(new ImageData(DEM_TILE, DEM_TILE)) });
-      if (!m || !s) return blank();
-      const [z, x, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
-      const r = await s.archive.getZxy(z, x, y);
-      if (!r?.data) return blank();
-      const bmp = await createImageBitmap(new Blob([r.data], { type: 'image/png' }), { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
-      const c = new OffscreenCanvas(DEM_TILE, DEM_TILE);
-      const g = c.getContext('2d', { willReadFrequently: true })!;
-      g.drawImage(bmp, 0, 0);
-      bmp.close();
-      const img = slopeTileImage(g.getImageData(0, 0, DEM_TILE, DEM_TILE).data, z, y, s.bands);
-      g.putImageData(new ImageData(img, DEM_TILE, DEM_TILE), 0, 0);
-      return { data: await createImageBitmap(c) };
-    });
-    slopeProtocol = true;
+  /** Reads and keeps the slope of the tiles under these points. */
+  async loadSlopes(points: LatLng[]): Promise<void> {
+    await Promise.all(
+      this.missingSlopes(points).map(async ({ x, y }) => {
+        const d = await this.tile(x, y);
+        this.slopes.set(`${x}/${y}`, d ? slopePctTile(d, DEM_ZOOM, y) : null);
+        if (this.slopes.size > 64) this.slopes.delete(this.slopes.keys().next().value!);
+      }),
+    );
   }
-  const same = slope && JSON.stringify(slope.bands) === JSON.stringify(bands);
-  if (!slope || !same) {
-    slope = { archive: slope?.archive ?? new PMTiles(new URL(demUrl, document.baseURI).href), bands };
-    // other classes: the tiles are drawn again
-    if (map.getLayer(SLOPE_LAYER)) map.removeLayer(SLOPE_LAYER);
-    if (map.getSource(SLOPE_SOURCE)) map.removeSource(SLOPE_SOURCE);
-  }
-  // the elevation tint steps back while the slope classes are shown (the shade keeps the relief readable)
-  if (map.getLayer(RELIEF_3D)) map.setPaintProperty(RELIEF_3D, 'color-relief-opacity', on ? 0 : 0.55);
-  if (!on) {
-    if (map.getLayer(SLOPE_LAYER)) map.setLayoutProperty(SLOPE_LAYER, 'visibility', 'none');
-    return;
-  }
-  if (!map.getSource(SLOPE_SOURCE)) {
-    map.addSource(SLOPE_SOURCE, { type: 'raster', tiles: [SLOPE_PROTOCOL + '://{z}/{x}/{y}'], tileSize: DEM_TILE, minzoom: DEM_ZOOM, maxzoom: DEM_ZOOM, bounds: [51, 22, 57, 27] });
-  }
-  const before = map.getLayer(BELOW[mode]) ? BELOW[mode] : undefined;
-  if (!map.getLayer(SLOPE_LAYER)) {
-    map.addLayer({ id: SLOPE_LAYER, type: 'raster', source: SLOPE_SOURCE, minzoom: 11, paint: { 'raster-opacity': 0.62, 'raster-fade-duration': 0 } }, before);
-  } else if (before) map.moveLayer(SLOPE_LAYER, before);
-  map.setLayoutProperty(SLOPE_LAYER, 'visibility', 'visible');
+
+  /** Slope percent of a whole elevation pixel at the finest zoom (world pixel numbers); NaN when absent or not loaded. */
+  slopeAt = (px: number, py: number): number => {
+    const t = this.slopes.get(`${Math.floor(px / DEM_TILE)}/${Math.floor(py / DEM_TILE)}`);
+    if (!t) return NaN;
+    const x = px - Math.floor(px / DEM_TILE) * DEM_TILE;
+    const y = py - Math.floor(py / DEM_TILE) * DEM_TILE;
+    return t[y * DEM_TILE + x];
+  };
 }

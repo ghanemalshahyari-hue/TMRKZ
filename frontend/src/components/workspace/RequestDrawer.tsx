@@ -1,3 +1,4 @@
+import { PURPOSE_TITLE, isPurpose } from '../../lib/requestPurpose';
 import { useMemo, useState } from 'react';
 import type { RestationingListItem, RestationingState } from '../../api/types';
 import { fullDate } from '../../lib/dates';
@@ -38,9 +39,7 @@ export function RequestDrawer({ items, selected, onSelect, open, setOpen, canCre
           <span className="tz-chip">{items?.length ?? '…'}</span>
           <Icon name="chevron" />
         </button>
-        <button className="button primary compact tz-new" disabled={!canCreate} onClick={onCreate} title={canCreate ? '' : 'تحتاج صلاحية «طلب إعادة التمركز»'}>
-          ＋ طلب إعادة تمركز
-        </button>
+        {canCreate && <a className="button primary compact tz-new" href="#newRequest" data-create={!!onCreate}>＋ طلب جديد</a>}
       </div>
       {open && (
         <>
@@ -58,6 +57,7 @@ export function RequestDrawer({ items, selected, onSelect, open, setOpen, canCre
               <button key={r.id} className={'rs-item' + (r.id === selected ? ' active' : '')} aria-current={r.id === selected} onClick={() => onSelect(r.id)}>
                 <span className="rs-item-head">
                   <b>{r.number}</b>
+                  {r.purpose && r.purpose !== 'RESTATIONING' && isPurpose(r.purpose) && <small className="tz-code">{PURPOSE_TITLE[r.purpose]}</small>}
                   <StatePill state={r.state} />
                 </span>
                 <span>

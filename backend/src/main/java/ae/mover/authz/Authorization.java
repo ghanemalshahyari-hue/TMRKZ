@@ -114,7 +114,8 @@ public class Authorization implements AccessContext.Confirmer {
             if (checkRequest(ctx, r, null, "view_any", "")) {
                 return true;
             }
-            if (!r.decided() || r.infoOrgs().isEmpty()) {
+            UUID myFyi = r.fyi().get(ctx.personId());
+            if (!r.decided() || (r.infoOrgs().isEmpty() && myFyi == null)) {
                 return false;
             }
             Map<String, Object> c = base(ctx);
@@ -122,6 +123,9 @@ public class Authorization implements AccessContext.Confirmer {
             String object = "request:" + r.requestId();
             List<FgaClient.Tuple> tuples = new ArrayList<>();
             r.infoOrgs().forEach(o -> tuples.add(new FgaClient.Tuple(object, "info_org", "organization:" + o, null)));
+            if (myFyi != null) {
+                tuples.add(new FgaClient.Tuple(object, "info_org", "organization:" + myFyi, null));
+            }
             return decide(ctx, object, "info_view", tuples, c);
         });
         if (!ok) {

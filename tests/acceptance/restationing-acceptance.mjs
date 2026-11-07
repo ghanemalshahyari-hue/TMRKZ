@@ -276,14 +276,14 @@ try {
       if (!who) { ok(false, 'A4', 'every stage has a fictional seat holder', `no seat for «${cur.label}»`); break; }
       const p = await pageAs(who);
       await openRequest(p, reqA);
-      await press(p, 'اعتماد المرحلة');
+      await press(p, 'اعتماد');
       await p.context().close();
     }
     v = await view(reqA);
     ok(v.state === 'APPROVED_NOT_ACTIVATED', 'A4', 'each stage approved on the page by its own seat holder', `${v.state}; ${routeText(v.route)}; final approver ${v.finalApprover?.name}`);
     const act = await pageAs('t.facilities');
     await openRequest(act, reqA);
-    await press(act, 'تفعيل (إجراء مستقل)');
+    await press(act, 'تفعيل');
     await act.screenshot({ path: shot('A-activated.png') });
     await act.context().close();
     v = await view(reqA);
@@ -481,7 +481,7 @@ try {
       const page = await pageAs(user);
       await page.goto(`${BASE}/#restationing`);
       await page.waitForSelector('.rs-list');
-      await page.getByRole('button', { name: '＋ طلب إعادة تمركز' }).click();
+      await page.goto(`${BASE}/#restationing/new`);
       await page.locator('.rs-form select').first().selectOption({ label: unitName });
       await page.locator('.rs-check', { hasText: movingName }).first().locator('input').check();
       await page.locator('.rs-form textarea').first().fill(`مسودة اختبار قبول — سلوك نسخ الحدود (${type}) — بيانات وهمية، ليست طلب عمل`);
@@ -529,7 +529,7 @@ try {
           if (!cur) break;
           const p = await pageAs(deciderFor(cur));
           await openRequest(p, r.id);
-          await press(p, 'اعتماد المرحلة');
+          await press(p, 'اعتماد');
           if (k === 0) await p.screenshot({ path: shot('R-L10-route.png'), fullPage: true });
           await p.context().close();
         }
@@ -548,7 +548,7 @@ try {
     const page = await pageAs('t.requester.pm');
     await page.goto(`${BASE}/#restationing`);
     await page.waitForSelector('.rs-list');
-    await page.getByRole('button', { name: '＋ طلب إعادة تمركز' }).click();
+    await page.goto(`${BASE}/#restationing/new`);
     await page.waitForTimeout(2000);
     const options = (await page.locator('.rs-form select').first().locator('option').allTextContents()).map((o) => o.trim()).filter((o) => o && !o.startsWith('—'));
     await page.locator('.rs-form select').first().selectOption({ label: 'وحدة الصيانة الإدارية' });

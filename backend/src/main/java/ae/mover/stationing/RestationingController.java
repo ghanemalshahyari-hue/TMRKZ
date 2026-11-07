@@ -106,6 +106,25 @@ public class RestationingController {
     // ---- lifecycle (ADR-034) --------------------------------------------------------------------------------
 
     /** D9/D16: ask to cancel a request before its activation. */
+    @GetMapping("/{id}/fyi-options")
+    public List<Map<String, Object>> fyiOptions(Actor actor, @PathVariable UUID id) {
+        return service.fyiOptions(access.context(actor), id);
+    }
+
+    @PostMapping("/{id}/fyi")
+    public Map<String, Object> distributeFyi(Actor actor, @PathVariable UUID id, @RequestBody RestationingService.FyiInput in) {
+        var ctx = access.context(actor);
+        service.distributeFyi(ctx, id, in, clock.instant());
+        return view(ctx, id);
+    }
+
+    @PostMapping("/{id}/fyi/{unit}/end")
+    public Map<String, Object> endFyi(Actor actor, @PathVariable UUID id, @PathVariable UUID unit, @RequestBody RestationingService.ReasonInput in) {
+        var ctx = access.context(actor);
+        service.endFyi(ctx, id, unit, in, clock.instant());
+        return view(ctx, id);
+    }
+
     @PostMapping("/{id}/cancellation")
     public Map<String, Object> askCancellation(Actor actor, @PathVariable UUID id, @RequestBody RestationingLifecycle.AskInput in) {
         var ctx = access.context(actor);

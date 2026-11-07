@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
+import { api, type SiteOccupants } from '../api/client';
 import type { MapFeature, SiteDetail, SiteGeometry, SiteLinkRecord, StationingRecord } from '../api/types';
 import { Icon } from '../components/ui';
 import type { BasemapMode } from '../components/map/maplibre/offlineStyle';
@@ -149,6 +149,7 @@ function SiteDetailsPanel({ site, sites, stationedAt, stationedShown, hidden }: 
   const [detail, setDetail] = useState<SiteDetail | null>(null);
   const [current, setCurrent] = useState<StationingRecord[] | null>(null);
   const [links, setLinks] = useState<SiteLinkRecord[] | null>(null);
+  const [occupants, setOccupants] = useState<SiteOccupants | null>(null);
   const [error, setError] = useState<string | null>(null);
   const id = site?.siteId ?? null;
   useEffect(() => {
@@ -160,6 +161,7 @@ function SiteDetailsPanel({ site, sites, stationedAt, stationedShown, hidden }: 
     api.site(id).then(setDetail).catch((e: Error) => setError(e.message));
     api.stationingCurrent(undefined, id).then(setCurrent).catch(() => setCurrent([]));
     api.siteLinks(undefined, id).then(setLinks).catch(() => setLinks([]));
+    api.siteOccupants(id).then(setOccupants).catch(() => setOccupants(null));
   }, [id]);
   const canRequest = app.can('CREATE_RESTATIONING');
 
@@ -263,6 +265,7 @@ function SiteDetailsPanel({ site, sites, stationedAt, stationedShown, hidden }: 
           )}
           {current == null && <p className="tz-muted">جارٍ التحميل…</p>}
           {current != null && here.length === 0 && <p className="tz-muted">لا تمركز حالي مسجّل ضمن ما تراه.</p>}
+          {!!occupants?.otherStationed && <p className="tz-muted" data-testid="others-at-site">جهة أخرى في الموقع: {occupants.otherStationed}</p>}
           <ul className="tz-sites">
             {here.map((c) => (
               <li key={c.id}>

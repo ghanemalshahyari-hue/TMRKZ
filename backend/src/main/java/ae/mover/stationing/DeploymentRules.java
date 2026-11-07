@@ -30,7 +30,7 @@ public final class DeploymentRules {
      */
     public static LegCheck leg(Leg leg, StationingPolicy policy, Double distanceM, TerrainDecision terrain) {
         TerrainDecision t = leg.terrainApplies() ? terrain : null;
-        double add = t == null ? 0 : t.controlling().allowanceM();
+        double add = t == null ? 0 : policy.terrainAddM(leg, t.controlling());
         double min = leg.minM() + (policy.terrainAppliesTo() == TerrainAppliesTo.MIN_AND_MAX ? add : 0);
         double max = leg.maxM() + add;
         Double exceptionMax = policy.exception().allowed() ? max + policy.exception().maxExtraM() : null;

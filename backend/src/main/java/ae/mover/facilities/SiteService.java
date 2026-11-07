@@ -313,28 +313,36 @@ public class SiteService {
     }
 
     public record SiteInput(String code, String name, String kind, String parentId, String responsibleOrgId, Integer capacity,
-                            Location location) {
+                            Location location, String notes, String reason) {
     }
 
     @Transactional
     public SiteView create(AccessContext ctx, SiteInput in) {
         validate(in);
-        requireFacilityManager(ctx, UUID.fromString(in.responsibleOrgId()));
+        // a site need not name a responsible organisation (ADR-045): only a manager of everything then registers it
+        UUID responsible = in.responsibleOrgId() == null || in.responsibleOrgId().isBlank() ? null : UUID.fromString(in.responsibleOrgId());
+        requireFacilityManager(ctx, responsible);
         UUID id = UUID.randomUUID();
         Instant now = clock.instant();
         try {
             jdbc.sql("""
-                    insert into site(id, code, name, kind, parent_id, capacity, lat, lng, created_at)
-                    values (:id, :code, :name, :kind, :parent, :cap, :lat, :lng, :now)""")
+                    insert into site(id, code, name, kind, parent_id, capacity, lat, lng, created_at, notes)
+                    values (:id, :code, :name, :kind, :parent, :cap, :lat, :lng, :now, :notes)""")
                     .param("id", id).param("code", in.code().trim()).param("name", in.name().trim()).param("kind", in.kind().trim())
                     .param("parent", in.parentId() == null ? null : UUID.fromString(in.parentId())).param("cap", in.capacity())
                     .param("lat", in.location() == null ? null : in.location().lat())
-                    .param("lng", in.location() == null ? null : in.location().lng()).param("now", Db.ts(now)).update();
+                    .param("lng", in.location() == null ? null : in.location().lng()).param("now", Db.ts(now)).param("notes", in.notes()).update();
         } catch (DataAccessException e) {
             throw ApiException.validation("تعذر حفظ الموقع: الرمز مستخدم أو الموقع الأب غير صالح.");
         }
-        setResponsibility(id, UUID.fromString(in.responsibleOrgId()), now);
-        audit.recordAs(ctx.actor(), "SITE_CREATED", "SITE", id.toString(), in.name(), Map.of("code", in.code()), null);
+        if (responsible != null) {
+            setResponsibility(id, responsible, now);
+        }
+        Map<String, Object> made = new LinkedHashMap<>();
+        made.put("code", in.code());
+        made.put("parentId", in.parentId());
+        made.put("responsibleOrgId", in.responsibleOrgId());
+        audit.recordAs(ctx.actor(), "SITE_CREATED", "SITE", id.toString(), in.name(), made, in.reason());
         return list(ctx).stream().filter(s -> s.id().equals(id.toString())).findFirst().orElseThrow();
     }
 
@@ -343,16 +351,18 @@ public class SiteService {
         validate(in);
         SiteRow current = rows("where s.id = :id", Map.of("id", id)).stream().findFirst().orElseThrow(ApiException::notFound);
         requireFacilityManager(ctx, current.orgId());
-        requireFacilityManager(ctx, UUID.fromString(in.responsibleOrgId()));
+        if (in.responsibleOrgId() != null) {
+            requireFacilityManager(ctx, UUID.fromString(in.responsibleOrgId()));
+        }
         Instant now = clock.instant();
         try {
             jdbc.sql("""
                     update site set name = :name, kind = :kind, parent_id = :parent, capacity = :cap, lat = :lat, lng = :lng,
-                           version = version + 1 where id = :id""")
+                           notes = coalesce(:notes, notes), version = version + 1 where id = :id""")
                     .param("name", in.name().trim()).param("kind", in.kind().trim())
                     .param("parent", in.parentId() == null ? null : UUID.fromString(in.parentId())).param("cap", in.capacity())
                     .param("lat", in.location() == null ? null : in.location().lat())
-                    .param("lng", in.location() == null ? null : in.location().lng()).param("id", id).update();
+                    .param("lng", in.location() == null ? null : in.location().lng()).param("notes", in.notes()).param("id", id).update();
         } catch (DataAccessException e) {
             if (Db.isCheckViolation(e)) {
                 throw ApiException.validation("لا يمكن أن يصبح الموقع تابعاً لأحد فروعه (دورة في شجرة المواقع).");
@@ -368,11 +378,17 @@ public class SiteService {
                 throw ApiException.validation("لا يمكن نقل الموقع في شجرة المواقع: " + String.join(" ", problems));
             }
         }
-        UUID newOrg = UUID.fromString(in.responsibleOrgId());
-        if (!newOrg.equals(current.orgId())) {
+        UUID newOrg = in.responsibleOrgId() == null ? current.orgId() : UUID.fromString(in.responsibleOrgId());
+        if (newOrg != null && !newOrg.equals(current.orgId())) {
             setResponsibility(id, newOrg, now);
         }
-        audit.recordAs(ctx.actor(), "SITE_UPDATED", "SITE", id.toString(), in.name(), Map.of("code", current.code()), null);
+        Map<String, Object> changed = new LinkedHashMap<>();
+        changed.put("code", current.code());
+        changed.put("nameBefore", current.name());
+        changed.put("nameAfter", in.name());
+        changed.put("parentBefore", current.parentId() == null ? null : current.parentId().toString());
+        changed.put("parentAfter", in.parentId());
+        audit.recordAs(ctx.actor(), "SITE_UPDATED", "SITE", id.toString(), in.name(), changed, in.reason());
         return list(ctx).stream().filter(s -> s.id().equals(id.toString())).findFirst().orElseThrow();
     }
 
@@ -556,8 +572,8 @@ public class SiteService {
 
     private void validate(SiteInput in) {
         if (in == null || in.code() == null || in.code().isBlank() || in.name() == null || in.name().isBlank()
-                || in.kind() == null || in.kind().isBlank() || in.responsibleOrgId() == null) {
-            throw ApiException.validation("أكمل رمز الموقع واسمه وتصنيفه والجهة المسؤولة.");
+                || in.kind() == null || in.kind().isBlank()) {
+            throw ApiException.validation("أكمل رمز الموقع واسمه وتصنيفه.");
         }
         if (in.location() != null && (!Double.isFinite(in.location().lat()) || !Double.isFinite(in.location().lng())
                 || Math.abs(in.location().lat()) > 90 || Math.abs(in.location().lng()) > 180)) {

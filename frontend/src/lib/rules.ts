@@ -65,6 +65,14 @@ export const FACT_SUBJECTS: RuleSubject[] = [
   { key: 'fact:requestType', label: 'نوع الطلب', kind: 'requestType' },
 ];
 
+/** What a flow's questions can also ask: where the requesting unit stands in the hierarchy. Only the studio offers these. */
+const YES_NO = [{ value: 'YES', label: 'نعم' }, { value: 'NO', label: 'لا' }];
+export const UNIT_SUBJECTS: RuleSubject[] = [
+  { key: 'fact:requesterIsMain', label: 'هل وحدة مقدم الطلب رئيسية؟', kind: 'select', options: YES_NO },
+  { key: 'fact:requesterHasParent', label: 'هل فوق وحدة مقدم الطلب جهة؟', kind: 'select', options: YES_NO },
+  { key: 'fact:requesterLevel', label: 'مستوى وحدة مقدم الطلب', kind: 'number' },
+];
+
 export const OP_LABELS: Record<RuleOp, string> = {
   eq: 'يساوي',
   neq: 'لا يساوي',

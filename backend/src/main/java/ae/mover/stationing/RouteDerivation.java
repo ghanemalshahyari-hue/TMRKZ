@@ -29,7 +29,7 @@ public final class RouteDerivation {
     private RouteDerivation() {
     }
 
-    public enum Kind { HIERARCHY, CROSS_BRANCH, EXCEPTION }
+    public enum Kind { HIERARCHY, CROSS_BRANCH, EXCEPTION, UNIT_OPERATIONS, FINAL }
 
     /** One approval condition a stage's decision satisfies (written to the decision record). */
     public record Requirement(String code, String label) {
@@ -103,6 +103,29 @@ public final class RouteDerivation {
         return stages;
     }
 
+    /**
+     * The stages the policy adds after the hierarchy (ADR-045): «اعتماد عمليات الوحدة», then «الاعتماد النهائي», each decided
+     * through its own permission for the requesting unit. Who holds them is configuration, never named here. A route the
+     * hierarchy did not complete stays incomplete, so the request cannot be submitted.
+     */
+    public static List<RouteStage> withConfiguredStages(List<RouteStage> route, StationingPolicy.ApprovalStages a) {
+        if (a == null || !complete(route)) {
+            return route;
+        }
+        List<RouteStage> out = new ArrayList<>(route);
+        if (a.finalByPermission()) {
+            RouteStage last = out.remove(out.size() - 1);
+            out.add(new RouteStage(last.key(), last.unit(), last.kind(), last.label(), last.satisfies(), false, last.dependsOn(), last.independentOf()));
+            out.add(new RouteStage("F:final", null, Kind.FINAL, "الاعتماد النهائي",
+                    new ArrayList<>(List.of(new Requirement("FINAL", "الاعتماد النهائي"))), true, EnumSet.allOf(Fact.class), null));
+        }
+        if (a.unitOperations()) {
+            out.add(out.size() - 1, new RouteStage("O:operations", null, Kind.UNIT_OPERATIONS, "اعتماد عمليات الوحدة",
+                    new ArrayList<>(List.of(new Requirement("UNIT_OPERATIONS", "اعتماد عمليات الوحدة"))), false, EnumSet.allOf(Fact.class), null));
+        }
+        return out;
+    }
+
     /** True when the route ends with the configured final stage (otherwise the request cannot be submitted). */
     public static boolean complete(List<RouteStage> stages) {
         return !stages.isEmpty() && stages.get(stages.size() - 1).finalStage();
@@ -133,9 +156,9 @@ public final class RouteDerivation {
 
     private static String what(CrossAuthority a) {
         return switch (a) {
-            case OTHER_UNIT -> "موافقة الوحدة من الفرع الآخر";
-            case OTHER_UNIT_PARENT -> "موافقة أب الوحدة من الفرع الآخر";
-            case SITE_RESPONSIBLE -> "موافقة المسؤول عن موقعها";
+            case OTHER_UNIT -> "موافقة الوحدة المضافة";
+            case OTHER_UNIT_PARENT -> "موافقة الجهة الأعلى للوحدة المضافة";
+            case SITE_RESPONSIBLE -> "موافقة المسؤول عن موقع الوحدة المضافة";
         };
     }
 

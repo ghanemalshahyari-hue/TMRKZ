@@ -261,6 +261,10 @@ public abstract class IntegrationTest {
                     .header("X-Requested-With", "mover").method("PATCH", HttpRequest.BodyPublishers.ofString(write(body))));
         }
 
+        public Res delete(String path) {
+            return send(HttpRequest.newBuilder(URI.create(url(path))).header("X-Requested-With", "mover").DELETE());
+        }
+
         public Res put(String path, Object body) {
             return send(HttpRequest.newBuilder(URI.create(url(path))).header("Content-Type", "application/json")
                     .header("X-Requested-With", "mover").PUT(HttpRequest.BodyPublishers.ofString(write(body))));

@@ -5,7 +5,8 @@ import type { DemSampler } from '../map/maplibre';
 import { formatArea, formatMeters } from '../../lib/footprint';
 import { anchorOf, partsOf, validateSite } from '../../lib/siteGeometry';
 import { CONNECTOR_TITLE, VERDICT, ruleLines, type Connector, type ConnectorKind } from '../../lib/terrainAnalysis';
-import { areaSamples, bandColours, elevationStats, profileOf, profilePoints, type ElevationStats, type Profile, type SlopeBand } from '../../lib/terrainRgb';
+import { SLOPE_TONES, TONE_COLOUR, areaSamples, elevationStats, profileOf, profilePoints, type ElevationStats, type Profile, type SlopeLimits, type SlopeTone } from '../../lib/terrainRgb';
+import type { SlopeInside, SlopeResult, SlopeShape } from '../map/maplibre';
 import type { CardRole } from './terrainCards';
 import './terrain3d.css';
 
@@ -325,34 +326,70 @@ export function cardLines(role: CardRole, insight: AreaInsight | null, extra: [s
 }
 
 
+const TONE_WORD: Record<SlopeTone, string> = { ok: 'مناسب', care: 'بحذر', risk: 'مرتفع أو منخفض شديد' };
+const TONE_VERDICT: Record<SlopeTone, string> = {
+  ok: 'مناسب للتمركز هنا',
+  care: 'ممكن، مع الحذر من الانحدار',
+  risk: 'مسموح مع الحذر من الانحدار',
+};
+
+const SHAPE_TITLE: Record<SlopeShape, string> = { site: ROLE_TITLE.SITE, primary: ROLE_TITLE.PRIMARY, alternative: ROLE_TITLE.ALTERNATIVE };
+
 /**
- * «الانحدار» on the map: the slope classes of the policy in force over the ground, green (flat) to red (steepest), with
- * their legend. Display only (computed from the elevation tiles); the server's class of a drawn area is the one that counts.
+ * «الانحدار» on the map: the ground inside the site and the deployment areas being placed, in green, orange or red, with
+ * what each colour means and, for the shape being edited, its share and a sentence following the colour with the most
+ * ground. The limits are the administrator's (Stationing policy). Display only: it blocks nothing, and the server's class
+ * in the terrain panel is the one the rules use.
  */
-export function SlopeControl({ on, setOn, bands, available }: { on: boolean; setOn: (v: boolean) => void; bands: SlopeBand[] | null; available: boolean }) {
-  const colours = bands ? bandColours(bands.length) : [];
-  const range = (b: SlopeBand) => (b.toPct == null ? `≥ ${b.fromPct}٪` : `${b.fromPct}–${b.toPct}٪`);
+export function SlopeControl({ on, setOn, limits, available, inside }: {
+  on: boolean;
+  setOn: (v: boolean) => void;
+  limits: SlopeLimits;
+  available: boolean;
+  inside: SlopeInside | null;
+}) {
+  const [result, setResult] = useState<SlopeResult | null>(null);
+  useEffect(() => {
+    if (!inside) return setResult(null);
+    return inside.subscribe(setResult);
+  }, [inside]);
+  const tone = result?.tone ?? null;
+  const n = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const range: Record<SlopeTone, string> = {
+    ok: `0–${n(limits.greenBelowPct)}٪`,
+    care: limits.redFromPct > limits.greenBelowPct ? `${n(limits.greenBelowPct)}–${n(limits.redFromPct)}٪` : '',
+    risk: `≥ ${n(limits.redFromPct)}٪`,
+  };
   return (
-    <div className="tz-slope" data-testid="slope-control" data-on={on ? 'true' : 'false'}>
+    <div className="tz-slope" data-testid="slope-control" data-on={on ? 'true' : 'false'} data-tone={tone ?? ''} data-live={result?.live ? 'true' : 'false'} data-shape={result?.shape ?? ''}>
       <button
         className={on ? 'on' : ''}
         aria-pressed={on}
-        disabled={!available || !bands}
-        title={!available ? 'نموذج الارتفاع غير مثبت في حزمة الخرائط' : !bands ? 'لا سياسة تمركز سارية' : 'ألوان الانحدار حسب فئات سياسة التمركز'}
+        disabled={!available}
+        title={!available ? 'نموذج الارتفاع غير مثبت في حزمة الخرائط' : 'ألوان الانحدار داخل الموقع والمناطق'}
         onClick={() => setOn(!on)}
       >
         <i className="tz-slope-swatch" aria-hidden /> الانحدار
       </button>
-      {on && bands && (
-        <div className="tz-slope-legend" role="note">
+      {on && available && (
+        <div className="tz-slope-legend" role="status">
+          {tone ? (
+            <>
+              <small data-testid="slope-shape">{result ? SHAPE_TITLE[result.shape] : ''}</small>
+              <b className={'tz-slope-verdict ' + tone} data-testid="slope-verdict">{TONE_VERDICT[tone]}</b>
+            </>
+          ) : (
+            <small>ضع الموقع أو المنطقة لعرض الانحدار داخلها</small>
+          )}
           <ul>
-            {bands.map((b, i) => (
-              <li key={b.code}>
-                <i style={{ background: `rgb(${colours[i].join(',')})` }} /> <span>{b.label}</span> <small dir="ltr">{range(b)}</small>
+            {SLOPE_TONES.filter((t) => range[t]).map((t) => (
+              <li key={t} data-tone={t}>
+                <i style={{ background: TONE_COLOUR[t] }} /> <span>{TONE_WORD[t]}</span> <small dir="ltr">{range[t]}</small>
+                {tone && <b data-testid={'slope-share-' + t}>{pct(Math.round(result!.shares[t]))}</b>}
               </li>
             ))}
           </ul>
-          <small>فئات سياسة التمركز السارية · للعرض من نموذج الارتفاع؛ التصنيف المعتمد للمنطقة المرسومة من الخادم</small>
+          <small>للعرض من نموذج الارتفاع، ولا يمنع الحفظ؛ التصنيف المعتمد من الخادم</small>
         </div>
       )}
     </div>

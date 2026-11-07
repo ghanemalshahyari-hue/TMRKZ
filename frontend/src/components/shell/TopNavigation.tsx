@@ -1,3 +1,4 @@
+import { ThemeToggle } from '../ThemeToggle';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import type { Me, Notification, RestationingListItem } from '../../api/types';
@@ -12,9 +13,9 @@ const POLL_MS = 30_000;
 export function BrandMark({ size = 34 }: { size?: number }) {
   return (
     <svg className="tz-mark" width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
-      <path d="M24 6 42 22h-8L24 13 14 22H6Z" fill="#2bc4a8" />
-      <path d="M24 17 40 31h-8l-8-7-8 7H8Z" fill="#c9a76b" />
-      <path d="M24 28 38 40H10Z" fill="#1d8f7c" />
+      <path d="M24 6 42 22h-8L24 13 14 22H6Z" fill="var(--tz-mark-1, #2bc4a8)" />
+      <path d="M24 17 40 31h-8l-8-7-8 7H8Z" fill="var(--tz-mark-2, #c9a76b)" />
+      <path d="M24 28 38 40H10Z" fill="var(--tz-mark-3, #1d8f7c)" />
     </svg>
   );
 }
@@ -205,6 +206,7 @@ function Notifications() {
   };
   return (
     <div className="notif-wrap">
+      <ThemeToggle />
       <button className="tz-icon-btn" aria-label={'الإشعارات' + (unread ? ' — ' + unread + ' غير مقروءة' : '')} onClick={() => setOpen((o) => !o)}>
         <Icon name="bell" />
         {unread > 0 && <span className="notif-badge">{unread}</span>}
@@ -219,7 +221,7 @@ function Notifications() {
             items.slice(0, 20).map((n) => (
               <button key={n.id} className={'notif-item ' + (n.readAt ? '' : 'unread')} onClick={() => read(n)}>
                 <b>{n.title}</b>
-                <small>{n.body}</small>
+                {n.body.startsWith('#restationing/') ? <small><a href={n.body.split(' ')[0]}>فتح الطلب</a>{n.body.includes(' — ') ? ' — ' + n.body.split(' — ').slice(1).join(' — ') : ''}</small> : <small>{n.body}</small>}
                 <small className="tz-muted">{fullTime(n.createdAt)}</small>
               </button>
             ))

@@ -20,6 +20,15 @@ describe('registered sites as a reference layer (owner decisions of 5 Nov 2026)'
   const current = [rec('u1', 'وحدة أ', 'm'), rec('u2', 'وحدة ب', 'm'), rec('u3', 'وحدة ج', 'hidden'), rec('u4', 'وحدة د', 'later', { siteLocation: { lat: 25.3, lng: 55.4 } })];
   const sites = registeredSites(features, current);
 
+  it('keeps a request\'s current site one object: no second boundary, one name that says it is the current site', () => {
+    const units = unitsPerSite([{ siteId: 'b', orgId: 'o1' }] as never);
+    const fc = siteReferenceFeatures(sites, null, units, new Set(['b']));
+    const b = fc.features.filter((f) => f.properties.siteId === 'b');
+    expect(b.map((f) => f.properties.role)).toEqual(['REF_LABEL']);
+    expect(b[0].properties.sub).toBe('الموقع الحالي · وحدة واحدة');
+    expect(fc.features.find((f) => f.properties.siteId === 'm')!.properties.sub).toBe('');
+  });
+
   it('draws a registered boundary with ONE label, a marker otherwise, and skips context and unlocated sites', () => {
     const fc = siteReferenceFeatures(sites);
     expect(fc.features.map((f) => [f.properties.siteId, f.properties.role, f.geometry.type])).toEqual([
@@ -44,7 +53,7 @@ describe('registered sites as a reference layer (owner decisions of 5 Nov 2026)'
 
   it('is reference only: identity and display state, no ranking, recommendation or validity, the server\'s order', () => {
     const fc = siteReferenceFeatures(sites);
-    for (const f of fc.features) expect(Object.keys(f.properties).sort()).toEqual(['label', 'name', 'related', 'role', 'selected', 'siteId']);
+    for (const f of fc.features) expect(Object.keys(f.properties).sort()).toEqual(['label', 'name', 'related', 'role', 'selected', 'siteId', 'sub']);
     expect(fc.features.map((f) => f.properties.siteId)).toEqual(['b', 'b', 'm', 'later']);
   });
 
@@ -139,10 +148,10 @@ describe('map-first request flow (owner correction of 5 Nov 2026)', () => {
   it('parses the list, one request, and a new request from a site or a unit; keeps #restationing/<id> working', () => {
     expect(parseRestationingHash('#restationing')).toEqual({ kind: 'list' });
     expect(parseRestationingHash('#restationing/' + ID)).toEqual({ kind: 'request', id: ID });
-    expect(parseRestationingHash(newRequestHash(ID))).toEqual({ kind: 'new', unit: ID, site: null });
-    expect(parseRestationingHash(newRequestFromSiteHash(ID))).toEqual({ kind: 'new', unit: null, site: ID });
-    expect(parseRestationingHash('#restationing/new')).toEqual({ kind: 'new', unit: null, site: null });
-    expect(parseRestationingHash('#restationing/new?unit=<script>')).toEqual({ kind: 'new', unit: null, site: null });
+    expect(parseRestationingHash(newRequestHash(ID))).toEqual({ kind: 'new', unit: ID, site: null, purpose: null });
+    expect(parseRestationingHash(newRequestFromSiteHash(ID))).toEqual({ kind: 'new', unit: null, site: ID, purpose: null });
+    expect(parseRestationingHash('#restationing/new')).toEqual({ kind: 'new', unit: null, site: null, purpose: null });
+    expect(parseRestationingHash('#restationing/new?unit=<script>')).toEqual({ kind: 'new', unit: null, site: null, purpose: null });
     expect(parseRestationingHash('#restationing/bad id')).toEqual({ kind: 'list' });
     expect(parseRestationingHash('#stationing/' + ID)).toEqual({ kind: 'list' });
   });

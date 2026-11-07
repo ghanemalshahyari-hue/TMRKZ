@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api } from '../api/client';
+import { api, type HomeCard } from '../api/client';
 import type { AuditEvent, Notification, RestationingListItem, RestationingState, StationingRecord } from '../api/types';
 import { BrandMark } from '../components/shell/TopNavigation';
 import { Icon } from '../components/ui';
@@ -53,6 +53,10 @@ export function HomePage() {
   const [current, setCurrent] = useState<StationingRecord[] | null>(null);
   const [notes, setNotes] = useState<Notification[] | null>(null);
   const [audit, setAudit] = useState<AuditEvent[] | null>(null);
+  const [cards, setCards] = useState<HomeCard[]>([]);
+  useEffect(() => {
+    api.homeCards().then(setCards).catch(() => setCards([]));
+  }, [app.revision]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (canRs) api.restationingRequests().then(setRequests).catch(() => setRequests([]));
@@ -86,6 +90,7 @@ export function HomePage() {
           </div>
         </div>
         <div className="tz-home-actions">
+          {!restriction('newRequest', app.can, app.summaryOnly) && <a className="button primary" href="#newRequest">＋ طلب جديد</a>}
           {canRs && (
             <a className="button primary" href="#restationing">
               <Icon name="map" /> مساحة إعادة التمركز
@@ -94,6 +99,11 @@ export function HomePage() {
         </div>
       </header>
 
+      {cards.length > 0 && (
+        <section className="tz-tiles" aria-label="ما ينتظرك" data-testid="home-cards">
+          {cards.map((c) => <Tile key={c.key} icon="clock" value={c.value.toLocaleString('ar-AE')} label={c.label} tone={c.value ? 'amber' : ''} href={c.href} />)}
+        </section>
+      )}
       <section className="tz-tiles" aria-label="مؤشرات حية">
         {STATIONING_V3_ENABLED && <Tile icon="pin" value={dash(current ? units.size : null)} label="الوحدات المتمركزة حالياً" sub={current ? `${current.length} سجل تمركز معتمد` : undefined} tone="teal" href={canRs ? '#restationing' : undefined} />}
         {canRs && <Tile icon="clock" value={dash(count(REVIEW))} label="طلبات قيد الاعتماد" tone="amber" href="#restationing" />}
@@ -186,7 +196,7 @@ export function HomePage() {
                 <span>
                   <b>{n.title}</b>
                   <small>
-                    {n.body} · {fullTime(n.createdAt)}
+                    {n.body.startsWith('#restationing/') ? <a href={n.body.split(' ')[0]}>فتح الطلب</a> : n.body} · {fullTime(n.createdAt)}
                   </small>
                 </span>
               </li>

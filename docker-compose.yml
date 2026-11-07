@@ -183,6 +183,7 @@ services:
       # Stationing V3 pages stay out of the build until accepted (ADR-033); an installation may opt in from .env.
       args:
         STATIONING_V3: ${TMRKZ_STATIONING_V3:-false}
+        FLOW_STUDIO_UI: ${TMRKZ_FLOW_STUDIO_UI:-false}
     restart: unless-stopped
     depends_on:
       backend:

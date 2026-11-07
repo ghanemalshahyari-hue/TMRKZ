@@ -48,11 +48,13 @@ public class TaskRealignment {
     private final AccessService access;
     private final AuditService audit;
     private final Clock clock;
+    private final ae.mover.workflow.PlaceResolver places;
     private final SeparationOfDuties separation;
     private final DirectoryScope directory;
 
     public TaskRealignment(JdbcClient jdbc, AccessService access, AuditService audit, Clock clock, SeparationOfDuties separation,
-                           DirectoryScope directory) {
+                           DirectoryScope directory, ae.mover.workflow.PlaceResolver places) {
+        this.places = places;
         this.jdbc = jdbc;
         this.access = access;
         this.audit = audit;
@@ -167,6 +169,32 @@ public class TaskRealignment {
                         rs.getString("role_code"), Db.uuid(rs, "target_org_id"), rs.getBoolean("final"),
                         Db.uuid(rs, "assigned_person_id"), rs.getBoolean("awaiting_assignment"), null)).list();
         for (OpenTask t : created) {
+            // nobody at the unit, nobody whose scope reaches it, or only people who approved earlier: it waits for the access
+            // managers rather than for nobody (ADR-042, the movement programme's waiting for an approver)
+            Map<String, Object> how = jdbc.sql("select strict_place, by_scope, independent_of_earlier, stage_key from task_assignment where id = :id")
+                    .param("id", t.id()).query().singleRow();
+            Set<UUID> present = null;
+            if (Boolean.TRUE.equals(how.get("by_scope")) && t.targetOrgId() != null) {
+                var match = places.scope(t.roleCode(), t.targetOrgId());
+                present = match.people();
+            } else if (Boolean.TRUE.equals(how.get("strict_place")) && t.targetOrgId() != null) {
+                present = places.holders(t.roleCode(), ae.mover.workflow.PlaceResolver.Place.of(t.targetOrgId()));
+            }
+            if (present != null && present.isEmpty()) {
+                route(t, scope, "NO_HOLDER", List.of(), List.of(), requesters, now, contexts, "مهمة بلا معتمد",
+                        "لا يوجد معتمد لهذه الخطوة؛ امنح الدور لشخص مخول ثم أسند المهمة إليه.");
+                continue;
+            }
+            if (Boolean.TRUE.equals(how.get("independent_of_earlier"))) {
+                Set<UUID> barred = new java.util.HashSet<>(requesters);
+                barred.addAll(separation.earlierApprovers(t.requestId(), (String) how.get("stage_key")));
+                boolean someone = present != null ? !barred.containsAll(present) : !holders(t, scope, now, contexts, 1, barred).isEmpty();
+                if (!someone) {
+                    route(t, scope, "SEPARATION_OF_DUTIES", List.of(), List.of(), requesters, now, contexts, "مهمة بلا صاحب صفة مستقل",
+                            "كل من يملك صفة هذه الخطوة وافق على الطلب قبلها؛ امنحها لشخص آخر مخول ثم أسند المهمة إليه.");
+                    continue;
+                }
+            }
             boolean requesterHolds = requesters.stream().anyMatch(p -> context(contexts, p, now)
                     .taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage()).isPresent());
             if (!requesterHolds) {

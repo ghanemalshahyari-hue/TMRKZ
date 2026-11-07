@@ -1,0 +1,155 @@
+{
+ "at": "2026-11-06T20:33:31.871Z",
+ "results": [
+  {
+   "id": "S01",
+   "pass": true,
+   "what": "the roles are published through the policy",
+   "detail": ""
+  },
+  {
+   "id": "A00",
+   "pass": true,
+   "what": "choosing the subject first shows nothing about bookings",
+   "detail": ""
+  },
+  {
+   "id": "A00a",
+   "pass": true,
+   "what": "and permissions asks nothing more",
+   "detail": ""
+  },
+  {
+   "id": "A01",
+   "pass": true,
+   "what": "the type is added from the screen, and selected",
+   "detail": "طلب صلاحيات"
+  },
+  {
+   "id": "A02",
+   "pass": true,
+   "what": "its path starts empty",
+   "detail": ""
+  },
+  {
+   "id": "Z01",
+   "pass": true,
+   "what": "a person with no permission lands on the page to ask",
+   "detail": ""
+  },
+  {
+   "id": "Z02",
+   "pass": true,
+   "what": "and it says when the path is not active yet",
+   "detail": ""
+  },
+  {
+   "id": "A03",
+   "pass": true,
+   "what": "the path is activated",
+   "detail": ""
+  },
+  {
+   "id": "D01",
+   "pass": true,
+   "what": "the cards of this type show no deadline",
+   "detail": ""
+  },
+  {
+   "id": "D02",
+   "pass": true,
+   "what": "and the step has no deadline to set",
+   "detail": ""
+  },
+  {
+   "id": "O01",
+   "pass": true,
+   "what": "the administrator chooses among what can be offered",
+   "detail": "REQUESTER,ORG_MANAGER,LIMITED_VIEWER,SHARED_SITE_REQUESTER,CHAIN_APPROVER,UNIT_OPERATIONS_APPROVER,FINAL_APPROVER,FYI_RECEIVER"
+  },
+  {
+   "id": "O02",
+   "pass": true,
+   "what": "and saves it",
+   "detail": ""
+  },
+  {
+   "id": "Z03",
+   "pass": true,
+   "what": "any address still shows only this page",
+   "detail": ""
+  },
+  {
+   "id": "Z04",
+   "pass": true,
+   "what": "the menu has nothing else",
+   "detail": "طلب صلاحية"
+  },
+  {
+   "id": "Z05",
+   "pass": true,
+   "what": "it offers only what the administrator shows to everyone",
+   "detail": "REQUESTER,CHAIN_APPROVER,UNIT_OPERATIONS_APPROVER"
+  },
+  {
+   "id": "Z06",
+   "pass": true,
+   "what": "it is sent, and no second one can be while it is open",
+   "detail": ""
+  },
+  {
+   "id": "Z07",
+   "pass": true,
+   "what": "the person sees where it waits",
+   "detail": ""
+  },
+  {
+   "id": "R01",
+   "pass": true,
+   "what": "the reviewer has it, with the reason",
+   "detail": ""
+  },
+  {
+   "id": "R01a",
+   "pass": true,
+   "what": "the manager has the extra permissions the person did not see",
+   "detail": ""
+  },
+  {
+   "id": "R02",
+   "pass": true,
+   "what": "advice grants nothing",
+   "detail": ""
+  },
+  {
+   "id": "F01",
+   "pass": true,
+   "what": "the final approver sees the advice",
+   "detail": "توصية المراجع: مقدم الطلب، للعلم — مدير إدارة التقنية"
+  },
+  {
+   "id": "F02",
+   "pass": true,
+   "what": "what the final approver chose is granted, the extra included, and what the manager removed is not",
+   "detail": "FYI_RECEIVER,REQUESTER"
+  },
+  {
+   "id": "Z08",
+   "pass": true,
+   "what": "the person’s application opens",
+   "detail": "الرئيسية الطلبات المواقع الوحدات التقارير المزيد"
+  },
+  {
+   "id": "Z09",
+   "pass": true,
+   "what": "and their list says what was activated",
+   "detail": ""
+  },
+  {
+   "id": "Z10",
+   "pass": true,
+   "what": "no browser errors",
+   "detail": ""
+  }
+ ]
+}

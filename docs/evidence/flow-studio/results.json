@@ -1,0 +1,186 @@
+{
+ "at": "2026-11-06T18:02:19.452Z",
+ "type": "EXTENSION",
+ "results": [
+  {
+   "id": "F01",
+   "pass": true,
+   "what": "the published flow opens as a chart: its stages in order, a start and an approved end",
+   "detail": "5 steps"
+  },
+  {
+   "id": "F02",
+   "pass": true,
+   "what": "a tile dragged from the palette lands on the chart as a new step",
+   "detail": ""
+  },
+  {
+   "id": "F03",
+   "pass": true,
+   "what": "a step moves with the pointer",
+   "detail": "moved 77, 48 px"
+  },
+  {
+   "id": "F04",
+   "pass": true,
+   "what": "undo and redo restore the place",
+   "detail": ""
+  },
+  {
+   "id": "F05",
+   "pass": true,
+   "what": "tidy and fit keep every step",
+   "detail": "9 steps"
+  },
+  {
+   "id": "F06",
+   "pass": true,
+   "what": "a line drawn from an outlet that already has one replaces it",
+   "detail": "4 → 4 lines"
+  },
+  {
+   "id": "F07",
+   "pass": true,
+   "what": "yes, no, a plain line and approved are drawn by dragging from handle to handle",
+   "detail": "8 lines"
+  },
+  {
+   "id": "F08",
+   "pass": true,
+   "what": "each line says what it means",
+   "detail": "عند الموافقة، نعم، لا"
+  },
+  {
+   "id": "F09",
+   "pass": true,
+   "what": "a name typed beside the chart appears on the step at once",
+   "detail": ""
+  },
+  {
+   "id": "F10",
+   "pass": true,
+   "what": "a unit is found by typing its name, and the step shows it",
+   "detail": "Level 2-1"
+  },
+  {
+   "id": "F11",
+   "pass": true,
+   "what": "eight ways to say where a step goes",
+   "detail": "وحدة مقدم الطلب، حسب نطاق الصلاحية، جهة أعلى منها، الجهة عند مستوى محدد، جهة محددة، الجهة المسؤولة عن…، الجهة المسؤولة عن الموقع، أي جهة ضمن النطاق"
+  },
+  {
+   "id": "F12",
+   "pass": true,
+   "what": "a responsibility and a rule «every unit under X → Y» are saved",
+   "detail": "كل الوحدات تحت Level 1 (تجريبي) ← المسؤول Level 2-1 إزالة"
+  },
+  {
+   "id": "F13",
+   "pass": true,
+   "what": "the check answers from the server, in plain Arabic",
+   "detail": "شرط «هل المدة طويلة؟»: القيمة مطلوبة لهذا المعامل."
+  },
+  {
+   "id": "F14",
+   "pass": true,
+   "what": "publishing stays closed while the check has anything to fix",
+   "detail": ""
+  },
+  {
+   "id": "F29",
+   "pass": true,
+   "what": "a problem in a question names the question",
+   "detail": ""
+  },
+  {
+   "id": "F30",
+   "pass": true,
+   "what": "the step with a problem is marked on the chart",
+   "detail": ""
+  },
+  {
+   "id": "F15",
+   "pass": true,
+   "what": "pressing a problem opens the step it is about",
+   "detail": ""
+  },
+  {
+   "id": "F16",
+   "pass": true,
+   "what": "the chart as drawn is saved with its positions",
+   "detail": "9 steps, 8 lines"
+  },
+  {
+   "id": "F17",
+   "pass": true,
+   "what": "after a reload the draft opens exactly as drawn",
+   "detail": ""
+  },
+  {
+   "id": "F18",
+   "pass": true,
+   "what": "long request on a real unit: «yes» goes through the new approval, to approved",
+   "detail": "7 steps"
+  },
+  {
+   "id": "F19",
+   "pass": true,
+   "what": "the route lights up on the chart",
+   "detail": "7 steps lit"
+  },
+  {
+   "id": "F20",
+   "pass": true,
+   "what": "the step says where it goes and how many people hold the role there",
+   "detail": "مراجع المرافق: Level 2-1 · لا أحد يملك هذا الدور هناك"
+  },
+  {
+   "id": "F21",
+   "pass": true,
+   "what": "publishing opens only after a clean check",
+   "detail": ""
+  },
+  {
+   "id": "F22",
+   "pass": true,
+   "what": "short request: «no» goes to the notice and the rejected end",
+   "detail": "4 steps"
+  },
+  {
+   "id": "F23",
+   "pass": true,
+   "what": "«what if rejected here?»: that approval has no rejected line, so the request ends rejected",
+   "detail": ""
+  },
+  {
+   "id": "F24",
+   "pass": true,
+   "what": "any change after the check closes publishing again",
+   "detail": ""
+  },
+  {
+   "id": "F25",
+   "pass": true,
+   "what": "this check published nothing",
+   "detail": ""
+  },
+  {
+   "id": "F26",
+   "pass": true,
+   "what": "no request left the application",
+   "detail": ""
+  },
+  {
+   "id": "F27",
+   "pass": true,
+   "what": "no browser errors",
+   "detail": ""
+  },
+  {
+   "id": "F28",
+   "pass": true,
+   "what": "what the check saved is removed: no draft and no responsibility left",
+   "detail": ""
+  }
+ ]
+}

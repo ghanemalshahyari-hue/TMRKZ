@@ -10,7 +10,9 @@ COPY frontend/ ./
 # unit tests run without it (one of them guards that the default is off); only the bundle is built with it. Build
 # arguments are visible to every RUN step, hence a name Vite does not read: --build-arg STATIONING_V3=true.
 ARG STATIONING_V3=false
-RUN npm test && VITE_STATIONING_V3=$STATIONING_V3 npm run build
+# The chart studio's page has its own rollout (ADR-045): off unless the build asks for it; the workflow engine is not affected.
+ARG FLOW_STUDIO_UI=false
+RUN npm test && VITE_STATIONING_V3=$STATIONING_V3 VITE_FLOW_STUDIO=$FLOW_STUDIO_UI npm run build
 
 FROM nginx:1.28.3-alpine
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf

@@ -10,7 +10,7 @@ import { describeRule } from '../lib/rules';
 const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o)) as T;
 
 function PreviewField({ f }: { f: FormField }) {
-  const star = f.required ? <span style={{ color: '#c99758' }}> *</span> : null;
+  const star = f.required ? <span style={{ color: 'var(--orange)' }}> *</span> : null;
   let control;
   if (f.kind === 'textarea') control = <textarea disabled placeholder={f.label} />;
   else if (f.kind === 'files')
@@ -154,7 +154,7 @@ export function FormStudio() {
     <>
       <Heading
         en="STUDIO / FORM BUILDER"
-        title="استوديو النماذج"
+        title="نماذج الطلبات"
         description="خصص الحقول والإلزامية، ثم انشر نسخة تُستخدم في الطلبات الجديدة."
         actions={
           <>

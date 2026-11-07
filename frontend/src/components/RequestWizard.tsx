@@ -457,7 +457,7 @@ export function RequestWizard({
   function renderField(f: FormField) {
     const v = w!.values[f.id];
     const required = fieldRequired(f, ruleCtx);
-    const star = required ? <span style={{ color: '#c99758' }}> *</span> : null;
+    const star = required ? <span style={{ color: 'var(--orange)' }}> *</span> : null;
     const onValue = (value: unknown) => set({ values: { ...w!.values, [f.id]: value } });
     let control;
     if (f.kind === 'textarea')
@@ -556,7 +556,7 @@ export function RequestWizard({
         <div className="type-grid">
           {/* a unit's move is re-stationing, done only in «إعادة التمركز» (owner decision of 5 Nov 2026); an earlier
               relocation request still opens with its own type */}
-          {requestTypes.filter((t) => t.kind !== 'RELOCATION' || t.code === w.typeCode).map((t) => (
+          {requestTypes.filter((t) => t.kind !== 'ACCESS' && (t.kind !== 'RELOCATION' || t.code === w.typeCode)).map((t) => (
             <button
               key={t.code}
               className={'type-button ' + (t.code === w.typeCode ? 'active' : '')}

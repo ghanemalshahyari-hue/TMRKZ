@@ -4,7 +4,7 @@
  * site) or from a unit (#restationing/new?unit=<orgId>: its site is located for the person to confirm). Identifiers
  * only; the editor and the server check everything.
  */
-export type RestationingRoute = { kind: 'list' } | { kind: 'request'; id: string } | { kind: 'new'; unit: string | null; site: string | null };
+export type RestationingRoute = { kind: 'list' } | { kind: 'request'; id: string } | { kind: 'new'; unit: string | null; site: string | null; purpose: string | null };
 
 const ID = /^[0-9A-Za-z-]{1,64}$/;
 
@@ -20,7 +20,7 @@ export function parseRestationingHash(hash: string): RestationingRoute {
       const v = q.get(k);
       return v && ID.test(v) ? v : null;
     };
-    return { kind: 'new', unit: id('unit'), site: id('site') };
+    return { kind: 'new', unit: id('unit'), site: id('site'), purpose: q.get('purpose') };
   }
   return ID.test(rest) ? { kind: 'request', id: rest } : { kind: 'list' };
 }

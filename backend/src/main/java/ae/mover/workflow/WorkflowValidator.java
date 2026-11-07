@@ -16,7 +16,7 @@ import ae.mover.forms.RuleLanguage.Problem;
 public final class WorkflowValidator {
 
     private static final Pattern KEY = Pattern.compile("^[a-z][a-z0-9_]{1,39}$");
-    private static final Set<String> TOP_KEYS = Set.of("name", "stages", "execution");
+    private static final Set<String> TOP_KEYS = Set.of("name", "stages", "execution", "graph");
     private static final Set<String> STAGE_KEYS = Set.of("key", "name", "mode", "slaDays", "assignees", "condition", "final", "requiresSignature");
     private static final Set<String> EXEC_KEYS = Set.of("key", "name", "role", "orgFrom", "dueDays", "evidenceRequired", "purpose");
     private static final Set<String> ORG_FROM = Set.of("REQUEST_ORG", "RESOURCE_ORG", "ANY");
@@ -30,6 +30,10 @@ public final class WorkflowValidator {
      * @param fieldIds        field ids of the request type's published form (allowed in stage conditions)
      */
     public static List<Problem> validate(JsonNode def, Map<String, Set<String>> rolePermissions, Set<String> fieldIds) {
+        return validate(def, rolePermissions, fieldIds, GraphValidator.Places.NONE);
+    }
+
+    public static List<Problem> validate(JsonNode def, Map<String, Set<String>> rolePermissions, Set<String> fieldIds, GraphValidator.Places places) {
         List<Problem> out = new ArrayList<>();
         if (def == null || !def.isObject()) {
             out.add(new Problem("definition", "تعريف التدفق يجب أن يكون كائناً."));
@@ -42,6 +46,11 @@ public final class WorkflowValidator {
         });
         if (!def.path("name").isTextual() || def.path("name").asText().isBlank()) {
             out.add(new Problem("name", "اسم التدفق مطلوب."));
+        }
+        if (def.hasNonNull("graph")) {
+            out.addAll(GraphValidator.validate(WorkflowDefinition.from(def), rolePermissions, fieldIds, places));
+            validateExecution(def, rolePermissions, out);
+            return out;
         }
         JsonNode stages = def.path("stages");
         if (!stages.isArray() || stages.isEmpty() || stages.size() > 20) {
@@ -108,6 +117,11 @@ public final class WorkflowValidator {
                 out.add(new Problem(p + ".requiresSignature", "التوقيع يرتبط بمرحلة الاعتماد النهائي فقط."));
             }
         }
+        validateExecution(def, rolePermissions, out);
+        return out;
+    }
+
+    private static void validateExecution(JsonNode def, Map<String, Set<String>> rolePermissions, List<Problem> out) {
         JsonNode exec = def.path("execution");
         if (!exec.isMissingNode() && !exec.isArray()) {
             out.add(new Problem("execution", "مهام التنفيذ يجب أن تكون قائمة."));
@@ -147,6 +161,5 @@ public final class WorkflowValidator {
                 }
             }
         }
-        return out;
     }
 }

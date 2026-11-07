@@ -5,8 +5,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
-    <meta name="color-scheme" content="light">
+    <meta name="color-scheme" content="light dark">
     <title>TMRKZ — تسجيل الدخول</title>
+    <script src="${url.resourcesPath}/js/theme.js"></script>
     <#if properties.styles?has_content>
         <#list properties.styles?split(' ') as style>
             <link href="${url.resourcesPath}/${style}" rel="stylesheet"/>
@@ -20,6 +21,9 @@
 </head>
 <body class="tm ${bodyClass}">
 <section class="tm-shell">
+    <button type="button" class="theme-toggle" id="tm-theme" aria-label="الوضع الداكن أو الفاتح" title="الوضع الداكن أو الفاتح">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18Z" fill="currentColor"/><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+    </button>
     <div class="tm-backdrop" aria-hidden="true"></div>
     <main class="tm-main">
         <div class="tm-card">

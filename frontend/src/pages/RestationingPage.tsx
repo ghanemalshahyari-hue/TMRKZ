@@ -1,3 +1,5 @@
+import { PURPOSE_TITLE, isPurpose, type Purpose } from '../lib/requestPurpose';
+import type { RestationingUnit } from '../api/types';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../api/client';
 import type { RestationingChecks, RestationingListItem, RestationingRequest } from '../api/types';
@@ -56,9 +58,9 @@ const idFromHash = () => {
   return r.kind === 'request' ? r.id : null;
 };
 /** #restationing/new?site=<siteId> or ?unit=<orgId>: a new request opened from a site (the Sites page) or a unit. */
-const newFromHash = (): { id: null; unit: string | null; site: string | null } | null => {
+const newFromHash = (): { id: null; unit: string | null; site: string | null; purpose: Purpose | null } | null => {
   const r = route();
-  return r.kind === 'new' ? { id: null, unit: r.unit, site: r.site } : null;
+  return r.kind === 'new' ? { id: null, unit: r.unit, site: r.site, purpose: isPurpose(r.purpose) ? r.purpose : null } : null;
 };
 
 /**
@@ -71,7 +73,7 @@ export function RestationingPage() {
   const app = useApp();
   const [items, setItems] = useState<RestationingListItem[] | null>(null);
   const [selected, setSelected] = useState<string | null>(idFromHash);
-  const [editing, setEditing] = useState<{ id: string | null; unit?: string | null; site?: string | null } | null>(newFromHash);
+  const [editing, setEditing] = useState<{ id: string | null; unit?: string | null; site?: string | null; purpose?: Purpose | null } | null>(newFromHash);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   // open beside the map on a desktop; on a tablet or phone it slides over the map only when asked for
@@ -111,7 +113,7 @@ export function RestationingPage() {
     history.replaceState(null, '', '#restationing/' + id);
   };
 
-  const canCreate = app.can('CREATE_RESTATIONING');
+  const canCreate = (['CREATE_RESTATIONING', 'CREATE_INITIAL_STATIONING', 'CREATE_DEPLOYMENT_REQUEST', 'REQUEST_SITE_REGISTRATION'] as const).some((p) => app.can(p));
   const canAccess = !restriction('permissions', app.can, app.summaryOnly) || !restriction('audit', app.can, app.summaryOnly);
   const actions: RailAction[] = [
     { key: 'links', label: 'ربط الوحدات بالمواقع', hint: 'التمركز الحالي وارتباطات المواقع', icon: 'link', active: !editing && tab === 'sites', onClick: () => (setEditing(null), setTab('sites')) },
@@ -139,8 +141,9 @@ export function RestationingPage() {
     return (
       // the editor brings its own step panel on the left: the request list steps aside until it closes
       <RestationingEditor
-        key={editing.id ?? 'new:' + (editing.unit ?? '') + ':' + (editing.site ?? '')}
+        key={editing.id ?? 'new:' + (editing.purpose ?? '') + ':' + (editing.unit ?? '') + ':' + (editing.site ?? '')}
         requestId={editing.id}
+        purpose={editing.purpose ?? null}
         preselectUnit={editing.unit ?? null}
         preselectSite={editing.site ?? null}
         historyOpen={historyOpen}
@@ -176,6 +179,37 @@ export function RestationingPage() {
         reload();
       }}
     />
+  );
+}
+
+/** «تحديد وحدات العلم»: after final approval, a holder chooses the units informed. Not a vote, and no lasting right (ADR-045). */
+function FyiDistribution({ r, busy, act }: { r: RestationingRequest; busy: boolean; act: (what: () => Promise<RestationingRequest>, done: string) => void }) {
+  const [options, setOptions] = useState<RestationingUnit[] | null>(null);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [note, setNote] = useState('');
+  const [q, setQ] = useState('');
+  const shown = (options ?? []).filter((o) => !q.trim() || o.name.includes(q.trim())).slice(0, 200);
+  return (
+    <section className="tz-card" data-testid="fyi-distribution">
+      <h4>توزيع للعلم</h4>
+      {options == null ? (
+        <button className="button primary" onClick={() => api.fyiOptions(r.id).then(setOptions)}>تحديد وحدات العلم</button>
+      ) : (
+        <>
+          <p className="micro tz-muted">ليس تصويتاً: يطّلع أفراد هذه الوحدات على هذا الطلب وحده، ولا تُمنح لهم أي صلاحية دائمة.</p>
+          <label className="field"><span>بحث عن وحدة</span><input aria-label="بحث عن وحدة علم" value={q} onChange={(e) => setQ(e.target.value)} /></label>
+          <div className="rs-list" style={{ maxHeight: 180, overflow: 'auto' }}>
+            {shown.map((o) => (
+              <label key={o.id} className="rs-check" style={{ paddingInlineStart: o.depth * 12 }}>
+                <input type="checkbox" data-fyi-unit={o.id} checked={chosen.includes(o.id)} onChange={() => setChosen(chosen.includes(o.id) ? chosen.filter((x) => x !== o.id) : [...chosen, o.id])} /> {o.name}
+              </label>
+            ))}
+          </div>
+          <label className="field"><span>ملاحظة (اختياري)</span><input aria-label="ملاحظة العلم" value={note} onChange={(e) => setNote(e.target.value)} /></label>
+          <button className="button primary" data-testid="fyi-send" disabled={busy} onClick={() => act(() => api.distributeFyi(r.id, chosen, note), chosen.length ? 'أُرسل للعلم' : 'سُجل: لا وحدات للعلم')}>{chosen.length ? 'إرسال للعلم' : 'تأكيد: بلا وحدات'}</button>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -235,7 +269,7 @@ function RequestWorkspace({ id, rail, tab, setTab, unitId, setUnitId, historyOpe
     );
   }
   const c = r.content;
-  const title = `${r.requestKind === 'EXTENSION' ? 'تمديد' : c.kind === 'TEMPORARY' ? 'إعادة تمركز مؤقتة' : 'إعادة تمركز دائمة'} — ${r.requestingUnit.name}`;
+  const title = isPurpose(r.purpose) && r.purpose !== 'RESTATIONING' ? `${PURPOSE_TITLE[r.purpose]} — ${r.requestingUnit.name}` : `${r.requestKind === 'EXTENSION' ? 'تمديد' : c.kind === 'TEMPORARY' ? 'إعادة تمركز مؤقتة' : 'إعادة تمركز دائمة'} — ${r.requestingUnit.name}`;
   return (
     <OperationalWorkspace
       sheetKey={r.id}
@@ -302,7 +336,7 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
         )}
         <dl className="rs-facts">
           <div>
-            <dt>الوحدات المنتقلة</dt>
+            <dt>{isPurpose(r.purpose) && r.purpose !== 'RESTATIONING' ? 'الوحدات' : 'الوحدات المنتقلة'}</dt>
             <dd>{r.units.map((u) => u.name).join('، ') || '—'}</dd>
           </div>
           <div>
@@ -310,8 +344,8 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
             <dd>{r.currentSites.map((s) => s.site.name).join('، ') || '—'}</dd>
           </div>
           <div>
-            <dt>موقع إعادة التمركز</dt>
-            <dd data-testid="proposed-site">{proposedSite(r)}</dd>
+            <dt>{r.purpose === 'INITIAL_STATIONING' || r.purpose === 'SITE_REGISTRATION' ? 'الموقع المطلوب' : r.purpose === 'DEPLOYMENT_AREAS' ? 'ما يتغير' : 'موقع إعادة التمركز'}</dt>
+            <dd data-testid="proposed-site">{r.purpose === 'INITIAL_STATIONING' ? r.targetSite?.name ?? '—' : r.purpose === 'SITE_REGISTRATION' ? `${c.siteInfo?.name ?? '—'} (${c.siteInfo?.code ?? ''})` : r.purpose === 'DEPLOYMENT_AREAS' ? 'منطقتا الانتشار فقط' : proposedSite(r)}</dd>
           </div>
           <div>
             <dt>{c.kind === 'TEMPORARY' ? 'المدة' : 'النفاذ'}</dt>
@@ -359,7 +393,7 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
         {r.can.decide && (
           <>
             <button className="button primary" disabled={busy} onClick={() => act(() => api.decideRestationing(r.id, 'APPROVE', reason), 'اعتُمدت المرحلة')}>
-              اعتماد المرحلة
+              {r.can.decideAs ?? 'اعتماد'}
             </button>
             <button className="button" disabled={busy} onClick={() => act(() => api.decideRestationing(r.id, 'RETURN', reason), 'أُعيد الطلب للتعديل')}>
               إرجاع للتعديل
@@ -371,7 +405,7 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
         )}
         {r.can.activate && (
           <button className="button primary" disabled={busy} onClick={() => act(() => api.activateRestationing(r.id, reason), r.requestKind === 'EXTENSION' ? 'فُعّل التمديد' : 'فُعّل الطلب')}>
-            {r.requestKind === 'EXTENSION' ? 'تفعيل التمديد (إجراء مستقل)' : 'تفعيل (إجراء مستقل)'}
+            {r.requestKind === 'EXTENSION' ? 'تفعيل التمديد (إجراء مستقل)' : 'تفعيل'}
           </button>
         )}
         {!r.can.edit && !r.can.submit && !r.can.decide && !r.can.activate && !hasLifecycle(r) && (
@@ -380,6 +414,21 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
       </section>
       )}
 
+      {r.can.fyi && !r.fyi?.doneAt && <FyiDistribution r={r} busy={busy} act={act} />}
+      {r.readOnlyFyi && (
+        <section className="tz-card rs-banner" data-testid="fyi-read-only">
+          <b>للعلم:</b> وصلك هذا الطلب للاطلاع فقط. لا يمنحك صلاحية على غيره.
+        </section>
+      )}
+      {r.fyi?.doneAt && (
+        <section className="tz-card" data-testid="fyi-done">
+          <h4>توزيع للعلم</h4>
+          <p className="micro">{r.fyi.units.length ? r.fyi.units.join('، ') : 'لا وحدات'} · {r.fyi.doneBy} · {fullDate(r.fyi.doneAt)}</p>
+          {r.can.fyi && r.fyi.active?.map((u) => (
+            <button key={u.id} className="button compact" data-end-fyi={u.id} disabled={busy} onClick={() => { const why = window.prompt('سبب إنهاء الاطلاع'); if (why && why.trim().length >= 5) act(() => api.endFyi(r.id, u.id, why), 'أُنهي الاطلاع'); }}>إنهاء اطلاع {u.name}</button>
+          ))}
+        </section>
+      )}
       <DeploymentCheckCard request={r} checks={checks} />
       <Lifecycle r={r} busy={busy} act={act} onOpen={onOpen} />
     </>

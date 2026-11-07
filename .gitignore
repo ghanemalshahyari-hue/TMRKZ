@@ -40,3 +40,10 @@ map-runtime/
 # Stationing regression reruns of 6 Nov 2026: screenshots, results and logs are kept; their recordings (about 200 MB) stay local
 docs/evidence/terrain-3d/regressions/**/*.webm
 docs/evidence/terrain-3d/regressions/**/*.gif
+# Screen recording work files (the finished videos are in docs/tutorials)
+docs/tutorials/.sessions/
+# Recordings and reports made on the retained installation show real organisation names: they stay local (the repository is public)
+docs/tutorials/studio/
+docs/reports/
+docs/evidence/flow-studio/climb/
+docs/evidence/theme/

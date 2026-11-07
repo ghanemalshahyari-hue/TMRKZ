@@ -11,7 +11,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -91,6 +93,26 @@ public class StudioController {
                                                @RequestBody(required = false) Map<String, Object> body) {
         Object facts = body == null ? null : body.get("facts");
         return workflows.simulate(access.context(actor), id, facts == null ? Map.of() : json.map(facts));
+    }
+
+    @GetMapping("/responsibilities")
+    public List<WorkflowService.Responsibility> responsibilities(Actor actor) {
+        return workflows.responsibilities(access.context(actor));
+    }
+
+    @PostMapping("/responsibilities")
+    public List<WorkflowService.Responsibility> addResponsibility(Actor actor, @RequestBody Map<String, String> body) {
+        return workflows.saveResponsibility(access.context(actor), body.get("name"));
+    }
+
+    @PutMapping("/responsibilities/{code}/rules/{scope}")
+    public List<WorkflowService.Responsibility> setRule(Actor actor, @PathVariable String code, @PathVariable UUID scope, @RequestBody Map<String, String> body) {
+        return workflows.setResponsibilityRule(access.context(actor), code, scope, UUID.fromString(body.get("responsibleOrgId")));
+    }
+
+    @DeleteMapping("/responsibilities/{code}/rules/{scope}")
+    public List<WorkflowService.Responsibility> removeRule(Actor actor, @PathVariable String code, @PathVariable UUID scope) {
+        return workflows.removeResponsibilityRule(access.context(actor), code, scope);
     }
 
     @PostMapping("/workflow-versions/{id}/publish")

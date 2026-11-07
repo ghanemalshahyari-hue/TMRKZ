@@ -7,5 +7,8 @@ import java.util.UUID;
  * stable Oracle id ({@code externalId}, null for a local unit), the parent and the level value Oracle sends (null when
  * the mirror has none). The level is a value, never a fixed depth.
  */
-public record OrgUnit(UUID id, String externalId, UUID parentId, Integer level, String code, String name) {
+public record OrgUnit(UUID id, String externalId, UUID parentId, Integer level, String code, String name, boolean main) {
+    public OrgUnit(UUID id, String externalId, UUID parentId, Integer level, String code, String name) {
+        this(id, externalId, parentId, level, code, name, false);
+    }
 }

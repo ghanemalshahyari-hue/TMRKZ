@@ -327,6 +327,11 @@ public class HrSyncService {
 
     // ---- staging ----------------------------------------------------------------------------------------------
 
+    /** A flag as sources write it: 1, Y or true. */
+    static boolean truthy(String v) {
+        return v != null && java.util.Set.of("1", "Y", "YES", "TRUE").contains(v.trim().toUpperCase());
+    }
+
     private void insertUnits(UUID runId, UUID snapshot, HrMapping.Compiled c, List<Map<String, Object>> rows, int[] dup, int[] skipped) {
         List<Object[]> args = new ArrayList<>();
         for (Map<String, Object> row : rows) {
@@ -337,11 +342,11 @@ public class HrSyncService {
                 continue;
             }
             args.add(new Object[]{snapshot, v.get("external_unit_id"), v.get("code"), v.get("name"), v.get("name_en"),
-                    v.get("parent_external_unit_id"), v.get("status"), Boolean.parseBoolean(v.get("active")), integer(v.get("level"))});
+                    v.get("parent_external_unit_id"), v.get("status"), Boolean.parseBoolean(v.get("active")), integer(v.get("level")), truthy(v.get("is_main"))});
         }
         int[] done = batch.batchUpdate("""
-                insert into hr_unit(snapshot_id, external_id, code, name, name_en, parent_external_id, status_raw, active, level)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing""", args);
+                insert into hr_unit(snapshot_id, external_id, code, name, name_en, parent_external_id, status_raw, active, level, is_main)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing""", args);
         for (int i = 0; i < done.length; i++) {
             if (done[i] == 0) {
                 dup[0]++;

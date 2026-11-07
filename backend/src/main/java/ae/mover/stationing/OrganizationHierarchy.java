@@ -41,14 +41,14 @@ public class OrganizationHierarchy implements OrgHierarchy {
                   select p.id, p.parent_id, p.code, p.name, p.source_external_id, up.depth + 1
                     from organization p join up on p.id = up.parent_id
                    where up.depth < :max)
-                select up.id, up.parent_id, up.code, up.name, up.source_external_id, h.level
+                select up.id, up.parent_id, up.code, up.name, up.source_external_id, h.level, coalesce(h.is_main, false) as is_main
                   from up
                   left join hr_unit h on h.external_id = up.source_external_id
                         and h.snapshot_id = (select s.id from hr_snapshot s where s.status = 'PUBLISHED')
                  order by up.depth""")
                 .param("id", id).param("max", MAX_DEPTH)
                 .query((rs, n) -> new OrgUnit(Db.uuid(rs, "id"), rs.getString("source_external_id"), Db.uuid(rs, "parent_id"),
-                        (Integer) rs.getObject("level"), rs.getString("code"), rs.getString("name")))
+                        (Integer) rs.getObject("level"), rs.getString("code"), rs.getString("name"), rs.getBoolean("is_main")))
                 .list();
     }
 }

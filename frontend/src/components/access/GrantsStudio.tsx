@@ -6,8 +6,9 @@ import { dubaiISO, fullDate, todayDubai } from '../../lib/dates';
 import { SCOPES } from '../../lib/labels';
 import { Dialog, DialogHead, Icon } from '../ui';
 import { OrgPick, PersonPicker, SitePick } from './pickers';
+import { UnitsDialog, unitCount, type UnitChoice } from './UnitsDialog';
 
-type Target = { kind: GrantTargetKind; id: string; name: string; includeDescendants: boolean };
+type Target = { kind: GrantTargetKind; id: string; name: string; includeDescendants: boolean; levels?: number[] };
 type Form = {
   personId: string;
   personName: string;
@@ -30,7 +31,7 @@ export function describeScope(f: Pick<Form, 'mode' | 'all' | 'combine' | 'target
     return 'نطاق الدور: ' + s + ' (يُحدد الموقع في نموذج الجهة)';
   }
   if (f.all) return 'نطاق شامل: جميع الجهات والمواقع (ممنوح صراحة)';
-  const orgs = f.targets.filter((t) => t.kind === 'ORGANIZATION').map((t) => '«' + t.name + '»' + (t.includeDescendants ? ' وفروعها' : ' وحدها'));
+  const orgs = f.targets.filter((t) => t.kind === 'ORGANIZATION').map((t) => '«' + t.name + '»' + (t.levels?.length ? ': المستوى ' + t.levels.join(' و') : t.includeDescendants ? ' وفروعها' : ' وحدها'));
   const sites = f.targets
     .filter((t) => t.kind !== 'ORGANIZATION')
     .map((t) => (t.kind === 'RESOURCE' ? 'المورد «' + t.name + '»' : '«' + t.name + '»' + (t.includeDescendants ? ' ومرافقه الفرعية' : ' وحده')));
@@ -41,6 +42,9 @@ export function describeScope(f: Pick<Form, 'mode' | 'all' | 'combine' | 'target
   if (site) return site + ' (يعمل باسم الجهة «' + homeName + '»)';
   return 'اختر هدفاً واحداً على الأقل';
 }
+
+/** A role given over chosen units, by the «تعيين» button: one that approves, and for-information (ADR-042). */
+export const chosenByUnits = (role: RoleDef) => role.permissions.includes('REVIEW') || role.permissions.includes('APPROVE') || role.code === 'FYI_RECEIVER';
 
 const KIND_NAMES: Record<GrantTargetKind, string> = { ORGANIZATION: 'جهة', SITE: 'موقع', RESOURCE: 'مورد' };
 
@@ -60,6 +64,7 @@ export function GrantsStudio() {
   const [pickOrg, setPickOrg] = useState<{ id: string; name: string } | null>(null);
   const [pickOrgBranches, setPickOrgBranches] = useState(true);
   const [pickSite, setPickSite] = useState<Site | null>(null);
+  const [choosingUnits, setChoosingUnits] = useState(false);
 
   useEffect(() => {
     api.roles().then(setRoles).catch(() => setRoles([]));
@@ -121,7 +126,7 @@ export function GrantsStudio() {
                 mode: 'CUSTOM',
                 all: form.all,
                 combine: form.combine,
-                targets: form.targets.map(({ kind, id, includeDescendants }) => ({ kind, id, includeDescendants })),
+                targets: form.targets.map(({ kind, id, includeDescendants, levels }) => ({ kind, id, includeDescendants, levels })),
               },
       });
       app.toast('أُضيفت المنحة: ' + r.scopeText);
@@ -144,6 +149,17 @@ export function GrantsStudio() {
     } catch (e) {
       app.toast((e as Error).message);
     }
+  };
+
+  // a role that approves is given over chosen units, as in the movement programme (ADR-042)
+  const approves = !!role && chosenByUnits(role);
+  const chosenUnits = form?.targets.filter((t) => t.kind === 'ORGANIZATION') ?? [];
+  const applyUnits = (units: UnitChoice[], everything: boolean) => {
+    if (!form) return;
+    const others = form.targets.filter((t) => t.kind !== 'ORGANIZATION');
+    const targets: Target[] = [...others, ...units.map((u) => ({ kind: 'ORGANIZATION' as const, id: u.id, name: u.name, includeDescendants: u.mode !== 'ONE', levels: u.mode === 'LEVELS' ? u.levels : undefined }))];
+    setForm({ ...form, all: everything, targets, mode: everything || targets.length ? 'CUSTOM' : 'ROLE' });
+    setChoosingUnits(false);
   };
 
   const hasOrg = form?.targets.some((t) => t.kind === 'ORGANIZATION');
@@ -243,6 +259,14 @@ export function GrantsStudio() {
                       ))}
                   </select>
                 </label>
+                {approves && (
+                  <div className="units-assign">
+                    <span>{role?.code === 'FYI_RECEIVER' ? 'الوحدات التي تصله للعلم' : 'الوحدات التي يعتمد طلباتها'}</span>
+                    <button type="button" className="button compact" data-testid="assign-units" onClick={() => setChoosingUnits(true)}>
+                      {form.all ? 'كل الوحدات' : chosenUnits.length ? unitCount(chosenUnits.length) : 'تعيين'}
+                    </button>
+                  </div>
+                )}
                 <label className="field">
                   <span>المسمى — اختياري</span>
                   <input value={form.positionTitle} onChange={(e) => setForm({ ...form, positionTitle: e.target.value })} />
@@ -377,6 +401,17 @@ export function GrantsStudio() {
           </>
         )}
       </Dialog>
+      {choosingUnits && form && org && role && (
+        <UnitsDialog
+          roleName={role.name}
+          home={org}
+          finalApprover={role.permissions.includes('APPROVE')}
+          everything={form.all}
+          value={chosenUnits.map((t) => ({ id: t.id, name: t.name, mode: t.levels?.length ? 'LEVELS' : t.includeDescendants ? 'BRANCH' : 'ONE', levels: t.levels ?? [] }))}
+          onSave={applyUnits}
+          onClose={() => setChoosingUnits(false)}
+        />
+      )}
     </div>
   );
 }

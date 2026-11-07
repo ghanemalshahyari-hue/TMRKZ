@@ -533,6 +533,97 @@ Report: `docs/audit/stationing-v3-production/CONTINUATION_REPORT.md`. Run with
 | D4 real non-production Oracle | — | — | Release gate (not available) |
 | D6 real touch device | — | — | Release gate (not available) |
 
+## Workflow studio as a flow chart (2026-11-06, ADR-041; owner)
+
+Evidence: `docs/evidence/flow-studio/` (`tests/acceptance/flow-studio.mjs`, real page, headless Chrome, the one app, real imported units; removes its draft and responsibility; publishes nothing).
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| Draw, move, connect, undo, tidy with the pointer | `pages/WorkflowStudio.tsx`, `components/studio/FlowCanvas.tsx`, `lib/flowGraph.ts` | `flowGraph.test.ts`; F02–F09, F17 | Pass |
+| Yes and no; what happens on rejection | `BpmnCompiler.compileGraph`, `DecisionService` | `WorkflowGraphIT` question, rejectedLine, rejectedEnds, rejectedAtOnce | Pass |
+| Parallel steps | `BpmnCompiler`, `GraphValidator` | `WorkflowGraphIT` parallel, refused | Pass |
+| Responsible unit across many levels, inherited | `PlaceResolver`, V23, `ResponsibilitiesDialog.tsx` | `WorkflowGraphIT` places, responsibilities; F10–F12 | Pass; 123 units measured, not 26,000 |
+| A step going to a unit binds to that unit | `task_assignment.strict_place`, `AccessContext.holdsRoleAt` | `WorkflowGraphIT` places | Pass |
+| Final approval, no path around it | `GraphValidator` | `WorkflowGraphIT` refused, straight | Pass |
+| Notice at the end, to chosen recipients | `WorkflowRuntime.notify` | `WorkflowGraphIT` notifies, rejectedEnds | Pass, in-app only |
+| Try on a unit; route, holders, what if rejected, units with nobody | `WorkflowService.simulate` | `WorkflowGraphIT` simulation; F18–F23 | Pass |
+| Publishing only after a clean check; running requests unaffected | `WorkflowStudio.tsx`, pinned versions | F14, F21, F24; `WorkflowAcceptanceIT` | Pass; publish from the page itself not clicked by the browser check |
+| One approval climbs the hierarchy to the main unit, with no card per level | `PlaceResolver.chain`, `WorkflowRuntime.slots`, `BpmnCompiler`, `NodeInspector.tsx` | `WorkflowGraphIT` climbsToTheMainUnit, mainUnitGoesOn, climbRejected, simulatesTheClimb; C01, C09, C11 (`flow-climb.mjs`) | Pass on the engine with test people; real approvers not exercised, nobody imported holds a role |
+| The stop can be the main unit, levels, the top, a count or a unit; levels come from the source | `PlaceResolver.chain`, `GraphValidator.chainProblems`, `LevelChecks`, `/stationing/hierarchy-levels` | `WorkflowGraphIT` otherStops, skipsEmptyUnits; C03–C05 | Pass; 10 levels measured, not 12 |
+| Main unit comes from Oracle | V24, `HrMapping`, `HrSyncService.truthy`, `OrganizationHierarchy.path` | sync of 123 units, 10 main; C11 | Pass on the local source |
+| A question can ask about the requesting unit | `RuleLanguage.FACTS`, `PlaceResolver.unitFacts`, `rules.ts` `UNIT_SUBJECTS` | `WorkflowGraphIT` questionsAboutTheUnit; C08, C09, C11 | Pass |
+
+## Approvals by scope and for-information by place (2026-11-06, ADR-042; owner)
+
+Evidence: `docs/evidence/scope-approvals/` (`tests/acceptance/scope-approvals.mjs`, real page and real sign-ins, temporary acceptance environment, fictional people, OpenFGA in the loop).
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| The climb ends below the main unit; a level with nobody refuses; the requester alone on a level is passed | `PlaceResolver.chain`, `chainOrgs`, `chainGap` | `WorkflowGraphIT` climbsToTheMainUnit, gapsInTheClimb; J05, J06 | Pass |
+| Unit matrix; «تعيين» with the unit, its levels, several units, or every unit for a final approver | `UnitMatrix.tsx`, `UnitsDialog.tsx`, `GrantAdminService.unitMatrix`, `replace` | `WorkflowGraphIT` unitMatrix; `UnitsDialog.test.ts`; U01–U13a, M01–M04 | Pass |
+| Chosen levels, from the source | V25, `GrantSource.reach`, `RawGrant.spec` | `WorkflowGraphIT` levelsOfAScope; U08, U09, U12, J08, J09 | Pass; following a changed hierarchy not exercised |
+| A step goes to the nearest grant reaching the unit | `PlaceResolver.scope`, `TaskSync`, `DecisionService` | `WorkflowGraphIT` nearestGrantWins; U14, J08 | Pass |
+| No approver: no such step, refused, or waits for the access managers | `PlaceResolver.usedInCommand`, `WorkflowService.scopeProblem`, `TaskRealignment.separate` | `WorkflowGraphIT` notRequired, levelsOfAScope | Pass |
+| By time: the routed unit's people, pinned, refused outside every period | V27, `PlaceResolver.routedNow`, `routedHolders`, `GrantAdminService.saveRoutes`, `UnitMatrix.tsx` | `WorkflowGraphIT` routesByTime; M06, M07 | Pass |
+| Whoever approved earlier does not decide a by-scope or final step | `SeparationOfDuties.earlierApprovers`, `DecisionService` | `WorkflowGraphIT` earlierApproverIsNotFinal, notRequired; J07, J10, J12 | Pass |
+| For information by person: after final only; the parties and main commands; only the role reads; who read it; the notice names the unit and its main unit | V26, `PlaceInfo`, `AccessContext.viewLevel`, `Authorization.view`, `RequestViews`, `OutboxProcessor` | `WorkflowGraphIT` forInformationByPlace; J11, J14–J18a, M05 | Pass |
+| A re-stationing activated at a place tells the same parties | `PlaceInfo.noticeStationed`, `RestationingService.activate` | `WorkflowGraphIT` forInformationByPlace calls the notice directly | Notice tested; not through a whole re-stationing |
+
+## Asking for permissions (2026-11-06, ADR-044; owner)
+
+Evidence: `docs/evidence/access-requests/` (`tests/acceptance/access-requests.mjs`, real pages and sign-ins, temporary acceptance environment, fictional people, OpenFGA in the loop).
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| A person with no permission has only the page to ask | `App.tsx`, `AccessRequestPage.tsx` | Z01, Z03, Z04 | Pass |
+| Asks for themselves, from the list, one open request | `AccessRequestService.submit`, V28 | `WorkflowGraphIT` askingForPermissions; Z05, Z06 | Pass |
+| A reviewer advises and grants nothing; only the final approval grants; the three lists stay apart | `AccessRequestService.decide`, `GrantAdminService.applyAccessRequest`, `AccessInboxPage.tsx` | `WorkflowGraphIT` askingForPermissions; R01, R02, F01, F02, Z08, Z09 | Pass |
+| No reviewer: straight to the final approval, which is told | `WorkflowRuntime.slots`, `AccessInboxPage.tsx` | `WorkflowGraphIT` askingWithoutReviewer | Pass |
+| Refused: grants nothing, and a new request can follow | `AccessRequestService.decide` | `WorkflowGraphIT` askingWithoutReviewer | Pass |
+| Moved in HR while waiting: the approval stops and says where | `AccessRequestService.decide`, `inbox` | `WorkflowGraphIT` askingWithoutReviewer | Pass; not re-routed as in the programme |
+| Kept out of request lists, counts, reports and the review box | `RequestViews.listWhere`, `ReportService`, `DecisionService.tasks` | `WorkflowGraphIT` askingForPermissions (tasks) | Tasks pass; lists, counts and reports not checked by a test |
+
+## Request types on the screen (2026-11-06; owner)
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| Add a type by name and what it does; remove it from every list; refuse while a request of it is open; past requests stay | `RequestTypes.create`, `remove`, `WorkflowStudio.tsx` | `WorkflowGraphIT` requestTypes; removal on the page in `docs/tutorials/studio/from-scratch/03-*`; adding in `access-requests.mjs` A01 | Pass |
+| The system administrator sets what a new person sees and what only the unit's access manager adds; extras are advice and reach the final approver; administration roles can never be offered; this type has no deadline, late notice or late count (V29) | `AccessRequestService.offer`, `saveOffer`, `OutboxProcessor.scanOverdue`, `ReportService`, `AccessOfferDialog.tsx`, `AccessInboxPage.tsx`, `FlowCanvas.tsx`, `NodeInspector.tsx` | `WorkflowGraphIT.whatCanBeAsked`; `tests/acceptance/access-requests.mjs` D01, D02, O01, O02, Z05, R01a, F01, F02 | Works with fictional people; not yet with people from Oracle |
+
+## Light and dark colours (2026-11-06, ADR-043; owner)
+
+Evidence: `docs/evidence/theme/` (`tests/acceptance/theme-contrast.mjs`, real page, headless Chrome, the one app).
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| Choose light or dark, kept across sign-in; with no choice, the sand | `lib/theme.ts`, `ThemeToggle.tsx`, `resources/js/theme.js` | `theme.test.ts`; T01, T01a, T02, T05–T07 | Pass |
+| The sign-in pages have the application's colours | `signin.css`, Keycloak `tmrkz.css`, `theme.css` | T08, T09 | Pass |
+| Readable in both themes | `theme.css`, `theme.generated.css`, `ops/tools/gen-theme.py` | T03, T04 and every page in both themes | Pass on what the pages show; maps and open dialogs not measured |
+
+## One terrain value on a maximum (2026-11-06, ADR-040; owner)
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| One value (km, m or %) for a distance, on ground that is not flat; never less; the minimum stays | `StationingPolicy.terrainAddM`, `DeploymentRules.leg`, `TerrainExtraField.tsx` | `StationingRulesTest.oneTerrainValueAddsOnGroundThatIsNotFlatAndNeverLess` | Pass |
+| More area on ground that is not flat, by the proposed place | `StationingPolicy.maxFootprintOn`, `RestationingChecks.maxFootprintFor`, `terrainAnalysis.ts` `maxFootprintOn` | the same test; `terrainAnalysis.test.ts` | Rule tested; not yet exercised on a real request |
+| Versions published earlier keep their allowance per class | `StationingPolicy.terrainAddM` | existing `StationingRulesTest` terrain cases | Pass |
+
+## «الانحدار» inside the shapes being placed (2026-11-06, ADR-039; owner requests during the review)
+
+Evidence: `docs/evidence/terrain-3d/slope-inside/` (`tests/acceptance/slope-inside.mjs`, real page, headless Chrome, development project `tmrkz-v3dev`, fictional data).
+
+| Requirement | Code | Test | Status |
+|---|---|---|---|
+| Colours inside the site only, none over the whole map | `lib/terrainRgb.ts` `slopeZones`, `components/map/maplibre/slopeInside.ts` | `terrainRgb.test.ts`; `slope-inside.mjs` S02–S04 | Pass |
+| Three colours with their meaning | `toneOfPct`, `TerrainPanel.tsx` `SlopeControl` | `terrainRgb.test.ts`; S01, S05, S07 | Pass |
+| The limits editable by the administrator, changing no rule | `StationingPolicy.SlopeDisplay`, `StationingPolicyPage.tsx` | `StationingRulesTest` `slopeColourLimitsAreCheckedAndChangeNoRule`; `terrainRgb.test.ts` | Pass; the page itself checked in the walkthrough only |
+| Deployment areas being placed are coloured; the current site is not | `RestationingEditor.tsx`, `SlopeInside` | S16, S17 | Pass |
+| One name and one symbol per site, at every zoom | `lib/sitesLayer.ts`, `siteLayers.ts`, `RequestMap.tsx` | `sitesLayer.test.ts`; seen on the real page | Pass |
+| Changes while moving, before the drop; while drawing | `RestationingEditor.tsx` `onSite`, `SiteEditor.ts` `onDrawShape` | S06, S12 | Pass |
+| 2D and 3D; can be switched off | `SlopeInside`, `SlopeControl` | S04, S09–S11 | Pass |
+| Display only: no writes, no outside traffic | `SlopeInside` | S13–S15 | Pass |
+| Accuracy against the native analysis | — | `measure_colours.py`, measured | Limits recorded; open owner choice |
+
 ## True offline 3D terrain (2026-11-06, ADR-038; owner brief «TRUE OFFLINE 3D TERRAIN»)
 
 Evidence: `docs/evidence/terrain-3d/` (`tests/acceptance/terrain-3d.mjs`, real page, headless Edge on the GPU, development project `tmrkz-v3dev`, fictional data). Not deployed, not committed.
@@ -561,3 +652,23 @@ Evidence: `docs/evidence/terrain-3d/` (`tests/acceptance/terrain-3d.mjs`, real p
 | Review §6 Mountain → plain at the same distance: class, allowance, effective maximum, verdict | server assess + `previewLeg` | R1 (MOUNTAINOUS → FLAT, +2000 → 0 m, 7000 → 5000 m, OK → OUT_OF_RANGE) | Pass |
 | Owner request «الانحدار»: slope classes of the policy over the ground (display only) | `showSlope`, `slopeTileImage` | R1b; `terrainRgb.test.ts` (classes, no seam) | Pass |
 | One rule for a moved leg everywhere (chip, area panel, map label, terrain panel) | `rules` in `RestationingEditor` | `geometry-two-methods.mjs` 10/10 | Pass |
+
+## Complete access, site and request phase (2026-11-07, ADR-045; owner brief)
+
+Evidence: `docs/evidence/stationing-next/` (`tests/acceptance/stationing-next.mjs`, real pages and sign-ins, separate environment `tmrkz-next`, fictional data). Status: built for owner review, with fictional data; not deployed to a retained environment.
+
+| Requirement | Code | Test |
+|---|---|---|
+| Permission request: capabilities in Arabic, scope, recommendation, return as the same request, final activation re-checks today | `AccessRequestService`, `GrantAdminService.applyAccessRequest`, `AccessRequestPage.tsx`, `AccessInboxPage.tsx` | `WorkflowGraphIT.askingWithScope`; ACCESS-01…18 |
+| Permission catalogue audited, gaps filled, draft documented | `Permission`, `AuthzModel`, `docs/PERMISSION_MATRIX_STATIONING_AR.md` | `AuthorizationIT.modelPublished` |
+| Setup from an empty installation: sites, main and sub-sites, shape, links, audited correction | `SiteSetupPage.tsx`, `SiteService`, `BoundaryService`, `StationingRegister` | SITE-01…10 |
+| One site, several units, no hierarchy change; others counted, never named | `RequestHubService.occupants`, `SitesPage.tsx` | `StationingNextIT.sharedSite`; SITE-05, SITE-06, SITE-09, SITE-10, POSTURE-07 |
+| One request entry; the server says what is available | `RequestHubService.hub`, `NewRequestPage.tsx` | `StationingNextIT.initialStationing`; INITIAL-STATIONING-01, 02; DEPLOYMENT-01; RESTATIONING-01 |
+| Site registration: nothing before activation, overlap blocks, registered once | `RestationingChecks.evaluateSiteRegistration`, `RestationingService.activatePurpose` | `StationingNextIT.siteRegistration` |
+| Initial stationing; a unit stationed nowhere cannot re-station | `RestationingChecks.evaluateInitial`, `evaluate` | `StationingNextIT.initialStationing`; INITIAL-STATIONING-03…06; RESTATIONING-02 |
+| Deployment areas belong to a unit; server eligibility; duplicate refused | V30, `RestationingChecks.evaluateDeployment`, `RestationingService.insertAreas`, `openRequest` | `StationingNextIT.deploymentAndPosture`; DEPLOYMENT-02…08; `ops/sql/checks/V30-upgrade-check.sh` |
+| Configured stages, each only to its holder; forged actions refused | `RouteDerivation.withConfiguredStages`, `RestationingService.requireDecider`, `decisionLabel` | `StationingNextIT.initialStationing`; APPROVAL-01…07 |
+| FYI distribution: chosen units, one request, no lasting right | `RestationingService.distributeFyi`, `fyiReader`, `FyiDistribution` | `StationingNextIT.initialStationing`; FYI-01…06 |
+| Read-only operational posture, isolated by branch | `RequestHubService.posture`, `PosturePage.tsx` | `StationingNextIT.deploymentAndPosture`; POSTURE-01…07 |
+| One list by type; scoped home counts | `RequestHubService.overview`, `homeCards`, `AllRequestsPage.tsx`, `HomePage.tsx` | APPROVAL-08, APPROVAL-09 |
+

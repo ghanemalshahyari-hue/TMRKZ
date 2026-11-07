@@ -41,6 +41,11 @@ public record Grant(
         Set<UUID> resourceSites,
         List<GrantTarget> targets) {
 
+    /** The for-information role: reads only through a request's own record of who is told, never by its scope (ADR-042). */
+    public boolean fyiOnly() {
+        return "FYI_RECEIVER".equals(roleCode);
+    }
+
     public boolean has(Permission p) {
         return permissions.contains(p);
     }

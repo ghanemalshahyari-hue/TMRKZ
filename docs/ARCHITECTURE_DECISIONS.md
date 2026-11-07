@@ -1614,3 +1614,172 @@ ground, terrain analysis with an elevation profile, and drawing and dragging in 
   - display only and off by default; the server's class of a drawn area remains the authoritative one;
   - its red and orange share hues with the occupied and primary meanings, so it sits under every geometry outline and
     carries its own legend.
+
+## ADR-039 «الانحدار» as three colours inside the shapes being placed — Proposed, awaiting the owner's visual acceptance (2026-11-06)
+
+**Context.** Owner, during the review of ADR-038: not the slope over the whole map; inside the drawn re-stationing site
+only, changing as it moves, in green, orange and red.
+
+**Decision.**
+- The whole-map layer of ADR-038 (custom tile protocol, five colours, off by default) is removed.
+- `lib/terrainRgb.ts` `slopeZones` cuts the shape into runs of one colour along its own edges; `SlopeInside` draws them
+  as a GeoJSON fill under the outlines, so MapLibre drapes them like every other request geometry. A vector overlay was
+  chosen over an image source because it needs no second draping path.
+- It follows every drag frame, vertex edit and pointer move while drawing; on by default from the new-site step, in 2D
+  and 3D, with the «الانحدار» button to switch it off. Coloured (owner): the site and the deployment areas being placed
+  in the request. Never coloured: the current site and what is already deployed. The legend's sentence and shares are
+  about the shape being edited.
+- The limits are the administrator's (owner): `slopeDisplay` (`greenBelowPct`, `redFromPct`) in the versioned Stationing
+  policy, checked and published like every other value, under «طبيعة الأرض» in «سياسة التمركز». They are independent of
+  the slope classes, so changing them changes no rule. Absent (every version before it): 10 and 30.
+- Wording: the owner set the red sentence «مسموح مع الحذر من الانحدار» and the red legend word «مرتفع أو منخفض شديد».
+  The rest is this ADR's default: green «مناسب للتمركز هنا» and «مناسب», orange «ممكن، مع الحذر من الانحدار» and «بحذر».
+
+**Unchanged.** Display only: computed in the browser, nothing sent or saved, no rule reads it and it blocks nothing.
+The sentence follows the colour with the most ground, moving or at rest, so it always matches what is painted; the
+server's class stays in the terrain panel and can differ, because its classes and the display limits are separate.
+
+**Site names and symbols on the map (owner, same review).** A request's current site is one object: the request draws
+its boundary, the registered-sites layer its symbol and one name saying «الموقع الحالي» (it was drawn twice, with two
+names and a mixed outline). Every name stands on a white plate, with what it is and its unit count under it. Every site
+keeps a location symbol at every zoom (the marker used to vanish past zoom 14.5). Unit symbols on the map are not part
+of this.
+
+**Open owner choices.** The initial 10 and 30 are this ADR's default, not an owner value. Measured limits and the options
+for narrow steep ground: `docs/evidence/terrain-3d/slope-inside/README.md`.
+
+## ADR-040 One terrain value on a maximum, in an amount or a percentage — Proposed, awaiting the owner's acceptance (2026-11-06)
+
+**Context.** Owner, on «سياسة التمركز»: no row per terrain class. Tick «إضافة طبيعة الأرض تنطبق» and give one number (km, m or a percentage) that gives more on ground that is not flat, for distance and for area, by the ground of the place being moved to.
+
+**Decision.**
+- `StationingPolicy.TerrainExtra` (`ABSOLUTE` in metres or m², or `PERCENT` of the maximum), on each leg (`Leg.terrainExtra`) and on the footprint (`footprintTerrainExtra`).
+- It applies to every class but the first of the classification (the one from 0 %). So undulating ground already gets it. It only adds; the minimum never moves.
+- A leg is judged by the ground of its deployment area, the site by the ground of the proposed place, never by where the unit is now.
+- The footprint's maximum now depends on the terrain, so the check on the server reads the class of the proposed place when the policy has this value. With no terrain answer it stays the base maximum.
+
+**Earlier versions.** A leg with no `terrainExtra` keeps its allowance per class (ADR-038 and before), so a request stays on the rules of its version. `terrainAllowancesM` is only required by such a leg. The page no longer edits it.
+
+**Limit.** A shape that moves from flat ground to a hill gets its larger maximum after the drop, when the server's class arrives; the server's check on save decides.
+
+## ADR-041 The workflow studio as a logical flow chart, with places found per request — Proposed, awaiting the owner's acceptance (2026-11-06)
+
+**Context.** Owner: remove the studio and start again as a real logical flow chart that can be redrawn easily, with what happens on yes or no, for an organisation of many levels and thousands of units: who is responsible at each step, requests that must pass one place, a final approval, and who is told at the end. The old studio was an ordered list of stages.
+
+**Decision.**
+- **Editor:** React Flow (`@xyflow/react` 12.10.1, MIT, bundled, no network). Chosen over bpmn-js because it suits a builder for non-specialists, and BPMN is produced by our compiler anyway. Research was directional (blogs and vendor pages), so the choice was proven by `tests/acceptance/flow-studio.mjs`, not by the sources.
+- **Definition:** an additive `graph` (`nodes`, `edges`) in the versioned definition. Step types: start, approval (approved and optional rejected line), decision (yes and no), notify, parallel, join, approved end, rejected end. Approval steps are derived as the definition's `stages`, so tasks, route views and carried approvals are unchanged.
+- **Engine:** compiled to BPMN for Flowable (`BpmnCompiler.compileGraph`), still with only fixed `moverWf` expressions. A rejected line sets `outcome_<key>` and completes the step; a rejected end terminates the whole process and writes `request_flow_end`, which closes the request with nothing approved or reserved.
+- **Places (`PlaceResolver`):** the unit of the requester, UP n levels, AT_LEVEL, FIXED, RESPONSIBLE, RESOURCE_ORG, ANY. A step whose selector finds no unit stays open to any holder of the role in scope; it is never skipped, and the check reports those units.
+- **Responsibilities (V23):** a duty and rules «every unit under X → Y». The nearest rule above a unit wins, so a few rules cover any number of units.
+- **A step going to a unit binds to that unit (`task_assignment.strict_place`):** only those who hold the role at that very unit may decide it, even when the role's reach is all units. Without this, a chosen unit meant nothing for the roles whose scope is ALL (found when a reviewer of one unit decided a step of another). Tasks of definitions from before the chart keep the role's reach.
+- **Publishing rules (`GraphValidator`):** one start; no loops (a request returns to its requester through «إعادة للتصحيح», on every approval); nothing unreachable; parallel branches close before the final approval; no path to an approved end without a final approval by a role with APPROVE; no approval or rejection after it. Publishing opens only after a clean check with no edit since.
+- **Try it:** on a real unit and sample values: the route lit on the chart, the unit and number of holders per step, what a rejection would do, and which units find nobody.
+- **One approval climbing the hierarchy (owner, same day):** an approval step may carry `chain`, so a flow need not know how many levels exist. It runs one after another from the requester's parent (or the unit itself) and stops at the main unit, the first of chosen levels, the top, a number of approvals, or one unit. A branch with no flagged unit stops at its top. A requesting unit at or above the stop has nothing to climb and the step is passed. Units with no holder are skipped by default; if there are units to climb and nobody holds the role in any of them, the step stays open to the role and is never approved by nobody. A rejection at any unit ends the climb. It cannot be the final approval. `hr_unit.is_main` (V24) comes from the source through the mapping, and levels offered are those in the published snapshot, never a fixed list.
+- **Questions about the requesting unit:** `requesterIsMain`, `requesterHasParent`, `requesterLevel`.
+
+**Kept.** Every published version stays as it is, and running requests stay on theirs. A definition from before opens as the chart it means. The old screen is in git history.
+
+**Limits.**
+- A main unit with a holder of the role signs in the climb. The movement programme stops below the main unit; the owner's decision is pending (`docs/reports/mover-permissions-study.html`, decision 3).
+- A chart cannot loop back to an earlier step.
+- A step moved in a parallel branch is not reordered by the layout beyond layers; «ترتيب تلقائي» is a starting point.
+- After a separation-of-duties reassignment a person may be chosen who does not hold the role at the unit; not exercised.
+- Notices are in-app only.
+- Chart steps other than «by scope» count a person at a unit their grant names, not at every unit below it (ADR-042).
+
+## ADR-042 Approvals found by a grant's scope, and for-information by place, as in the movement programme — Proposed, awaiting the owner's acceptance (2026-11-06)
+
+**Context.** Owner: study how the movement programme (`~/Desktop/mover`, read only) places its approvals and «mimic everything». Asked which way to go on each open question, the owner answered that the answers are in the programme itself. Study: `docs/reports/mover-permissions-study.html`. The owner's own additions: a scope may be chosen by levels, and for-information reaches a unit at the place while its main unit is elsewhere, naming both.
+
+**Decision.**
+- **The climb:** starts at the requester's parent, as a unit never approves its own request, and ends below the main unit, which only groups its units and is never a station. A level where the requester is the only holder is passed. A level with nobody refuses the request before it is sent, unless the flow chooses to skip such levels.
+- **Levels in a scope (V25, the owner's addition):** a unit target with descendants may carry `levels`, kept as levels and worked out from the published HR snapshot when the grant is read (`GrantSource.reach`). `RawGrant.spec()` gives everything else plain units, so scope checks and OpenFGA tuples need no new concept. Not offered to a final approver.
+- **A step «by scope» (`orgFrom: BY_SCOPE`):** stands on the requesting unit and goes to those whose grant of the role reaches it, the nearest grant only (`PlaceResolver.scope`), so a branch can have its own approver. The first valid approval closes it.
+- **No approver, three outcomes:** nobody holds the role under the main unit: the command has no such step and the request goes on, except that a final approval is never passed. Someone does but not for this unit: refused before sending (`WorkflowService.scopeProblem`). The approver is lost later: the step waits for the access managers (`TaskRealignment.separate`), not for nobody.
+- **By time (V27):** a command may name periods and receiving units for «معتمد عمليات الوحدة». The nearest command up to the main unit that has any decides, in Dubai time. The routed unit's own people act, among those whose grant reaches it. A time no period covers refuses the request. The units are pinned on the task (`scope_orgs`), so a later edit affects new requests only. A receiving unit must lie inside the command.
+- **Independent of earlier approvals, with no switch:** in a chart, nobody who approved another step, or whom they acted for, decides a by-scope or final step (`SeparationOfDuties.earlierApprovers`, compared by the human). Levels of a climb do not bar each other. Definitions from before the chart are unchanged.
+- **Where a grant is held:** a chart step going to a unit counts the units a grant names; a grant naming units no longer counts at its home organisation. Before this, custom scopes had no effect on chart steps.
+- **The matrix and «تعيين»:** `UnitMatrix.tsx`: a unit's people in rows and the roles in columns, saved at once. A role that approves, and for-information, has a button reading how many units it covers (`UnitsDialog.tsx`). The tree starts at the main units the granter may reach, as does the search. A new unit starts as «الوحدة فقط»; a final approver takes a whole unit or every unit. A changed scope ends the old grant and makes the new one together (`GrantAdminService.replace`), so history stays.
+- **For information (V26, `PlaceInfo`):** on final approval, each holder of `FYI_RECEIVER` whose scope covers a party gets one row in `request_fyi`: who is told is who may read, and it records who read it. The parties: the requesting unit and its main unit, the units at the place (stationed, linked or responsible; walking up the sites, the first level with units answers) and their main units, the units the requester chose, and the main commands chosen explicitly (`fyi_main_command`). The role gives nothing before the final approval whatever its scope, and only the summary after it. Others at an informed unit see nothing by it. A re-stationing activated at a place sends the same parties a notice naming the unit and its main unit.
+- **Roles as data:** `ops/policy/approval-roles.json`, published through the role policy.
+
+**Not copied.** Movement stages, provision, routes, movement windows and the operational picture: outside TMRKZ's administrative scope.
+
+**Not built yet, though they are in the programme.** Duty permits, the page access table, the ten separate rights of an access manager, adding a party to for-information by hand, the final approver's structured return, and rank and condition rules on dynamic permissions.
+
+**Limits.**
+- A grant limited by both organisation and site is matched by its organisation when finding the nearest; the site is still enforced when deciding.
+- Re-stationing keeps its own stages and seats; only the notice is shared.
+- A changed hierarchy reaches a levels grant at once in the database and in OpenFGA within the 5-minute reconcile; not exercised.
+
+## ADR-043 Light and dark colours, chosen by the person; one palette with the sign-in pages — Proposed, awaiting the owner's acceptance (2026-11-06)
+
+**Context.** Owner: choose between dark and light, with one set of colours in and out of sign-in. Inside was a dark navy console with light pages, and sign-in was sand and brown. First built with a teal light theme; the owner then chose: the sand of the sign-in page, across the whole application, and the dark one as built.
+
+**Decision.**
+- **The choice:** a switch in the top bar and on both sign-in pages, kept in the browser (`tmrkz-theme`), the same key on the application and on the identity page. With no choice, the sand. It is set on `<html data-theme>` before the first paint (`lib/theme.ts`, and `theme.js` on the identity page, because the page's security policy allows no inline script).
+- **One palette:** light is the sand: beige ground, cream panels, brown primary buttons, and the sign-in page has its original values. Dark is navy and teal. `signin.css` and the Keycloak `tmrkz.css` use the same values. The colours of the two themes are in `theme.css`.
+- **The older stylesheets stay as they are:** `prototype.css` must remain verbatim, so `ops/tools/gen-theme.py` generates `theme.generated.css`, overriding their fixed colours per theme: surfaces and text follow the theme, greys warm up and the teal accent becomes brown in the sand, and a saturated colour that means something, such as a status, stays. Run it after changing a stylesheet.
+- **Measured, not judged:** `tests/acceptance/theme-contrast.mjs` measures the contrast of all visible text on the real pages in both themes, against WCAG AA.
+
+**Kept from the original sign-in page, changed once:** the small labels of its guidance notes are brown rather than gold, because gold on white was too faint to read. **Limits.** Maps keep their own colours in both themes, and the unit symbols keep theirs. Text inside maps and drawings is not in the measure, and a gradient is measured by its most opaque colour. Measured on what the pages show with this data; a state not on screen, such as an open dialog, is not measured.
+
+## ADR-044 Asking for permissions, through the same request engine — Proposed, awaiting the owner's acceptance (2026-11-06)
+
+**Context.** Owner: anyone can sign in but sees nothing, then asks for permissions; build it as in the movement programme, or say if there is a better idea used widely. There, a person with no access reaches only the page to ask; a request is not a grant; a local reviewer advises and only the final approval grants; what was asked, advised and granted are kept apart.
+
+**Decision.**
+- **The same engine, not a separate one (the better idea put to the owner):** the programme has its own table and fixed route for this. Here a request type of kind `ACCESS` runs through the same chart, tasks, notices and audit as any request, so its path is drawn in «مسار الموافقات» and can change without code. Only its form and its effect are its own.
+- **No permission, one page:** a person with none has only «طلب صلاحية», whatever the address (`App.tsx`). The server was already refusing the rest.
+- **Asking (`AccessRequestService`, V28):** for themselves, at their unit from HR, from a fixed list: مقدم الطلب، معتمد السلسلة الهرمية، معتمد عمليات الوحدة، للعلم. One open request per person. It needs a type of kind `ACCESS` with an active path; only one such type exists.
+- **Deciding:** the reviewer's list is advice and grants nothing; the final approver's list grants. Both may differ from what was asked. The ordinary decision checks apply: the person may not decide their own, nor anyone who approved earlier decide the final.
+- **Granting:** on final approval, the roles granted become grants at the person's unit with each role's own default reach (`GrantAdminService.applyAccessRequest`). Wider reach is given afterwards with «تعيين».
+- **Roles as data:** `مدير صلاحيات الوحدة` (manage access and review, over the unit and its branches) and `معتمد طلبات الصلاحية` (review and approve, over everything), in `ops/policy/approval-roles.json`. The reviewer reads no other request.
+- **No reviewer:** a review step of `مدير صلاحيات الوحدة` with nobody, or only the applicant, is passed and goes to the final approval, which is told so.
+- **Kept apart:** permission requests appear in no request list, count or report, and their tasks only on «طلبات الصلاحية».
+
+**Differs from the programme.** If HR moves the person while the request waits, the programme re-routes it to the new unit's reviewer. Here the approval is refused and says where they moved; the reviewer rejects it and the person asks again.
+
+**Amended 2026-11-06 (owner, V29).** As in the programme (`self_requestable_keys`, `grantable_keys`):
+- **What is shown is a setting.** `access_request_offer`: for each role the system administrator chooses «تظهر لأي شخص جديد» or «يضيفها مدير صلاحيات الوحدة فقط», or leaves it out (button «الصلاحيات المعروضة للطلب» on this type, needs `CONFIGURE`). It starts with the four earlier roles shown to everyone. At least one must be shown to everyone. Roles of scope `ALL` and roles holding `CONFIGURE` or `MANAGE_ACCESS` can never be offered. This narrows the programme, whose final administrator can grant any non-system key.
+- **Extras.** The manager's list appears only in review; adding is advice like the rest, and the final approver sees and may grant it. The programme's list comes from each reviewer's authority; here it is this one setting.
+- **No deadline.** The owner asked what the deadline does. It never decided anything: it raises a late notice and a count. The programme's access requests have none, so this type shows no deadline on its cards or step, raises no late notice and counts in no late report. The hidden `slaDays` value stays because the shared validator needs it.
+- **Sign-in is unchanged.** First sign-in links to the one HR person whose domain account equals the directory login, with no list of names to maintain; a person with no match goes to the review list. This install's stand-in directory holds no people, so it has not run with people from Oracle.
+
+**Limits.** A person with no HR unit cannot ask. Exercised with fictional people in the temporary environment; people from Oracle cannot sign in yet.
+
+## ADR-045 One request engine: access, site bootstrap, initial stationing, deployment areas, stages, FYI, posture — Proposed, for owner review (2026-11-07)
+
+**Context.** The owner's brief wants TMRKZ usable from a nearly empty installation: ACCESS → SITES → LINKS → INITIAL STATIONING → DEPLOYMENT AREAS → RE-STATIONING → APPROVALS → FYI → ACTIVATION → READ-ONLY POSTURE, as one application, with MOVER's button behaviour. Audit found that V3 re-stationing had no unit operations stage and no chosen FYI, that deployment areas keyed on a request and were never read back, that nothing could say which actions a unit had, and that sites, links and corrections had server paths with no page.
+
+**Decision.**
+- **One engine.** `restationing_request.purpose` carries RESTATIONING, INITIAL_STATIONING, DEPLOYMENT_AREAS and SITE_REGISTRATION through the same revisions, return, selective re-approval, hierarchy drift, route and activation. The same editor serves all four. No second workflow.
+- **Separate permissions for separate requests.** `CREATE_INITIAL_STATIONING`, `CREATE_DEPLOYMENT_REQUEST`, `REQUEST_SITE_REGISTRATION`, `DECIDE_UNIT_OPERATIONS`, `FINAL_APPROVE_STATIONING`, `MANAGE_FYI_DISTRIBUTION`, `VIEW_OPERATIONAL_POSTURE`. Existing ones are reused otherwise (`docs/PERMISSION_MATRIX_STATIONING_AR.md`). No new OpenFGA structure: the generator adds relations per permission.
+- **Stages are policy, holders are grants.** `StationingPolicy.approvalStages` (`unitOperations`, `finalByPermission`, `fyiBeforeActivation`), null on every earlier version, so a request stays on the rules of its pinned version. No level, person or holder is named in code.
+- **Deployment areas belong to a unit's stationing record.** `deployment_area.organization_id` and `stationing_id`, one row per unit. Two units sharing a site hold different areas; approving one never touches the other. A permanent move and a correction retire the areas with the record; an extension carries them forward.
+- **Eligibility is the server's.** `GET /request-hub`: NO_STATIONING, DEPLOYMENT_MISSING, DEPLOYMENT_REQUEST_PENDING, DEPLOYMENT_COMPLETE per unit, with each action's reason. A right the person lacks yields no action. Every operation checks again.
+- **A re-stationing needs a stationing.** The server refuses to submit one for a unit stationed nowhere; such a unit asks for initial stationing, on a registered site.
+- **Site registration.** Nothing changes before activation. An overlap with a registered site is reported and blocks (except the chosen parent), then checked again at activation. Activation registers the site once, with the requesting unit as its responsible context and one link; a link is not stationing.
+- **FYI.** `restationing_fyi`: chosen units, audited, notified. People affiliated to them read that one request. No membership is written.
+- **Posture.** `GET /operational-posture` returns the units the right reaches with their site, kind, own areas and a request's state. A unit outside the reach at the same site is counted, never named. It opens no action.
+- **Access requests.** The offered list stays the system administrator's (ADR-044). A request carries a scope (`UNIT`, `UNIT_TREE`, `UNITS`, `SITES`); `ALL` cannot be asked for and only a global access manager may give it at the final approval. A reviewer recommends for or against; a return is the same request, sent again. The final approval checks the person, the unit, the permissions and the scope against today.
+- **Bootstrap.** «تهيئة المواقع والتمركز» uses the existing audited paths with a written reason: `MANAGE_FACILITIES`, `MANAGE_SITE_LINKS`, `CORRECT_STATIONING`. A site may name no responsible organisation, and then only a manager of everything may register it.
+
+**Choices made without the owner, each reversible.**
+- `SITE_REGISTRATION` names the requesting unit as responsible, since approved humans identified it; no separate field.
+- A final access approver grants from the offered lists, not any non-system role as MOVER's administrator can.
+- A site that is only a marker measures deployment from its point: the client sends a one-metre footprint as reference, and the server measures from the register.
+- Initial stationing is permanent, because a temporary one needs a permanent base to return to.
+- A deployment request is one unit at a time.
+
+**Not changed.** Oracle's hierarchy, sites independent of it, link not stationing, no movement of descendants, no distance rule current→proposed, the map editor, no best-site logic. Light and dark themes both stay: the brief asks for the dark design and the owner earlier asked for the sand light theme by choice; the chooser keeps both.
+
+**Migration.** V30. Proved on a throwaway database by `ops/sql/checks/V30-upgrade-check.sh` (clean path, and upgrade path with legacy rows, every row kept). Applied to `tmrkz-mover` on the owner's direct instruction of 7 Nov 2026 after a verified backup.
+
+**FYI access (owner correction, 7 Nov 2026).** Reading is per request and per chosen unit, through `restationing_fyi`; it writes no grant. A person with no permission opens it by its address and from their own page. It ends when a holder ends it with a reason, when the person leaves the unit in HR, and when the request is cancelled before activation or lapses. Parents, children and siblings of the chosen unit inherit nothing.
+
+**Flow Studio's page has its own rollout (owner, 7 Nov 2026).** The workflow engine is not affected. `TMRKZ_FLOW_STUDIO_UI` (default false) builds the page in; :8088 was built with it true because the owner uses that page there. «الصلاحيات المعروضة للطلب» is also in «مركز الصلاحيات», so it does not depend on the studio.
+
+**Limits.** See `docs/evidence/stationing-next/MORNING_HANDOFF_AR.md`.
+

@@ -1,0 +1,77 @@
+{
+  "note": "أدوار الاعتماد وطلبات الصلاحية كما في برنامج التنقل (ADR-042، ADR-044)",
+  "roles": [
+    {
+      "code": "CHAIN_APPROVER",
+      "name": "معتمد السلسلة الهرمية",
+      "scope": "ORGANIZATION",
+      "permissions": [
+        "VIEW",
+        "REVIEW"
+      ],
+      "summaryOnly": false,
+      "grantableRoles": []
+    },
+    {
+      "code": "UNIT_OPERATIONS_APPROVER",
+      "name": "معتمد عمليات الوحدة",
+      "scope": "ORGANIZATION",
+      "permissions": [
+        "VIEW",
+        "REVIEW"
+      ],
+      "summaryOnly": false,
+      "grantableRoles": []
+    },
+    {
+      "code": "FINAL_APPROVER",
+      "name": "المعتمد النهائي",
+      "scope": "ORGANIZATION",
+      "permissions": [
+        "VIEW",
+        "REVIEW",
+        "APPROVE",
+        "EXPORT"
+      ],
+      "summaryOnly": false,
+      "grantableRoles": []
+    },
+    {
+      "code": "FYI_RECEIVER",
+      "name": "للعلم",
+      "scope": "SITE",
+      "permissions": [
+        "VIEW_SUMMARY"
+      ],
+      "summaryOnly": true,
+      "grantableRoles": []
+    },
+    {
+      "code": "UNIT_ACCESS_MANAGER",
+      "name": "مدير صلاحيات الوحدة",
+      "scope": "ORGANIZATION",
+      "permissions": [
+        "MANAGE_ACCESS",
+        "REVIEW"
+      ],
+      "summaryOnly": false,
+      "grantableRoles": [
+        "REQUESTER",
+        "CHAIN_APPROVER",
+        "UNIT_OPERATIONS_APPROVER",
+        "FYI_RECEIVER"
+      ]
+    },
+    {
+      "code": "ACCESS_FINAL_APPROVER",
+      "name": "معتمد طلبات الصلاحية",
+      "scope": "ALL",
+      "permissions": [
+        "REVIEW",
+        "APPROVE"
+      ],
+      "summaryOnly": false,
+      "grantableRoles": []
+    }
+  ]
+}

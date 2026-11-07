@@ -161,7 +161,7 @@ public final class AccessContext {
         }
         ViewLevel best = ViewLevel.NONE;
         for (Grant g : grants) {
-            if (!g.viewer()) {
+            if (!g.viewer() || g.fyiOnly()) {
                 continue;
             }
             if (g.coversRequest(r)) {
@@ -173,8 +173,8 @@ public final class AccessContext {
         }
         if (best == ViewLevel.NONE && r.decided()) {
             boolean infoRecipient = grants.stream()
-                    .anyMatch(g -> g.viewer() && g.orgId() != null && r.infoOrgs().contains(g.orgId()));
-            if (infoRecipient) {
+                    .anyMatch(g -> g.viewer() && !g.fyiOnly() && g.orgId() != null && r.infoOrgs().contains(g.orgId()));
+            if (infoRecipient || r.fyi().containsKey(actor.personId())) {
                 best = ViewLevel.SUMMARY;
             }
         }
@@ -188,6 +188,19 @@ public final class AccessContext {
      */
     public Optional<Grant> taskGrant(String roleCode, UUID targetOrgId, RequestScope r, boolean finalStage) {
         return taskGrant(roleCode, targetOrgId, r, finalStage, g -> true);
+    }
+
+    /** Whether this person holds the role at this very unit: what a chart's step going to a unit asks (ADR-041). */
+    public boolean holdsRoleAt(String roleCode, UUID orgId) {
+        return grants.stream().anyMatch(g -> {
+            if (!g.roleCode().equals(roleCode)) {
+                return false;
+            }
+            // units named by the grant are where it is held; a grant naming no unit is held at its home organisation
+            List<GrantTarget> units = g.targets().stream().filter(t -> GrantTarget.ORGANIZATION.equals(t.kind())).toList();
+            return units.isEmpty() ? orgId.equals(g.orgId())
+                    : units.stream().anyMatch(t -> t.id().equals(orgId) || t.reached().contains(orgId));
+        });
     }
 
     /** {@link #taskGrant} among the grants that pass {@code allowed}. */
@@ -234,7 +247,7 @@ public final class AccessContext {
     public ViewLevel siteView(UUID siteId, Set<UUID> siteAncestry, UUID responsibleOrgId) {
         ViewLevel best = ViewLevel.NONE;
         for (Grant g : grants) {
-            if (!g.viewer() && !g.has(Permission.MANAGE_FACILITIES)) {
+            if ((!g.viewer() || g.fyiOnly()) && !g.has(Permission.MANAGE_FACILITIES)) {
                 continue;
             }
             if (g.coversSite(siteId, responsibleOrgId)) {

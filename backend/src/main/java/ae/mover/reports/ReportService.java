@@ -139,7 +139,7 @@ public class ReportService {
         long overdueCount = jdbc.sql("select count(*) from execution_task e join request r on r.id = e.request_id where e.status = 'OPEN' and e.due_at < :now and " + scope)
                 .params(params).query(Long.class).single();
         out.put("overdueExecution", Map.of("count", overdueCount, "items", overdue));
-        long overdueReview = jdbc.sql("select count(*) from task_assignment t join request r on r.id = t.request_id where t.status = 'OPEN' and t.due_at < :now and " + scope)
+        long overdueReview = jdbc.sql("select count(*) from task_assignment t join request r on r.id = t.request_id join request_type ty on ty.code = r.type_code where ty.kind <> 'ACCESS' and t.status = 'OPEN' and t.due_at < :now and " + scope)
                 .params(params).query(Long.class).single();
         out.put("overdueReview", Map.of("count", overdueReview));
         return out;
@@ -175,7 +175,7 @@ public class ReportService {
                        (select string_agg(res.name, '، ' order by res.code) from request_resource rr join resource res on res.id = rr.resource_id
                         where rr.request_id = r.id) as resources
                 from request r join request_type t on t.code = r.type_code join organization o on o.id = r.owner_org_id
-                where""" + " " + where + " order by r.number limit 50000").params(params).query().listOfRows();
+                where t.kind <> 'ACCESS' and""" + " " + where + " order by r.number limit 50000").params(params).query().listOfRows();
         var scopes = access.scopes(rows.stream().map(m -> (UUID) m.get("id")).toList());
         StringBuilder csv = new StringBuilder("﻿");
         csv.append(row("رقم الطلب", "النوع", "الحالة", "الجهة", "المرافق", "بداية الفترة", "نهاية الفترة")).append('\n');

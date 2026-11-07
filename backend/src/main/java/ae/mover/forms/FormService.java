@@ -53,7 +53,7 @@ public class FormService {
     public List<FormSummary> list(AccessContext ctx) {
         ctx.require(Permission.CONFIGURE);
         return jdbc.sql("""
-                select f.id, t.code, t.name from form_definition f join request_type t on t.code = f.request_type_code
+                select f.id, t.code, t.name from form_definition f join request_type t on t.code = f.request_type_code and t.active
                 order by t.sort_order""")
                 .query((rs, n) -> new FormSummary(rs.getString("id"),
                         Map.of("id", rs.getString("code"), "code", rs.getString("code"), "name", rs.getString("name")),

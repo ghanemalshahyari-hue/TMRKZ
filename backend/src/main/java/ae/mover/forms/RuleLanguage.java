@@ -18,7 +18,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 public final class RuleLanguage {
 
     public static final Set<String> OPS = Set.of("eq", "neq", "gt", "gte", "lt", "lte", "in", "empty", "notEmpty");
-    public static final Set<String> FACTS = Set.of("resourceCount", "durationDays", "durationHours", "participantCount", "requestType");
+    public static final Set<String> FACTS = Set.of("resourceCount", "durationDays", "durationHours", "participantCount", "requestType",
+            "requesterLevel", "requesterIsMain", "requesterHasParent");
     private static final int MAX_DEPTH = 6;
     private static final int MAX_NODES = 60;
 

@@ -37,7 +37,7 @@ const external = [];
 const consoleErrors = [];
 const writes = [];
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ ...(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH } : { channel: 'msedge' }), headless: true });
 // sign in once, outside the recordings
 const login = await browser.newContext({ viewport: SIZE });
 const lp = await login.newPage();

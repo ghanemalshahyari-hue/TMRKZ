@@ -1,5 +1,5 @@
 import type { Permission } from '../api/types';
-import { NAV, type View } from './app';
+import { FLOW_STUDIO_UI_ENABLED, NAV, type View } from './app';
 
 /**
  * Navigation of the operational shell (owner brief «FULL APPLICATION UI REBUILD», §4): the same views and the same
@@ -7,9 +7,20 @@ import { NAV, type View } from './app';
  * this only keeps a person from being offered a page they cannot open.
  */
 
+const STATIONING_REQUEST_RIGHTS: Permission[] = ['CREATE_RESTATIONING', 'CREATE_INITIAL_STATIONING', 'CREATE_DEPLOYMENT_REQUEST', 'REQUEST_SITE_REGISTRATION'];
+const STATIONING_RIGHTS: Permission[] = [...STATIONING_REQUEST_RIGHTS, 'VIEW', 'APPROVE', 'ACTIVATE_STATIONING', 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION', 'DECIDE_PRE_ACTIVATION_CANCELLATION',
+  'ACTIVATE_TEMPORARY_EXTENSION', 'DECIDE_EARLY_RETURN', 'DECIDE_BEFORE_START_CANCELLATION', 'DECIDE_UNIT_OPERATIONS', 'FINAL_APPROVE_STATIONING', 'MANAGE_FYI_DISTRIBUTION'];
+
 /** Server-enforced permissions decide what each screen shows; this mirrors them for navigation only. */
 export function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: boolean): boolean {
-  if (view === 'docs' || view === 'home') return false;
+  if (view === 'docs' || view === 'home' || view === 'requestAccess') return false;
+  // the read-only posture opens with its own right, and that right opens nothing else
+  if (view === 'posture') return !can('VIEW_OPERATIONAL_POSTURE');
+  if (view === 'siteSetup') return !(can('MANAGE_FACILITIES') || can('MANAGE_SITE_LINKS') || can('CORRECT_STATIONING'));
+  if (view === 'newRequest') return !STATIONING_REQUEST_RIGHTS.some((p) => can(p));
+  if (view === 'allRequests') return !STATIONING_RIGHTS.some((p) => can(p)) && !can('REVIEW');
+  if (view === 'accessInbox') return !can('REVIEW');
+  if (view === 'workflow' && !FLOW_STUDIO_UI_ENABLED) return true;
   if (['workflow', 'forms', 'settings'].includes(view)) return !can('CONFIGURE');
   if (view === 'permissions') return !can('MANAGE_ACCESS');
   if (view === 'org') return !(can('VIEW') || can('MANAGE_ACCESS') || can('MANAGE_FACILITIES') || can('CONFIGURE'));
@@ -17,8 +28,8 @@ export function restriction(view: View, can: (p: Permission) => boolean, summary
   if (view === 'stationingPolicy') return !can('CONFIGURE');
   // the lifecycle rights (ADR-034) open the page too: their holders decide the requests they act on
   if (view === 'restationing')
-    return !(['VIEW', 'CREATE_RESTATIONING', 'APPROVE', 'ACTIVATE_STATIONING', 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION', 'DECIDE_PRE_ACTIVATION_CANCELLATION',
-      'ACTIVATE_TEMPORARY_EXTENSION', 'DECIDE_EARLY_RETURN', 'DECIDE_BEFORE_START_CANCELLATION'] as Permission[]).some((p) => can(p));
+    // one request sent «للعلم» opens by its address, whatever else the person holds; the server decides whether it is theirs
+    return !STATIONING_RIGHTS.some((p) => can(p)) && !(typeof location !== 'undefined' && /^#restationing\/[0-9a-f-]{36}$/.test(location.hash));
   if (summaryOnly) return true;
   if (view === 'review') return !can('REVIEW');
   if (view === 'audit') return !can('AUDIT');
@@ -33,7 +44,7 @@ export type NavLink = { view: View; label: string; icon: string };
  */
 const PRIMARY: { label: string; icon: string; views: View[] }[] = [
   { label: 'الرئيسية', icon: 'home', views: ['home'] },
-  { label: 'الطلبات', icon: 'file', views: ['restationing', 'requests'] },
+  { label: 'الطلبات', icon: 'file', views: ['allRequests', 'restationing', 'requests'] },
   { label: 'المواقع', icon: 'pin', views: ['stationing'] },
   { label: 'الوحدات', icon: 'tree', views: ['org'] },
   { label: 'التقارير', icon: 'chart', views: ['audit', 'calendar'] },
@@ -52,7 +63,7 @@ export function primaryNav(can: (p: Permission) => boolean, summaryOnly: boolean
 }
 
 /** Names that would repeat a top-bar entry's name for another page. */
-const MORE_LABEL: Partial<Record<View, string>> = { requests: 'طلبات المرافق والحجوزات', restationing: 'إعادة التمركز' };
+const MORE_LABEL: Partial<Record<View, string>> = { requests: 'طلبات المرافق والحجوزات', restationing: 'إعادة التمركز', allRequests: 'الطلبات' };
 
 /** Every other view the person may open, in NAV order, for the «المزيد» menu. */
 export function moreNav(can: (p: Permission) => boolean, summaryOnly: boolean): NavLink[] {

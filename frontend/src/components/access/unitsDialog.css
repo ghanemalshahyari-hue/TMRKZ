@@ -1,0 +1,21 @@
+/* «تعيين» dialog of an approving role (ADR-042). Colours and controls come from the shared stylesheet. */
+.units-assign { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px 0 12px; }
+.ud-body { display: flex; flex-direction: column; gap: 12px; }
+.ud-grid { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.ud-tree input[type='search'] { width: 100%; margin-bottom: 8px; }
+.ud-tree ul { list-style: none; margin: 0; padding-inline-start: 14px; }
+.ud-tree > ul { padding: 0; max-height: 46vh; overflow: auto; }
+.ud-node { display: flex; align-items: center; gap: 4px; padding: 2px 4px; border-radius: 4px; }
+.ud-node.on { font-weight: 600; }
+.ud-node label, .ud-hit { display: flex; gap: 6px; align-items: baseline; cursor: pointer; }
+.ud-hit { padding: 3px 4px; flex-wrap: wrap; }
+.ud-arrow { width: 22px; flex: none; background: none; border: 0; cursor: pointer; color: inherit; }
+.ud-note { padding: 4px 8px; font-size: 13px; opacity: 0.75; }
+.ud-levels { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 6px; }
+.ud-levels label { display: flex; gap: 3px; align-items: center; }
+.ud-chosen h4 { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; }
+@media (max-width: 720px) { .ud-grid { grid-template-columns: 1fr; } }
+.unit-matrix th { white-space: normal; min-width: 92px; font-size: 12px; }
+.unit-matrix td { text-align: center; }
+.unit-matrix td:first-child { text-align: start; white-space: nowrap; }
+.unit-matrix th:first-child, .unit-matrix td:first-child { position: sticky; inset-inline-start: 0; z-index: 1; background: var(--paper); }

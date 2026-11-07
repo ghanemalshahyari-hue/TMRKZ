@@ -69,13 +69,26 @@ export function routeStrip(r: RestationingRequest, checks: RestationingChecks | 
       nodes.push({ key: s.key, label: s.label, unit: s.unit?.name ?? null, person: null, at: null, status: 'upcoming', note: 'متوقع عند الإرسال', final: s.final });
     }
   }
+  // a stage of this request only: FYI appears when the policy asked for it or it was done (ADR-045)
+  if (r.fyi && (r.fyi.required || r.fyi.doneAt)) {
+    nodes.push({
+      key: 'fyi',
+      label: 'توزيع للعلم',
+      unit: null,
+      person: r.fyi.doneBy,
+      at: r.fyi.doneAt,
+      status: r.fyi.doneAt ? 'done' : 'current',
+      note: r.fyi.doneAt ? (r.fyi.units.join('، ') || 'لا وحدات') : 'ليس تصويتاً',
+      final: false,
+    });
+  }
   nodes.push({
     key: 'activation',
     label: r.requestKind === 'EXTENSION' ? 'تفعيل التمديد' : 'التفعيل',
     unit: null,
     person: r.activation?.by.name ?? null,
     at: r.activation?.at ?? null,
-    status: ACTIVATED.includes(r.state) || r.activation ? 'done' : r.state === 'APPROVED_NOT_ACTIVATED' ? 'current' : 'upcoming',
+    status: ACTIVATED.includes(r.state) || r.activation ? 'done' : r.state === 'APPROVED_NOT_ACTIVATED' && !r.fyi?.required ? 'current' : 'upcoming',
     note: 'إجراء مستقل',
     final: false,
   });

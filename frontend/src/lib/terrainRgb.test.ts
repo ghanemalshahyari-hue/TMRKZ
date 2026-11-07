@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { distanceM } from './geo';
 import type { Part } from './siteGeometry';
-import { areaSamples, decodeMapbox, elevationStats, insideParts, profileOf, profilePoints, sampleTile, slopeTileImage, tileOf, tilesFor } from './terrainRgb';
+import { areaSamples, decodeMapbox, elevationStats, insideParts, profileOf, profilePoints, sampleTile, slopePctTile, slopeZones, tileOf, tilesFor, toneOfPct } from './terrainRgb';
 
 /** The builder's encoding (ops/terrain/build_terrain_3d.py encode): v = round((h + 10000) / 0.1). */
 const encode = (h: number) => {
@@ -96,41 +96,97 @@ describe('Terrain-RGB elevations (display only)', () => {
   });
 });
 
-describe('slope classes of an elevation tile (display only)', () => {
-  const bands = [
-    { code: 'FLAT', label: 'مستوٍ', fromPct: 0, toPct: 2 },
-    { code: 'UNDULATING', label: 'متموّج', fromPct: 2, toPct: 10 },
-    { code: 'ROLLING', label: 'متدرجة', fromPct: 10, toPct: 15 },
-    { code: 'HILLY', label: 'تلال', fromPct: 15, toPct: 30 },
-    { code: 'MOUNTAINOUS', label: 'جبلي', fromPct: 30, toPct: null },
-  ];
+describe('slope inside a shape (display only)', () => {
+  const limits = { greenBelowPct: 10, redFromPct: 30 };
   // zoom 12, a tile row at about 24.8° N: one pixel is about 34.7 m
   const z = 12;
   const y = tileOf({ lat: 24.8, lng: 56 }).y;
   const cell = (40075016.686 * Math.cos((24.8 * Math.PI) / 180)) / (256 * 4096);
-  const colourAt = (img: Uint8ClampedArray, x: number, yy: number) => Array.from(img.slice((yy * 256 + x) * 4, (yy * 256 + x) * 4 + 4));
+  const at = (t: Float32Array, x: number, yy: number) => t[yy * 256 + x];
+  const site = (lat: number, lng: number, m = 600): Part => [[
+    { lat: lat - m / 2 / 110900, lng: lng - m / 2 / 101000 },
+    { lat: lat - m / 2 / 110900, lng: lng + m / 2 / 101000 },
+    { lat: lat + m / 2 / 110900, lng: lng + m / 2 / 101000 },
+    { lat: lat + m / 2 / 110900, lng: lng - m / 2 / 101000 },
+  ]];
+  const allRects = (fc: GeoJSON.FeatureCollection) => fc.features.flatMap((f) => (f.geometry as GeoJSON.MultiPolygon).coordinates);
 
-  it('colours each pixel by the policy class of its slope: green flat … red mountainous', async () => {
-    const { bandColours } = await import('./terrainRgb');
-    const c = bandColours(5);
-    expect(colourAt(slopeTileImage(planeTile(300, 0, 0), z, y, bands), 128, 128)).toEqual([...c[0], 150]);
-    // 5 % east-west → UNDULATING; 20 % → HILLY; 60 % → MOUNTAINOUS
-    expect(colourAt(slopeTileImage(planeTile(300, 0.05 * cell, 0), z, y, bands), 128, 128)).toEqual([...c[1], 150]);
-    expect(colourAt(slopeTileImage(planeTile(300, 0.2 * cell, 0), z, y, bands), 128, 128)).toEqual([...c[3], 150]);
-    expect(colourAt(slopeTileImage(planeTile(300, 0, 0.6 * cell), z, y, bands), 128, 128)).toEqual([...c[4], 150]);
+  it('reads the slope percent of a plane, without a seam at the tile edge, and leaves sea level empty', () => {
+    const t = slopePctTile(planeTile(300, 0.2 * cell, 0.05 * cell), z, y);
+    expect(at(t, 128, 128)).toBeCloseTo(Math.hypot(20, 5), 0);
+    expect(at(t, 0, 0)).toBeCloseTo(at(t, 128, 128), 0);
+    expect(at(t, 255, 128)).toBeCloseTo(at(t, 128, 128), 0);
+    expect(at(t, 128, 255)).toBeCloseTo(at(t, 128, 128), 0);
+    expect(Number.isNaN(at(slopePctTile(planeTile(0, 0, 0), z, y), 10, 10))).toBe(true);
   });
 
-  it('has no seam: a pixel on the tile edge gets the same class as the interior', () => {
-    const img = slopeTileImage(planeTile(300, 0.2 * cell, 0.05 * cell), z, y, bands);
-    expect(colourAt(img, 0, 0)).toEqual(colourAt(img, 128, 128));
-    expect(colourAt(img, 255, 128)).toEqual(colourAt(img, 128, 128));
-    expect(colourAt(img, 128, 255)).toEqual(colourAt(img, 128, 128));
+  it('colours by the administrator\'s limits: a limit belongs to the steeper colour, and the limits can be changed', () => {
+    expect([0, 9.99, 10, 29.99, 30, 200].map((p) => toneOfPct(p, limits))).toEqual(['ok', 'ok', 'care', 'care', 'risk', 'risk']);
+    expect([4, 6, 20].map((p) => toneOfPct(p, { greenBelowPct: 5, redFromPct: 15 }))).toEqual(['ok', 'care', 'risk']);
+    expect([9, 12].map((p) => toneOfPct(p, { greenBelowPct: 10, redFromPct: 10 }))).toEqual(['ok', 'risk']);
+    expect(slopeZones([site(24.8, 56)], () => 20, { greenBelowPct: 25, redFromPct: 40 }).tone).toBe('ok');
   });
 
-  it('leaves sea level clear and spreads any number of classes over the ramp', async () => {
-    const { bandColours, SLOPE_RAMP } = await import('./terrainRgb');
-    expect(colourAt(slopeTileImage(planeTile(0, 0, 0), z, y, bands), 10, 10)).toEqual([0, 0, 0, 0]);
-    expect(bandColours(3)).toEqual([SLOPE_RAMP[0], SLOPE_RAMP[2], SLOPE_RAMP[4]]);
-    expect(bandColours(5)).toEqual(SLOPE_RAMP);
+  it('colours a whole shape by its slope: green on the plain, orange on a hillside, red on a mountain', () => {
+    const shape = [site(24.8, 56)];
+    for (const [pct, tone] of [[1, 'ok'], [5, 'ok'], [20, 'care'], [45, 'risk']] as const) {
+      const z1 = slopeZones(shape, () => pct, limits);
+      expect(z1.tone).toBe(tone);
+      expect(z1.shares[tone]).toBeCloseTo(100, 5);
+      expect(z1.zones.features.map((f) => f.properties!.tone)).toEqual([tone]);
+    }
+  });
+
+  it('splits the shape where the slope changes, and the colour with the most ground governs', () => {
+    const mid = tileOf({ lat: 24.8, lng: 56 });
+    const edge = mid.x * 256 + mid.px + 15; // about 500 m east of the centre of a shape 2 km wide: the west is steep
+    const shape = [site(24.8, 56, 2000)];
+    const z1 = slopeZones(shape, (px) => (px < edge ? 45 : 1), limits);
+    expect(z1.shares.ok).toBeGreaterThan(5);
+    expect(z1.shares.risk).toBeGreaterThan(z1.shares.ok);
+    // the slope is interpolated between elevation pixels, so a sharp step passes through orange in a narrow strip
+    expect(z1.shares.care).toBeLessThan(2);
+    expect(z1.shares.ok + z1.shares.care + z1.shares.risk).toBeCloseTo(100, 5);
+    expect(z1.tone).toBe('risk');
+    expect(z1.zones.features.map((f) => f.properties!.tone).sort()).toEqual(['care', 'ok', 'risk']);
+  });
+
+  it('stays exactly inside the shape: outside a triangle nothing is coloured, and a hole stays empty', () => {
+    const tri: Part = [[{ lat: 24.79, lng: 55.99 }, { lat: 24.79, lng: 56.01 }, { lat: 24.81, lng: 56 }]];
+    const rects = allRects(slopeZones([tri], () => 45, limits).zones);
+    expect(rects.length).toBeGreaterThan(20);
+    for (const [ring] of rects) {
+      const [lngs, lats] = [ring.map((c) => c[0]), ring.map((c) => c[1])];
+      const c = { lng: (Math.min(...lngs) + Math.max(...lngs)) / 2, lat: (Math.min(...lats) + Math.max(...lats)) / 2 };
+      expect(insideParts(c, [tri])).toBe(true);
+    }
+    const outer = site(24.8, 56, 2000)[0];
+    const hole = site(24.8, 56, 800)[0];
+    const holed = allRects(slopeZones([[outer, hole]], () => 45, limits).zones);
+    for (const [ring] of holed) {
+      const [lngs, lats] = [ring.map((c) => c[0]), ring.map((c) => c[1])];
+      expect(insideParts({ lng: (Math.min(...lngs) + Math.max(...lngs)) / 2, lat: (Math.min(...lats) + Math.max(...lats)) / 2 }, [[hole]])).toBe(false);
+    }
+  });
+
+  it('colours every part of a MultiPolygon, and says nothing with no shape or no data', () => {
+    const two = slopeZones([site(24.8, 56), site(24.82, 56.02)], () => 1, limits);
+    const lats = allRects(two.zones).map(([r]) => r[0][1]);
+    expect(Math.min(...lats)).toBeLessThan(24.81);
+    expect(Math.max(...lats)).toBeGreaterThan(24.81);
+    expect(slopeZones([], () => 1, limits).tone).toBeNull();
+    const empty = slopeZones([site(24.8, 56)], () => NaN, limits);
+    expect(empty.tone).toBeNull();
+    expect(empty.zones.features).toEqual([]);
+  });
+
+  it('is cheap enough for every frame of a drag, even with 1,500 vertices', () => {
+    const ring = Array.from({ length: 1500 }, (_, i) => {
+      const a = (i / 1500) * 2 * Math.PI;
+      return { lat: 24.8 + 0.01 * Math.sin(a), lng: 56 + 0.01 * Math.cos(a) };
+    });
+    const t0 = performance.now();
+    for (let i = 0; i < 5; i++) slopeZones([[ring]], (px, py) => ((px + py) % 40) * 1.2, limits);
+    expect((performance.now() - t0) / 5).toBeLessThan(40);
   });
 });

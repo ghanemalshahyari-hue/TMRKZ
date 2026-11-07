@@ -20,7 +20,19 @@ import java.util.UUID;
  */
 public record RestationingContent(String kind, Instant start, Instant end, List<UUID> scope,
                                   Map<UUID, OccupantDecision> occupants, ProposedSite site, Map<String, Object> primary,
-                                  Map<String, Object> alternative, Map<String, String> exceptions, String reason) {
+                                  Map<String, Object> alternative, Map<String, String> exceptions, String reason,
+                                  UUID existingSite, SiteInfo siteInfo) {
+
+    /** A site asked to be registered (طلب اعتماد موقع): its register fields, written only on activation. */
+    public record SiteInfo(String name, String code, UUID parentId, String kind, String notes) {
+    }
+
+    /** Content of a request that names no existing site and registers none. */
+    public RestationingContent(String kind, Instant start, Instant end, List<UUID> scope, Map<UUID, OccupantDecision> occupants,
+                               ProposedSite site, Map<String, Object> primary, Map<String, Object> alternative,
+                               Map<String, String> exceptions, String reason) {
+        this(kind, start, end, scope, occupants, site, primary, alternative, exceptions, reason, null, null);
+    }
 
     /** A unit of another branch at an affected site: stays, goes in a separate request, or is included (O-03). */
     public enum OccupantDecision { EXCLUDED, INCLUDED, SEPARATE }
@@ -77,7 +89,8 @@ public record RestationingContent(String kind, Instant start, Instant end, List<
             f.add(Fact.DURATION);
             f.add(Fact.AVAILABILITY);
         }
-        if (!Objects.equals(geometry(a.site), geometry(b.site))) {
+        if (!Objects.equals(geometry(a.site), geometry(b.site)) || !Objects.equals(a.existingSite, b.existingSite)
+                || !Objects.equals(a.siteInfo, b.siteInfo)) {
             f.add(Fact.SITE);
             f.add(Fact.AVAILABILITY);
         }
@@ -127,6 +140,18 @@ public record RestationingContent(String kind, Instant start, Instant end, List<
         m.put("alternative", alternative);
         m.put("exceptions", new java.util.TreeMap<>(exceptions));
         m.put("reason", reason);
+        if (existingSite != null) {
+            m.put("existingSite", existingSite.toString());
+        }
+        if (siteInfo != null) {
+            Map<String, Object> i = new LinkedHashMap<>();
+            i.put("name", siteInfo.name());
+            i.put("code", siteInfo.code());
+            i.put("parentId", siteInfo.parentId() == null ? null : siteInfo.parentId().toString());
+            i.put("kind", siteInfo.kind());
+            i.put("notes", siteInfo.notes());
+            m.put("siteInfo", i);
+        }
         return m;
     }
 
@@ -152,7 +177,14 @@ public record RestationingContent(String kind, Instant start, Instant end, List<
         }
         return new RestationingContent((String) m.get("kind"), time(m.get("start")), time(m.get("end")), scope, occ, site,
                 m.get("primary") instanceof Map<?, ?> p ? (Map<String, Object>) p : null,
-                m.get("alternative") instanceof Map<?, ?> a ? (Map<String, Object>) a : null, ex, (String) m.get("reason"));
+                m.get("alternative") instanceof Map<?, ?> a ? (Map<String, Object>) a : null, ex, (String) m.get("reason"),
+                m.get("existingSite") == null ? null : UUID.fromString(m.get("existingSite").toString()),
+                m.get("siteInfo") instanceof Map<?, ?> i ? new SiteInfo(text(i.get("name")), text(i.get("code")),
+                        i.get("parentId") == null ? null : UUID.fromString(i.get("parentId").toString()), text(i.get("kind")), text(i.get("notes"))) : null);
+    }
+
+    private static String text(Object v) {
+        return v == null ? null : v.toString();
     }
 
     private static Instant time(Object v) {

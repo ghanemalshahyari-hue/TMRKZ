@@ -139,32 +139,79 @@ public class RequestViews {
             @JsonInclude(JsonInclude.Include.ALWAYS) String lastNote,
             List<StageView> stages, List<HistoryItem> history,
             @JsonInclude(JsonInclude.Include.ALWAYS) ApprovalDocumentView approvalDocument,
-            List<ReservationRef> reservations, List<ExecutionTaskView> executionTasks, Actions actions) {
+            List<ReservationRef> reservations, List<ExecutionTaskView> executionTasks, Actions actions, List<FyiView> fyi) {
+    }
+
+    /** Who was told for information, why, and when they first read it (ADR-042). */
+    public record FyiView(String person, String unit, String reason, String toldAt, String firstReadAt) {
     }
 
     // ---- list ---------------------------------------------------------------------------------------
 
-    public PageResult<RequestListItem> list(AccessContext ctx, String status, String q, Integer page, Integer size,
-                                            boolean excludeDrafts, boolean mine) {
+    /** What narrows the requests list and its status counts. {@code from} and {@code to} are instants; a period overlapping them matches. */
+    public record ListFilter(String q, boolean excludeDrafts, boolean mine, String type, String from, String to) {
+    }
+
+    private static final Map<String, String> SORTS = Map.of("updated", "r.updated_at", "number", "r.number", "period", "r.period_start");
+
+    /** The person's scope and the filters, shared by the list and its counts. */
+    private StringBuilder listWhere(AccessContext ctx, ListFilter f, Map<String, Object> params) {
+        // permission requests have their own pages (ADR-044)
+        StringBuilder where = new StringBuilder(access.requestPredicate(ctx, params)).append(" and t.kind <> 'ACCESS'");
+        if (f.excludeDrafts()) {
+            where.append(" and r.status <> 'DRAFT'");
+        }
+        if (f.mine()) {
+            where.append(" and r.created_by = :me");
+            params.put("me", ctx.personId());
+        }
+        if (f.type() != null && !f.type().isBlank()) {
+            where.append(" and r.type_code = :type");
+            params.put("type", f.type());
+        }
+        if (f.from() != null && !f.from().isBlank()) {
+            where.append(" and (r.period_end is null or r.period_end >= :from)");
+            params.put("from", instantParam(f.from()));
+        }
+        if (f.to() != null && !f.to().isBlank()) {
+            where.append(" and r.period_start <= :to");
+            params.put("to", instantParam(f.to()));
+        }
+        if (f.q() != null && !f.q().isBlank()) {
+            where.append(" and (r.number ilike :q or coalesce(r.draft->>'subject', '') ilike :q or t.name ilike :q)");
+            params.put("q", "%" + f.q().trim().replace("%", "") + "%");
+        }
+        return where;
+    }
+
+    private static java.sql.Timestamp instantParam(String v) {
+        try {
+            return java.sql.Timestamp.from(java.time.Instant.parse(v));
+        } catch (java.time.format.DateTimeParseException e) {
+            throw ae.mover.common.ApiException.validation("تاريخ غير صالح في فلتر الطلبات");
+        }
+    }
+
+    public Map<String, Long> counts(AccessContext ctx, ListFilter f) {
+        Map<String, Object> params = new HashMap<>();
+        StringBuilder where = listWhere(ctx, f, params);
+        Map<String, Long> out = new java.util.LinkedHashMap<>();
+        jdbc.sql("select r.status, count(*) as n from request r join request_type t on t.code = r.type_code where " + where + " group by r.status")
+                .params(params).query().listOfRows().forEach(m -> out.put((String) m.get("status"), ((Number) m.get("n")).longValue()));
+        return out;
+    }
+
+    public PageResult<RequestListItem> list(AccessContext ctx, String status, Integer page, Integer size, ListFilter f, String sort, String dir) {
         int p = PageResult.page(page);
         int s = PageResult.size(size);
         Map<String, Object> params = new HashMap<>();
-        StringBuilder where = new StringBuilder(access.requestPredicate(ctx, params));
+        StringBuilder where = listWhere(ctx, f, params);
         if (status != null && !status.isBlank()) {
             where.append(" and r.status = :status");
             params.put("status", status);
         }
-        if (excludeDrafts) {
-            where.append(" and r.status <> 'DRAFT'");
-        }
-        if (mine) {
-            where.append(" and r.created_by = :me");
-            params.put("me", ctx.personId());
-        }
-        if (q != null && !q.isBlank()) {
-            where.append(" and (r.number ilike :q or coalesce(r.draft->>'subject', '') ilike :q or t.name ilike :q)");
-            params.put("q", "%" + q.trim().replace("%", "") + "%");
-        }
+        // only named columns reach the statement; anything else keeps the default order
+        String order = SORTS.getOrDefault(sort == null ? "updated" : sort, "r.updated_at") + ("asc".equalsIgnoreCase(dir) ? " asc" : " desc");
         long total = jdbc.sql("select count(*) from request r join request_type t on t.code = r.type_code where " + where)
                 .params(params).query(Long.class).single();
         params.put("limit", s);
@@ -174,7 +221,7 @@ public class RequestViews {
                        r.owner_org_id, o.name as owner_name, r.period_start, r.period_end, r.current_revision, r.updated_at,
                        r.created_by
                 from request r join request_type t on t.code = r.type_code join organization o on o.id = r.owner_org_id
-                where""" + " " + where + " order by r.updated_at desc limit :limit offset :offset")
+                where""" + " " + where + " order by " + order + ", r.id limit :limit offset :offset")
                 .params(params).query().listOfRows();
         List<UUID> ids = rows.stream().map(m -> (UUID) m.get("id")).toList();
         Map<UUID, RequestScope> scopes = access.scopes(ids);
@@ -274,6 +321,10 @@ public class RequestViews {
         }
         ctx.confirmView(scope, level);
         boolean full = level == ViewLevel.FULL;
+        if (scope.fyi().containsKey(ctx.personId())) {
+            jdbc.sql("update request_fyi set first_read_at = now() where request_id = :r and person_id = :p and first_read_at is null")
+                    .param("r", id).param("p", ctx.personId()).update();
+        }
         Map<String, Object> r = jdbc.sql("""
                 select r.*, r.draft::text as draft_text, t.name as type_name, t.kind, o.name as owner_name,
                        p.display_name as creator_name
@@ -354,7 +405,16 @@ public class RequestViews {
                 iso(r.get("created_at")), iso(r.get("submitted_at")), full ? (String) r.get("last_note") : null,
                 stages, full ? history(id) : List.of(), approvalDocument(id, full),
                 reservations(id, full), full ? exec : List.of(),
-                new Actions(editable, editable, canClose, myTasks));
+                new Actions(editable, editable, canClose, myTasks), full ? fyiOf(id) : List.of());
+    }
+
+    private List<FyiView> fyiOf(UUID requestId) {
+        return jdbc.sql("""
+                select p.display_name, o.name, f.reason, f.told_at, f.first_read_at from request_fyi f
+                join person p on p.id = f.person_id join organization o on o.id = f.organization_id
+                where f.request_id = :r order by o.name, p.display_name""")
+                .param("r", requestId)
+                .query((rs, n) -> new FyiView(rs.getString(1), rs.getString(2), rs.getString(3), iso(rs.getObject(4)), iso(rs.getObject(5)))).list();
     }
 
     private List<StageView> stages(UUID requestId, int revision, String status, WorkflowDefinition def, boolean started) {
@@ -394,7 +454,7 @@ public class RequestViews {
             } else if (open.containsKey(s.key())) {
                 state = "SUBMITTED".equals(status) ? "ACTIVE" : "PENDING";
             } else {
-                state = t.stream().anyMatch(x -> "APPROVED".equals(x.state())) ? "COMPLETE" : "PENDING";
+                state = t.stream().anyMatch(x -> "APPROVED".equals(x.state()) || "REJECTED".equals(x.state())) ? "COMPLETE" : "PENDING";
             }
             if (t == null) {
                 t = s.assignees().stream().map(a -> new TaskView(null, roleNames.getOrDefault(a.role(), a.role()), null,

@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -68,6 +69,17 @@ public class RequestController {
         this.signingJobs = signingJobs;
     }
 
+    @PostMapping("/request-types")
+    public Map<String, Object> createRequestType(Actor actor, @RequestBody RequestTypes.NewType in) {
+        return types.create(access.context(actor), in);
+    }
+
+    @DeleteMapping("/request-types/{code}")
+    public ResponseEntity<Void> removeRequestType(Actor actor, @PathVariable String code) {
+        types.remove(access.context(actor), code);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/request-types")
     public List<RequestTypes.TypeView> requestTypes(Actor actor) {
         access.context(actor).requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.CREATE, Permission.CONFIGURE);
@@ -88,8 +100,24 @@ public class RequestController {
                                                          @RequestParam(required = false) Integer page,
                                                          @RequestParam(required = false) Integer size,
                                                          @RequestParam(required = false, defaultValue = "false") boolean excludeDrafts,
-                                                         @RequestParam(required = false, defaultValue = "false") boolean mine) {
-        return views.list(access.context(actor), status, q, page, size, excludeDrafts, mine);
+                                                         @RequestParam(required = false, defaultValue = "false") boolean mine,
+                                                         @RequestParam(required = false) String type,
+                                                         @RequestParam(required = false) String from,
+                                                         @RequestParam(required = false) String to,
+                                                         @RequestParam(required = false) String sort,
+                                                         @RequestParam(required = false) String dir) {
+        return views.list(access.context(actor), status, page, size, new RequestViews.ListFilter(q, excludeDrafts, mine, type, from, to), sort, dir);
+    }
+
+    /** How many requests of each status match the same filters, within the person's scope: the list's status tabs. */
+    @GetMapping("/requests/counts")
+    public Map<String, Long> counts(Actor actor, @RequestParam(required = false) String q,
+                                    @RequestParam(required = false, defaultValue = "false") boolean excludeDrafts,
+                                    @RequestParam(required = false, defaultValue = "false") boolean mine,
+                                    @RequestParam(required = false) String type,
+                                    @RequestParam(required = false) String from,
+                                    @RequestParam(required = false) String to) {
+        return views.counts(access.context(actor), new RequestViews.ListFilter(q, excludeDrafts, mine, type, from, to));
     }
 
     @PostMapping("/requests")

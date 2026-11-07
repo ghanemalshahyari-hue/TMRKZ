@@ -77,6 +77,9 @@ public class DecisionService {
     private final RelocationService relocations;
     private final SeparationOfDuties separation;
     private final ae.mover.hr.TaskRealignment realignment;
+    private final ae.mover.workflow.PlaceResolver places;
+    private final ae.mover.stationing.PlaceInfo placeInfo;
+    private final ae.mover.authz.GrantAdminService grantAdmin;
 
     public DecisionService(JdbcClient jdbc, Json json, Clock clock, AccessService access, TaskService taskService,
                            RuntimeService runtime, TaskSync taskSync, WorkflowService workflows,
@@ -84,7 +87,11 @@ public class DecisionService {
                            SignatureService signatures, AuditService audit, OutboxService outbox,
                            IdempotencyService idempotency, RequestViews views, ApprovalSigner signer, SigningJobs signingJobs,
                            RelocationService relocations, SeparationOfDuties separation,
-                           ae.mover.hr.TaskRealignment realignment) {
+                           ae.mover.hr.TaskRealignment realignment, ae.mover.workflow.PlaceResolver places,
+                           ae.mover.stationing.PlaceInfo placeInfo, ae.mover.authz.GrantAdminService grantAdmin) {
+        this.grantAdmin = grantAdmin;
+        this.places = places;
+        this.placeInfo = placeInfo;
         this.realignment = realignment;
         this.relocations = relocations;
         this.separation = separation;
@@ -126,7 +133,35 @@ public class DecisionService {
 
     record TaskRow(UUID id, UUID requestId, int revision, String flowableTaskId, String stageKey, String stageName,
                    String roleCode, String roleName, UUID targetOrgId, boolean finalStage, boolean requiresSignature,
-                   String status, Instant createdAt, Instant dueAt, UUID assignedPersonId, boolean awaitingAssignment) {
+                   String status, Instant createdAt, Instant dueAt, UUID assignedPersonId, boolean awaitingAssignment, boolean strictPlace,
+                   boolean byScope, boolean independentOfEarlier, List<UUID> pinned) {
+
+        /** A chart's step going to a unit is for those who hold the role at that unit (ADR-041). */
+        boolean placeAllows(AccessContext ctx) {
+            return !strictPlace || targetOrgId == null || ctx.holdsRoleAt(roleCode, targetOrgId);
+        }
+    }
+
+    private static Set<UUID> plus(Set<UUID> a, Set<UUID> b) {
+        Set<UUID> out = new java.util.HashSet<>(a);
+        out.addAll(b);
+        return out;
+    }
+
+    /** A step found by scope is for the nearest grant reaching the requesting unit (ADR-042). */
+    private boolean nearest(AccessContext ctx, String role, UUID requestOrg, List<UUID> pinned) {
+        if (pinned != null) {
+            return places.routedHolders(role, pinned).contains(ctx.personId());
+        }
+        return requestOrg != null && places.scope(role, requestOrg).people().contains(ctx.personId());
+    }
+
+    private static List<UUID> pinned(Object array) {
+        try {
+            return array == null ? null : java.util.Arrays.stream((Object[]) ((java.sql.Array) array).getArray()).map(x -> (UUID) x).toList();
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private TaskRow task(UUID taskId, boolean lock) {
@@ -139,12 +174,27 @@ public class DecisionService {
                         rs.getString("role_code"), rs.getString("role_name"), Db.uuid(rs, "target_org_id"),
                         rs.getBoolean("final"), rs.getBoolean("requires_signature"), rs.getString("status"),
                         Db.instant(rs, "created_at"), Db.instant(rs, "due_at"), Db.uuid(rs, "assigned_person_id"),
-                        rs.getBoolean("awaiting_assignment")))
+                        rs.getBoolean("awaiting_assignment"), rs.getBoolean("strict_place"),
+                        rs.getBoolean("by_scope"), rs.getBoolean("independent_of_earlier"), pinned(rs.getObject("scope_orgs"))))
                 .optional().orElseThrow(ApiException::notFound);
     }
 
     /** Open tasks the actor may decide now (role + scope + separation of duties evaluated per task). */
     public List<TaskItem> myTasks(AccessContext ctx) {
+        return tasks(ctx, false);
+    }
+
+    /** The permission requests waiting for this person (ADR-044): they have their own page, and no place among other requests. */
+    public List<TaskItem> accessTasks(AccessContext ctx) {
+        return tasks(ctx, true);
+    }
+
+    /** A decision on a permission request: same checks as any decision. Its reviewer may have no right to read other requests. */
+    public void decideAccess(AccessContext ctx, UUID taskId, DecisionInput in) {
+        doDecide(ctx, taskId, in);
+    }
+
+    private List<TaskItem> tasks(AccessContext ctx, boolean accessRequests) {
         Set<String> roles = new java.util.HashSet<>();
         ctx.grants().stream().filter(g -> g.has(ae.mover.access.Permission.REVIEW)).forEach(g -> roles.add(g.roleCode()));
         if (roles.isEmpty()) {
@@ -152,13 +202,14 @@ public class DecisionService {
         }
         List<Map<String, Object>> rows = jdbc.sql("""
                 select t.id, t.request_id, r.number, ty.name as type_name, t.stage_key, t.stage_name, t.role_code,
-                       rd.name as role_name, o.name as org_name, t.target_org_id, t.created_at, t.due_at, t.final, t.requires_signature,
+                       rd.name as role_name, o.name as org_name, t.target_org_id, t.strict_place, t.by_scope, t.independent_of_earlier, t.scope_orgs, t.created_at, t.due_at, t.final, t.requires_signature,
                        t.assigned_person_id, t.awaiting_assignment
                 from task_assignment t join request r on r.id = t.request_id join request_type ty on ty.code = r.type_code
                 join role_def rd on rd.code = t.role_code left join organization o on o.id = t.target_org_id
                 where t.status = 'OPEN' and r.status = 'SUBMITTED' and t.role_code = any(string_to_array(:roles, ','))
+                  and (ty.kind = 'ACCESS') = :access
                 order by t.due_at limit 500""")
-                .param("roles", String.join(",", roles)).query().listOfRows();
+                .param("roles", String.join(",", roles)).param("access", accessRequests).query().listOfRows();
         List<UUID> requestIds = rows.stream().map(m -> (UUID) m.get("request_id")).distinct().toList();
         Map<UUID, RequestScope> scopes = access.scopes(requestIds);
         Map<UUID, Set<UUID>> requesters = separation.requesters(requestIds);
@@ -169,9 +220,13 @@ public class DecisionService {
             UUID requestId = (UUID) m.get("request_id");
             RequestScope scope = scopes.get(requestId);
             boolean fin = (Boolean) m.get("final");
-            if (independent.taskGrant((String) m.get("role_code"), (UUID) m.get("target_org_id"), scope, fin,
-                            requesters.getOrDefault(requestId, Set.of())).isEmpty()
-                    || !ctx.assignedToMe((UUID) m.get("assigned_person_id"), (Boolean) m.get("awaiting_assignment"))) {
+            Set<UUID> excluded = (Boolean) m.get("independent_of_earlier")
+                    ? plus(requesters.getOrDefault(requestId, Set.of()), separation.earlierApprovers(requestId, (String) m.get("stage_key")))
+                    : requesters.getOrDefault(requestId, Set.of());
+            if (independent.taskGrant((String) m.get("role_code"), (UUID) m.get("target_org_id"), scope, fin, excluded).isEmpty()
+                    || ((Boolean) m.get("by_scope") && !nearest(ctx, (String) m.get("role_code"), (UUID) m.get("target_org_id"), pinned(m.get("scope_orgs"))))
+                    || !ctx.assignedToMe((UUID) m.get("assigned_person_id"), (Boolean) m.get("awaiting_assignment"))
+                    || ((Boolean) m.get("strict_place") && !ctx.holdsRoleAt((String) m.get("role_code"), (UUID) m.get("target_org_id")))) {
                 continue;
             }
             Instant due = Db.toInstant(m.get("due_at"));
@@ -246,8 +301,10 @@ public class DecisionService {
         if (independent.isRequester(requesters)) {
             throw SeparationOfDuties.refusal();
         }
-        if (independent.taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage(), requesters).isEmpty()
-                || !ctx.assignedToMe(t.assignedPersonId(), t.awaitingAssignment())) {
+        Set<UUID> excluded = t.independentOfEarlier() ? plus(requesters, separation.earlierApprovers(t.requestId(), t.stageKey())) : requesters;
+        if (independent.taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage(), excluded).isEmpty()
+                || !ctx.assignedToMe(t.assignedPersonId(), t.awaitingAssignment()) || !t.placeAllows(ctx)
+                || (t.byScope() && !nearest(ctx, t.roleCode(), t.targetOrgId(), t.pinned()))) {
             throw ApiException.notFound();
         }
         Canonical c = canonical(t.requestId(), t.revision());
@@ -282,6 +339,16 @@ public class DecisionService {
             throw ApiException.validation("هذه المرحلة لا تتطلب توقيعاً بالشهادة.");
         }
         Grant grant = separation.of(ctx).require(t.roleCode(), t.targetOrgId(), scope, t.finalStage(), separation.requester(t.requestId()));
+        if (!t.placeAllows(ctx)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "هذه الخطوة لمن يحمل الدور في الجهة المحددة لها.");
+        }
+        if (t.byScope() && !nearest(ctx, t.roleCode(), t.targetOrgId(), t.pinned())) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "هذه الخطوة لأقرب معتمد يشمل نطاقه وحدة مقدم الطلب.");
+        }
+        if (t.independentOfEarlier() && separation.of(ctx).taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage(),
+                separation.earlierApprovers(t.requestId(), t.stageKey())).isEmpty()) {
+            throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES, SeparationOfDuties.EARLIER_REFUSAL);
+        }
         if (!ctx.assignedToMe(t.assignedPersonId(), t.awaitingAssignment())) {
             throw ApiException.forbidden("المهمة مسندة إلى شخص آخر أو بانتظار الإسناد.");
         }
@@ -389,6 +456,16 @@ public class DecisionService {
         // Separation of duties (ADR-027): the requester — any record of the same human — never decides, nor does a grant
         // delegated by them; checked before the assignment, so a task assigned to the requester still refuses them.
         Grant grant = separation.of(ctx).require(t.roleCode(), t.targetOrgId(), scope, t.finalStage(), separation.requester(t.requestId()));
+        if (!t.placeAllows(ctx)) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "هذه الخطوة لمن يحمل الدور في الجهة المحددة لها.");
+        }
+        if (t.byScope() && !nearest(ctx, t.roleCode(), t.targetOrgId(), t.pinned())) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "هذه الخطوة لأقرب معتمد يشمل نطاقه وحدة مقدم الطلب.");
+        }
+        if (t.independentOfEarlier() && separation.of(ctx).taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage(),
+                separation.earlierApprovers(t.requestId(), t.stageKey())).isEmpty()) {
+            throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES, SeparationOfDuties.EARLIER_REFUSAL);
+        }
         if (!ctx.assignedToMe(t.assignedPersonId(), t.awaitingAssignment())) {
             throw ApiException.forbidden(t.awaitingAssignment()
                     ? "المهمة بانتظار أن يسندها مسؤول الصلاحيات إلى شخص مخول."
@@ -433,7 +510,9 @@ public class DecisionService {
         SignatureService.Signed signed = null;
         SigningJobs.Job signingJob = null;
         String mode = policies.settings().signatureMode();
-        if ("APPROVE".equals(decision) && t.finalStage() && t.requiresSignature() && policies.settings().signatureRequired()) {
+        // a permission request is decided without a signature, as in the movement programme (ADR-044)
+        boolean accessRequest = jdbc.sql("select count(*) from access_request where request_id = :r").param("r", t.requestId()).query(Long.class).single() > 0;
+        if (!accessRequest && "APPROVE".equals(decision) && t.finalStage() && t.requiresSignature() && policies.settings().signatureRequired()) {
             doc = canonical(requestIdValue, currentRevision);
             if ("PKI".equals(mode)) {
                 if (in.signature() == null || !Boolean.TRUE.equals(in.signature().confirm())) {
@@ -458,7 +537,9 @@ public class DecisionService {
                 .param("dec", decision).param("rcode", reasonCode).param("note", note).param("now", Db.ts(now))
                 .param("self", false).update(); // kept for decisions recorded before ADR-027
 
-        if (!forward) {
+        WorkflowDefinition flow = workflows.definition((UUID) req.get("workflow_version_id"));
+        boolean routedRejection = "REJECT".equals(decision) && flow.graph() != null && flow.graph().rejectEdge(t.stageKey());
+        if (!forward && !routedRejection) {
             String status = "RETURN".equals(decision) ? "RETURNED" : "REJECTED";
             jdbc.sql("update task_assignment set status = :s, closed_at = :now where id = :id")
                     .param("s", status).param("now", Db.ts(now)).param("id", t.id()).update();
@@ -479,12 +560,19 @@ public class DecisionService {
             return requestIdValue;
         }
 
-        jdbc.sql("update task_assignment set status = 'APPROVED', closed_at = :now where id = :id")
-                .param("now", Db.ts(now)).param("id", t.id()).update();
+        if (routedRejection) {
+            // the chart has a line for this rejection: the step closes and the flow continues along it
+            jdbc.sql("update task_assignment set status = 'REJECTED', closed_at = :now where id = :id")
+                    .param("now", Db.ts(now)).param("id", t.id()).update();
+            runtime.setVariable(pid, "outcome_" + t.stageKey(), "REJECTED");
+        } else {
+            jdbc.sql("update task_assignment set status = 'APPROVED', closed_at = :now where id = :id")
+                    .param("now", Db.ts(now)).param("id", t.id()).update();
+        }
         if (note != null && !note.isEmpty()) {
             jdbc.sql("update request set last_note = :note where id = :id").param("note", note).param("id", requestIdValue).update();
         }
-        audit.record(ctx.actor(), capacity, "REFER".equals(decision) ? "TASK_REFERRED" : "TASK_APPROVED", "REQUEST",
+        audit.record(ctx.actor(), capacity, routedRejection ? "TASK_REJECTED_ROUTED" : "REFER".equals(decision) ? "TASK_REFERRED" : "TASK_APPROVED", "REQUEST",
                 requestIdValue.toString(), number,
                 Map.of("stage", t.stageName()), note, currentRevision);
         taskService.complete(t.flowableTaskId());
@@ -492,6 +580,21 @@ public class DecisionService {
         boolean ended = runtime.createProcessInstanceQuery().processInstanceId(pid).count() == 0;
         if (!ended) {
             taskSync.sync(requestIdValue, currentRevision, pid, def);
+            return requestIdValue;
+        }
+        var flowRejected = workflowRuntime.rejectedEnd(requestIdValue, currentRevision);
+        if (flowRejected.isPresent()) {
+            // the flow reached a rejected end: the request closes as rejected, nothing is approved or signed
+            jdbc.sql("update task_assignment set status = 'CANCELLED', closed_at = :now where request_id = :r and status = 'OPEN'")
+                    .param("now", Db.ts(now)).param("r", requestIdValue).update();
+            jdbc.sql("""
+                    update request set status = 'REJECTED', last_note = :note, decided_at = :now, updated_at = :now, version = version + 1,
+                           process_instance_id = null where id = :id""")
+                    .param("note", note == null || note.isBlank() ? flowRejected.get() : note).param("now", Db.ts(now)).param("id", requestIdValue).update();
+            audit.record(ctx.actor(), capacity, "REQUEST_REJECTED", "REQUEST", requestIdValue.toString(), number,
+                    Map.of("stage", t.stageName(), "end", flowRejected.get()), note, currentRevision);
+            outbox.enqueue("REQUEST", requestIdValue.toString(), "REQUEST_REJECTED",
+                    Map.of("requestId", requestIdValue.toString(), "revision", currentRevision));
             return requestIdValue;
         }
         if (doc == null) {
@@ -541,6 +644,7 @@ public class DecisionService {
                     effects.add(rid.toString());
                 }
             }
+            case "ACCESS" -> effects.addAll(grantAdmin.applyAccessRequest(ctx, requestId));
             case "RELOCATION" -> {
                 // administrative decision only: nothing is booked and the site register is not changed; the
                 // requester records the move and the request is closed with a completion statement. The distance
@@ -610,6 +714,11 @@ public class DecisionService {
         audit.record(ctx.actor(), capacity, "REQUEST_APPROVED", "REQUEST", requestId.toString(), number,
                 Map.of("kind", kind, "reservations", effects, "period", Times.iso(start) + " → " + (end == null ? "مفتوحة" : Times.iso(end))),
                 null, revision);
+        // for information, once finally approved: the units at the place and the main units, as parties of the request (ADR-042)
+        List<String> informed = "ACCESS".equals(kind) ? List.of() : placeInfo.route(requestId);
+        if (!informed.isEmpty()) {
+            audit.record(ctx.actor(), capacity, "REQUEST_INFO_ROUTED", "REQUEST", requestId.toString(), number, Map.of("organizations", informed), null, revision);
+        }
         outbox.enqueue("REQUEST", requestId.toString(), "REQUEST_APPROVED",
                 Map.of("requestId", requestId.toString(), "revision", revision));
     }

@@ -80,7 +80,7 @@ class RestationingWorkflowIT extends RestationingTestBase {
         assertThat(jdbc.sql("select count(*) from site_geometry_version where site_id = :s and version = 1").param("s", site).query(Long.class).single())
                 .isEqualTo(1);
         assertThat(jdbc.sql("select count(*) from deployment_area where site_id = :s and state = 'ACTIVE'").param("s", site).query(Long.class).single())
-                .isEqualTo(2);
+                .as("both areas, once for each of the two units (ADR-045)").isEqualTo(4);
         assertThat(jdbc.sql("select valid_to is null from site_link where id = :id").param("id", link).query(Boolean.class).single())
                 .as("activation never touches site links (O-14)").isTrue();
         assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action like 'RESTATIONING_%'").param("id", id)

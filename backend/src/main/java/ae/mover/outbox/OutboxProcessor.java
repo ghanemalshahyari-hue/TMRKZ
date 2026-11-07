@@ -39,9 +39,12 @@ public class OutboxProcessor {
     private final AccessService access;
     private final MeterRegistry meters;
     private final boolean enabled;
+    private final ae.mover.stationing.PlaceInfo placeInfo;
 
     public OutboxProcessor(JdbcClient jdbc, Json json, Clock clock, TransactionTemplate tx, AccessService access,
-                           MeterRegistry meters, @Value("${mover.outbox.enabled:true}") boolean enabled) {
+                           MeterRegistry meters, @Value("${mover.outbox.enabled:true}") boolean enabled,
+                           ae.mover.stationing.PlaceInfo placeInfo) {
+        this.placeInfo = placeInfo;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -63,10 +66,16 @@ public class OutboxProcessor {
         if (!enabled) {
             return;
         }
+        scanOverdue();
+    }
+
+    /** A permission request has no deadline: nothing is ever late, and a deadline never decides anything. */
+    public void scanOverdue() {
         tx.executeWithoutResult(s -> {
             List<Map<String, Object>> rows = jdbc.sql("""
-                    select id, request_id from task_assignment where status = 'OPEN' and due_at < :now and not overdue_notified
-                    for update skip locked limit 100""").param("now", Db.ts(clock.instant())).query().listOfRows();
+                    select t.id, t.request_id from task_assignment t join request r on r.id = t.request_id join request_type y on y.code = r.type_code
+                    where t.status = 'OPEN' and t.due_at < :now and not t.overdue_notified and y.kind <> 'ACCESS'
+                    for update of t skip locked limit 100""").param("now", Db.ts(clock.instant())).query().listOfRows();
             for (Map<String, Object> r : rows) {
                 jdbc.sql("update task_assignment set overdue_notified = true where id = :id").param("id", r.get("id")).update();
                 jdbc.sql("insert into outbox_event(aggregate_type, aggregate_id, event_type, payload) values ('TASK', :id, 'TASK_OVERDUE', cast(:p as jsonb))")
@@ -145,9 +154,11 @@ public class OutboxProcessor {
             case "REQUEST_REJECTED" -> notify(eventId, creator, "REQUEST_REJECTED", "رُفض الطلب " + number,
                     "اطلع على سبب الرفض في سجل الطلب.", requestId);
             case "REQUEST_APPROVED" -> {
+                boolean accessRequest = jdbc.sql("select count(*) from access_request where request_id = :r").param("r", requestId).query(Long.class).single() > 0;
                 notify(eventId, creator, "REQUEST_APPROVED", "اعتُمد الطلب " + number,
-                        "ثُبت الحجز الإداري وفق الفترة المعتمدة.", requestId);
+                        accessRequest ? "فُعّلت صلاحياتك المعتمدة." : "ثُبت الحجز الإداري وفق الفترة المعتمدة.", requestId);
                 notifyInfoRecipients(eventId, requestId, number, (String) r.get("type_name"), (String) r.get("resources"));
+                notifyFyi(eventId, requestId, number, (String) r.get("type_name"), (String) r.get("resources"));
             }
             case "TASK_OVERDUE" -> notify(eventId, creator, "TASK_OVERDUE", "تأخر مراجعة الطلب " + number,
                     "تجاوزت إحدى مراحل المراجعة مهلتها المحددة.", requestId);
@@ -169,6 +180,8 @@ public class OutboxProcessor {
                 where rp.request_id = :r and rp.relation = 'INFO'
                   and m.valid_from <= now() and (m.valid_to is null or m.valid_to > now())""")
                 .param("r", requestId).query().listOfRows();
+        // which unit it is, and its main unit: a unit may stand at this place while its main unit is elsewhere (ADR-042)
+        String unit = people.isEmpty() ? "" : placeInfo.unitLine(jdbc.sql("select owner_org_id from request where id = :r").param("r", requestId).query(UUID.class).single());
         for (Map<String, Object> p : people) {
             Actor actor = new Actor((UUID) p.get("id"), (String) p.get("username"), (String) p.get("display_name"), null);
             var ctx = access.load(actor, clock.instant());
@@ -176,7 +189,20 @@ public class OutboxProcessor {
                 continue;
             }
             notify(eventId, actor.personId(), "INFO_COPY", "للعلم: اعتماد " + typeName + " — " + number,
-                    "المرافق: " + (resources == null ? "-" : resources) + ". نسخة للعلم دون مرفقات.", requestId);
+                    "المرافق: " + (resources == null ? "-" : resources) + ". " + unit + ". نسخة للعلم دون مرفقات.", requestId);
+        }
+    }
+
+    /** The holders told about this request (ADR-042): which unit it is and its main unit, summary only. */
+    private void notifyFyi(long eventId, UUID requestId, String number, String typeName, String resources) {
+        List<UUID> people = jdbc.sql("select person_id from request_fyi where request_id = :r").param("r", requestId).query(UUID.class).list();
+        if (people.isEmpty()) {
+            return;
+        }
+        String unit = placeInfo.unitLine(jdbc.sql("select owner_org_id from request where id = :r").param("r", requestId).query(UUID.class).single());
+        for (UUID person : people) {
+            notify(eventId, person, "INFO_COPY", "للعلم: اعتماد " + typeName + " — " + number,
+                    "المرافق: " + (resources == null ? "-" : resources) + ". " + unit + ". نسخة للعلم دون مرفقات.", requestId);
         }
     }
 

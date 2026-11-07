@@ -1,0 +1,701 @@
+{
+ "at": "2026-11-06T21:18:33.111Z",
+ "results": [
+  {
+   "id": "ACCESS-01",
+   "pass": true,
+   "what": "مستخدم بلا صلاحيات يرى شاشة طلب الصلاحية فقط",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-02",
+   "pass": true,
+   "what": "القائمة لا تحوي غيرها",
+   "detail": "طلب صلاحية"
+  },
+  {
+   "id": "ACCESS-03",
+   "pass": true,
+   "what": "يختار مما يعرضه مدير النظام، بأسماء عربية",
+   "detail": "POSTURE_VIEWER,STATIONING_REQUESTER,DEPLOYMENT_REQUESTER,SITE_REGISTRATION_REQUESTER"
+  },
+  {
+   "id": "ACCESS-04",
+   "pass": true,
+   "what": "لا تظهر أسماء داخلية",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-05",
+   "pass": true,
+   "what": "النظام بالكامل ليس خياراً",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-06",
+   "pass": true,
+   "what": "الحالة بانتظار التوصية",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-07",
+   "pass": true,
+   "what": "p02: إرسال التوصية بلا اعتماد وتفعيل",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-08",
+   "pass": true,
+   "what": "صلاحيات إضافية يضيفها المدير ولا يراها مقدم الطلب",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-09",
+   "pass": true,
+   "what": "أُعيد إليه الطلب نفسه للتعديل",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-10",
+   "pass": true,
+   "what": "طلب واحد لا طلبان",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-11",
+   "pass": true,
+   "what": "التوصية لا تمنح شيئاً",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-12",
+   "pass": true,
+   "what": "مقدم الطلب لا يعتمد طلبه بطلب مصنوع",
+   "detail": "403"
+  },
+  {
+   "id": "ACCESS-13",
+   "pass": true,
+   "what": "المراجع المحلي لا يفعّل بطلب مصنوع",
+   "detail": "404"
+  },
+  {
+   "id": "ACCESS-14",
+   "pass": true,
+   "what": "p03: اعتماد وتفعيل بلا إرسال التوصية",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-15",
+   "pass": true,
+   "what": "يرى حال الشخص الآن",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-16",
+   "pass": true,
+   "what": "الصلاحية نافذة بنطاقها، وOpenFGA يوافق",
+   "detail": "200"
+  },
+  {
+   "id": "ACCESS-17",
+   "pass": true,
+   "what": "سجل التدقيق كامل",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-18",
+   "pass": true,
+   "what": "لا تظهر له طلبات أخرى",
+   "detail": "تمركز TMRKZ الرئيسية المزيد 1 م ج مستخدم جديد (وهمي) متابعة الموقف العملياتي"
+  },
+  {
+   "id": "SITE-01",
+   "pass": true,
+   "what": "موقع يُرسم على الخريطة ويُسجل بسبب",
+   "detail": ""
+  },
+  {
+   "id": "SITE-02",
+   "pass": true,
+   "what": "بحدوده",
+   "detail": ""
+  },
+  {
+   "id": "SITE-03",
+   "pass": true,
+   "what": "مُدقَّق",
+   "detail": ""
+  },
+  {
+   "id": "SITE-04",
+   "pass": true,
+   "what": "موقع فرعي تحت موقع رئيسي، بلا هيكل Oracle",
+   "detail": ""
+  },
+  {
+   "id": "SITE-11",
+   "pass": true,
+   "what": "موقع من جزأين",
+   "detail": "2"
+  },
+  {
+   "id": "SITE-12",
+   "pass": true,
+   "what": "يتحرك الجزءان معاً",
+   "detail": "{\"m\":226,\"spread\":0.026355679091589423}"
+  },
+  {
+   "id": "SITE-13",
+   "pass": true,
+   "what": "يُسجل موقعاً واحداً متعدد الأجزاء",
+   "detail": ""
+  },
+  {
+   "id": "SITE-04b",
+   "pass": true,
+   "what": "يتغير الموقع الرئيسي بسبب مسجل",
+   "detail": ""
+  },
+  {
+   "id": "SITE-04c",
+   "pass": true,
+   "what": "نسخة حدود جديدة تُحفظ، والقديمة باقية",
+   "detail": ""
+  },
+  {
+   "id": "SITE-05",
+   "pass": true,
+   "what": "أربع جهات رئيسية في موقع واحد",
+   "detail": "الوحدات المتمركزة حالياً\nالقيادة الرئيسية أ\nالقيادة الرئيسية ب\nالقيادة الرئيسية ج\nالقيادة الرئيسية د\nتثبيت التمركز (تصحيح مُدقَّق)\n\nللتهيئة الأولى والتصحيح فقط: كل وحدة تُختار بنفسها، ولا ينتقل معها م"
+  },
+  {
+   "id": "SITE-06",
+   "pass": true,
+   "what": "موقع واحد لا أربعة",
+   "detail": ""
+  },
+  {
+   "id": "SITE-07",
+   "pass": true,
+   "what": "الربط يُضاف",
+   "detail": ""
+  },
+  {
+   "id": "SITE-08",
+   "pass": true,
+   "what": "الربط لا يصنع تمركزاً",
+   "detail": ""
+  },
+  {
+   "id": "SITE-09",
+   "pass": true,
+   "what": "لا يتغير هيكل Oracle بالمشاركة في الموقع",
+   "detail": ""
+  },
+  {
+   "id": "SITE-10",
+   "pass": true,
+   "what": "جهة من فرع آخر تُعد ولا تُسمّى",
+   "detail": "{\"stationed\":[],\"linked\":[{\"id\":\"7d6868ce-fc88-e87a-8c83-1653c69530ba\",\"orgId\":\"6fbd8c40-2285-b9fd-44ee-3b55ac4a1d74\",\"orgName\":\"شعبة أ1\",\"reason\":\"بيانات قبول وهمية\"}],\"otherStati"
+  },
+  {
+   "id": "INITIAL-STATIONING-01",
+   "pass": true,
+   "what": "الحالة من الخادم",
+   "detail": ""
+  },
+  {
+   "id": "INITIAL-STATIONING-02",
+   "pass": true,
+   "what": "وحدة بلا تمركز: طلب تمركز أولي، لا إعادة تمركز",
+   "detail": ""
+  },
+  {
+   "id": "DEPLOYMENT-01",
+   "pass": true,
+   "what": "طلب منطقة انتشار لمن ينقصه فقط",
+   "detail": ""
+  },
+  {
+   "id": "RESTATIONING-01",
+   "pass": true,
+   "what": "إعادة التمركز لوحدة متمركزة",
+   "detail": ""
+  },
+  {
+   "id": "RESTATIONING-02",
+   "pass": true,
+   "what": "وحدة بلا تمركز لا تُعاد تمركزها بطلب مصنوع",
+   "detail": "400"
+  },
+  {
+   "id": "INITIAL-STATIONING-03",
+   "pass": true,
+   "what": "أُرسل الطلب",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-01",
+   "pass": true,
+   "what": "المسار: تسلسل حقيقي ثم عمليات الوحدة ثم النهائي",
+   "detail": "HIERARCHY,HIERARCHY,UNIT_OPERATIONS,FINAL"
+  },
+  {
+   "id": "APPROVAL-02",
+   "pass": true,
+   "what": "مرحلة ليس دورها مرفوضة بطلب مصنوع",
+   "detail": "403"
+  },
+  {
+   "id": "APPROVAL-03",
+   "pass": true,
+   "what": "من خارج النطاق مرفوض",
+   "detail": "404"
+  },
+  {
+   "id": "APPROVAL-04",
+   "pass": true,
+   "what": "مقدم الطلب لا يقرر طلبه",
+   "detail": "403"
+  },
+  {
+   "id": "APPROVAL-05",
+   "pass": true,
+   "what": "p06.h1: اعتماد فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-05",
+   "pass": true,
+   "what": "p07.h2: اعتماد فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-05",
+   "pass": true,
+   "what": "p08.ops: اعتماد عمليات الوحدة فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-05",
+   "pass": true,
+   "what": "p09.fin: اعتماد نهائي فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-05",
+   "pass": true,
+   "what": "لا زر تفعيل قبل تحديد وحدات العلم",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-05",
+   "pass": true,
+   "what": "p10: تحديد وحدات العلم فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-05",
+   "pass": true,
+   "what": "p11: تفعيل فقط",
+   "detail": ""
+  },
+  {
+   "id": "INITIAL-STATIONING-04",
+   "pass": true,
+   "what": "فُعّل",
+   "detail": ""
+  },
+  {
+   "id": "INITIAL-STATIONING-05",
+   "pass": true,
+   "what": "صار للوحدة تمركز معتمد",
+   "detail": ""
+  },
+  {
+   "id": "INITIAL-STATIONING-06",
+   "pass": true,
+   "what": "لا تنتقل الوحدات الأخرى",
+   "detail": ""
+  },
+  {
+   "id": "FYI-01",
+   "pass": true,
+   "what": "وحدة العلم تقرأ هذا الطلب",
+   "detail": ""
+  },
+  {
+   "id": "FYI-02",
+   "pass": true,
+   "what": "وصل إليها إشعار",
+   "detail": ""
+  },
+  {
+   "id": "FYI-03",
+   "pass": true,
+   "what": "لا صلاحية دائمة",
+   "detail": ""
+  },
+  {
+   "id": "FYI-04",
+   "pass": true,
+   "what": "لا أزرار لها",
+   "detail": ""
+  },
+  {
+   "id": "FYI-05",
+   "pass": true,
+   "what": "مُدقَّق",
+   "detail": ""
+  },
+  {
+   "id": "FYI-06",
+   "pass": true,
+   "what": "بلا صلاحيتها مرفوض",
+   "detail": "403"
+  },
+  {
+   "id": "DEPLOYMENT-09",
+   "pass": true,
+   "what": "تُسحب المنطقة على الخريطة",
+   "detail": ""
+  },
+  {
+   "id": "DEPLOYMENT-10",
+   "pass": true,
+   "what": "صفر كتابة أثناء التعديل على الخريطة",
+   "detail": ""
+  },
+  {
+   "id": "DEPLOYMENT-02",
+   "pass": true,
+   "what": "يفحصها الخادم",
+   "detail": "الفحوص مستوفاة — يمكن الإرسال\n\nيثبت منطقتي الانتشار لهذه الوحدة وحدها، ولا يغير تمركزها.\n\nسبب الطلب\nحفظ المسودة والفحص\nإرسال للاعتماد"
+  },
+  {
+   "id": "DEPLOYMENT-03",
+   "pass": true,
+   "what": "طلب مكرر مرفوض",
+   "detail": "400"
+  },
+  {
+   "id": "DEPLOYMENT-04",
+   "pass": true,
+   "what": "لا شيء يُسجل قبل التفعيل",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-06",
+   "pass": true,
+   "what": "p06.h1: اعتماد فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-06",
+   "pass": true,
+   "what": "p07.h2: اعتماد فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-06",
+   "pass": true,
+   "what": "p08.ops: اعتماد عمليات الوحدة فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-06",
+   "pass": true,
+   "what": "p09.fin: اعتماد نهائي فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-06",
+   "pass": true,
+   "what": "لا زر تفعيل قبل تحديد وحدات العلم",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-06",
+   "pass": true,
+   "what": "p10: تحديد وحدات العلم فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-06",
+   "pass": true,
+   "what": "p11: تفعيل فقط",
+   "detail": ""
+  },
+  {
+   "id": "DEPLOYMENT-05",
+   "pass": true,
+   "what": "فُعّل",
+   "detail": ""
+  },
+  {
+   "id": "DEPLOYMENT-06",
+   "pass": true,
+   "what": "منطقتان للوحدة نفسها",
+   "detail": ""
+  },
+  {
+   "id": "DEPLOYMENT-07",
+   "pass": true,
+   "what": "لم يتغير تمركزها",
+   "detail": ""
+  },
+  {
+   "id": "DEPLOYMENT-08",
+   "pass": true,
+   "what": "مناطق الجهات الأخرى كما هي",
+   "detail": ""
+  },
+  {
+   "id": "RESTATIONING-03",
+   "pass": true,
+   "what": "يبدأ من الموقع الحالي المعتمد ولا يسأل عن الأصل",
+   "detail": ""
+  },
+  {
+   "id": "RESTATIONING-04",
+   "pass": true,
+   "what": "أُرسل",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-07",
+   "pass": true,
+   "what": "p06.h1: اعتماد فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-07",
+   "pass": true,
+   "what": "p07.h2: اعتماد فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-07",
+   "pass": true,
+   "what": "p08.ops: اعتماد عمليات الوحدة فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-07",
+   "pass": true,
+   "what": "p09.fin: اعتماد نهائي فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-07",
+   "pass": true,
+   "what": "لا زر تفعيل قبل تحديد وحدات العلم",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-07",
+   "pass": true,
+   "what": "p10: تحديد وحدات العلم فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-07",
+   "pass": true,
+   "what": "p11: تفعيل فقط",
+   "detail": ""
+  },
+  {
+   "id": "RESTATIONING-05",
+   "pass": true,
+   "what": "فُعّل",
+   "detail": ""
+  },
+  {
+   "id": "RESTATIONING-06",
+   "pass": true,
+   "what": "الموقع الجديد هو التمركز المعتمد الآن",
+   "detail": ""
+  },
+  {
+   "id": "RESTATIONING-07",
+   "pass": true,
+   "what": "مناطق الموقع القديم تُحال مع تمركزها",
+   "detail": ""
+  },
+  {
+   "id": "SITE-14",
+   "pass": true,
+   "what": "لا يُسجل الموقع قبل الاعتماد والتفعيل",
+   "detail": ""
+  },
+  {
+   "id": "SITE-15",
+   "pass": true,
+   "what": "الفحوص مستوفاة",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-10",
+   "pass": true,
+   "what": "p06.h1: اعتماد فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-10",
+   "pass": true,
+   "what": "p07.h2: اعتماد فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-10",
+   "pass": true,
+   "what": "p08.ops: اعتماد عمليات الوحدة فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-10",
+   "pass": true,
+   "what": "p09.fin: اعتماد نهائي فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-10",
+   "pass": true,
+   "what": "لا زر تفعيل قبل تحديد وحدات العلم",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-10",
+   "pass": true,
+   "what": "p10: تحديد وحدات العلم فقط",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-10",
+   "pass": true,
+   "what": "p11: تفعيل فقط",
+   "detail": ""
+  },
+  {
+   "id": "SITE-16",
+   "pass": true,
+   "what": "فُعّل",
+   "detail": ""
+  },
+  {
+   "id": "SITE-17",
+   "pass": true,
+   "what": "سُجل الموقع مرة واحدة",
+   "detail": ""
+  },
+  {
+   "id": "SITE-18",
+   "pass": true,
+   "what": "التسجيل ليس تمركزاً",
+   "detail": ""
+  },
+  {
+   "id": "SITE-19",
+   "pass": true,
+   "what": "التسجيل المكرر يُبلَّغ ويُمنع",
+   "detail": "[\"يتداخل مع موقع مسجل: موقع مطلوب اعتماده (وهمي) — استخدم الموقع المسجل أو اطلب ربط وحدتك به، بدل تسجيله مرة أخرى.\"]"
+  },
+  {
+   "id": "RESTATIONING-08",
+   "pass": true,
+   "what": "الأرض المشغولة منع صريح",
+   "detail": "[\"الموقع المقترح يتداخل مع: أرض مشغولة (وهمي)\",\"منطقتا الانتشار الرئيسية والبديلة مطلوبتان في السياسة السارية\"]"
+  },
+  {
+   "id": "RESTATIONING-09",
+   "pass": true,
+   "what": "ولا يُرسل",
+   "detail": ""
+  },
+  {
+   "id": "TERRAIN-01",
+   "pass": true,
+   "what": "تحليل GLO-30 للموقع الوعر من الخادم",
+   "detail": "MOUNTAINOUS"
+  },
+  {
+   "id": "POSTURE-01",
+   "pass": true,
+   "what": "يرى منطقتي الانتشار بعد التفعيل",
+   "detail": ""
+  },
+  {
+   "id": "POSTURE-02",
+   "pass": true,
+   "what": "وحدته وما يتبعها فقط",
+   "detail": "قسم الحركة أ موقع بلا انتشار (وهمي) شعبة أ1 معسكر الاتحاد (وهمي) شعبة أ2 موقع RS-2026-0004 شعبة أ3 بلا تمركز معتمد"
+  },
+  {
+   "id": "POSTURE-03",
+   "pass": true,
+   "what": "لا أزرار تعديل أو قرار",
+   "detail": ""
+  },
+  {
+   "id": "POSTURE-04",
+   "pass": true,
+   "what": "لا طلب جديد",
+   "detail": ""
+  },
+  {
+   "id": "POSTURE-05",
+   "pass": true,
+   "what": "لا يغيّر شيئاً حتى بطلبات مصنوعة",
+   "detail": "403,403,403,404"
+  },
+  {
+   "id": "POSTURE-06",
+   "pass": true,
+   "what": "مستخدم فرع آخر لا يرى هذا الفرع",
+   "detail": ""
+  },
+  {
+   "id": "POSTURE-07",
+   "pass": true,
+   "what": "جهات الموقع المشترك تُعد ولا تُسمّى",
+   "detail": "4"
+  },
+  {
+   "id": "APPROVAL-08",
+   "pass": true,
+   "what": "الطلبات كلها في قائمة واحدة بنوعها",
+   "detail": "RESTATIONING,SITE_REGISTRATION,DEPLOYMENT_AREAS,INITIAL_STATIONING"
+  },
+  {
+   "id": "APPROVAL-08b",
+   "pass": true,
+   "what": "وتصفّي بالنوع",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-08c",
+   "pass": true,
+   "what": "المراحل تُضبط من السياسة، لا من الكود",
+   "detail": ""
+  },
+  {
+   "id": "APPROVAL-09",
+   "pass": true,
+   "what": "العدادات ضمن النطاق",
+   "detail": "[\"NO_STATIONING:1\",\"NO_DEPLOYMENT:1\",\"RESTATIONING:0\"]"
+  },
+  {
+   "id": "NEXT-01",
+   "pass": true,
+   "what": "لا أخطاء في المتصفح",
+   "detail": ""
+  },
+  {
+   "id": "NEXT-02",
+   "pass": true,
+   "what": "صفر طلب خارجي",
+   "detail": ""
+  }
+ ]
+}

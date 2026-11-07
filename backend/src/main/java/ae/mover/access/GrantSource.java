@@ -43,8 +43,17 @@ public class GrantSource {
         return load(personId, at, false, Map.of());
     }
 
+    /** Grants of one role in force at {@code at}, of everyone: who a step found by scope can go to (ADR-042). */
+    public List<RawGrant> ofRole(String roleCode, Instant at) {
+        return load(null, roleCode, at, true, Map.of());
+    }
+
     private List<RawGrant> load(UUID personId, Instant at, boolean startedOnly, Map<String, RoleOverride> roles) {
-        String started = startedOnly ? " and %s.valid_from <= :at" : "";
+        return load(personId, null, at, startedOnly, roles);
+    }
+
+    private List<RawGrant> load(UUID personId, String roleCode, Instant at, boolean startedOnly, Map<String, RoleOverride> roles) {
+        String started = (startedOnly ? " and %s.valid_from <= :at" : "") + " and (cast(:role as text) is null or r.code = :role)";
         List<Map<String, Object>> rows = jdbc.sql("""
                 select m.id as grant_id, m.person_id, m.id as membership_id, null::uuid as delegation_id, null as delegator_name,
                        r.code, r.name, r.permissions, r.scope, r.summary_only,
@@ -72,7 +81,7 @@ public class GrantSource {
                 join organization o on o.id = m.organization_id and o.status = 'ACTIVE'
                 left join site s on s.id = m.site_scope_id
                 where (cast(:pid as uuid) is null or d.delegate_id = :pid) and d.revoked_at is null and d.valid_to > :at
-                  and (m.valid_to is null or m.valid_to > :at)""" + started.formatted("d") + started.formatted("m") + "\n" + """
+                  and (m.valid_to is null or m.valid_to > :at)""" + started.formatted("d") + (startedOnly ? " and m.valid_from <= :at" : "") + "\n" + """
                 union all
                 -- responsibility seats: the role follows whoever currently holds the HR position in the organisation
                 select null::uuid, a.person_id, null::uuid, null::uuid, null,
@@ -88,7 +97,7 @@ public class GrantSource {
                 where (cast(:pid as uuid) is null or a.person_id = :pid) and (a.valid_to is null or a.valid_to > :at)"""
                 + started.formatted("a") + "\n" + """
                 order by 2, 4 nulls first, 6""")
-                .param("pid", personId).param("at", Db.ts(at))
+                .param("pid", personId).param("at", Db.ts(at)).param("role", roleCode)
                 .query().listOfRows();
         List<UUID> custom = rows.stream().filter(r -> "CUSTOM".equals(r.get("scope_mode")))
                 .map(r -> (UUID) r.get("membership_id")).distinct().toList();
@@ -121,13 +130,36 @@ public class GrantSource {
             return out;
         }
         jdbc.sql("""
-                select membership_id, kind, target_id, include_descendants from membership_scope_target
+                select membership_id, kind, target_id, include_descendants, array_to_string(levels, ',') as levels from membership_scope_target
                 where membership_id = any(string_to_array(:ids, ',')::uuid[]) order by kind, target_id""")
                 .param("ids", Db.ids(membershipIds))
-                .query((rs, n) -> out.computeIfAbsent(Db.uuid(rs, "membership_id"), k -> new ArrayList<>())
-                        .add(new GrantTarget(rs.getString("kind"), Db.uuid(rs, "target_id"), rs.getBoolean("include_descendants"))))
+                .query((rs, n) -> {
+                    UUID target = Db.uuid(rs, "target_id");
+                    List<Integer> levels = levels(rs.getString("levels"));
+                    return out.computeIfAbsent(Db.uuid(rs, "membership_id"), k -> new ArrayList<>())
+                            .add(levels.isEmpty() ? new GrantTarget(rs.getString("kind"), target, rs.getBoolean("include_descendants"))
+                                    : new GrantTarget(rs.getString("kind"), target, true, levels, reach(target, levels)));
+                })
                 .list();
         return out;
+    }
+
+    private static List<Integer> levels(String text) {
+        return text == null || text.isBlank() ? List.of() : java.util.Arrays.stream(text.split(",")).map(Integer::valueOf).toList();
+    }
+
+    /** The active units at these levels of the published hierarchy, at or below {@code root} (ADR-042). */
+    public Set<UUID> reach(UUID root, List<Integer> levels) {
+        return new java.util.HashSet<>(jdbc.sql("""
+                with recursive t(id) as (
+                  select id from organization where id = :root
+                  union select o.id from organization o join t on o.parent_id = t.id)
+                select o.id from t join organization o on o.id = t.id and o.status = 'ACTIVE'
+                join hr_unit h on h.external_id = o.source_external_id and h.snapshot_id = (select s.id from hr_snapshot s where s.status = 'PUBLISHED')
+                where h.level = any(string_to_array(:levels, ',')::int[])""")
+                .param("root", root)
+                .param("levels", String.join(",", levels.stream().map(String::valueOf).toList()))
+                .query(UUID.class).list());
     }
 
     static Set<Permission> permissions(Object value) {

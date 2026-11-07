@@ -18,36 +18,97 @@ const rel = (on: unknown, off: unknown) => ['case', ['coalesce', ['get', 'relate
 /** Larger and outlined in the selection colour while the pointer is over the site (feature state, per site id). */
 const hov = (on: unknown, off: unknown) => ['case', ['boolean', ['feature-state', 'hover'], false], on, off];
 const markerPaint = {
-  'circle-radius': sel(11, hov(10, rel(9, 8))),
+  'circle-radius': sel(14, hov(13, rel(12, 11))),
   'circle-color': sel(REF_SELECTED, REF_COLOUR),
   'circle-stroke-color': sel('#ffe2a8', hov('#ffd27a', rel(REF_RELATED, '#ffffff'))),
   'circle-stroke-width': sel(4, hov(4, rel(3.5, 2.5))),
 } as never;
+
+/** A name on the map stands on a small white plate, always readable over roads and boundaries (stretched to the text). */
+export const LABEL_PILL = 'tz-label-pill';
+export const labelPillLayout = {
+  'icon-image': LABEL_PILL,
+  'icon-text-fit': 'both' as const,
+  'icon-text-fit-padding': [1, 4, 1, 4] as [number, number, number, number],
+  'icon-allow-overlap': false,
+};
+const SITE_GLYPH = 'tz-site-glyph';
+
+const canvas2d = (w: number, h: number) => {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  return c.getContext('2d')!;
+};
+
+/** The plate: rounded, white, a thin slate border and a soft edge; only its middle stretches. At pixel ratio 2. */
+function addLabelPill(m: MlMap): void {
+  if (m.hasImage(LABEL_PILL)) return;
+  const n = 32;
+  const r = 8;
+  const g = canvas2d(n, n);
+  g.beginPath();
+  g.roundRect(2, 2, n - 4, n - 4, r);
+  g.fillStyle = 'rgba(255, 255, 255, 0.96)';
+  g.shadowColor = 'rgba(15, 35, 55, 0.28)';
+  g.shadowBlur = 3;
+  g.fill();
+  g.shadowBlur = 0;
+  g.lineWidth = 1.5;
+  g.strokeStyle = 'rgba(47, 79, 111, 0.45)';
+  g.stroke();
+  const edge = r + 2;
+  m.addImage(LABEL_PILL, g.getImageData(0, 0, n, n), { pixelRatio: 2, stretchX: [[edge, n - edge]], stretchY: [[edge, n - edge]], content: [edge, edge, n - edge, n - edge] });
+}
+
+/** The symbol of a site: a white location pin, drawn here (no sprite file), standing on the site's round marker. */
+function addSiteGlyph(m: MlMap): void {
+  if (m.hasImage(SITE_GLYPH)) return;
+  const n = 40;
+  const g = canvas2d(n, n);
+  g.fillStyle = '#ffffff';
+  g.beginPath();
+  g.arc(20, 15, 10.5, Math.PI * 0.84, Math.PI * 0.16);
+  g.lineTo(20, 36);
+  g.closePath();
+  g.fill();
+  g.globalCompositeOperation = 'destination-out';
+  g.beginPath();
+  g.arc(20, 15, 4.2, 0, Math.PI * 2);
+  g.fill();
+  m.addImage(SITE_GLYPH, g.getImageData(0, 0, n, n), { pixelRatio: 2 });
+}
+
+const glyphLayout = { 'icon-image': SITE_GLYPH, 'icon-size': sel(1.15, 0.95), 'icon-allow-overlap': true, 'icon-ignore-placement': true } as never;
 const nameLayout = {
-  // the name, with a small count of the units stationed there («· 3 وحدات»): one object per site
-  'text-field': ['coalesce', ['get', 'label'], ['get', 'name']],
+  // the name, and under it what kind of site it is here and how many units are stationed there: one object per site
+  'text-field': ['format', ['get', 'name'], {}, ['case', ['==', ['coalesce', ['get', 'sub'], ''], ''], '', ['concat', '\n', ['get', 'sub']]], { 'font-scale': 0.82, 'text-color': '#4f6377' }],
   'text-font': [LABEL_FONT],
-  'text-size': sel(15, 13.5),
+  'text-size': sel(14, 13),
+  'text-line-height': 1.25,
   'text-max-width': 30,
   // around the marker, wherever there is room; names never pile on each other
   'text-variable-anchor': ['top', 'bottom', 'right', 'left'],
-  'text-radial-offset': 1.1,
+  'text-radial-offset': 1.6,
   'text-justify': 'auto',
   'text-allow-overlap': false,
   'text-optional': true,
   'symbol-sort-key': sel(0, 1),
+  ...labelPillLayout,
 } as never;
-const namePaint = { 'text-color': sel('#7a4f00', '#14304d'), 'text-halo-color': '#ffffff', 'text-halo-width': 2.4 } as never;
+const namePaint = { 'text-color': sel('#7a4f00', '#14304d') } as never;
 
 /**
  * The registered sites' layers (owner decision of 5 Nov 2026, item 4; map-first review of 5 Nov): a faint fill and a
- * dashed outline for a registered boundary, and one marker and one name per site. Zoomed out (up to
+ * dashed outline for a registered boundary, and one symbol and one name per site. Zoomed out (up to
  * GROUP_UP_TO_ZOOM) sites that would cover each other are one bubble «n مواقع» — a click zooms in — so every name on
  * the map can be read; a site alone keeps its marker and name. Added BEFORE a page's own overlays, so a request's
  * fills and outlines draw above them; markers, names and groups sit above the basemap's own labels (a road shield never
  * covers a site). Reference only.
  */
 export function addSiteLayers(m: MlMap): void {
+  addLabelPill(m);
+  addSiteGlyph(m);
   m.addSource('ref-sites', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'siteId' });
   m.addSource('ref-points', {
     type: 'geojson',
@@ -99,8 +160,10 @@ export function addSiteLayers(m: MlMap): void {
   addOverlayLayer(m, { id: 'ref-pt-label', type: 'symbol', source: 'ref-points', filter: ['!', ['has', 'point_count']], maxzoom: GROUP_UP_TO_ZOOM + 1, layout: nameLayout, paint: namePaint }, 'top');
   // zoomed in: every site on its own
   addOverlayLayer(m, { id: 'ref-marker', type: 'circle', source: 'ref-sites', filter: role('REF_MARKER'), minzoom: GROUP_UP_TO_ZOOM + 1, paint: markerPaint }, 'top');
-  // a registered boundary is small at first: a dot at its label point keeps it visible until its outline is
-  addOverlayLayer(m, { id: 'ref-dot', type: 'circle', source: 'ref-sites', filter: role('REF_LABEL'), minzoom: GROUP_UP_TO_ZOOM + 1, maxzoom: 14.5, paint: markerPaint }, 'top');
+  // a site with a boundary keeps its symbol at every zoom, at its label point
+  addOverlayLayer(m, { id: 'ref-dot', type: 'circle', source: 'ref-sites', filter: role('REF_LABEL'), minzoom: GROUP_UP_TO_ZOOM + 1, paint: markerPaint }, 'top');
+  addOverlayLayer(m, { id: 'ref-pt-glyph', type: 'symbol', source: 'ref-points', filter: ['!', ['has', 'point_count']], maxzoom: GROUP_UP_TO_ZOOM + 1, layout: glyphLayout }, 'top');
+  addOverlayLayer(m, { id: 'ref-glyph', type: 'symbol', source: 'ref-sites', filter: ['in', ['get', 'role'], ['literal', ['REF_LABEL', 'REF_MARKER']]], minzoom: GROUP_UP_TO_ZOOM + 1, layout: glyphLayout }, 'top');
   addOverlayLayer(m, {
     id: 'ref-label',
     type: 'symbol',

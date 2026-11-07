@@ -1,0 +1,34 @@
+/* «الطلبات الإدارية»: built for thousands of requests. Status tabs with counts, filters, a compact table with a header that stays, paging. */
+.rq-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 10px 14px 0; border-bottom: 1px solid var(--line); }
+.rq-tab { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border: 0; border-bottom: 2px solid transparent; background: none; color: inherit; font: inherit; font-size: 13.5px; cursor: pointer; }
+.rq-tab:hover { color: var(--green, #0f766e); }
+.rq-tab[aria-selected='true'] { border-bottom-color: var(--green, #0f766e); color: var(--green, #0f766e); font-weight: 700; }
+.rq-tab b { min-width: 22px; padding: 1px 7px; border-radius: 10px; background: rgba(15, 35, 55, 0.07); font-size: 12px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+.rq-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.rq-filters label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted, #5b6b7a); }
+.rq-filters input[type='date'], .rq-filters select { height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; font: inherit; font-size: 13px; color: inherit; }
+.rq-filters .rq-search { flex: 1 1 260px; }
+.rq-filters .rq-search input { width: 100%; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 13px; }
+.rq-filters label.rq-mine { flex-direction: row; align-items: center; gap: 6px; height: 36px; color: inherit; font-size: 13px; }
+.rq-table-wrap { max-height: calc(100vh - 430px); min-height: 300px; overflow: auto; transition: opacity 0.12s; }
+.rq-table-wrap[aria-busy='true'] { opacity: 0.55; }
+.rq-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+.rq-table thead th { position: sticky; top: 0; z-index: 1; padding: 9px 12px; background: #f6f8f7; border-bottom: 1px solid var(--line); color: var(--muted, #5b6b7a); font-size: 12px; font-weight: 600; text-align: start; white-space: nowrap; }
+.rq-table th button { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.rq-table th[aria-sort='ascending'] button, .rq-table th[aria-sort='descending'] button { color: var(--green, #0f766e); font-weight: 700; }
+.rq-table tbody td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.rq-table tbody tr { cursor: pointer; }
+.rq-table tbody tr:hover { background: rgba(15, 118, 110, 0.05); }
+.rq-subject { display: block; max-width: 300px; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.rq-sub { display: block; color: var(--muted, #5b6b7a); font-size: 12px; }
+.rq-clip { display: block; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rq-more { margin-inline-start: 5px; padding: 0 6px; border-radius: 8px; background: rgba(15, 35, 55, 0.07); font-size: 11px; }
+.rq-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-top: 1px solid var(--line); font-size: 13px; }
+.rq-pager nav { display: flex; align-items: center; gap: 3px; }
+.rq-pager nav button { min-width: 32px; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: #fff; font: inherit; font-size: 13px; color: inherit; cursor: pointer; font-variant-numeric: tabular-nums; }
+.rq-pager nav button[aria-current='page'] { border-color: var(--green, #0f766e); background: var(--green, #0f766e); color: #fff; font-weight: 700; }
+.rq-pager nav button:disabled { opacity: 0.45; cursor: not-allowed; }
+.rq-pager nav span { padding: 0 3px; color: var(--muted, #5b6b7a); }
+.rq-pager select { height: 32px; min-width: 66px; padding: 0 8px; margin-inline-start: 6px; border: 1px solid var(--line); border-radius: 7px; background: #fff; font: inherit; font-size: 13px; }
+.rq-empty { padding: 44px 16px; color: var(--muted, #5b6b7a); text-align: center; }
+.rq-empty button { margin-top: 10px; }

@@ -19,6 +19,13 @@ export type Permission =
   | 'MANAGE_SITE_LINKS'
   | 'REPLAY_STATIONING_EVENTS'
   | 'CREATE_RESTATIONING'
+  | 'CREATE_INITIAL_STATIONING'
+  | 'CREATE_DEPLOYMENT_REQUEST'
+  | 'REQUEST_SITE_REGISTRATION'
+  | 'DECIDE_UNIT_OPERATIONS'
+  | 'FINAL_APPROVE_STATIONING'
+  | 'MANAGE_FYI_DISTRIBUTION'
+  | 'VIEW_OPERATIONAL_POSTURE'
   | 'ACTIVATE_STATIONING'
   | 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION'
   | 'DECIDE_PRE_ACTIVATION_CANCELLATION'
@@ -31,7 +38,7 @@ export type Period = { start: string; end: string | null };
 export type Page<T> = { items: T[]; page: number; size: number; total: number };
 
 export type RequestStatus = 'DRAFT' | 'SUBMITTED' | 'RETURNED' | 'REJECTED' | 'APPROVED' | 'CLOSED';
-export type RequestKind = 'NEW_RESERVATION' | 'EXTENSION' | 'MODIFICATION' | 'CANCELLATION' | 'EVACUATION' | 'RELOCATION';
+export type RequestKind = 'ACCESS' | 'NEW_RESERVATION' | 'EXTENSION' | 'MODIFICATION' | 'CANCELLATION' | 'EVACUATION' | 'RELOCATION';
 export type ViewLevel = 'FULL' | 'SUMMARY' | 'CONTEXT';
 /** Site availability for a period: BUSY only when every requested resource is blocked; PARTIAL when some are. */
 export type Availability = 'FREE' | 'PARTIAL' | 'BUSY' | 'NO_RESOURCES';
@@ -42,7 +49,7 @@ export type Administrative = 'APPROVED' | 'PENDING' | 'NONE';
 
 export type RuleOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'empty' | 'notEmpty';
 export type RuleValue = string | number | boolean | (string | number)[];
-export type FactName = 'resourceCount' | 'durationDays' | 'durationHours' | 'participantCount' | 'requestType';
+export type FactName = 'resourceCount' | 'durationDays' | 'durationHours' | 'participantCount' | 'requestType' | 'requesterLevel' | 'requesterIsMain' | 'requesterHasParent';
 export type Rule =
   | { all: Rule[] }
   | { any: Rule[] }
@@ -358,7 +365,46 @@ export type FormField = {
 };
 export type FormSchema = { fields: FormField[] };
 
-export type OrgFrom = 'REQUEST_ORG' | 'RESOURCE_ORG' | 'ANY';
+export type OrgFrom = 'BY_SCOPE' | 'REQUEST_ORG' | 'RESOURCE_ORG' | 'ANY' | 'UP' | 'AT_LEVEL' | 'FIXED' | 'RESPONSIBLE';
+/** A role at a place, found per request (ADR-041). {@code orgName} only keeps the name on screen. */
+export type WfPlace = { role: string; orgFrom: OrgFrom; levelsUp?: number; level?: number; orgId?: string; orgName?: string; responsibility?: string };
+export type FlowNodeType = 'start' | 'approval' | 'decision' | 'notify' | 'parallel' | 'join' | 'end_approved' | 'end_rejected';
+export type FlowRecipient = ({ kind: 'REQUESTER' } | ({ kind: 'PLACE' } & WfPlace));
+/**
+ * One approval that climbs the hierarchy, one unit at a time. It stops at the branch's main unit, the top, the first of the
+ * levels chosen (the levels are those the HR source has), after a number of approvals, or at one unit.
+ */
+export type FlowChain = {
+  from: 'PARENT' | 'SELF';
+  stop: 'MAIN_UNIT' | 'TOP' | 'LEVELS' | 'COUNT' | 'ORG';
+  levels?: number[];
+  count?: number;
+  orgId?: string;
+  orgName?: string;
+  onlyLevels?: number[];
+  skipEmpty: boolean;
+};
+export type FlowNode = {
+  id: string;
+  type: FlowNodeType;
+  name: string;
+  x: number;
+  y: number;
+  mode?: 'ALL' | 'ANY';
+  slaDays?: number;
+  assignees?: WfPlace[];
+  chain?: FlowChain | null;
+  final?: boolean;
+  requiresSignature?: boolean;
+  condition?: Rule | null;
+  recipients?: FlowRecipient[];
+  message?: string;
+};
+export type FlowWhen = 'approved' | 'rejected' | 'yes' | 'no';
+export type FlowEdge = { from: string; to: string; when?: FlowWhen };
+export type FlowGraph = { nodes: FlowNode[]; edges: FlowEdge[] };
+export type ResponsibilityRule = { scopeOrgId: string; scopeOrgName: string; responsibleOrgId: string; responsibleOrgName: string };
+export type Responsibility = { code: string; name: string; rules: ResponsibilityRule[] };
 export type WfStage = {
   key: string;
   name: string;
@@ -370,7 +416,7 @@ export type WfStage = {
   requiresSignature?: boolean;
 };
 export type WfExec = { key: string; name: string; role: string; orgFrom: OrgFrom; dueDays: number; evidenceRequired: boolean };
-export type WorkflowDefinition = { name: string; stages: WfStage[]; execution: WfExec[] };
+export type WorkflowDefinition = { name: string; stages: WfStage[]; execution: WfExec[]; graph?: FlowGraph | null };
 
 export type VersionStatus = 'DRAFT' | 'PUBLISHED' | 'RETIRED';
 export type VersionInfo = {
@@ -381,7 +427,7 @@ export type VersionInfo = {
   publishedAt: string | null;
   publishedBy: string | null;
 };
-export type StudioItem = { id: string; requestType: Ref & { code: string }; published: VersionInfo | null; draft: VersionInfo | null };
+export type StudioItem = { id: string; requestType: Ref & { code: string; kind?: string }; published: VersionInfo | null; draft: VersionInfo | null };
 export type FormVersion = VersionInfo & { formId: string; schema: FormSchema };
 export type WorkflowVersion = VersionInfo & { workflowId: string; definition: WorkflowDefinition; activeRequests: number };
 export type ValidationResult = { valid: boolean; errors: { path: string; message: string }[] };
@@ -390,6 +436,9 @@ export type SimulationResult = {
   errors: { path: string; message: string }[];
   path: { key: string; name: string; runs: boolean }[];
   impact: { inFlightOnOlderVersions: number; message: string };
+  route: { node: string; type: FlowNodeType; name: string; taken: FlowWhen | null; chain?: boolean; places: { role: string; orgs: string[]; anyOrg: boolean; unresolved: boolean; holders: number }[] }[];
+  outcome: 'APPROVED' | 'NO_FINAL_APPROVER' | 'REJECTED' | null;
+  coverage: { node: string; name: string; role: string; total: number; unresolved: number; sample: string[] }[];
 };
 
 // ---------- requests ----------
@@ -465,6 +514,7 @@ export type RequestDetail = RequestListItem & {
   origin: 'MAP' | 'LIST';
   participantOrgs?: Ref[];
   infoOrgs?: Ref[];
+  fyi?: { person: string; unit: string; reason: string; toldAt: string; firstReadAt: string | null }[];
   values?: Record<string, unknown>;
   attachments?: Attachment[];
   targetReservation: { id: string; resourceName: string; period: Period; status: string } | null;
@@ -916,7 +966,7 @@ export type RoleImpact = {
 };
 export type PolicyImpact = { draftVersion: number; publishedVersion: number; roles: RoleImpact[]; problems: PolicyProblem[]; publishable: boolean };
 export type GrantTargetKind = 'ORGANIZATION' | 'SITE' | 'RESOURCE';
-export type GrantTargetView = { kind: GrantTargetKind; id: string; name: string; includeDescendants: boolean };
+export type GrantTargetView = { kind: GrantTargetKind; id: string; name: string; includeDescendants: boolean; levels: number[] };
 export type GrantView = {
   id: string;
   person: { id: string; displayName: string; employeeNo: string };
@@ -938,7 +988,7 @@ export type GrantScopeInput = {
   mode: 'ROLE' | 'CUSTOM';
   all?: boolean;
   combine?: 'AND' | 'OR';
-  targets?: { kind: GrantTargetKind; id: string; includeDescendants: boolean }[];
+  targets?: { kind: GrantTargetKind; id: string; includeDescendants: boolean; levels?: number[] }[];
 };
 export type ExplainReason = { role: string; organization: string; scope: string; validTo: string | null; via: string | null };
 export type ExplainVerdict = { allowed: boolean; reasons: ExplainReason[] };
@@ -1019,10 +1069,14 @@ export type RestationingContent = {
   alternative: GeoPolygon | null;
   exceptions?: Record<string, string>;
   reason: string;
+  /** The registered site of an initial stationing. */
+  existingSite?: string | null;
+  /** The register fields of a site asked to be registered. */
+  siteInfo?: { name: string; code: string; parentId?: string | null; kind: string; notes?: string | null } | null;
 };
 export type RestationingStage = {
   key: string;
-  kind: 'HIERARCHY' | 'CROSS_BRANCH' | 'EXCEPTION';
+  kind: 'HIERARCHY' | 'CROSS_BRANCH' | 'EXCEPTION' | 'UNIT_OPERATIONS' | 'FINAL';
   label: string;
   unit: Ref | null;
   satisfies: string[];
@@ -1035,6 +1089,7 @@ export type RestationingStage = {
 /** A unit the actor may request a re-stationing for (`GET /restationing-requests/units`), depth-ordered. */
 export type RestationingUnit = { id: string; code: string; name: string; parentId: string | null; depth: number };
 export type RestationingListItem = {
+  purpose?: string;
   id: string;
   number: string;
   state: RestationingState;
@@ -1062,6 +1117,12 @@ export type RestationingRequest = {
   id: string;
   number: string;
   state: RestationingState;
+  purpose?: 'RESTATIONING' | 'INITIAL_STATIONING' | 'DEPLOYMENT_AREAS' | 'SITE_REGISTRATION';
+  /** The registered site an initial stationing asks for. */
+  targetSite?: { id: string; name: string; geometry: { type: string; coordinates: unknown } | null } | null;
+  fyi?: { required: boolean; doneAt: string | null; doneBy: string | null; note: string | null; units: string[]; active?: { id: string; name: string }[] };
+  /** This person reads this one request because their unit was chosen for information, and holds nothing else on it. */
+  readOnlyFyi?: boolean;
   requestingUnit: Ref;
   requester: Ref;
   content: RestationingContent;
@@ -1085,6 +1146,8 @@ export type RestationingRequest = {
     edit: boolean;
     submit: boolean;
     decide: boolean;
+    decideAs?: string | null;
+    fyi?: boolean;
     activate: boolean;
     askCancellation?: boolean;
     askStartCancellation?: boolean;
@@ -1185,11 +1248,15 @@ export type SiteLinkRecord = { id: string; siteId: string; siteName: string; org
 export type StationingFact = 'SCOPE' | 'CLASSIFICATION' | 'DURATION' | 'SITE' | 'DEPLOYMENT' | 'AVAILABILITY';
 export type SlopeClassValue = { code: string; label: string; fromPct: number; toPct: number | null };
 export type RoutingLevelValue = { level: number; approves: boolean; label: string; finalStage: boolean; dependsOn: StationingFact[] };
+/** What ground that is not flat adds to a maximum: an amount (metres, or m² for the footprint) or a percentage of it. */
+export type TerrainExtra = { kind: 'ABSOLUTE' | 'PERCENT'; value: number };
 export type StationingPolicyValues = {
   maxFootprintAreaM2: number;
   deploymentRequirement: 'REQUIRED' | 'OPTIONAL' | null;
-  primary: { minM: number; maxM: number; terrainApplies: boolean };
-  alternative: { minM: number; maxM: number; terrainApplies: boolean };
+  primary: { minM: number; maxM: number; terrainApplies: boolean; terrainExtra?: TerrainExtra | null };
+  alternative: { minM: number; maxM: number; terrainApplies: boolean; terrainExtra?: TerrainExtra | null };
+  /** The footprint's maximum on ground that is not flat. Null or absent: none. */
+  footprintTerrainExtra?: TerrainExtra | null;
   terrainSlopeClassification: { datasetCode: string; datasetVersion: string; classes: SlopeClassValue[] };
   terrainAllowancesM: Record<string, number>;
   terrainClassPriority: string[];
@@ -1202,6 +1269,10 @@ export type StationingPolicyValues = {
    * absent: not configured (every version published before it). CIRCLE is drawn as a regular 16-vertex polygon of that area.
    */
   deploymentAreaDefault?: { shape: 'SQUARE' | 'CIRCLE'; areaM2: number } | null;
+  /** The slope colours inside a shape on the map, display only (ADR-039). Null or absent: the initial limits. */
+  slopeDisplay?: { greenBelowPct: number; redFromPct: number } | null;
+  /** The stages after the hierarchy (ADR-045): who holds them is a grant, never a value here. Null or absent: none. */
+  approvalStages?: { unitOperations: boolean; finalByPermission: boolean; fyiBeforeActivation: boolean } | null;
 };
 export type StationingPolicyVersion = {
   id: string;

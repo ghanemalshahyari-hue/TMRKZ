@@ -191,14 +191,10 @@ await session(req.state, 'R1-deployment-mountain-to-plain', async (page, mark) =
      ['FLAT', 'UNDULATING'].includes(after.class) && after.verdict === 'OUT_OF_RANGE' && Number(after.effectiveMax) < 7000 && Math.abs(km(P.primary, c) - 5.8) < 0.15,
     'R1', 'deployment area dragged in 3D from a mountain flank to a plain at the same distance: class, allowance, effective maximum and verdict follow the ground',
     `${km(P.primary, P.MTN).toFixed(2)} km → ${km(P.primary, c).toFixed(2)} km; class ${before.class} → ${after.class}; allowance ${before.allowance} → ${after.allowance} m; effective max ${before.effectiveMax} → ${after.effectiveMax} m; verdict ${before.verdict} → ${after.verdict}; heights ${before.min}–${before.max} → ${after.min}–${after.max} m; chip «${chip.replace(/\s+/g, ' ')}»`);
-  // the owner's slope colours over the same ground
-  await page.locator('[data-testid=slope-control] button').click();
-  await settle(page, 2500);
-  const slope = await mapEval(page, `const l = m.getLayer('terrain3d-slope'); return { layer: !!l, visible: l && m.getLayoutProperty('terrain3d-slope', 'visibility') === 'visible', loaded: m.isSourceLoaded('terrain3d-slope'), last: m.getStyle().layers.map((x) => x.id).filter((x) => x.startsWith('terrain3d')).at(-1) };`);
+  // the owner's slope colours, inside the proposed site only (tests/acceptance/slope-inside.mjs has the full check)
+  const slope = await mapEval(page, `const l = m.getLayer('rs-slope-zones'); return { layer: !!l, zones: m.getSource('rs-slope-zones')?.serialize().data.features.length ?? 0, whole: !!m.getLayer('terrain3d-slope') }`);
   await shot(page, 'R1-slope-colours.png');
-  ok(slope.layer && slope.visible && slope.loaded && slope.last === 'terrain3d-slope' && (await page.locator('.tz-slope-legend li').count()) === 5, 'R1b', '«الانحدار»: the policy\'s five slope classes coloured over the terrain (display only), above the tint and shade', JSON.stringify(slope));
-  await page.locator('[data-testid=slope-control] button').click();
-  await settle(page, 800);
+  ok(slope.layer && slope.zones > 0 && !slope.whole && (await page.locator('.tz-slope-legend li').count()) === 3, 'R1b', '«الانحدار»: three colours inside the proposed site, none over the whole map (display only)', JSON.stringify(slope));
   // R2: the proposed site and the occupied ground on slopes, from two bearings
   await page.locator('.tz3-card.r-SITE').click();
   await settle(page, 2500);

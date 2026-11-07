@@ -6,7 +6,7 @@ import { LABEL_FONT, type BasemapMode, type Terrain3dSource } from '../map/mapli
 import { centre, requestFeatures } from '../../lib/requestMap';
 import { siteReferenceFeatures, sitesExtent } from '../../lib/sitesLayer';
 import { SiteInfoCard } from './SiteInfoCard';
-import { addSiteLayers, bindSiteClicks, setSiteData } from './siteLayers';
+import { addSiteLayers, labelPillLayout, bindSiteClicks, setSiteData } from './siteLayers';
 import { useRegisteredSites } from './useRegisteredSites';
 
 /**
@@ -133,7 +133,9 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
   const registered = useRegisteredSites();
   const [info, setInfo] = useState<string | null>(null);
   const highlighted = pick ? pick.selectedId : (info ?? highlight);
-  const refData = useMemo(() => siteReferenceFeatures(registered.all, highlighted, registered.counts), [registered.all, highlighted, registered.counts]);
+  // a request's current site is one object: the request draws its boundary, the registered layer its symbol and one name
+  const currentIds = useMemo(() => new Set(request.currentSites.filter((s) => s.geometry?.type === 'Polygon' || s.geometry?.type === 'MultiPolygon').map((s) => s.site.id)), [request.currentSites]);
+  const refData = useMemo(() => siteReferenceFeatures(registered.all, highlighted, registered.counts, currentIds), [registered.all, highlighted, registered.counts, currentIds]);
   const interactive = useRef(referenceInteractive);
   interactive.current = referenceInteractive;
   const onSite = useRef<(id: string | null, here?: string[]) => void>(setInfo);
@@ -178,7 +180,12 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
     }
   }, [map, fitSites, registered.loaded, refData]);
   // the editor draws the shape it is editing itself (hideSite, or the deployment area left out of the request)
-  const data = useMemo(() => requestFeatures(request, checks, hideSite), [request, checks, hideSite]);
+  const data = useMemo(() => {
+    const fc = requestFeatures(request, checks, hideSite);
+    // the name of a current site the registered layer already names (a site not visible there keeps this label)
+    const named = new Set(registered.all.filter((s) => s.onMap).map((s) => s.siteId));
+    return { ...fc, features: fc.features.filter((f) => !(f.properties.siteId && named.has(f.properties.siteId))) };
+  }, [request, checks, hideSite, registered.all]);
   const initial = useMemo(() => {
     const c = request.content.site?.geometry ? centre(request.content.site.geometry) : { lng: 55.3, lat: 25.2 };
     return [c.lng, c.lat] as [number, number];
@@ -351,15 +358,14 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
               'text-max-width': 40,
               'text-allow-overlap': false,
               'text-variable-anchor': ['center', 'top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'],
-              'text-radial-offset': 0.9,
+              'text-radial-offset': 1.2,
               'text-justify': 'auto',
               'text-padding': 4,
+              ...labelPillLayout,
               'symbol-sort-key': ['match', ['get', 'role'], 'SITE', 0, 'PRIMARY', 1, 'ALTERNATIVE', 2, 'CURRENT', 3, 'MOVE_LABEL', 4, 5],
             },
             paint: {
               'text-color': ['match', ['get', 'role'], 'CURRENT', '#2f6db0', 'SITE', '#05634f', 'PRIMARY', '#9a5212', 'ALTERNATIVE', '#5b3896', 'LEG_LABEL', ['match', ['get', 'tone'], 'ok', '#1d6a39', 'warn', '#9a6212', 'bad', '#a3322a', '#1d2733'], '#1d2733'],
-              'text-halo-color': '#ffffff',
-              'text-halo-width': 1.8,
             },
           },
           'top',

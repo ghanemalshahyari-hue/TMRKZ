@@ -32,7 +32,7 @@ const external = [];
 const consoleErrors = [];
 const writes = [];
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ ...(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH } : { channel: 'msedge' }), headless: true });
 const login = await browser.newContext({ viewport: SIZE });
 const lp = await login.newPage();
 await lp.goto(AUTH + '/api/v1/auth/oidc/start');

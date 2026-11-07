@@ -8,6 +8,10 @@ import { AppContext, NAV, flattenOrgs, type AppContextValue, type View, type Wiz
 import { todayDubai } from './lib/dates';
 import { clearMapContexts } from './lib/mapState';
 import { moreNav, primaryNav, restriction } from './lib/navigation';
+import { AccessInboxPage } from './pages/AccessInboxPage';
+import { AccessRequestPage } from './pages/AccessRequestPage';
+import { AllRequestsPage } from './pages/AllRequestsPage';
+import { NewRequestPage } from './pages/NewRequestPage';
 import { AuditPage } from './pages/AuditPage';
 import { CalendarPage } from './pages/CalendarPage';
 import { DocsPage } from './pages/DocsPage';
@@ -25,6 +29,8 @@ import { WorkflowStudio } from './pages/WorkflowStudio';
 // Stationing V3 (behind VITE_STATIONING_V3): loaded on demand, so the offline map code is a separate chunk
 const StationingPolicyPage = lazy(() => import('./pages/StationingPolicyPage').then((m) => ({ default: m.StationingPolicyPage })));
 const RestationingPage = lazy(() => import('./pages/RestationingPage').then((m) => ({ default: m.RestationingPage })));
+const PosturePage = lazy(() => import('./pages/PosturePage').then((m) => ({ default: m.PosturePage })));
+const SiteSetupPage = lazy(() => import('./pages/SiteSetupPage').then((m) => ({ default: m.SiteSetupPage })));
 
 const POLL_MS = 30_000;
 
@@ -193,6 +199,18 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
         <RestationingPage />
       </Suspense>
     ),
+    newRequest: () => <NewRequestPage />,
+    allRequests: () => <AllRequestsPage />,
+    posture: () => (
+      <Suspense fallback={<div className="empty">جارٍ تحميل الخريطة…</div>}>
+        <PosturePage />
+      </Suspense>
+    ),
+    siteSetup: () => (
+      <Suspense fallback={<div className="empty">جارٍ تحميل الخريطة…</div>}>
+        <SiteSetupPage />
+      </Suspense>
+    ),
     requests: () => <RequestsPage />,
     review: () => <ReviewPage />,
     calendar: () => <CalendarPage />,
@@ -203,11 +221,18 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     settings: () => <SettingsPage />,
     audit: () => <AuditPage />,
     docs: () => <DocsPage />,
+    requestAccess: () => <AccessRequestPage />,
+    accessInbox: () => <AccessInboxPage />,
   };
-  const links = useMemo(() => primaryNav(can, me.summaryOnly), [can, me.summaryOnly]);
-  const more = useMemo(() => moreNav(can, me.summaryOnly), [can, me.summaryOnly]);
+  // signing in is not a permission: a person with none has only the page to ask (ADR-044)
+  const noAccess = me.permissions.length === 0;
+  // one request sent «للعلم» opens by its address even with no permission at all; the server decides whether it is this person's
+  const fyiAddress = /^#restationing\/[0-9a-f-]{36}$/.test(location.hash);
+  const shownView: View = noAccess && !fyiAddress ? 'requestAccess' : view;
+  const links = useMemo(() => (noAccess ? [{ view: 'requestAccess' as View, label: 'طلب صلاحية', icon: 'shield' }] : primaryNav(can, me.summaryOnly)), [can, me.summaryOnly, noAccess]);
+  const more = useMemo(() => (noAccess ? [] : moreNav(can, me.summaryOnly)), [can, me.summaryOnly, noAccess]);
   // the operational views fill the screen below the top bar; every other page keeps its own layout inside the shell
-  const console = view === 'home' || view === 'restationing' || view === 'stationing';
+  const console = shownView === 'home' || shownView === 'restationing' || shownView === 'stationing' || shownView === 'posture' || shownView === 'siteSetup';
   const logout = async () => {
     let target = '/';
     try {
@@ -221,12 +246,12 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
 
   return (
     <AppContext.Provider value={ctx}>
-      <div className={'tz-app' + (console ? ' is-console' : ' is-page')} data-view={view}>
+      <div className={'tz-app' + (console ? ' is-console' : ' is-page')} data-view={shownView}>
         <a className="tz-skip" href="#main">تخطي إلى المحتوى</a>
-        <TopNavigation me={me} view={view} links={links} more={more} onLogout={logout} navOpen={navOpen} setNavOpen={setNavOpen} />
+        <TopNavigation me={me} view={shownView} links={links} more={more} onLogout={logout} navOpen={navOpen} setNavOpen={setNavOpen} />
         <button id="navShade" className="nav-shade" aria-label="إغلاق القائمة" onClick={() => setNavOpen(false)} hidden={!navOpen} />
         <main id="main" className="tz-main" tabIndex={-1}>
-          <ScreenBoundary resetKey={view}>{restriction(view, can, me.summaryOnly) ? <NoAccess /> : pages[view]()}</ScreenBoundary>
+          <ScreenBoundary resetKey={shownView}>{restriction(shownView, can, me.summaryOnly) ? <NoAccess /> : pages[shownView]()}</ScreenBoundary>
         </main>
       </div>
       <RequestWizard request={wizard} update={wizardUpdate} onUpdateHandled={() => setWizardUpdate(null)} onClose={() => (setWizard(null), setWizardUpdate(null))} />

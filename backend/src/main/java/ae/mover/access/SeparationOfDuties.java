@@ -54,6 +54,25 @@ public class SeparationOfDuties {
         return out;
     }
 
+    /**
+     * Everyone who approved another step of this request, and whoever they acted for: nobody among them decides a step that
+     * must be independent of earlier approvals (ADR-042, as in the movement programme). Compared by the human, not the record.
+     */
+    public Set<UUID> earlierApprovers(UUID requestId, String stageKey) {
+        Set<UUID> signers = new java.util.HashSet<>(jdbc.sql("""
+                select de.actor_person_id from decision de
+                where de.request_id = :r and de.stage_key <> :s and de.decision in ('APPROVE', 'REFER')
+                union
+                select dl.delegator_id from decision de join delegation dl on dl.id = de.via_delegation_id
+                where de.request_id = :r and de.stage_key <> :s and de.decision in ('APPROVE', 'REFER')""")
+                .param("r", requestId).param("s", stageKey).query(UUID.class).list());
+        Set<UUID> out = new java.util.HashSet<>();
+        keys.samePeople(signers).values().forEach(out::addAll);
+        return out;
+    }
+
+    public static final String EARLIER_REFUSAL = "لا يبت في هذه الخطوة من وافق على الطلب في خطوة سابقة؛ يبت فيها شخص آخر مخوّل.";
+
     public Set<UUID> requester(UUID requestId) {
         return requesters(List.of(requestId)).getOrDefault(requestId, Set.of());
     }

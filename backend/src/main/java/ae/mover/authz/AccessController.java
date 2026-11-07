@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -116,6 +117,59 @@ public class AccessController {
                                        @RequestParam(required = false) UUID siteId,
                                        @RequestParam(required = false) UUID resourceId) {
         return policies.explain(access.context(actor), personId, organizationId, siteId, resourceId);
+    }
+
+    @GetMapping("/scope-preview")
+    public Map<String, Object> scopePreview(Actor actor, @RequestParam UUID organizationId,
+                                            @RequestParam(required = false) Boolean descendants,
+                                            @RequestParam(required = false) List<Integer> levels) {
+        return grants.scopePreview(access.context(actor), organizationId, Boolean.TRUE.equals(descendants), levels);
+    }
+
+    @GetMapping("/grant-roots")
+    public List<Map<String, Object>> grantRoots(Actor actor) {
+        return grants.grantRoots(access.context(actor));
+    }
+
+    @GetMapping("/unit-matrix")
+    public Map<String, Object> unitMatrix(Actor actor, @RequestParam UUID organizationId, @RequestParam(required = false) String q,
+                                          @RequestParam(required = false) Integer page) {
+        return grants.unitMatrix(access.context(actor), organizationId, q, page);
+    }
+
+    public record ReplaceInput(GrantAdminService.GrantInput grant, String reason) {
+    }
+
+    @PostMapping("/grants/{id}/replace")
+    public Map<String, Object> replaceGrant(Actor actor, @PathVariable UUID id, @RequestBody ReplaceInput in) {
+        return grants.replace(access.context(actor), id, in.grant(), in.reason());
+    }
+
+    @GetMapping("/unit-ops-routes")
+    public List<Map<String, Object>> routes(Actor actor, @RequestParam UUID commandId) {
+        return grants.routes(access.context(actor), commandId);
+    }
+
+    @PutMapping("/unit-ops-routes")
+    public List<Map<String, Object>> saveRoutes(Actor actor, @RequestParam UUID commandId, @RequestBody List<GrantAdminService.RouteInput> in) {
+        return grants.saveRoutes(access.context(actor), commandId, in);
+    }
+
+    @GetMapping("/fyi-mains")
+    public List<Map<String, Object>> fyiMains(Actor actor) {
+        return grants.fyiMains(access.context(actor));
+    }
+
+    @PutMapping("/fyi-mains/{id}")
+    public ResponseEntity<Void> addFyiMain(Actor actor, @PathVariable UUID id) {
+        grants.setFyiMain(access.context(actor), id, true);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/fyi-mains/{id}")
+    public ResponseEntity<Void> removeFyiMain(Actor actor, @PathVariable UUID id) {
+        grants.setFyiMain(access.context(actor), id, false);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/grants")

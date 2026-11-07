@@ -1,0 +1,179 @@
+{
+ "at": "2026-11-06T10:33:23.465Z",
+ "results": [
+  {
+   "id": "S01",
+   "pass": true,
+   "what": "on by default on the new-site step: three colours and what each means",
+   "detail": "الانحدار موقع إعادة التمركز مناسب للتمركز هنا مناسب 0–10٪ 100٪ بحذر 10–30٪ 0٪ مرتفع أو منخفض شديد ≥ 30٪ 0٪ للعرض من نموذج الارتفاع، ولا يمنع الحفظ؛ التصنيف المعتمد من الخادم"
+  },
+  {
+   "id": "S02",
+   "pass": true,
+   "what": "no slope colouring over the whole map any more",
+   "detail": ""
+  },
+  {
+   "id": "S03",
+   "pass": true,
+   "what": "the zones lie under the outlines",
+   "detail": ""
+  },
+  {
+   "id": "S04",
+   "pass": true,
+   "what": "on the mountain: the colours are drawn in 3D, and only inside the shape",
+   "detail": "201 runs, 0 outside, 5 painted"
+  },
+  {
+   "id": "S05",
+   "pass": true,
+   "what": "on the mountain: red, «allowed, with care for the slope»; the server also classes it mountainous",
+   "detail": "MOUNTAINOUS; {\"tone\":\"risk\",\"live\":\"false\",\"verdict\":\"مسموح مع الحذر من الانحدار\",\"ok\":\"0٪\",\"care\":\"13٪\",\"risk\":\"87٪\"}"
+  },
+  {
+   "id": "S06",
+   "pass": true,
+   "what": "during the drag, before the drop, the colours change on the way",
+   "detail": "19 different mixes; verdicts risk risk risk risk risk risk risk risk risk risk risk care ok ok ok ok ok ok ok ok ok ok ok ok"
+  },
+  {
+   "id": "S07",
+   "pass": true,
+   "what": "dropped on the plain: green, «suitable»; the server also classes it flat or undulating",
+   "detail": "FLAT; {\"tone\":\"ok\",\"live\":\"false\",\"verdict\":\"مناسب للتمركز هنا\",\"ok\":\"100٪\",\"care\":\"0٪\",\"risk\":\"0٪\"}; {\"ok\":81}"
+  },
+  {
+   "id": "S08",
+   "pass": true,
+   "what": "the colour follows the ground, not a fixed value",
+   "detail": "risk → ok"
+  },
+  {
+   "id": "S09",
+   "pass": true,
+   "what": "the same colours in 2D",
+   "detail": "81 runs"
+  },
+  {
+   "id": "S10",
+   "pass": true,
+   "what": "switched off: the colours are gone and the site has its own tint back",
+   "detail": ""
+  },
+  {
+   "id": "S11",
+   "pass": true,
+   "what": "switched on again: the colours return for the shape where it is",
+   "detail": ""
+  },
+  {
+   "id": "S12",
+   "pass": true,
+   "what": "while a new boundary is being drawn, the colours show inside it before it closes",
+   "detail": "{\"tone\":\"ok\",\"live\":\"true\",\"verdict\":\"مناسب للتمركز هنا\",\"ok\":\"100٪\",\"care\":\"0٪\",\"risk\":\"0٪\"}"
+  },
+  {
+   "id": "S16",
+   "pass": true,
+   "what": "the deployment area being placed gets its colours, and the legend is about it",
+   "detail": "{\"shape\":\"primary\",\"tone\":\"risk\",\"title\":\"منطقة الانتشار الرئيسية\"} (was site)"
+  },
+  {
+   "id": "S17",
+   "pass": true,
+   "what": "the site being placed keeps its colours beside the area",
+   "detail": "{\"features\":3,\"inCurrent\":79}"
+  },
+  {
+   "id": "S13",
+   "pass": true,
+   "what": "nothing written: no request writes, database rows unchanged",
+   "detail": "0/0/13 → 0/0/13; writes 0"
+  },
+  {
+   "id": "S14",
+   "pass": true,
+   "what": "no request left the application",
+   "detail": ""
+  },
+  {
+   "id": "S15",
+   "pass": true,
+   "what": "no console errors",
+   "detail": ""
+  }
+ ],
+ "mountain": {
+  "zones": {
+   "rects": 201,
+   "outside": 0,
+   "tones": {
+    "ok": 3,
+    "care": 75,
+    "risk": 123
+   },
+   "painted": 5
+  },
+  "control": {
+   "tone": "risk",
+   "live": "false",
+   "verdict": "مسموح مع الحذر من الانحدار",
+   "ok": "0٪",
+   "care": "13٪",
+   "risk": "87٪"
+  },
+  "server": {
+   "pending": "false",
+   "cls": "MOUNTAINOUS"
+  }
+ },
+ "plain": {
+  "zones": {
+   "rects": 81,
+   "outside": 0,
+   "tones": {
+    "ok": 81
+   },
+   "painted": 1
+  },
+  "control": {
+   "tone": "ok",
+   "live": "false",
+   "verdict": "مناسب للتمركز هنا",
+   "ok": "100٪",
+   "care": "0٪",
+   "risk": "0٪"
+  },
+  "server": {
+   "pending": "false",
+   "cls": "FLAT"
+  }
+ },
+ "seen": [
+  "risk",
+  "risk",
+  "risk",
+  "risk",
+  "risk",
+  "risk",
+  "risk",
+  "risk",
+  "risk",
+  "risk",
+  "risk",
+  "care",
+  "ok",
+  "ok",
+  "ok",
+  "ok",
+  "ok",
+  "ok",
+  "ok",
+  "ok",
+  "ok",
+  "ok",
+  "ok",
+  "ok"
+ ]
+}

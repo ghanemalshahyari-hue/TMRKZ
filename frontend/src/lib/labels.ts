@@ -44,6 +44,13 @@ export const PERMISSIONS: Permission[] = [
   'ACTIVATE_TEMPORARY_EXTENSION',
   'DECIDE_EARLY_RETURN',
   'DECIDE_BEFORE_START_CANCELLATION',
+  'CREATE_INITIAL_STATIONING',
+  'CREATE_DEPLOYMENT_REQUEST',
+  'REQUEST_SITE_REGISTRATION',
+  'DECIDE_UNIT_OPERATIONS',
+  'FINAL_APPROVE_STATIONING',
+  'MANAGE_FYI_DISTRIBUTION',
+  'VIEW_OPERATIONAL_POSTURE',
 ];
 export const PERMISSION_NAMES: Record<Permission, string> = {
   VIEW: 'عرض',
@@ -64,6 +71,13 @@ export const PERMISSION_NAMES: Record<Permission, string> = {
   MANAGE_SITE_LINKS: 'إدارة روابط المواقع',
   REPLAY_STATIONING_EVENTS: 'إعادة إرسال أحداث التمركز',
   CREATE_RESTATIONING: 'طلب إعادة التمركز',
+  CREATE_INITIAL_STATIONING: 'طلب تمركز أولي',
+  CREATE_DEPLOYMENT_REQUEST: 'طلب منطقة انتشار',
+  REQUEST_SITE_REGISTRATION: 'طلب اعتماد موقع',
+  DECIDE_UNIT_OPERATIONS: 'اعتماد عمليات الوحدة',
+  FINAL_APPROVE_STATIONING: 'الاعتماد النهائي للتمركز',
+  MANAGE_FYI_DISTRIBUTION: 'تحديد وحدات العلم',
+  VIEW_OPERATIONAL_POSTURE: 'متابعة الموقف العملياتي',
   ACTIVATE_STATIONING: 'تفعيل التمركز',
   APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION: 'اعتماد استثناء مسافة الانتشار',
   DECIDE_PRE_ACTIVATION_CANCELLATION: 'قرار الإلغاء قبل التفعيل',
@@ -90,6 +104,7 @@ export const TASK_STATE: Record<TaskState, string> = {
 };
 
 export const KIND_ICON: Record<RequestKind, string> = {
+  ACCESS: 'shield',
   NEW_RESERVATION: 'building',
   EXTENSION: 'clock',
   MODIFICATION: 'building',

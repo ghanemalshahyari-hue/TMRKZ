@@ -15,7 +15,7 @@ import { anchorOf, labelPoint, partsOf } from './siteGeometry';
  * - MOVE: the current site → proposed site connection, a neutral line with its distance as information. It has no
  *   range or verdict, because re-stationing has no distance restriction.
  */
-export type RequestMapProps = { role: string; label?: string; leg?: 'primary' | 'alternative'; rotate?: number; tone?: 'ok' | 'warn' | 'bad' | 'none' };
+export type RequestMapProps = { role: string; label?: string; siteId?: string; leg?: 'primary' | 'alternative'; rotate?: number; tone?: 'ok' | 'warn' | 'bad' | 'none' };
 export type RequestMapFeature = GeoJSON.Feature<GeoJSON.Geometry, RequestMapProps>;
 
 /** The roles of the named sites and areas (one label point each). */
@@ -47,27 +47,46 @@ export function legText(d: number, l: RestationingLeg | undefined): { text: stri
 export function requestFeatures(r: RestationingRequest, checks: RestationingChecks | null, hideSite = false): GeoJSON.FeatureCollection<GeoJSON.Geometry, RequestMapProps> {
   const out: RequestMapFeature[] = [];
   const point = (lng: number, lat: number, props: RequestMapProps) => out.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] }, properties: props });
-  const named = (g: SiteGeometry, role: string, label: string) => {
+  const named = (g: SiteGeometry, role: string, label: string, siteId?: string) => {
     out.push({ type: 'Feature', geometry: g as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: { role } });
     const p = labelPoint(g);
-    point(p.lng, p.lat, { role, label });
+    point(p.lng, p.lat, { role, label, ...(siteId ? { siteId } : {}) });
   };
   const current: SiteGeometry[] = [];
   for (const s of r.currentSites) {
     // a MultiPolygon current site is drawn with every part (owner, 4 Nov 2026); a Point has no footprint to draw
     if (s.geometry?.type === 'Polygon' || s.geometry?.type === 'MultiPolygon') {
-      named(s.geometry as SiteGeometry, 'CURRENT', `${LABELS.CURRENT} · ${s.site.name}`);
+      named(s.geometry as SiteGeometry, 'CURRENT', `${LABELS.CURRENT} · ${s.site.name}`, s.site.id);
       current.push(s.geometry as SiteGeometry);
+    } else if (s.geometry?.type === 'Point') {
+      const [lng, lat] = s.geometry.coordinates as [number, number];
+      point(lng, lat, { role: 'CURRENT', label: `${LABELS.CURRENT} · ${s.site.name}`, siteId: s.site.id });
     }
   }
   const c = r.content;
+  const isShape = (g: unknown): g is SiteGeometry => !!g && ['Polygon', 'MultiPolygon'].includes((g as { type?: string }).type ?? '');
+  const siteShape = isShape(c.site?.geometry) ? (c.site!.geometry as SiteGeometry) : null;
+  // a registered site asked for: drawn as the place requested, never as a site being moved to (ADR-045)
+  const target = r.targetSite;
+  if (target?.geometry) {
+    if (isShape(target.geometry)) named(target.geometry, 'SITE', `الموقع المطلوب · ${target.name}`);
+    else if (target.geometry.type === 'Point') {
+      const [lng, lat] = target.geometry.coordinates as [number, number];
+      point(lng, lat, { role: 'SITE', label: `الموقع المطلوب · ${target.name}` });
+    }
+  }
   // the proposed site as submitted: one Polygon or one MultiPolygon with every part
-  if (c.site?.geometry && !hideSite) named(c.site.geometry, 'SITE', LABELS.SITE);
+  const siteLabel = r.purpose === 'SITE_REGISTRATION' ? 'الموقع المطلوب اعتماده' : LABELS.SITE;
+  if (siteShape && !hideSite && r.purpose !== 'DEPLOYMENT_AREAS') named(siteShape, 'SITE', siteLabel);
+  else if (c.site?.geometry && !siteShape && !hideSite) {
+    const [lng, lat] = (c.site.geometry as unknown as { coordinates: [number, number] }).coordinates;
+    point(lng, lat, { role: 'SITE', label: siteLabel });
+  }
   if (c.primary) named(c.primary as GeoPolygon, 'PRIMARY', LABELS.PRIMARY);
   if (c.alternative) named(c.alternative as GeoPolygon, 'ALTERNATIVE', LABELS.ALTERNATIVE);
   // the re-stationing move, for information: current site → proposed site, its distance, an arrowhead; no rule
-  if (c.site?.geometry) {
-    const to = centre(c.site.geometry);
+  if (siteShape && (r.purpose ?? 'RESTATIONING') === 'RESTATIONING') {
+    const to = centre(siteShape);
     for (const g of current) {
       const from = centre(g);
       const d = distanceM(from, to);
@@ -94,7 +113,7 @@ export function requestFeatures(r: RestationingRequest, checks: RestationingChec
     const head = destination(a, bearing(a, b), d * 0.9);
     point(head.lng, head.lat, { role: 'LEG_HEAD', leg, rotate: bearing(a, b) });
   };
-  legLine(c.site?.geometry, c.primary as SiteGeometry | null, 'primary');
+  legLine(siteShape ?? (isShape(target?.geometry) ? (target!.geometry as unknown as SiteGeometry) : null), c.primary as SiteGeometry | null, 'primary');
   legLine(c.primary as SiteGeometry | null, c.alternative as SiteGeometry | null, 'alternative');
   return { type: 'FeatureCollection', features: out };
 }

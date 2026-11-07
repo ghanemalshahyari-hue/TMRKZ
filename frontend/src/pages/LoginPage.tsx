@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, api } from '../api/client';
 import type { AuthStatus, Me } from '../api/types';
+import { ThemeToggle } from '../components/ThemeToggle';
 import '../styles/signin.css';
 
 /** Messages for the error the server put in the address after a refused automatic sign-in (never a fallback). */
@@ -138,6 +139,7 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
   return (
     <div className="tm" dir="rtl">
       <section className="tm-shell">
+        <ThemeToggle />
         <div className="tm-backdrop" aria-hidden="true" />
         <main className="tm-main">
           <div className="tm-card">

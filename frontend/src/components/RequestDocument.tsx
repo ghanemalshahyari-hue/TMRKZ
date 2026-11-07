@@ -218,6 +218,18 @@ export function RequestDocument({
           <h3>المراجعات المطلوبة</h3>
           <Timeline stages={r.stages} />
         </section>
+        {!!r.fyi?.length && (
+          <section data-testid="fyi-list">
+            <h3>للعلم</h3>
+            <ul className="test-list">
+              {r.fyi.map((f, i) => (
+                <li key={i}>
+                  {f.person} · {f.unit} · {f.firstReadAt ? 'اطّلع في ' + fullDate(f.firstReadAt) : 'لم يطّلع بعد'}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section>
           <h3>سجل الطلب</h3>
           <div className="timeline">

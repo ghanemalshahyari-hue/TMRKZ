@@ -38,7 +38,95 @@ public record StationingPolicy(
         DistanceException exception,
         CrossBranch crossBranch,
         Routing routing,
-        DeploymentAreaDefault deploymentAreaDefault) {
+        DeploymentAreaDefault deploymentAreaDefault,
+        SlopeDisplay slopeDisplay,
+        TerrainExtra footprintTerrainExtra,
+        ApprovalStages approvalStages) {
+
+    /**
+     * The stages after the hierarchy (ADR-045), an administrator's choice and never a person or level in code. Null (every
+     * version published before them): the configured final level closes the route, as before.
+     *
+     * @param unitOperations       a separate «اعتماد عمليات الوحدة» stage after the hierarchy
+     * @param finalByPermission    a separate «الاعتماد النهائي» stage; the hierarchy's final level then only closes the hierarchy
+     * @param fyiBeforeActivation  «تحديد وحدات العلم» must be recorded before «تفعيل»
+     */
+    public record ApprovalStages(boolean unitOperations, boolean finalByPermission, boolean fyiBeforeActivation) {
+    }
+
+    /** A version without configured stages. */
+    public StationingPolicy(double maxFootprintAreaM2, DeploymentRequirement deploymentRequirement, Leg primary, Leg alternative,
+            SlopeClassification terrainSlopeClassification, Map<String, Double> terrainAllowancesM, List<String> terrainClassPriority,
+            TerrainAppliesTo terrainAppliesTo, DistanceException exception, CrossBranch crossBranch, Routing routing,
+            DeploymentAreaDefault deploymentAreaDefault, SlopeDisplay slopeDisplay, TerrainExtra footprintTerrainExtra) {
+        this(maxFootprintAreaM2, deploymentRequirement, primary, alternative, terrainSlopeClassification, terrainAllowancesM,
+                terrainClassPriority, terrainAppliesTo, exception, crossBranch, routing, deploymentAreaDefault, slopeDisplay,
+                footprintTerrainExtra, null);
+    }
+
+    /** A version without the footprint's terrain addition (versions stored before it read it as null). */
+    public StationingPolicy(double maxFootprintAreaM2, DeploymentRequirement deploymentRequirement, Leg primary, Leg alternative,
+            SlopeClassification terrainSlopeClassification, Map<String, Double> terrainAllowancesM, List<String> terrainClassPriority,
+            TerrainAppliesTo terrainAppliesTo, DistanceException exception, CrossBranch crossBranch, Routing routing,
+            DeploymentAreaDefault deploymentAreaDefault, SlopeDisplay slopeDisplay) {
+        this(maxFootprintAreaM2, deploymentRequirement, primary, alternative, terrainSlopeClassification, terrainAllowancesM,
+                terrainClassPriority, terrainAppliesTo, exception, crossBranch, routing, deploymentAreaDefault, slopeDisplay, null);
+    }
+
+    /**
+     * What ground that is not flat adds to a maximum (owner, 6 Nov 2026; ADR-040): one value for every class but the first,
+     * an amount (metres, or square metres for the footprint) or a percentage of the maximum. It only ever adds. It is
+     * decided by the ground of the place the shape is going to, never of where the unit is now.
+     */
+    public record TerrainExtra(Kind kind, double value) {
+        public enum Kind { ABSOLUTE, PERCENT }
+
+        public double of(double base) {
+            return kind == Kind.PERCENT ? base * value / 100 : value;
+        }
+    }
+
+    /** Whether a class is the flat one: the first band of the classification, the one that starts from 0 %. */
+    public boolean isFlat(String classCode) {
+        var cs = terrainSlopeClassification.classes();
+        return !cs.isEmpty() && cs.get(0).code().equals(classCode);
+    }
+
+    /**
+     * What the ground adds to a leg's maximum. A leg with its own {@link TerrainExtra} uses it; a version published before
+     * it keeps its allowance per class, so a request stays on the rules of its version.
+     */
+    public double terrainAddM(Leg leg, TerrainClass controlling) {
+        if (leg.terrainExtra() == null) {
+            return controlling.allowanceM();
+        }
+        return isFlat(controlling.code()) ? 0 : leg.terrainExtra().of(leg.maxM());
+    }
+
+    /** The largest footprint on ground of this class (null: not known, so the base maximum). */
+    public double maxFootprintOn(String classCode) {
+        if (footprintTerrainExtra == null || classCode == null || isFlat(classCode)) {
+            return maxFootprintAreaM2;
+        }
+        return maxFootprintAreaM2 + footprintTerrainExtra.of(maxFootprintAreaM2);
+    }
+
+    /** A version without display limits (versions stored before them read {@link #slopeDisplay} as null). */
+    public StationingPolicy(double maxFootprintAreaM2, DeploymentRequirement deploymentRequirement, Leg primary, Leg alternative,
+            SlopeClassification terrainSlopeClassification, Map<String, Double> terrainAllowancesM, List<String> terrainClassPriority,
+            TerrainAppliesTo terrainAppliesTo, DistanceException exception, CrossBranch crossBranch, Routing routing,
+            DeploymentAreaDefault deploymentAreaDefault) {
+        this(maxFootprintAreaM2, deploymentRequirement, primary, alternative, terrainSlopeClassification, terrainAllowancesM,
+                terrainClassPriority, terrainAppliesTo, exception, crossBranch, routing, deploymentAreaDefault, null);
+    }
+
+    /**
+     * The slope colours shown inside a shape on the map (owner, 6 Nov 2026; ADR-039): green below {@code greenBelowPct},
+     * red from {@code redFromPct}, orange between. DISPLAY ONLY: no rule reads them, unlike the slope classes. Null: the
+     * page's initial limits.
+     */
+    public record SlopeDisplay(double greenBelowPct, double redFromPct) {
+    }
 
     /** `stationing_areas_requirement`: both deployment areas, or none or both. */
     public enum DeploymentRequirement { REQUIRED, OPTIONAL }
@@ -69,7 +157,10 @@ public record StationingPolicy(
     }
 
     /** One deployment relation: stationing site → primary, primary → alternative (centre to centre, O-04). */
-    public record Leg(double minM, double maxM, boolean terrainApplies) {
+    public record Leg(double minM, double maxM, boolean terrainApplies, TerrainExtra terrainExtra) {
+        public Leg(double minM, double maxM, boolean terrainApplies) {
+            this(minM, maxM, terrainApplies, null);
+        }
     }
 
     /** A terrain class as the rules use it: code and label from the classification, its configured allowance. */
@@ -127,9 +218,22 @@ public record StationingPolicy(
             }
         }
         Set<String> codes = classificationProblems(out);
+        for (var leg : List.of(primary, alternative)) {
+            if (leg.terrainApplies() && leg.terrainExtra() != null) {
+                extraProblems(leg.terrainExtra(), out);
+            }
+        }
+        if (footprintTerrainExtra != null) {
+            extraProblems(footprintTerrainExtra, out);
+        }
+        // the allowance per class of earlier versions is needed only by a leg that has no value of its own
+        boolean perClass = List.of(primary, alternative).stream().anyMatch(l -> l.terrainApplies() && l.terrainExtra() == null);
         for (String c : codes) {
             Double a = terrainAllowancesM.get(c);
             if (a == null) {
+                if (!perClass) {
+                    continue;
+                }
                 out.add("لم تُهيأ إضافة فئة الأرض «" + c + "» (القيمة يحددها المسؤول، والصفر قيمة صريحة)");
             } else if (a < 0) {
                 out.add("إضافة فئة الأرض لا تكون سالبة: " + c);
@@ -170,6 +274,7 @@ public record StationingPolicy(
         if (routing.levels().stream().noneMatch(RoutingLevel::finalStage)) {
             out.add("لا مستوى نهائي في إعداد المسار");
         }
+        slopeDisplayProblems(out);
         if (deploymentAreaDefault != null) { // absent is valid: not configured
             if (deploymentAreaDefault.shape() == null) {
                 out.add("شكل المنطقة الابتدائية لمنطقة الانتشار مطلوب (مربع أو دائرة)");
@@ -183,6 +288,23 @@ public record StationingPolicy(
             }
         }
         return out;
+    }
+
+    private static void extraProblems(TerrainExtra e, List<String> out) {
+        if (e.kind() == null || !(e.value() > 0)) {
+            out.add("قيمة إضافة طبيعة الأرض يجب أن تكون أكبر من صفر");
+        }
+    }
+
+    private void slopeDisplayProblems(List<String> out) {
+        if (slopeDisplay == null) {
+            return;
+        }
+        double g = slopeDisplay.greenBelowPct();
+        double r = slopeDisplay.redFromPct();
+        if (!(g > 0) || !(r >= g) || r > MAX_ENCODED_SLOPE_PCT) {
+            out.add("حدود ألوان الانحدار غير صالحة: الأخضر أقل من حد أكبر من 0، والأحمر يبدأ من حد لا يقل عنه ولا يتجاوز " + MAX_ENCODED_SLOPE_PCT + "٪");
+        }
     }
 
     /** Validates `terrain_slope_classification`; returns its class codes. */

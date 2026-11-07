@@ -49,6 +49,40 @@ class AccessAcceptanceIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("The requests list with many requests: pages, filters, order and status counts, within the scope")
+    void requestsListAtScale() {
+        Api req = login("req");
+        for (int i = 0; i < 3; i++) {
+            req.draft(finalType, "LIST", orgA, List.of(resA), day("2028-05-01"), day("2028-05-03"), Map.of("reason", "مبرر اختبار كافٍ لطلب رقم " + i));
+        }
+        long drafts = req.get("/requests/counts").body().path("DRAFT").asLong();
+        assertThat(drafts).isGreaterThanOrEqualTo(3);
+        JsonNode one = req.get("/requests?status=DRAFT&size=1&page=0").body();
+        JsonNode two = req.get("/requests?status=DRAFT&size=1&page=1").body();
+        assertThat(one.path("total").asLong()).isEqualTo(drafts);
+        assertThat(one.path("items")).hasSize(1);
+        assertThat(two.path("items").get(0).path("id").asText()).isNotEqualTo(one.path("items").get(0).path("id").asText());
+        // order: named columns only; anything else keeps the default and reaches no statement
+        JsonNode asc = req.get("/requests?status=DRAFT&sort=number&dir=asc&size=200").body().path("items");
+        JsonNode desc = req.get("/requests?status=DRAFT&sort=number&dir=desc&size=200").body().path("items");
+        assertThat(asc.get(0).path("number").asText()).isLessThan(desc.get(0).path("number").asText());
+        assertThat(req.get("/requests?sort=r.id;drop%20table%20request&size=1").status()).isEqualTo(200);
+        // filters narrow the list and its counts alike
+        String type = asc.get(0).path("type").path("code").asText();
+        assertThat(req.get("/requests?type=" + type + "&status=DRAFT").body().path("total").asLong()).isEqualTo(req.get("/requests/counts?type=" + type).body().path("DRAFT").asLong());
+        assertThat(req.get("/requests?type=NO-SUCH-TYPE").body().path("total").asLong()).isZero();
+        assertThat(req.get("/requests?mine=true&status=DRAFT").body().path("total").asLong()).isGreaterThanOrEqualTo(3);
+        assertThat(req.get("/requests?to=1999-01-01T00:00:00Z").body().path("total").asLong()).isZero();
+        assertThat(req.get("/requests?from=2999-01-01T00:00:00Z&status=DRAFT").body().path("total").asLong()).isZero();
+        assertThat(req.get("/requests?from=2028-04-30T00:00:00Z&to=2028-05-02T00:00:00Z&status=DRAFT").body().path("total").asLong()).isEqualTo(drafts);
+        assertThat(req.get("/requests/counts?to=not-a-date").status()).isEqualTo(400);
+        // the counts stay within the scope, like the list
+        Api out = login("outsider");
+        assertThat(out.get("/requests/counts").body().path("DRAFT").asLong()).isEqualTo(out.get("/requests?status=DRAFT").body().path("total").asLong());
+        assertThat(out.get("/requests/counts").body().path("DRAFT").asLong()).isLessThan(drafts);
+    }
+
+    @Test
     @DisplayName("AT-19: a user outside the scope cannot read the request, its attachments or its counts by id")
     void outOfScope() {
         Api req = login("req");

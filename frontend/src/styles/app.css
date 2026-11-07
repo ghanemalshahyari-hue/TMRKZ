@@ -116,3 +116,12 @@
 .document-verification.good{color:var(--green)}
 .document-verification.bad{color:var(--red)}
 
+
+/* «طلب جديد» (ADR-045) */
+.hub-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.hub-card h3 { margin: 0 0 4px; }
+.hub-card.off { opacity: .72; }
+.hub-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.inline-search input { min-width: 180px; }
+tr.clickable { cursor: pointer; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

@@ -131,7 +131,7 @@ public class AccessService {
         Map<String, Object> row = jdbc.sql("select id, created_by, status, owner_org_id from request where id = :id")
                 .param("id", requestId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         return scopes(List.of(requestId)).getOrDefault(requestId, new RequestScope(requestId, (UUID) row.get("created_by"),
-                (String) row.get("status"), (UUID) row.get("owner_org_id"), Set.of(), Set.of(), Set.of(), Set.of(), Set.of()));
+                (String) row.get("status"), (UUID) row.get("owner_org_id"), Set.of(), Set.of(), Set.of(), Set.of(), Set.of(), Map.of()));
     }
 
     /** Batch-loads request scopes (owner, participants, info recipients, resource sites and their administrators). */
@@ -168,13 +168,17 @@ public class AccessService {
                     }
                     return null;
                 }).list();
+        Map<UUID, Map<UUID, UUID>> fyi = new HashMap<>();
+        jdbc.sql("select request_id, person_id, organization_id from request_fyi where request_id = any(string_to_array(:ids, ',')::uuid[])")
+                .param("ids", ids).query((rs, n) -> fyi.computeIfAbsent(Db.uuid(rs, "request_id"), k -> new HashMap<>())
+                        .put(Db.uuid(rs, "person_id"), Db.uuid(rs, "organization_id"))).list();
         jdbc.sql("select id, created_by, status, owner_org_id from request where id = any(string_to_array(:ids, ',')::uuid[])")
                 .param("ids", ids).query((rs, n) -> {
                     UUID rid = Db.uuid(rs, "id");
                     out.put(rid, new RequestScope(rid, Db.uuid(rs, "created_by"), rs.getString("status"),
                             Db.uuid(rs, "owner_org_id"), participants.getOrDefault(rid, Set.of()),
                             info.getOrDefault(rid, Set.of()), resourceOrgs.getOrDefault(rid, Set.of()),
-                            sites.getOrDefault(rid, Set.of()), resources.getOrDefault(rid, Set.of())));
+                            sites.getOrDefault(rid, Set.of()), resources.getOrDefault(rid, Set.of()), fyi.getOrDefault(rid, Map.of())));
                     return null;
                 }).list();
         return out;
@@ -200,7 +204,7 @@ public class AccessService {
         Set<UUID> infoOrgs = new HashSet<>();
         int i = 0;
         for (Grant g : ctx.grants()) {
-            if (!g.viewer()) {
+            if (!g.viewer() || g.fyiOnly()) {
                 continue;
             }
             if (g.orgId() != null) {
@@ -229,6 +233,7 @@ public class AccessService {
             }
         }
         params.put("scope_info", Db.ids(infoOrgs));
+        ors.add("(r.status in ('APPROVED','CLOSED') and exists (select 1 from request_fyi f where f.request_id = r.id and f.person_id = :scope_me))");
         ors.add("""
                 (r.status in ('APPROVED','CLOSED') and exists (select 1 from request_participant ip
                   where ip.request_id = r.id and ip.relation = 'INFO'

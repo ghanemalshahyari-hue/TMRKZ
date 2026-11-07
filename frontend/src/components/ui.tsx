@@ -20,11 +20,11 @@ export function Icon({ name }: { name: string }) {
   );
 }
 
-export function Heading({ en, title, description, actions }: { en: string; title: string; description: string; actions?: ReactNode }) {
+export function Heading({ en, title, description, actions }: { en?: string; title: string; description: string; actions?: ReactNode }) {
   return (
     <div className="page-heading">
       <div>
-        <span className="eyebrow">{en}</span>
+        {en && <span className="eyebrow">{en}</span>}
         <h1>{title}</h1>
         <p>{description}</p>
       </div>

@@ -465,6 +465,10 @@ public class RequestService {
         }
         String processDefinitionId = workflows.processDefinitionId(wfVersion);
         WorkflowDefinition def = workflows.definition(wfVersion);
+        var noApprover = workflows.scopeProblem(def, (UUID) row.get("owner_org_id"), cleanValues, facts);
+        if (noApprover.isPresent()) {
+            throw ApiException.validation(noApprover.get());
+        }
         int revision = ((Number) row.get("current_revision")).intValue() + 1;
         Instant now = clock.instant();
 
@@ -546,6 +550,20 @@ public class RequestService {
                 Map.of("formVersion", forms.versionNumber(formVersionId), "workflowVersion", workflows.versionNumber(wfVersion),
                         "sha256", sha), in.resubmissionReason(), revision);
         outbox.enqueue("REQUEST", id.toString(), "REQUEST_SUBMITTED", Map.of("requestId", id.toString(), "revision", revision));
+        // a chart can reach a rejected end by its questions alone, before anyone decides
+        if (pi.isEnded() || runtime.createProcessInstanceQuery().processInstanceId(pi.getId()).count() == 0) {
+            var flowRejected = jdbc.sql("select coalesce(note, '') from request_flow_end where request_id = :r and revision = :v")
+                    .param("r", id).param("v", revision).query(String.class).optional();
+            if (flowRejected.isPresent()) {
+                jdbc.sql("""
+                        update request set status = 'REJECTED', last_note = :note, decided_at = :now, updated_at = :now, version = version + 1,
+                               process_instance_id = null where id = :id""")
+                        .param("note", flowRejected.get()).param("now", Db.ts(now)).param("id", id).update();
+                audit.record(ctx.actor(), AuditService.Capacity.NONE, "REQUEST_REJECTED", "REQUEST", id.toString(), (String) row.get("number"),
+                        Map.of("end", flowRejected.get()), null, revision);
+                outbox.enqueue("REQUEST", id.toString(), "REQUEST_REJECTED", Map.of("requestId", id.toString(), "revision", revision));
+            }
+        }
     }
 
     static Map<String, Object> facts(String typeCode, int resourceCount, Instant start, Instant end, int participants) {

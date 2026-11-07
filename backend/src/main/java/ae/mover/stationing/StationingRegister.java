@@ -166,6 +166,9 @@ public class StationingRegister {
         try {
             if (open != null) {
                 jdbc.sql("""
+                        update deployment_area set state = 'RETIRED', valid_to = greatest(:t, valid_from) where stationing_id = :id and state = 'ACTIVE'""")
+                        .param("t", Db.ts(effective)).param("id", open.id()).update();
+                jdbc.sql("""
                         update org_stationing set valid_to = :t, end_reason = 'CORRECTED', ended_by = :by, ended_at = :now
                          where id = :id and valid_to is null""")
                         .param("t", Db.ts(effective)).param("by", ctx.personId()).param("now", Db.ts(now)).param("id", open.id()).update();

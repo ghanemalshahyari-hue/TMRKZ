@@ -1,4 +1,4 @@
-// Visual rule editor in Microsoft Edge against the acceptance environment (PA-21, owner brief §9).
+// Visual rule editor in a real browser against the acceptance environment (PA-21, owner brief §9).
 // Rules are authored by clicks only; the API is used for setup and to cross-check what the server stored and enforces
 // (reported separately). The environment is restored at the end: the form loses the test rules in a new version and
 // the workflow draft returns to the published stages.
@@ -127,31 +127,88 @@ try {
     return 'طلب 45 يوماً دون «' + label + '» ← رفض 400 من الخادم';
   });
 
-  await step('RULES-03', 'A stage made conditional by clicks; the simulation skips or runs it by sample values', async () => {
+  await step('RULES-03', 'A question on the flow chart built by clicks; trying it takes yes or no by sample values', async () => {
+    // from the published flow, whatever an interrupted run left in the draft
+    const item = (await admin.get('/workflows')).body.find((w) => w.requestType.code === 'ADMIN_TRANSFER');
+    const published = (await admin.get('/workflow-versions/' + item.published.id)).body;
+    await admin.post(`/workflows/${item.id}/drafts`, { definition: published.definition });
     await page.goto(base + '#workflow');
-    await page.getByLabel('نوع الطلب المرتبط').selectOption({ label: TYPE });
-    const stage = page.locator('.flow-node').first();
-    await stage.getByRole('button', { name: /المرحلة شرطية|شرط المرحلة/ }).click();
-    const editor = page.getByRole('region', { name: 'تُنفذ المرحلة عندما' });
-    if (await editor.getByRole('button', { name: 'إزالة الشرط' }).count()) await editor.getByRole('button', { name: 'إزالة الشرط' }).click();
-    await addCondition(editor, 'fact:resourceCount', 'gt', 1);
-    await page.getByRole('button', { name: 'تطبيق على المسودة' }).click();
-    await stage.locator('.stage-condition', { hasText: '«عدد الموارد المطلوبة» أكبر من «1»' }).waitFor();
-    const count = page.locator('.sim-inputs').getByLabel('عدد الموارد المطلوبة');
-    await count.fill('1');
-    await page.getByRole('button', { name: 'محاكاة الأثر' }).click();
-    await page.locator('.test-list li', { hasText: 'تُتخطى' }).first().waitFor();
-    await count.fill('2');
-    await page.getByRole('button', { name: 'محاكاة الأثر' }).click();
-    await page.waitForFunction(() => ![...document.querySelectorAll('.test-list li')].some((li) => li.textContent.includes('تُتخطى')));
+    await page.reload();
+    await page.waitForSelector('[data-testid=flow-studio] .react-flow__node', { timeout: 30000 });
+    await page.selectOption('select[aria-label="نوع الطلب"]', 'ADMIN_TRANSFER');
+    await page.waitForTimeout(1200);
+
+    // the published chart's last approval stays; the rest goes, on the screen only, to leave room for the question
+    await page.getByRole('button', { name: 'ترتيب البطاقات' }).click();
+    await page.locator('.react-flow__controls-fitview').click();
+    await page.waitForTimeout(600);
+    const approvals = await page.locator('[data-testid=node-approval]').evaluateAll((l) => l.map((e) => e.getAttribute('data-node')));
+    for (const id of approvals.slice(0, -1)) {
+      await page.locator(`.react-flow__node[data-id="${id}"]`).click();
+      await page.keyboard.press('Delete');
+      await page.waitForTimeout(150);
+    }
+    const finalId = approvals.at(-1);
+    const canvas = page.locator('.fs-canvas');
+    const size = await canvas.boundingBox();
+    await page.locator('[data-testid=tile-decision]').dragTo(canvas, { targetPosition: { x: size.width * 0.2, y: size.height * 0.2 } });
+    await page.locator('[data-testid=tile-approval]').dragTo(canvas, { targetPosition: { x: size.width * 0.8, y: size.height * 0.2 } });
+    await page.getByRole('button', { name: 'ترتيب البطاقات' }).click();
+    await page.locator('.react-flow__controls-fitview').click();
+    await page.waitForTimeout(600);
+    const ask = await page.locator('[data-testid=node-decision]').getAttribute('data-node');
+    const start = await page.locator('[data-testid=node-start]').getAttribute('data-node');
+    const extra = (await page.locator('[data-testid=node-approval]').evaluateAll((l) => l.map((e) => e.getAttribute('data-node')))).find((i) => i !== finalId);
+
+    await page.locator(`.react-flow__node[data-id="${extra}"]`).click();
+    await page.getByLabel('اسم الخطوة').fill('موافقة إضافية');
+    if (!(await page.locator('[data-testid=inspector] select option[value="ORG_MANAGER"]').count())) await page.getByRole('button', { name: /جهة موافقة/ }).click();
+    await page.locator('[data-testid=inspector] select').filter({ has: page.locator('option[value="ORG_MANAGER"]') }).first().selectOption('ORG_MANAGER');
+
+    await page.locator(`.react-flow__node[data-id="${ask}"]`).click();
+    await addCondition(page.getByRole('region', { name: 'الشرط' }), 'fact:resourceCount', 'gt', 1);
+    await page.locator('.fs-sentence', { hasText: '«عدد الموارد المطلوبة» أكبر من «1»' }).waitFor();
+
+    const wire = async (from, cls, to) => {
+      const a = await page.locator(`.react-flow__node[data-id="${from}"] .react-flow__handle${cls}`).boundingBox();
+      const b = await page.locator(`.react-flow__node[data-id="${to}"] .react-flow__handle.target`).boundingBox();
+      await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 12 });
+      await page.waitForTimeout(100);
+      await page.mouse.up();
+      await page.waitForTimeout(250);
+    };
+    await wire(start, '.source', ask);
+    await wire(ask, '.h-yes', extra);
+    await wire(ask, '.h-no', finalId);
+    await wire(extra, '.h-approved', finalId);
+
+    await page.getByTestId('try').click();
+    await page.waitForSelector('[data-testid=try-panel]');
+    await page.waitForTimeout(1000);
+    if (!(await page.locator('.fs-try .fs-org-chosen').count())) {
+      await page.getByLabel('الوحدة مقدمة الطلب').fill('الخدمات');
+      await page.waitForSelector('.fs-try .fs-org-picker li button', { timeout: 8000 });
+      await page.locator('.fs-try .fs-org-picker li button').first().click();
+    }
+    const route = async (resources) => {
+      await page.locator('.fs-try-facts label', { hasText: 'عدد الموارد' }).locator('input').fill(String(resources));
+      await page.getByRole('button', { name: 'تشغيل التجربة' }).click();
+      await page.waitForSelector('[data-testid=route]', { timeout: 15000 });
+      await page.waitForTimeout(800);
+      return (await page.locator('.fs-route').innerText()).replace(/\s+/g, ' ');
+    };
+    const one = await route(1);
+    expect(!one.includes('موافقة إضافية'), 'one resource should pass the extra approval: ' + one.slice(0, 200));
+    const two = await route(2);
+    expect(two.includes('موافقة إضافية'), 'two resources should reach the extra approval: ' + two.slice(0, 200));
     await page.screenshot({ path: shot('rules-03-stage-condition.png'), fullPage: true });
-    // leave the server draft equal to the published stages
-    await stage.getByRole('button', { name: 'تعديل شرط المرحلة' }).click();
-    await page.getByRole('region', { name: 'تُنفذ المرحلة عندما' }).getByRole('button', { name: 'إزالة الشرط' }).click();
-    await page.getByRole('button', { name: 'تطبيق على المسودة' }).click();
-    await page.getByRole('button', { name: 'محاكاة الأثر' }).click();
-    await page.locator('.test-list li').first().waitFor();
-    return 'موارد 1 ← المرحلة الأولى تُتخطى · موارد 2 ← تُنفذ';
+
+    // leave the server draft equal to the published flow
+    const restored = await admin.post(`/workflows/${item.id}/drafts`, { definition: published.definition });
+    expect(restored.status === 200, 'draft not restored: ' + restored.status);
+    return 'موارد 1 ← لا، بلا الموافقة الإضافية · موارد 2 ← نعم، معها';
   });
 
   await step('RULES-04', 'Clean-up through the interface: rules removed and published as a new version', async () => {

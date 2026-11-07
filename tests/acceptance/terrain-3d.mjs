@@ -43,7 +43,7 @@ const sql = (q) =>
 const rowCounts = () => sql("select (select count(*) from restationing_request) || '/' || (select count(*) from restationing_revision) || '/' || (select count(*) from org_stationing)");
 
 // headless Edge draws with the machine's GPU (ANGLE Direct3D 11); a software renderer would measure nothing useful
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch({ ...(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH } : { channel: 'msedge' }), headless: true });
 
 async function signIn(user) {
   const ctx = await browser.newContext({ viewport: SIZE });

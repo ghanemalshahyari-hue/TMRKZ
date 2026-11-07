@@ -69,11 +69,19 @@ export function previewLeg(kind: 'primary' | 'alternative', distance: number | n
       tied: a.tied,
       resolved: a.resolved,
       priority: [],
-      allowanceM: r.terrainApplies ? a.allowanceM : 0,
+      allowanceM: Math.max(0, r.effectiveMaxM - r.baseMaxM),
       dataset: a.datasetCode + ' ' + a.datasetVersion,
       surfaceModel: a.surfaceModel,
     },
   };
+}
+
+/** The largest footprint on ground of this class, as StationingPolicy.maxFootprintOn: more only where the ground is not flat. */
+export function maxFootprintOn(policy: Pick<StationingPolicyValues, 'maxFootprintAreaM2' | 'footprintTerrainExtra' | 'terrainSlopeClassification'>, classCode: string | null | undefined): number {
+  const base = policy.maxFootprintAreaM2;
+  const e = policy.footprintTerrainExtra;
+  if (!e || !classCode || policy.terrainSlopeClassification.classes[0]?.code === classCode) return base;
+  return base + (e.kind === 'PERCENT' ? (base * e.value) / 100 : e.value);
 }
 
 const km = (m: number) => (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 2 });

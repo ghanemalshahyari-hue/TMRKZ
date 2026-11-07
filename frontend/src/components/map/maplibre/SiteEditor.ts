@@ -94,6 +94,7 @@ export class SiteEditor {
   private readonly map: MlMap;
   private readonly onChange: (live: SiteLive, final: boolean) => void;
   private readonly maxAreaM2: () => number | null;
+  private readonly onDrawShape: ((shape: LatLng[] | null) => void) | null;
   private type: SiteGeometry['type'] = 'Polygon';
   private parts: Part[] = [];
   private mode: 'move' | 'vertices' = 'move';
@@ -125,10 +126,12 @@ export class SiteEditor {
   /** The (ring, index) of each vertex handle shown in vertex mode, by handle number. */
   private handles: { ring: number; index: number }[] = [];
 
-  constructor(map: MlMap, options: { onChange: (live: SiteLive, final: boolean) => void; maxAreaM2: () => number | null }) {
+  /** {@code onDrawShape}: the boundary being drawn on every pointer move, closed through the pointer once it encloses ground (null: not yet). */
+  constructor(map: MlMap, options: { onChange: (live: SiteLive, final: boolean) => void; maxAreaM2: () => number | null; onDrawShape?: (shape: LatLng[] | null) => void }) {
     this.map = map;
     this.onChange = options.onChange;
     this.maxAreaM2 = options.maxAreaM2;
+    this.onDrawShape = options.onDrawShape ?? null;
     map.addSource('rs-edit', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addSource('rs-edit-link', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     addOverlayLayer(map, {
@@ -516,6 +519,8 @@ export class SiteEditor {
       (el, i) => this.text(el.firstElementChild as HTMLElement, sideLabel(sides[i])),
     );
     if (emit) this.emit(false, r);
+    const open = this.pointer ? [...v, this.pointer] : v;
+    this.onDrawShape?.(open.length >= 3 ? open : null);
   }
 
   /** A new editing session (a copy, a drawn shape or a saved draft): history starts here; nothing → nothing to edit. */

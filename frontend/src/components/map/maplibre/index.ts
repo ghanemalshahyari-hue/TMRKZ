@@ -20,5 +20,6 @@ export {
 export { ensureOfflineMapSetup } from './setup';
 export { BASEMAP_URL, HILLSHADE, MAP_DATA, MAP_FONT_URL, MAP_MANIFEST_URL } from './mapPackage';
 export { drawGlyphsLeftToRight } from './glyphDirection';
-export { DemSampler, EXAGGERATION, PITCH_3D, frame, has3d, place3dLayers, setView3d, showSlope, type MapView } from './terrain3d';
+export { DemSampler, EXAGGERATION, PITCH_3D, frame, has3d, place3dLayers, setView3d, type MapView } from './terrain3d';
+export { SlopeInside, type SlopeResult, type SlopeShape } from './slopeInside';
 export { TERRAIN_3D, installedPackage, installedTerrain3d } from './mapPackage';

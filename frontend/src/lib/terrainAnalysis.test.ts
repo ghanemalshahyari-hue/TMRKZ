@@ -1,3 +1,4 @@
+import { maxFootprintOn } from './terrainAnalysis';
 import { describe, expect, it } from 'vitest';
 import type { GeoPolygon, TerrainAssessment } from '../api/types';
 import { connectors, discrepancy, previewLeg, ruleLines, serverLegFor, VERDICT } from './terrainAnalysis';
@@ -80,5 +81,19 @@ describe('deployment leg preview (the server decides on save)', () => {
     expect(serverLegFor('primary', { legs: [server] }, 'a', 'b')).toBeNull();
     expect(discrepancy(previewLeg('primary', 9400, assessment(), policy), server)).toBe('النطاق الفعّال يختلف عن فحص الخادم');
     expect(discrepancy(previewLeg('primary', 9400, assessment(), policy), { ...server, effectiveMaxM: 10000 })).toBeNull();
+  });
+});
+
+describe('the footprint on ground that is not flat', () => {
+  const classes = [{ code: 'FLAT', label: 'مستوٍ', fromPct: 0, toPct: 2 }, { code: 'HILLY', label: 'تلال', fromPct: 2, toPct: null }];
+  const policy = (footprintTerrainExtra: { kind: 'ABSOLUTE' | 'PERCENT'; value: number } | null) =>
+    ({ maxFootprintAreaM2: 2_000_000, footprintTerrainExtra, terrainSlopeClassification: { datasetCode: '', datasetVersion: '', classes } });
+
+  it('adds only where the ground is not flat, an amount or a percentage', () => {
+    expect(maxFootprintOn(policy({ kind: 'PERCENT', value: 20 }), 'HILLY')).toBe(2_400_000);
+    expect(maxFootprintOn(policy({ kind: 'ABSOLUTE', value: 500_000 }), 'HILLY')).toBe(2_500_000);
+    expect(maxFootprintOn(policy({ kind: 'PERCENT', value: 20 }), 'FLAT')).toBe(2_000_000);
+    expect(maxFootprintOn(policy({ kind: 'PERCENT', value: 20 }), null)).toBe(2_000_000);
+    expect(maxFootprintOn(policy(null), 'HILLY')).toBe(2_000_000);
   });
 });
