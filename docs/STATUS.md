@@ -679,7 +679,7 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Limits:** true 3D is not accepted because the installed package is `DEV-UNVERIFIED-local-rebuild-not-a-release`. The real removal (`cleanup.mjs`) has run only as a dry run. `stationing-next` and `persona-buttons` ran on `d07acce`, not on the final `fdfd61b`; `access-requests` and `scope-approvals` were not run on :8088.
 - **Not production-ready.** Owner visual review is pending.
 
-## Final acceptance on the one application (2026-11-07, ADR-047; code at `a4304c1`, not pushed)
+## Final acceptance on the one application (2026-11-07, ADR-047; code at `a4304c1`)
 
 - **Results:** every suite ran on `a4304c1` on :8088: journeys 124, button matrix 18, access and scope 23, extra 25, editors 44, 3D 24, slope 17, backend 256, frontend 200. Gate table and limits: `docs/evidence/stationing-next/MORNING_HANDOFF_AR.md`.
 - **Map package:** `tmrkz-map-2026.11.2` built twice from clean commit `8114472` with identical bytes, installed, rollback proven, READY 23 checks. ADR-047. The earlier statement in this file that its release rebuild stays open is superseded.
