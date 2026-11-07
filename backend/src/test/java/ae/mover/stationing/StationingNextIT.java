@@ -22,6 +22,12 @@ class StationingNextIT extends RestationingTestBase {
 
     UUID fresh, fresh2, shared;
 
+    @org.junit.jupiter.api.AfterEach
+    void noPathsLeftBehind() {
+        jdbc.sql("update restationing_request set route_version_id = null where route_version_id is not null").update();
+        jdbc.sql("delete from stationing_route_version").update();
+    }
+
     @BeforeEach
     void next() {
         UUID snapshot = publishedSnapshot();
@@ -186,6 +192,65 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(allowed(after, "RESTATIONING")).isTrue();
         assertThat(allowed(after, "DEPLOYMENT_AREAS")).isTrue();
         assertThat(allowed(after, "INITIAL_STATIONING")).isFalse();
+    }
+
+    private Map<String, Object> level(int level, boolean approves, String label, boolean last) {
+        return Map.of("level", level, "approves", approves, "label", label, "finalStage", last, "dependsOn", List.of("SCOPE", "SITE", "DEPLOYMENT"));
+    }
+
+    @Test
+    @DisplayName("The path of one request type: draft does nothing; activated it decides that type alone; a sent request stays on its version; only an administrator")
+    void aPathForEachType() {
+        Map<String, Object> onlyDept = Map.of("routing", Map.of("startAt", "SELF", "levels", List.of(level(8, false, "القسم", false), level(7, true, "اعتماد الإدارة", true))),
+                "stages", Map.of("unitOperations", false, "finalByPermission", false, "fyiBeforeActivation", false));
+        Api admin = login("sysadmin");
+        assertThat(login("rq").put("/stationing/routes/SITE_REGISTRATION/draft", onlyDept).status()).as("an administrator's").isEqualTo(403);
+        assertThat(admin.put("/stationing/routes/NOT_A_TYPE/draft", onlyDept).status()).isEqualTo(400);
+        assertThat(admin.put("/stationing/routes/INITIAL_STATIONING/draft", Map.of("routing", Map.of("startAt", "SELF", "levels", List.of(level(8, true, "القسم", false))), "stages", Map.of("unitOperations", false, "finalByPermission", false, "fyiBeforeActivation", false))).status())
+                .as("a path needs a last level").isEqualTo(400);
+        assertThat(admin.post("/stationing/routes/INITIAL_STATIONING/publish", Map.of("reason", "لا مسودة له")).status()).as("nothing saved").isEqualTo(400);
+        assertThat(admin.put("/stationing/routes/INITIAL_STATIONING/draft", onlyDept).status()).isEqualTo(200);
+
+        // a draft decides nothing
+        String sentBefore = request("INITIAL_STATIONING", initial(List.of(fresh)), sec);
+        Res s1 = login("rq").post("/restationing-requests/" + sentBefore + "/submit", Map.of());
+        assertThat(keys(s1.body().path("route"))).as("the policy's route").contains("O:operations", "F:final");
+
+        // it tries, writes nothing, and says who holds what
+        JsonNode tried = admin.post("/stationing/routes/INITIAL_STATIONING/simulate", new java.util.LinkedHashMap<>(Map.of("routing", onlyDept.get("routing"), "stages", onlyDept.get("stages"), "orgId", sec.toString()))).body();
+        assertThat(tried.path("complete").asBoolean()).isTrue();
+        assertThat(tried.path("stages")).hasSize(1);
+        assertThat(tried.path("stages").get(0).path("unit").asText()).isEqualTo("وحدة DEPT");
+        assertThat(tried.path("stages").get(0).path("holders").asLong()).isPositive();
+
+        assertThat(admin.post("/stationing/routes/INITIAL_STATIONING/publish", Map.of("reason", "x")).status()).as("a reason").isEqualTo(400);
+        assertThat(admin.post("/stationing/routes/INITIAL_STATIONING/publish", Map.of("reason", "مسار للاختبار")).status()).isEqualTo(200);
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'STATIONING_ROUTE_PUBLISHED' and entity_id = 'INITIAL_STATIONING'").query(Long.class).single()).isPositive();
+
+        // activated: this type follows it, another type does not, and the request already sent keeps its route
+        String after = request("INITIAL_STATIONING", initial(List.of(fresh2)), sec);
+        Res s2 = login("rq").post("/restationing-requests/" + after + "/submit", Map.of());
+        assertThat(s2.status()).as(s2.toString()).isEqualTo(200);
+        assertThat(keys(s2.body().path("route"))).containsExactly("H:" + dept);
+        assertThat(s2.body().path("route").get(0).path("final").asBoolean()).isTrue();
+        assertThat(keys(login("rq").get("/restationing-requests/" + sentBefore).body().path("route"))).contains("O:operations", "F:final");
+        stationed(team, shared, true);
+        String other = request("DEPLOYMENT_AREAS", deployment(team, 0), sec);
+        assertThat(keys(login("rq").post("/restationing-requests/" + other + "/submit", Map.of()).body().path("route"))).as("another type").contains("O:operations", "F:final");
+
+        // a later version leaves a sent request on the one it started with, even when it is returned and sent again
+        Map<String, Object> onlyTop = Map.of("routing", Map.of("startAt", "SELF", "levels", List.of(level(8, false, "القسم", false), level(7, false, "الإدارة", false), level(6, true, "اعتماد الأعلى", true))),
+                "stages", Map.of("unitOperations", false, "finalByPermission", false, "fyiBeforeActivation", false));
+        assertThat(admin.put("/stationing/routes/INITIAL_STATIONING/draft", onlyTop).status()).isEqualTo(200);
+        assertThat(admin.post("/stationing/routes/INITIAL_STATIONING/publish", Map.of("reason", "مسار ثان للاختبار")).status()).isEqualTo(200);
+        assertThat(login("apDept").post("/restationing-requests/" + after + "/decision", Map.of("decision", "RETURN", "reason", "عدّل السبب")).status()).isEqualTo(200);
+        Res again = login("rq").post("/restationing-requests/" + after + "/submit", Map.of("reason", "عدلت الطلب"));
+        assertThat(again.status()).as(again.toString()).isEqualTo(200);
+        assertThat(keys(again.body().path("route"))).as("the version it was sent on").containsExactly("H:" + dept);
+        assertThat(decide("apDept", after, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        JsonNode listed = admin.get("/stationing/routes").body();
+        assertThat(listed.path("routes")).hasSize(4);
+        assertThat(listed.path("policyInForce").asBoolean()).isTrue();
     }
 
     @Test

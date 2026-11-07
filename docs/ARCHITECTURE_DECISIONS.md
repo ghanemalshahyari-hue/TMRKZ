@@ -1783,3 +1783,11 @@ for narrow steep ground: `docs/evidence/terrain-3d/slope-inside/README.md`.
 
 **Limits.** See `docs/evidence/stationing-next/MORNING_HANDOFF_AR.md`.
 
+
+## ADR-046 Each stationing request type has its own path on «مسار الموافقات» (owner, 7 Nov 2026)
+
+**Decision.** The four stationing request types appear beside «طلب صلاحيات» on the page. Each has its own path: the Oracle levels that approve, the last level, where the path starts, and whether unit operations, a separate final approval and the FYI step follow. It is saved as a draft, tried on a unit (which also counts who could decide each stage now, as a guide), and activated with a reason (`stationing_route_version`, V31). The chart is drawn from those settings and is read-only: only `ACCESS` uses a hand-drawn graph.
+
+**In force.** A request pins the version in force when it is first sent (`restationing_request.route_version_id`); returning and resending keeps it. A type with no activated version follows the stationing policy's route as before, so V31 changes nothing until someone activates a path. Distances, terrain and footprint stay in the stationing policy: a request still needs a policy in force.
+
+**Not decided here.** No levels or holders are seeded. A path names levels and stages, never people; who decides is what the grants say. Cross-branch stages remain policy settings.

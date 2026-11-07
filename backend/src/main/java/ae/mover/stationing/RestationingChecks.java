@@ -67,12 +67,18 @@ public class RestationingChecks {
 
     /** The checks of a request by its purpose (ADR-045): one set of rules for geometry, distance, terrain and the route. */
     public Result evaluate(String purpose, UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now) {
+        return evaluate(purpose, requestingUnit, c, policy, policyVersion, now, null);
+    }
+
+    /** With the type's own activated path when it has one (ADR-046); otherwise the policy's route. */
+    public Result evaluate(String purpose, UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now, StationingRoutes.RouteRule path) {
+        StationingRoutes.RouteRule rule = path != null ? path : new StationingRoutes.RouteRule(policy.routing(), policy.approvalStages());
         return switch (purpose == null ? RESTATIONING : purpose) {
-            case INITIAL_STATIONING -> evaluateInitial(requestingUnit, c, policy, policyVersion, now);
-            case DEPLOYMENT_AREAS -> evaluateDeployment(requestingUnit, c, policy, policyVersion, now);
-            case SITE_REGISTRATION -> evaluateSiteRegistration(requestingUnit, c, policy, now);
+            case INITIAL_STATIONING -> evaluateInitial(requestingUnit, c, policy, policyVersion, now, rule);
+            case DEPLOYMENT_AREAS -> evaluateDeployment(requestingUnit, c, policy, policyVersion, now, rule);
+            case SITE_REGISTRATION -> evaluateSiteRegistration(requestingUnit, c, policy, now, rule);
             default -> {
-                Result r = evaluate(requestingUnit, c, policy, policyVersion, now);
+                Result r = evaluate(requestingUnit, c, policy, policyVersion, now, rule);
                 // a re-stationing starts from where the unit is: a unit stationed nowhere asks for its initial stationing
                 Map<UUID, UUID> at = currentSites(c.scope(), now);
                 List<UUID> nowhere = c.scope().stream().filter(u -> !at.containsKey(u)).toList();
@@ -92,8 +98,8 @@ public class RestationingChecks {
     public static final String DEPLOYMENT_AREAS = "DEPLOYMENT_AREAS";
     public static final String SITE_REGISTRATION = "SITE_REGISTRATION";
 
-    private List<RouteStage> routeOf(List<OrgUnit> path, StationingPolicy policy, boolean exception) {
-        return RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, policy.routing(), policy.crossBranch(), List.of(), exception), policy.approvalStages());
+    private List<RouteStage> routeOf(List<OrgUnit> path, StationingPolicy policy, boolean exception, StationingRoutes.RouteRule rule) {
+        return RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, rule.routing(), policy.crossBranch(), List.of(), exception), rule.stages());
     }
 
     private void routeAndReason(List<RouteStage> route, RestationingContent c, List<String> problems) {
@@ -130,7 +136,7 @@ public class RestationingChecks {
     }
 
     /** طلب تمركز أولي: units stationed nowhere, on an existing site. The shared site's own ground is not a conflict. */
-    private Result evaluateInitial(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now) {
+    private Result evaluateInitial(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now, StationingRoutes.RouteRule rule) {
         List<String> problems = new ArrayList<>();
         List<OrgUnit> path = hierarchy.path(requestingUnit);
         if (path.isEmpty()) {
@@ -156,13 +162,13 @@ public class RestationingChecks {
         legs.add(leg("primary", "منطقة الانتشار الرئيسية", policy.primary(), siteGeo, primaryGeo, c, policy, policyVersion, now, problems));
         legs.add(leg("alternative", "منطقة الانتشار البديلة", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
         boolean exception = legs.stream().anyMatch(l -> l.check().status() == LegStatus.NEEDS_EXCEPTION);
-        List<RouteStage> route = routeOf(path, policy, exception);
+        List<RouteStage> route = routeOf(path, policy, exception, rule);
         routeAndReason(route, c, problems);
         return new Result(problems, null, policy.maxFootprintAreaM2(), List.of(), legs, List.of(), route, exception, current);
     }
 
     /** طلب منطقة انتشار: both areas for one unit, measured from where that unit is authoritatively stationed now. */
-    private Result evaluateDeployment(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now) {
+    private Result evaluateDeployment(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now, StationingRoutes.RouteRule rule) {
         List<String> problems = new ArrayList<>();
         List<OrgUnit> path = hierarchy.path(requestingUnit);
         if (path.isEmpty()) {
@@ -194,13 +200,13 @@ public class RestationingChecks {
         legs.add(leg("primary", "منطقة الانتشار الرئيسية", policy.primary(), siteGeo, primaryGeo, c, policy, policyVersion, now, problems));
         legs.add(leg("alternative", "منطقة الانتشار البديلة", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
         boolean exception = legs.stream().anyMatch(l -> l.check().status() == LegStatus.NEEDS_EXCEPTION);
-        List<RouteStage> route = routeOf(path, policy, exception);
+        List<RouteStage> route = routeOf(path, policy, exception, rule);
         routeAndReason(route, c, problems);
         return new Result(problems, null, policy.maxFootprintAreaM2(), List.of(), legs, List.of(), route, exception, current);
     }
 
     /** طلب اعتماد موقع: a physical site registered once. An overlap with a registered site is reported and blocks, never merged. */
-    private Result evaluateSiteRegistration(UUID requestingUnit, RestationingContent c, StationingPolicy policy, Instant now) {
+    private Result evaluateSiteRegistration(UUID requestingUnit, RestationingContent c, StationingPolicy policy, Instant now, StationingRoutes.RouteRule rule) {
         List<String> problems = new ArrayList<>();
         List<OrgUnit> path = hierarchy.path(requestingUnit);
         if (path.isEmpty()) {
@@ -227,7 +233,7 @@ public class RestationingChecks {
                 }
             }
         }
-        List<RouteStage> route = routeOf(path, policy, false);
+        List<RouteStage> route = routeOf(path, policy, false, rule);
         routeAndReason(route, c, problems);
         return new Result(problems, null, policy.maxFootprintAreaM2(), duplicates, List.of(), List.of(), route, false, Map.of());
     }
@@ -274,6 +280,10 @@ public class RestationingChecks {
     }
 
     public Result evaluate(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now) {
+        return evaluate(requestingUnit, c, policy, policyVersion, now, new StationingRoutes.RouteRule(policy.routing(), policy.approvalStages()));
+    }
+
+    public Result evaluate(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now, StationingRoutes.RouteRule rule) {
         List<String> problems = new ArrayList<>();
         List<OrgUnit> path = hierarchy.path(requestingUnit);
         if (path.isEmpty()) {
@@ -366,7 +376,7 @@ public class RestationingChecks {
         }
         // the route from the requesting unit (O-07, O-09) must reach the configured final stage
         List<CrossBranchInclusion> inclusions = included.stream().map(u -> inclusion(u, names.get(u), current.get(u), now)).toList();
-        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, policy.routing(), policy.crossBranch(), inclusions, exception), policy.approvalStages());
+        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, rule.routing(), policy.crossBranch(), inclusions, exception), rule.stages());
         if (!RouteDerivation.complete(route)) {
             problems.add("لم يُشتق مسار اعتماد كامل من هيكل الوحدة الطالبة والإعداد (لا مرحلة نهائية).");
         }
@@ -380,6 +390,10 @@ public class RestationingChecks {
      * hierarchy stages rest on).
      */
     public Result evaluateExtension(UUID requestingUnit, RestationingContent c, Instant effectiveEnd, StationingPolicy policy, Instant now) {
+        return evaluateExtension(requestingUnit, c, effectiveEnd, policy, now, new StationingRoutes.RouteRule(policy.routing(), policy.approvalStages()));
+    }
+
+    public Result evaluateExtension(UUID requestingUnit, RestationingContent c, Instant effectiveEnd, StationingPolicy policy, Instant now, StationingRoutes.RouteRule rule) {
         List<String> problems = new ArrayList<>();
         List<OrgUnit> path = hierarchy.path(requestingUnit);
         if (path.isEmpty()) {
@@ -394,7 +408,7 @@ public class RestationingChecks {
         if (c.reason().trim().length() < 5) {
             problems.add("سبب التمديد مطلوب (5 أحرف على الأقل).");
         }
-        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, policy.routing(), policy.crossBranch(), List.of(), false), policy.approvalStages());
+        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, rule.routing(), policy.crossBranch(), List.of(), false), rule.stages());
         if (!RouteDerivation.complete(route)) {
             problems.add("لم يُشتق مسار اعتماد كامل من هيكل الوحدة الطالبة والإعداد (لا مرحلة نهائية).");
         }

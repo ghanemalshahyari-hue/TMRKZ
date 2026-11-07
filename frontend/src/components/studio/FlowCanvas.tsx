@@ -66,7 +66,9 @@ const Card = memo(function Card({ data }: NodeProps<Node<CardData>>) {
 
 const nodeTypes = { card: Card };
 
-function Canvas({ noDeadline, graph, selected, selectedEdge, hints, problems, route, onGraph, onCommit, onSelect, onSelectEdge, focus, roleName, responsibilityName }: {
+function Canvas({ readOnly, noDeadline, graph, selected, selectedEdge, hints, problems, route, onGraph, onCommit, onSelect, onSelectEdge, focus, roleName, responsibilityName }: {
+  /** Drawn from settings, not by hand: nothing moves or connects. */
+  readOnly?: boolean;
   noDeadline?: boolean;
   graph: FlowGraph;
   selected: string | null;
@@ -189,7 +191,10 @@ function Canvas({ noDeadline, graph, selected, selectedEdge, hints, problems, ro
         onNodeClick={(_, n) => (onSelect(n.id), onSelectEdge(null))}
         onEdgeClick={(_, e) => (onSelectEdge(e.id), onSelect(null))}
         onPaneClick={() => (onSelect(null), onSelectEdge(null))}
-        deleteKeyCode={['Delete', 'Backspace']}
+        deleteKeyCode={readOnly ? null : ['Delete', 'Backspace']}
+        nodesDraggable={!readOnly}
+        nodesConnectable={!readOnly}
+        edgesReconnectable={!readOnly}
         snapToGrid
         snapGrid={[10, 10]}
         fitView

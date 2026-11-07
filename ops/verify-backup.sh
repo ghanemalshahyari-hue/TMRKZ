@@ -44,6 +44,8 @@ docker run -d --name "$C" --memory 1g -e POSTGRES_USER=mover -e POSTGRES_DB=move
 until docker logs "$C" 2>&1 | grep -q "PostgreSQL init process complete"; do sleep 2; done
 until docker exec "$C" pg_isready -U mover -d mover >/dev/null 2>&1; do sleep 1; done
 sleep 2
+# the image's own extensions and tiger schema would collide with the dump (ops/sql/clear-postgis-init.sql)
+docker exec -i "$C" psql -X -q -U mover -d mover -v ON_ERROR_STOP=1 -f - < ops/sql/clear-postgis-init.sql >/dev/null 2>&1 || fail "the empty database could not be prepared"
 docker exec -i "$C" pg_restore -U mover -d mover --no-owner --exit-on-error < "$SRC/db.dump" || fail "db.dump does not restore"
 q() { docker exec -i "$C" psql -X -U mover -d mover -At -v ON_ERROR_STOP=1 "$@"; }
 q -f - < ops/sql/fingerprint.sql > "$SRC/fingerprint.backupcheck.txt"

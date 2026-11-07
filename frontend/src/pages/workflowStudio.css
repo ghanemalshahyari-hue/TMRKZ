@@ -11,6 +11,10 @@
 .fs-palette, .fs-side { overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: #fff; }
 .fs-palette { display: flex; flex-direction: column; gap: 6px; padding: 10px; }
 .fs-palette h3 { margin: 0; font-size: 14px; }
+.fs-route-body { grid-template-columns: 270px minmax(0, 1fr) 326px; }
+.fs-route-levels .fs-check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.fs-route-level { display: grid; gap: 4px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; }
+.fs-route-level input:not([type]) { width: 100%; }
 .fs-tile { display: flex; flex-direction: column; gap: 1px; padding: 8px 10px; border: 1px solid var(--line); border-inline-start: 4px solid #64748b; border-radius: 8px; background: #fff; font: inherit; text-align: start; cursor: grab; }
 .fs-tile:hover { background: #f4f7f6; }
 .fs-tile b { font-size: 13px; }
@@ -98,6 +102,9 @@
   .fs-canvas { height: 560px; }
   .fs-palette { flex-direction: row; flex-wrap: wrap; }
   .fs-help { display: none; }
+  .fs-route-body { grid-template-columns: 1fr; }
+  .fs-route-levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); align-items: start; }
+  .fs-route-levels > h3, .fs-route-levels > small { grid-column: 1 / -1; }
 }
 
 .fs-node-chain { color: #0f766e; font-weight: 600; white-space: normal; }

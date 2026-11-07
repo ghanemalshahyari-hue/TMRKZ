@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from '../api/client';
+import { api, type StationingRouteRow } from '../api/client';
+import { StationingRoutePanel } from '../components/studio/StationingRoutePanel';
+import { PURPOSE_TITLE, type Purpose } from '../lib/requestPurpose';
+import { STATIONING_V3_ENABLED } from '../lib/stationingV3';
 import type { FlowEdge, FlowGraph, FlowNode, FlowNodeType, FormField, HierarchyLevel, Responsibility, RoleDef, SimulationResult, StudioItem, WfExec, WorkflowVersion } from '../api/types';
 import { NumberField } from '../components/NumberField';
 import { formSubjects } from '../components/rules/FieldRulesDialog';
@@ -59,7 +62,16 @@ export function WorkflowStudio() {
   graphRef.current = graph;
   const [, setTick] = useState(0);
 
-  const item = items.find((i) => i.requestType.code === typeCode) ?? items[0];
+  // the stationing requests are in the same list, each with its own path (ADR-046); their path is not drawn by hand
+  const routePurpose = typeCode?.startsWith('route:') ? (typeCode.slice(6) as Purpose) : null;
+  const [routes, setRoutes] = useState<StationingRouteRow[]>([]);
+  const [policyInForce, setPolicyInForce] = useState(true);
+  const loadRoutes = useCallback(() => {
+    if (!STATIONING_V3_ENABLED) return;
+    api.stationingRoutes().then((r) => (setRoutes(r.routes), setPolicyInForce(r.policyInForce))).catch(() => setRoutes([]));
+  }, []);
+  useEffect(() => loadRoutes(), [loadRoutes]);
+  const item = routePurpose ? undefined : items.find((i) => i.requestType.code === typeCode) ?? items[0];
   const subjects = useMemo(() => [...formSubjects(formFields, app.requestTypes), ...UNIT_SUBJECTS], [formFields, app.requestTypes]);
   const reviewerRoles = useMemo(() => roles.filter((r) => !EXCLUDED_ROLES.has(r.code)), [roles]);
   const roleName = useCallback((code: string) => roles.find((r) => r.code === code)?.name ?? code, [roles]);
@@ -246,20 +258,21 @@ export function WorkflowStudio() {
       <header className="fs-bar">
         <div className="fs-bar-title">
           <h1>مسار الموافقات</h1>
-          <select aria-label="نوع الطلب" value={item?.requestType.code ?? ''} onChange={(e) => setTypeCode(e.target.value)}>
+          <select aria-label="نوع الطلب" value={routePurpose ? 'route:' + routePurpose : item?.requestType.code ?? ''} onChange={(e) => setTypeCode(e.target.value)}>
             {items.map((i) => <option key={i.requestType.code} value={i.requestType.code}>{i.requestType.name}</option>)}
+            {STATIONING_V3_ENABLED && (['SITE_REGISTRATION', 'INITIAL_STATIONING', 'DEPLOYMENT_AREAS', 'RESTATIONING'] as Purpose[]).map((p) => <option key={p} value={'route:' + p}>{PURPOSE_TITLE[p]}</option>)}
           </select>
           <button className="button compact" data-testid="type-add" onClick={() => setNewType({ name: '', topic: '', kind: '' })}>＋ نوع طلب</button>
           {item && <button className="button compact" data-testid="type-remove" onClick={removeType}>حذف هذا النوع</button>}
           {item?.requestType.kind === 'ACCESS' && <button className="button compact" data-testid="access-offer" onClick={() => setOfferOpen(true)}>الصلاحيات المعروضة للطلب</button>}
-          <span className="fs-state">
+          {!routePurpose && <span className="fs-state">
             {published ? `المعمول به: النسخة ${published.version} · ${fullTime(published.publishedAt ?? published.createdAt)}` : 'لا يوجد مسار معمول به بعد'}
             {item?.draft && !dirty ? ' · توجد نسخة محفوظة لم تُفعّل' : ''}
             {dirty ? ' · تعديلات غير محفوظة' : ''}
             {published && published.activeRequests > 0 ? ` · ${published.activeRequests} طلب قائم` : ''}
-          </span>
+          </span>}
         </div>
-        <div className="fs-tools">
+        {!routePurpose && <div className="fs-tools">
           <button className="button compact" disabled={!past.current.length} onClick={undo} title="تراجع">↶ تراجع</button>
           <button className="button compact" disabled={!future.current.length} onClick={redo} title="إعادة">↷ إعادة</button>
           <button className="button compact" onClick={() => (commit(), change(autoLayout(graph)))}>ترتيب البطاقات</button>
@@ -269,7 +282,7 @@ export function WorkflowStudio() {
           <button className="button compact" disabled={busy || !dirty} onClick={() => run(async () => { await save(); app.toast('حُفظ'); })}>حفظ</button>
           <button className="button compact" data-testid="try" disabled={busy} onClick={() => tryIt()}>تجربة وفحص</button>
           <button className="button primary compact" data-testid="publish" disabled={busy || !checkedOk} title={checkedOk ? undefined : 'جرّب المسار أولاً، بلا ملاحظات وبلا تعديل بعده'} onClick={publish}>تفعيل المسار</button>
-        </div>
+        </div>}
       </header>
       {offerOpen && <AccessOfferDialog onClose={() => setOfferOpen(false)} />}
       {newType && (
@@ -315,7 +328,10 @@ export function WorkflowStudio() {
           </div>
         </Dialog>
       )}
-      {itemsLoaded && !items.length ? (
+      {routePurpose && !policyInForce && <div className="rs-banner orange" data-testid="no-policy" style={{ margin: '0 0 10px' }}>لا توجد سياسة تمركز منشورة بعد. يمكنك ضبط هذا المسار وتفعيله الآن، لكن لا يُرسل أي طلب تمركز حتى تُنشر السياسة بقيم المسافات والتضاريس.</div>}
+      {routePurpose ? (
+        <StationingRoutePanel purpose={routePurpose} others={routes} onChanged={loadRoutes} />
+      ) : itemsLoaded && !items.length ? (
         <div className="empty" data-testid="no-types">لا توجد أنواع طلبات. أضف أول نوع من زر «＋ نوع طلب» ثم نرسم له مسار الموافقات.</div>
       ) : (
       <div className="fs-body">

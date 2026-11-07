@@ -113,7 +113,7 @@ public class RestationingService {
     record Req(UUID id, String number, UUID requester, UUID unit, String state, RestationingContent content, Integer policyVersion,
                int routeNo, List<UUID> routePath, HierarchySnapshot snapshot, Map<String, Object> returned, Map<String, Object> paused,
                UUID finalApprover, UUID activatedBy, Instant activatedAt, UUID siteId, Instant createdAt, Instant updatedAt,
-               String kind, UUID parentId, String purpose) {
+               String kind, UUID parentId, String purpose, UUID routeVersion) {
         boolean extension() {
             return "EXTENSION".equals(kind);
         }
@@ -138,9 +138,12 @@ public class RestationingService {
     private final PersonKeys keys;
     private final TransactionTemplate tx;
     private final PlaceInfo placeInfo;
+    private final StationingRoutes routes;
 
     public RestationingService(JdbcClient jdbc, Json json, AuditService audit, StationingPolicyStore policies, RestationingChecks checks,
-                               OrgHierarchy hierarchy, StationingOutbox outbox, PersonKeys keys, TransactionTemplate tx, PlaceInfo placeInfo) {
+                               OrgHierarchy hierarchy, StationingOutbox outbox, PersonKeys keys, TransactionTemplate tx, PlaceInfo placeInfo,
+                               StationingRoutes routes) {
+        this.routes = routes;
         this.placeInfo = placeInfo;
         this.jdbc = jdbc;
         this.json = json;
@@ -196,6 +199,17 @@ public class RestationingService {
             case RestationingChecks.SITE_REGISTRATION -> Permission.REQUEST_SITE_REGISTRATION;
             default -> throw ApiException.validation("نوع طلب غير معروف.");
         };
+    }
+
+    /**
+     * The path a request follows (ADR-046): the version it was pinned to when first sent; a draft takes the one in force now. A
+     * request sent while its type had none stays on the policy's route, as does a type with none.
+     */
+    private StationingRoutes.RouteRule pathOf(Req r) {
+        if (r.routeVersion() != null) {
+            return routes.byId(r.routeVersion()).orElse(null);
+        }
+        return "DRAFT".equals(r.state()) ? routes.published(r.purpose()).map(Map.Entry::getValue).orElse(null) : null;
     }
 
     /** One open initial-stationing or deployment request at a time for a unit: another would overwrite what the first decides. */
@@ -259,7 +273,7 @@ public class RestationingService {
             return none;
         }
         Result res = r.extension() ? extensionChecks(r, pv.get().values(), now)
-                : checks.evaluate(r.purpose(), r.unit(), r.content(), pv.get().values(), pv.get().version(), now);
+                : checks.evaluate(r.purpose(), r.unit(), r.content(), pv.get().values(), pv.get().version(), now, pathOf(r));
         return checkView(res, pv.get().version());
     }
 
@@ -276,7 +290,7 @@ public class RestationingService {
                     ? policies.inForce(now).orElseThrow(() -> ApiException.validation("لا توجد سياسة تمركز نافذة؛ ينشرها مسؤول النظام قبل إرسال أي طلب."))
                     : policies.byVersion(r.policyVersion()).orElseThrow();
             refuseDuplicate(r.purpose(), r.content().scope(), r.id());
-            Result res = r.extension() ? extensionChecks(r, pv.values(), now) : checks.evaluate(r.purpose(), r.unit(), r.content(), pv.values(), pv.version(), now);
+            Result res = r.extension() ? extensionChecks(r, pv.values(), now) : checks.evaluate(r.purpose(), r.unit(), r.content(), pv.values(), pv.version(), now, pathOf(r));
             if (!res.ok()) {
                 throw ApiException.validation(res.problems().get(0), Map.of("problems", res.problems()));
             }
@@ -312,7 +326,8 @@ public class RestationingService {
             jdbc.sql("""
                     update restationing_request set state = 'UNDER_REVIEW', policy_version = :pv, route_no = :route,
                            route_path = string_to_array(:path, ',')::uuid[], hierarchy_snapshot = cast(:snap as jsonb), returned = null,
-                           paused = null, updated_at = :now, version = version + 1 where id = :id""")
+                           paused = null, updated_at = :now, version = version + 1, route_version_id = :rv where id = :id""")
+                    .param("rv", first ? routes.published(r.purpose()).map(Map.Entry::getKey).orElse(null) : r.routeVersion())
                     .param("pv", pv.version()).param("route", routeNo).param("path", Db.ids(snap.path()))
                     .param("snap", json.write(snapshot(snap))).param("now", Db.ts(now)).param("id", id).update();
             int n = prev == null ? 1 : ((Number) prev.get("n")).intValue() + 1;
@@ -687,7 +702,8 @@ public class RestationingService {
         if (r.policyVersion() == null || !"APPROVED_NOT_ACTIVATED".equals(r.state()) || r.extension()) {
             return false;
         }
-        var stages = policies.byVersion(r.policyVersion()).map(v -> v.values().approvalStages()).orElse(null);
+        StationingRoutes.RouteRule path = pathOf(r);
+        var stages = path != null ? path.stages() : policies.byVersion(r.policyVersion()).map(v -> v.values().approvalStages()).orElse(null);
         if (stages == null || !stages.fyiBeforeActivation()) {
             return false;
         }
@@ -964,7 +980,9 @@ public class RestationingService {
     /** An extension is checked against its temporary stationing, which must still be scheduled or in force. */
     private Result extensionChecks(Req r, StationingPolicy policy, Instant now) {
         Req parent = load(r.parentId()).orElseThrow();
-        Result res = checks.evaluateExtension(r.unit(), r.content(), effectiveEnd(parent.id()), policy, now);
+        StationingRoutes.RouteRule path = pathOf(r);
+        Result res = path != null ? checks.evaluateExtension(r.unit(), r.content(), effectiveEnd(parent.id()), policy, now, path)
+                : checks.evaluateExtension(r.unit(), r.content(), effectiveEnd(parent.id()), policy, now);
         if (Set.of("TEMPORARY_SCHEDULED", "ACTIVE_TEMPORARY").contains(parent.state())) {
             return res;
         }
@@ -1504,7 +1522,7 @@ public class RestationingService {
                 select id, number, requester_id, requesting_unit_id, state, content::text as content, policy_version, route_no,
                        array_to_string(route_path, ',') as path, hierarchy_snapshot::text as snap, returned::text as ret,
                        paused::text as paused, final_approver_id, activated_by, activated_at, site_id, created_at, updated_at,
-                       kind, parent_request_id, purpose
+                       kind, parent_request_id, purpose, route_version_id
                   from restationing_request where id = :id""")
                 .param("id", id).query((rs, n) -> new Req(Db.uuid(rs, "id"), rs.getString("number"), Db.uuid(rs, "requester_id"),
                         Db.uuid(rs, "requesting_unit_id"), rs.getString("state"),
@@ -1513,7 +1531,7 @@ public class RestationingService {
                         rs.getString("ret") == null ? null : json.map(rs.getString("ret")),
                         rs.getString("paused") == null ? null : json.map(rs.getString("paused")),
                         Db.uuid(rs, "final_approver_id"), Db.uuid(rs, "activated_by"), Db.instant(rs, "activated_at"), Db.uuid(rs, "site_id"),
-                        Db.instant(rs, "created_at"), Db.instant(rs, "updated_at"), rs.getString("kind"), Db.uuid(rs, "parent_request_id"), rs.getString("purpose")))
+                        Db.instant(rs, "created_at"), Db.instant(rs, "updated_at"), rs.getString("kind"), Db.uuid(rs, "parent_request_id"), rs.getString("purpose"), Db.uuid(rs, "route_version_id")))
                 .optional();
     }
 

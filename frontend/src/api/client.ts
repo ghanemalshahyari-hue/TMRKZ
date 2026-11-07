@@ -103,6 +103,7 @@ import type {
   WorkflowVersion,
   Permission,
   Scope,
+  RoutingLevelValue,
 } from './types';
 
 export const API_BASE = '/api/v1';
@@ -279,6 +280,9 @@ export type HubUnit = { id: string; code: string; name: string; parentId: string
 export type RequestHub = { actions: HubAction[]; units: HubUnit[]; unitsTotal: number };
 export type HubSite = { id: string; code: string; name: string; lat: number | null; lng: number | null; geometry: { type: string; coordinates: unknown } | null; linked: boolean };
 export type OverviewItem = { id: string; number: string; type: string; state: string; stateLabel?: string; updatedAt?: string; requestingUnit?: { name: string }; person?: string; mine?: boolean; myTurn?: boolean; currentStage?: string; currentStageKind?: string; fyi?: boolean; fyiPending?: boolean; activatable?: boolean };
+export type StationingRouteVersion = { id: string; version: number; routing: { startAt: 'SELF' | 'PARENT'; levels: RoutingLevelValue[] }; stages: { unitOperations: boolean; finalByPermission: boolean; fyiBeforeActivation: boolean }; reason: string | null; publishedAt: string | null; publishedBy: string | null };
+export type StationingRouteRow = { purpose: string; published: StationingRouteVersion | null; draft: StationingRouteVersion | null };
+export type StationingRouteTry = { stages: { key: string; kind: string; label: string; unit: string | null; holders: number }[]; complete: boolean; problems: string[]; activators?: number; fyiHolders?: number };
 export type HomeCard = { key: string; label: string; value: number; href: string };
 export type PostureUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; state: string; site?: { id: string; name: string; geometry: { type: string; coordinates: unknown } | null } | null; kind?: string; plannedEnd?: string | null; primary?: unknown; alternative?: unknown; otherUnitsAtSite?: number; request?: { purpose: string; state: string } | null };
 export type SiteOccupants = { stationed: { orgId: string; orgName: string }[]; linked: { id: string; orgId: string; orgName: string; reason: string }[]; otherStationed: number };
@@ -392,6 +396,10 @@ export const api = {
   createSiteLink: (body: { siteId: string; organizationId: string; reason: string }) => post<unknown>('/site-links', body),
   endSiteLink: (id: string, reason: string) => post<unknown>(`/site-links/${id}/end`, { reason }),
   correctStationing: (body: { organizationId: string; siteId: string; reason: string }) => post<unknown>('/stationing/corrections', body),
+  stationingRoutes: () => get<{ routes: StationingRouteRow[]; policyInForce: boolean }>('/stationing/routes'),
+  saveStationingRoute: (purpose: string, route: { routing: unknown; stages: unknown }) => put<StationingRouteVersion>(`/stationing/routes/${purpose}/draft`, route),
+  publishStationingRoute: (purpose: string, reason: string) => post<StationingRouteVersion>(`/stationing/routes/${purpose}/publish`, { reason }),
+  tryStationingRoute: (purpose: string, body: { routing: unknown; stages: unknown; orgId: string }) => post<StationingRouteTry>(`/stationing/routes/${purpose}/simulate`, body),
   requestHub: () => get<RequestHub>('/request-hub'),
   hubUnit: (id: string) => get<HubUnit>(`/request-hub/units/${id}`),
   hubSites: (unit: string) => get<HubSite[]>(`/request-hub/units/${unit}/sites`),
