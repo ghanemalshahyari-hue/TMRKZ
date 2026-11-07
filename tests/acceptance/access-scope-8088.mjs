@@ -56,6 +56,8 @@ const N18 = 'مستخدم جديد ثالث';
 const N19 = 'مستخدم جديد رابع';
 
 try {
+  // ACC_UNITS_ONLY=1: the grant by units alone, for a batch whose people already asked
+  if (process.env.ACC_UNITS_ONLY !== '1') {
   // ---- refused by the reviewer, then by the final approver ---------------------------------------------------------------
   const p18 = await as('p18.new');
   await ask(p18, 'CHAIN_APPROVER', 'UNIT', 'طلب سيُرفض في المراجعة');
@@ -68,7 +70,7 @@ try {
   await it.getByRole('button', { name: 'رفض', exact: true }).click();
   await it.waitFor({ state: 'detached', timeout: 10000 });
   ok(live('p18.new') === '', 'REJECT-01', 'رفض المراجع لا يمنح شيئاً');
-  ok(sql(`select count(*) from audit_event where action like 'ACCESS_REQUEST_REJECT%' and actor_person_id = '${person('p02.access')}'`) === '1', 'REJECT-02', 'الرفض مسجل باسم من رفض');
+  ok(sql(`select count(*) from audit_event where action = 'REQUEST_REJECTED' and actor_person_id = '${person('p02.access')}'`) === '1', 'REJECT-02', 'الرفض مسجل باسم من رفض');
 
   const p19 = await as('p19.new');
   await ask(p19, 'CHAIN_APPROVER', 'UNIT', 'طلب سيُرفض في الاعتماد النهائي');
@@ -132,6 +134,8 @@ try {
   const siteTarget = sql(`select count(*) from membership_scope_target t join membership m on m.id = t.membership_id where m.person_id = '${person('p19.new')}' and t.kind = 'SITE' and t.target_id = '${site('SITE-05')}'`);
   ok(siteTarget === '1', 'SCOPE-07', 'النطاق المحفوظ هو الموقع المختار', siteTarget);
 
+  }
+
   // ---- this path has no deadline -----------------------------------------------------------------------------------------------
   const admin = await as('p14.admin');
   await go(admin, '#workflow');
@@ -168,9 +172,9 @@ try {
   await admin.waitForTimeout(700);
   await dialog.getByLabel('ابحث عن وحدة').fill('القيادة الرئيسية أ' + SFX);
   await admin.waitForTimeout(700);
-  const tree = dialog.getByTestId('units-tree');
-  ok((await tree.innerText()).includes('القيادة الرئيسية أ'), 'UNITS-03', 'الشجرة تبدأ من الوحدات الرئيسية');
-  await tree.locator('input[type=checkbox]').first().check();
+  const hit = dialog.locator('.ud-hit', { hasText: 'القيادة الرئيسية أ' + SFX });
+  ok((await hit.count()) === 1, 'UNITS-03', 'البحث يجد الوحدة الرئيسية', await hit.count());
+  await hit.locator('input').check();
   const row = dialog.getByTestId('unit-row').first();
   const scopeSelect = row.locator('select');
   ok((await scopeSelect.inputValue()) === 'ONE', 'UNITS-04', 'الوحدة المختارة تبدأ بـ«الوحدة فقط»');

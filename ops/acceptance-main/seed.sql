@@ -144,5 +144,5 @@ select md5('__NS__:st:' || unit)::uuid, md5('__NS__:org:' || unit)::uuid, md5('_
   from n_map where unit is not null;
 -- a temporary stationing with an end date, for the posture's temporary state
 insert into org_stationing(id, organization_id, site_id, kind, base_id, valid_from, planned_end, origin, reason, recorded_by)
-select md5('__NS__:st:N-A120:t')::uuid, md5('__NS__:org:N-A120')::uuid, md5('__NS__:site:SITE-02')::uuid, 'TEMPORARY', md5('__NS__:st:N-A120')::uuid, now() - interval '3 days', '2027-03-31T00:00:00Z', 'CORRECTION', 'اختبار قبول — وهمي', md5('__NS__:person:p14.admin')::uuid;
+select md5('__NS__:st:N-A119:t')::uuid, md5('__NS__:org:N-A119')::uuid, md5('__NS__:site:SITE-02')::uuid, 'TEMPORARY', md5('__NS__:st:N-A119')::uuid, now() - interval '3 days', '2027-03-31T00:00:00Z', 'CORRECTION', 'اختبار قبول — وهمي', md5('__NS__:person:p14.admin')::uuid;
 commit;

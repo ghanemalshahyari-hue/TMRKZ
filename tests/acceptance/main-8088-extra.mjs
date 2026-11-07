@@ -113,7 +113,7 @@ try {
   // ---- posture: a temporary stationing's end date, and 3D -------------------------------------------------------------
   const view = await as('p12.view');
   await go(view, '#posture');
-  await view.locator(`[data-unit="${org('N-A120')}"]`).click({ timeout: 15000 });
+  await view.locator(`[data-unit="${org(process.env.ACC_TEMP_UNIT ?? 'N-A119')}"]`).click({ timeout: 15000 });
   await view.waitForTimeout(1500);
   const text = (await view.locator('main#main').innerText()).replace(/\s+/g, ' ');
   ok(/مؤقت/.test(text) && text.includes('2027'), 'POSTURE-T1', 'التمركز المؤقت يظهر بحالته وتاريخ نهايته', text.slice(0, 260));

@@ -110,4 +110,4 @@ body { transition: background-color 0.15s; }
 /* Text on a strong colour stays white in the sand theme: the active 2D/3D button, and a trial's result on «مسار الموافقات». */
 :root[data-theme='light'] .tz-view-switch button.on,
 :root[data-theme='light'] .fs-outcome { color: #fff; }
-.fs-outcome.ok { background: #157a38; }
+.fs-outcome.ok { background: #0f6b30; }
