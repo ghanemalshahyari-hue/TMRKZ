@@ -212,8 +212,10 @@ export function SiteSetupPage() {
     act(async () => {
       const at = shape === 'POINT' ? point : geometry ? anchorOf(partsOf(geometry)) : null;
       if (!at) throw new Error('حدد الموقع على الخريطة أولاً.');
-      const made = await api.createSite({ code: form.code.trim(), name: form.name.trim(), kind: form.kind.trim(), parentId: form.parentId || null, responsibleOrgId: null, capacity: null, location: at, notes: form.notes || null, reason: form.reason });
-      if (shape === 'POLYGON' && geometry) await api.saveSiteGeometry(made.id, { geometry, crs: 'EPSG:4326', expectedVersion: 0, reason: form.reason, method: 'DRAWN' });
+      const site = { code: form.code.trim(), name: form.name.trim(), kind: form.kind.trim(), parentId: form.parentId || null, responsibleOrgId: null, capacity: null, location: at, notes: form.notes || null, reason: form.reason };
+      // one act on the server: a boundary it refuses leaves no site behind
+      if (shape === 'POLYGON' && geometry) await api.createSiteWithBoundary({ site, boundary: { geometry, crs: 'EPSG:4326', expectedVersion: 0, reason: form.reason, method: 'DRAWN' } });
+      else await api.createSite(site);
     }, 'سُجل الموقع', () => {
       setAdding(false);
       editor.current?.load(null, false);

@@ -82,6 +82,12 @@ public class FacilityController {
         return sites.create(access.context(actor), in);
     }
 
+    /** A new site and its boundary as one act (ADR-045): a refused boundary leaves no site behind. */
+    @PostMapping("/sites/with-boundary")
+    public SiteService.SiteView createSiteWithBoundary(Actor actor, @RequestBody BoundaryService.CreateInput in) {
+        return boundaries.createWithBoundary(access.context(actor), in);
+    }
+
     @PutMapping("/sites/{id}")
     public SiteService.SiteView updateSite(Actor actor, @PathVariable UUID id, @RequestBody SiteService.SiteInput in) {
         return sites.update(access.context(actor), id, in);

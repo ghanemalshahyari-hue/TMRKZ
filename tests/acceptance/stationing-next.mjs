@@ -185,8 +185,14 @@ try {
   const p04 = await pageAs('p04.sites');
   await go(p04, '#siteSetup');
   await p04.getByTestId('setup-tree').waitFor({ timeout: 15000 });
+  // free ground east of this batch's sites: other acceptance batches may be on the map, and a site that overlaps one is refused
+  const freeGround = async () => {
+    await p04.evaluate(([x, y]) => document.querySelector('.tz-mapframe .tz-map-layer').tmrkzMap.jumpTo({ center: [x, y], zoom: 12 }), [56.3, Y(24.86)]);
+    await p04.waitForTimeout(800);
+  };
   await p04.getByTestId('add-site').click();
   await shot(p04, '04-site-bootstrap.png');
+  await freeGround();
   await p04.getByTestId('draw-site').click();
   await p04.waitForTimeout(500);
   const box = await p04.locator('.tz-mapframe .tz-map-layer canvas').first().boundingBox();
@@ -207,6 +213,7 @@ try {
   ok(sql(`select count(*) from site s join site p on p.id = s.parent_id where s.code = '${PFX}SITE-NEW-1' and p.code = '${PFX}SITE-02'`) === '1', 'SITE-04', 'موقع فرعي تحت موقع رئيسي، بلا هيكل Oracle');
   // a site of two parts: drawn with the same editor, and it moves as one
   await p04.getByTestId('add-site').click();
+  await freeGround();
   await p04.getByTestId('draw-site').click();
   await p04.waitForTimeout(400);
   for (const [dx, dy] of [[0.2, 0.72], [0.26, 0.72], [0.26, 0.8], [0.2, 0.8]]) {

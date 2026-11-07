@@ -194,6 +194,35 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(allowed(after, "INITIAL_STATIONING")).isFalse();
     }
 
+    @Test
+    @DisplayName("A new site and its boundary are one act: a boundary that overlaps a registered site leaves no site, and the code stays free")
+    void aRefusedBoundaryLeavesNoSite() {
+        double lat = lat0 + 0.05;
+        double lng = lng0;
+        Map<String, Object> overlapping = Map.of("type", "Polygon", "coordinates", List.of(List.of(List.of(lng - 0.001, lat - 0.001), List.of(lng + 0.001, lat - 0.001), List.of(lng + 0.001, lat + 0.001), List.of(lng - 0.001, lat + 0.001), List.of(lng - 0.001, lat - 0.001))));
+        Map<String, Object> site = new LinkedHashMap<>();
+        site.put("code", "ATOMIC-1");
+        site.put("name", "موقع يُرفض");
+        site.put("kind", "موقع");
+        site.put("location", Map.of("lat", lat, "lng", lng));
+        site.put("reason", "تسجيل موقع للاختبار");
+        site.put("responsibleOrgId", top.toString());
+        Map<String, Object> boundary = Map.of("geometry", overlapping, "crs", "EPSG:4326", "expectedVersion", 0, "reason", "حدود للاختبار", "method", "DRAWN");
+        person("sites", role("NXSITES", "ORGANIZATION", "VIEW", "MANAGE_FACILITIES"), top);
+        Api admin = login("sites");
+        Res refused = admin.post("/sites/with-boundary", Map.of("site", site, "boundary", boundary));
+        assertThat(refused.status()).as(refused.toString()).isEqualTo(400);
+        assertThat(jdbc.sql("select count(*) from site where code = 'ATOMIC-1'").query(Long.class).single()).as("no site left behind").isZero();
+        assertThat(login("rq").post("/sites/with-boundary", Map.of("site", site, "boundary", boundary)).status()).as("the same right as creating a site").isEqualTo(403);
+
+        double far = lng + 0.2;
+        Map<String, Object> free = Map.of("type", "Polygon", "coordinates", List.of(List.of(List.of(far - 0.001, lat - 0.001), List.of(far + 0.001, lat - 0.001), List.of(far + 0.001, lat + 0.001), List.of(far - 0.001, lat + 0.001), List.of(far - 0.001, lat - 0.001))));
+        site.put("location", Map.of("lat", lat, "lng", far));
+        Res saved = admin.post("/sites/with-boundary", Map.of("site", site, "boundary", Map.of("geometry", free, "crs", "EPSG:4326", "expectedVersion", 0, "reason", "حدود للاختبار", "method", "DRAWN")));
+        assertThat(saved.status()).as(saved.toString()).isEqualTo(200);
+        assertThat(jdbc.sql("select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = 'ATOMIC-1'").query(Long.class).single()).isEqualTo(1L);
+    }
+
     private Map<String, Object> level(int level, boolean approves, String label, boolean last) {
         return Map.of("level", level, "approves", approves, "label", label, "finalStage", last, "dependsOn", List.of("SCOPE", "SITE", "DEPLOYMENT"));
     }

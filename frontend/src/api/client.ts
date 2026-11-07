@@ -391,6 +391,7 @@ export const api = {
     reason?: string;
   }) => post<Site>('/sites', body),
   updateSite: (id: string, body: { code: string; name: string; kind: string; parentId: string | null; responsibleOrgId?: string | null; capacity: number | null; location: { lat: number; lng: number } | null; notes?: string | null; reason: string }) => put<Site>(`/sites/${id}`, body),
+  createSiteWithBoundary: (body: { site: { code: string; name: string; kind: string; parentId?: string | null; responsibleOrgId: string | null; capacity?: number | null; location: { lat: number; lng: number }; notes?: string | null; reason?: string }; boundary: { geometry: SiteGeometry; crs: string; expectedVersion: number; reason: string; method: string } }) => post<Site>('/sites/with-boundary', body),
   saveSiteGeometry: (id: string, body: { geometry: SiteGeometry; crs: string; expectedVersion: number; reason: string; method: string }) => post<unknown>(`/sites/${id}/geometry`, body),
   siteOccupants: (id: string) => get<SiteOccupants>(`/sites/${id}/occupants`),
   createSiteLink: (body: { siteId: string; organizationId: string; reason: string }) => post<unknown>('/site-links', body),

@@ -181,6 +181,20 @@ public class BoundaryService {
     // ---- publish one site ---------------------------------------------------------------------------------
 
     /** Geometry arrives as a plain GeoJSON object (HTTP bodies are read with Jackson 3; see ADR-011). */
+    public record CreateInput(SiteService.SiteInput site, SaveInput boundary) {
+    }
+
+    /** A new site and its boundary as one act: a refused boundary (it overlaps a registered site) leaves no site behind. */
+    @Transactional
+    public SiteService.SiteView createWithBoundary(AccessContext ctx, CreateInput in) {
+        if (in == null || in.site() == null || in.boundary() == null) {
+            throw ApiException.validation("أدخل بيانات الموقع وحدوده.");
+        }
+        SiteService.SiteView made = sites.create(ctx, in.site());
+        save(ctx, UUID.fromString(made.id()), in.boundary());
+        return made;
+    }
+
     public record SaveInput(Map<String, Object> geometry, String crs, Integer expectedVersion, String reason, String method) {
     }
 

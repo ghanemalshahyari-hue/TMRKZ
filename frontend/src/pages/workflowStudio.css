@@ -77,7 +77,7 @@
 .fs-problems { margin: 4px 0; padding-inline-start: 16px; font-size: 12.5px; line-height: 1.55; }
 .fs-problems .link-button { text-align: start; white-space: normal; }
 .fs-outcome { padding: 6px 9px; border-radius: 7px; color: #fff; font-weight: 700; }
-.fs-outcome.ok { background: #1b8a42; }
+.fs-outcome.ok { background: #0f6b30; }
 .fs-outcome.no { background: #d7301f; }
 .fs-route { margin: 8px 0; padding-inline-start: 18px; font-size: 12.5px; }
 .fs-route li { margin-bottom: 7px; }

@@ -110,6 +110,29 @@ try {
   ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${code}'`) === '0' && sql(`select lat is not null from site where code = '${code}'`) === 't', 'SITE-P1', 'موقع نقطة بلا حدود مخترعة');
   await sites.screenshot({ path: OUT + 'point-site.png' });
 
+  // ---- a boundary that overlaps a registered site: refused, and no site left behind -----------------------------------------
+  const refusedCode = PFX + 'SITE-OVERLAP-' + Date.now().toString(36);
+  await sites.getByTestId('add-site').click();
+  const [olat, olng] = sql(`select lat || ' ' || lng from site where id = md5('${NS}:site:SITE-07')::uuid`).split(' ').map(Number);
+  await sites.evaluate(([x, y]) => document.querySelector('.tz-mapframe .tz-map-layer').tmrkzMap.jumpTo({ center: [x, y], zoom: 14 }), [olng, olat]);
+  await sites.waitForTimeout(800);
+  await sites.getByTestId('draw-site').click();
+  await sites.waitForTimeout(500);
+  const ob = await sites.locator('.tz-mapframe .tz-map-layer canvas').first().boundingBox();
+  for (const [dx, dy] of [[0.4, 0.4], [0.6, 0.4], [0.6, 0.6], [0.4, 0.6]]) {
+    await sites.mouse.click(ob.x + ob.width * dx, ob.y + ob.height * dy);
+    await sites.waitForTimeout(250);
+  }
+  await sites.waitForTimeout(800);
+  await sites.getByLabel('اسم الموقع').fill('موقع متداخل — اختبار قبول — وهمي');
+  await sites.getByLabel('رمز الموقع').fill(refusedCode);
+  await sites.getByLabel('سبب تسجيل الموقع').fill('موقع يتداخل مع موقع مسجل');
+  await sites.getByTestId('save-site').click();
+  await sites.waitForTimeout(1800);
+  ok(sql(`select count(*) from site where code = '${refusedCode}'`) === '0', 'SITE-ATOMIC', 'الحدود المرفوضة لا تترك موقعاً بلا حدود');
+  ok((await sites.getByTestId('add-site-form').count()) === 1, 'SITE-ATOMIC-2', 'يبقى النموذج مفتوحاً ليعدّل المستخدم الحدود');
+  await sites.reload();
+
   // ---- posture: a temporary stationing's end date, and 3D -------------------------------------------------------------
   const view = await as('p12.view');
   await go(view, '#posture');
