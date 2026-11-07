@@ -159,7 +159,9 @@ console.log('[cleanup] directory entries removed; Keycloak users removed:', kc.l
 waitAuthzDrained();
 
 const after = fingerprintAll();
-const changed = Object.keys({ ...m.before, ...after }).filter((t) => m.before[t] !== after[t]);
+// a change made on purpose while the data was loaded and recorded in the manifest (the HR settings key rotation re-encrypted hr_source)
+const expected = m.expectedChanges ?? {};
+const changed = Object.keys({ ...m.before, ...after }).filter((t) => m.before[t] !== after[t] && !(t in expected));
 const tuples = tupleCounts();
 m.verification = { at: new Date().toISOString(), changedTables: changed.map((t) => ({ t, before: m.before[t], after: after[t] })), tuplesBefore: m.tuples, tuplesAfter: tuples, notCompared: NOT_COMPARED, leftoverPeople: psql(`select count(*) from person where id::text in (${list(m.roots.person)})`), auditRetained: psql(`select count(*) from audit_event where id > ${m.auditFrom}`) };
 m.cleanedAt = new Date().toISOString();
