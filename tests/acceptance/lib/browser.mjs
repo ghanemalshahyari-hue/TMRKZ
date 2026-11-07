@@ -99,7 +99,7 @@ export async function apiSession(user) {
     }
     return { status: r.status, body: json };
   };
-  return { get: (p) => call('GET', p), post: (p, b) => call('POST', p, b ?? {}), patch: (p, b) => call('PATCH', p, b), cookie };
+  return { get: (p) => call('GET', p), post: (p, b) => call('POST', p, b ?? {}), patch: (p, b) => call('PATCH', p, b), put: (p, b) => call('PUT', p, b), cookie };
 }
 
 export function evidenceDir() {

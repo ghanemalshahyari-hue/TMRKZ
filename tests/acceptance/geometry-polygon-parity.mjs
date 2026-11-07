@@ -37,7 +37,7 @@ const login = await browser.newContext({ viewport: SIZE });
 const lp = await login.newPage();
 await lp.goto(AUTH + '/api/v1/auth/oidc/start');
 await lp.waitForSelector('#kc-form-login', { timeout: 30000 });
-await lp.fill('#username', 't.requester');
+await lp.fill('#username', (process.env.ACC_USER ?? 't.requester'));
 await lp.fill('#password', PASSWORD);
 await lp.click('#kc-login');
 await lp.waitForURL((u) => u.toString().startsWith(AUTH) && !u.toString().includes('/auth/realms/'), { timeout: 30000 });
@@ -55,7 +55,8 @@ const page = await ctx.newPage();
 page.on('request', (q) => {
   const u = q.url();
   if (!u.startsWith(UI) && !u.startsWith(AUTH) && !u.startsWith('data:') && !u.startsWith('blob:')) external.push(u);
-  if (q.method() !== 'GET') writes.push(`${q.method()} ${u}`);
+  // the terrain analysis is a read-only POST: it carries a geometry and saves nothing
+  if (q.method() !== 'GET' && !u.endsWith('/api/v1/stationing/terrain/assess')) writes.push(`${q.method()} ${u}`);
 });
 page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
 page.on('pageerror', (e) => consoleErrors.push(e.message));
@@ -81,7 +82,7 @@ try {
   const v = partVectors(before, after);
   ok(v.metres > 400 && (await page.locator('.stw-vtx').count()) === 0, 'P-DRAG', 'the polygon itself follows the pointer and drops where released; no handles in the move', `moved ${Math.round(v.metres)} m; chip «${dist}»`);
   // 4 — «تعديل الحدود»: every vertex numbered, every side measured; move one vertex
-  await page.getByRole('button', { name: 'تعديل الحدود' }).click();
+  await page.getByRole('button', { name: 'تعديل الرؤوس' }).click();
   await page.waitForTimeout(1200);
   const handles = await page.locator('.stw-vtx').count();
   const sides = await page.locator('.stw-edge').count();

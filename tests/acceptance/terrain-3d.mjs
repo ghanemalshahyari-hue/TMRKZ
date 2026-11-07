@@ -18,7 +18,7 @@ import { toNewSiteStep, toScreen } from './geometry-helpers.mjs';
 const UI = process.env.UI_URL ?? 'http://localhost:5197';
 const AUTH = process.env.AUTH_URL ?? 'http://localhost:8097';
 const DB = process.env.DB_CONTAINER ?? 'tmrkz-v3dev-db-1';
-const OUT = fileURLToPath(new URL('../../docs/evidence/terrain-3d/', import.meta.url));
+const OUT = process.env.EVIDENCE_DIR ? process.env.EVIDENCE_DIR.replace(/[\/]?$/, '/') : fileURLToPath(new URL('../../docs/evidence/terrain-3d/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 const PASSWORD = readFileSync(new URL('../../ops/test-env/.generated/user-password', import.meta.url), 'utf8').trim();
 const { chromium } = createRequire(new URL('./package.json', import.meta.url))('playwright-core');
@@ -118,8 +118,8 @@ const rotate = async (page, dx, steps = 60) => {
 const shot = (page, file) => page.screenshot({ path: OUT + file });
 
 // ---- sign in, the fictional data, nothing saved ------------------------------------------------------------------
-const req = await signIn('t.requester');
-const rec = req.current.find((c) => c.siteName === 'موقع السهل الغربي (وهمي)');
+const req = await signIn((process.env.ACC_USER ?? 't.requester'));
+const rec = req.current.find((c) => c.siteName === ('موقع السهل الغربي' + (process.env.ACC_SUFFIX ?? ' (وهمي)')));
 if (!rec) throw new Error('fictional current site not found: run ops/test-env/dev-3d-terrain-seed.sql');
 const counts0 = rowCounts();
 const videoDir = OUT + '.video-master';
@@ -388,9 +388,9 @@ renameSync(videoPath, OUT + 'master.webm');
 rmSync(videoDir, { recursive: true, force: true });
 
 // ---- MultiPolygon and drag timings (t.manager.ga) ----------------------------------------------------------------------
-const mgr = await signIn('t.manager.ga');
+const mgr = await signIn((process.env.ACC_MGR ?? 't.manager.ga'));
 const timings = [];
-for (const [code, parts] of [['موقع من جزأين على السهل (وهمي)', 2], ['موقع من أربعة أجزاء (وهمي)', 4], ['موقع كثيف الرؤوس (وهمي)', 1]]) {
+for (const [code, parts] of [[('موقع من جزأين على السهل' + (process.env.ACC_SUFFIX ?? ' (وهمي)')), 2], [('موقع من أربعة أجزاء' + (process.env.ACC_SUFFIX ?? ' (وهمي)')), 4], [('موقع كثيف الرؤوس' + (process.env.ACC_SUFFIX ?? ' (وهمي)')), 1]]) {
   const r = mgr.current.find((c) => c.siteName === code);
   if (!r) {
     ok(false, 'T18', 'fictional site present: ' + code);

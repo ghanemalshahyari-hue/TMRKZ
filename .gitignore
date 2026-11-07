@@ -47,3 +47,5 @@ docs/tutorials/studio/
 docs/reports/
 docs/evidence/flow-studio/climb/
 docs/evidence/theme/
+# Acceptance fixtures on the one application: manifests, passwords, evidence with real unit names (ops/acceptance-main)
+ops/acceptance-main/.generated/

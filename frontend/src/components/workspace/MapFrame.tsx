@@ -3,6 +3,8 @@ import type { BasemapMode } from '../map/maplibre/offlineStyle';
 import type { MapView } from '../map/maplibre/terrain3d';
 import { LABELS } from '../../lib/requestMap';
 import { Icon } from '../ui';
+// the 2D/3D switch below is styled here: a page without the terrain panel (the posture) must not lose it under the map
+import './terrain3d.css';
 
 /** «الشوارع» / «طبيعة الأرض»: the two backgrounds of the offline map (the terrain is the GLO-30 hillshade, display only). */
 export function MapModeSwitcher({ mode, setMode }: { mode: BasemapMode; setMode: (m: BasemapMode) => void }) {

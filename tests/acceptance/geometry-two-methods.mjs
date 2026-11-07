@@ -43,7 +43,7 @@ const login = await browser.newContext({ viewport: SIZE });
 const lp = await login.newPage();
 await lp.goto(AUTH + '/api/v1/auth/oidc/start');
 await lp.waitForSelector('#kc-form-login', { timeout: 30000 });
-await lp.fill('#username', 't.requester');
+await lp.fill('#username', (process.env.ACC_USER ?? 't.requester'));
 await lp.fill('#password', PASSWORD);
 await lp.click('#kc-login');
 await lp.waitForURL((u) => u.toString().startsWith(AUTH) && !u.toString().includes('/auth/realms/'), { timeout: 30000 });

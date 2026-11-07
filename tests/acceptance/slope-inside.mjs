@@ -95,13 +95,13 @@ const fp = (z) => JSON.stringify(z.tones);
 // ---- sign in, the fictional data, nothing saved ------------------------------------------------------------------
 await page.goto(`${AUTH}/api/v1/auth/oidc/start`);
 await page.waitForSelector('#kc-form-login', { timeout: 30000 });
-await page.fill('#username', 't.requester');
+await page.fill('#username', (process.env.ACC_USER ?? (process.env.ACC_USER ?? 't.requester')));
 await page.fill('#password', PASSWORD);
 await page.click('#kc-login');
 await page.waitForURL((u) => u.toString().startsWith(AUTH) && !u.toString().includes('/auth/realms/'), { timeout: 30000 });
 await page.goto(UI + '/');
 const current = await page.evaluate(async () => (await fetch('/api/v1/stationing/current')).json());
-const rec = current.find((c) => c.siteName === 'موقع السهل الغربي (وهمي)');
+const rec = current.find((c) => c.siteName === ('موقع السهل الغربي' + (process.env.ACC_SUFFIX ?? ' (وهمي)')));
 if (!rec) throw new Error('fictional current site not found: run ops/test-env/dev-3d-terrain-seed.sql');
 const counts0 = rowCounts();
 

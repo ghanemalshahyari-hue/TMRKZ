@@ -8,11 +8,19 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { apiSession, BASE, consoleErrors, external, launch, newContext, signInManual, watch } from './lib/browser.mjs';
 
+// On the one application (ops/acceptance-main): ACC_NS and ACC_PREFIX name the loaded run; ACC_EVIDENCE keeps evidence out of Git,
+// because pages on :8088 can show real units. Defaults keep the separate fictional environments working.
+const NS = process.env.ACC_NS ?? 't';
+const PFX = process.env.ACC_PREFIX ?? '';
+// the button matrix's own new person and unit, so it can run after the journeys on the same load
+const NEW = process.env.PB_NEW ?? 'p01.new';
+const UNIT = process.env.PB_UNIT ?? 'N-A11';
+const ASK = process.env.ACC_ASK_ROLE ?? 'POSTURE_VIEWER';
 const DB = process.env.DB_CONTAINER ?? 'tmrkz-next-db-1';
-const evidence = fileURLToPath(new URL('../../docs/evidence/stationing-next/', import.meta.url));
+const evidence = process.env.ACC_EVIDENCE ?? fileURLToPath(new URL('../../docs/evidence/stationing-next/', import.meta.url));
 mkdirSync(evidence, { recursive: true });
 const sql = (q) => execFileSync('docker', ['exec', DB, 'psql', '-X', '-q', '-U', 'mover', '-d', 'mover', '-At', '-c', q], { encoding: 'utf8' }).trim();
-const org = (x) => sql(`select md5('t:org:${x}')::uuid`);
+const org = (x) => sql(`select md5('${NS}:org:${x}')::uuid`);
 const rows = [];
 const browser = await launch();
 const pageOf = new Map();
@@ -55,23 +63,23 @@ const without = (...keep) => ALL.filter((b) => !keep.includes(b));
 const square = (lng, lat, d = 0.0015) => ({ type: 'Polygon', coordinates: [[[lng - d, lat - d], [lng + d, lat - d], [lng + d, lat + d], [lng - d, lat + d], [lng - d, lat - d]]] });
 
 try {
-  const p01Api = await apiSession('p01.new');
-  await check('p01.new', 'مستخدم جديد', 'طلب صلاحية', '#requestAccess', ['إرسال طلب الصلاحية'], ['إرسال التوصية', 'اعتماد وتفعيل', ...ALL, '＋ طلب جديد']);
-  const asked = await p01Api.post('/access-requests', { roles: ['POSTURE_VIEWER'], reason: 'أتابع موقف وحدتي', scope: { mode: 'UNIT', ids: [] } });
+  const p01Api = await apiSession(NEW);
+  await check(NEW, 'مستخدم جديد', 'طلب صلاحية', '#requestAccess', ['إرسال طلب الصلاحية'], ['إرسال التوصية', 'اعتماد وتفعيل', ...ALL, '＋ طلب جديد']);
+  const asked = await p01Api.post('/access-requests', { roles: [ASK], reason: 'أتابع موقف وحدتي', scope: { mode: 'UNIT', ids: [] } });
   if (asked.status !== 200) throw new Error('access: ' + JSON.stringify(asked.body));
   const task = () => sql(`select id from task_assignment where request_id = '${asked.body.id}' and status = 'OPEN'`);
   await check('p02.access', 'مدير صلاحيات الوحدة', 'طلبات الصلاحية', '#accessInbox', ['إرسال التوصية', 'إرجاع للتعديل', 'رفض'], ['اعتماد وتفعيل', ...ALL], [
-    ['قرار نهائي قبل وقته بنطاق النظام كله', 'post', `/access-requests/${asked.body.id}/decision`, { taskId: task(), decision: 'APPROVE', roles: ['POSTURE_VIEWER'], scope: { mode: 'ALL', ids: [] } }],
+    ['قرار نهائي قبل وقته بنطاق النظام كله', 'post', `/access-requests/${asked.body.id}/decision`, { taskId: task(), decision: 'APPROVE', roles: [ASK], scope: { mode: 'ALL', ids: [] } }],
   ]);
   const a02 = await apiSession('p02.access');
-  const rec = await a02.post(`/access-requests/${asked.body.id}/decision`, { taskId: task(), decision: 'APPROVE', roles: ['POSTURE_VIEWER'] });
+  const rec = await a02.post(`/access-requests/${asked.body.id}/decision`, { taskId: task(), decision: 'APPROVE', roles: [ASK] });
   if (rec.status !== 200) throw new Error('recommend: ' + JSON.stringify(rec.body));
   await check('p03.final', 'معتمد الصلاحيات النهائي', 'طلبات الصلاحية', '#accessInbox', ['اعتماد وتفعيل', 'إرجاع للتعديل', 'رفض'], ['إرسال التوصية', ...ALL]);
 
   const a05 = await apiSession('p05.req');
   await check('p04.sites', 'مدير المواقع', 'تهيئة المواقع والتمركز', '#siteSetup', ['＋ إضافة موقع'], [...ALL, 'اعتماد وتفعيل', 'إرسال التوصية']);
   await check('p05.req', 'مقدم الطلبات', 'طلب جديد', '#newRequest', ['طلب منطقة انتشار', 'طلب تمركز أولي', 'طلب إعادة تمركز'], [...ALL, 'اعتماد وتفعيل', 'إرسال التوصية', '＋ إضافة موقع']);
-  const made = await a05.post('/restationing-requests', { requestingUnitId: org('N-A11'), purpose: 'DEPLOYMENT_AREAS', content: { kind: 'PERMANENT', scope: [org('N-A11')], primary: square(56.1195, 24.86), alternative: square(56.1195, 24.8965), reason: 'منطقتا الانتشار لفحص الأزرار' } });
+  const made = await a05.post('/restationing-requests', { requestingUnitId: org(UNIT), purpose: 'DEPLOYMENT_AREAS', content: { kind: 'PERMANENT', scope: [org(UNIT)], primary: square(56.1195, 24.86), alternative: square(56.1195, 24.8965), reason: 'منطقتا الانتشار لفحص الأزرار' } });
   if (made.status !== 200) throw new Error('draft: ' + JSON.stringify(made.body));
   const id = made.body.id;
   const sub = await a05.post(`/restationing-requests/${id}/submit`, {});
@@ -103,8 +111,8 @@ try {
   await check('p12.view', 'متابعة الموقف', 'الموقف العملياتي', '#posture', [], [...ALL, 'إرجاع للتعديل', 'رفض', 'حفظ المسودة والفحص', 'إرسال للاعتماد', '＋ طلب جديد', 'إضافة ربط', 'تعديل الطلب'], [
     ['إنشاء طلب مصنوع', 'post', '/restationing-requests', { requestingUnitId: org('N-A11'), purpose: 'DEPLOYMENT_AREAS', content: { kind: 'PERMANENT', scope: [org('N-A11')], reason: 'محاولة مصنوعة' } }],
     decide, activate, fyi,
-    ['ربط مصنوع', 'post', '/site-links', { siteId: sql(`select md5('t:site:SITE-01')::uuid`), organizationId: org('N-A11'), reason: 'محاولة مصنوعة' }],
-    ['تصحيح مصنوع', 'post', '/stationing/corrections', { organizationId: org('N-A11'), siteId: sql(`select md5('t:site:SITE-01')::uuid`), reason: 'محاولة مصنوعة' }],
+    ['ربط مصنوع', 'post', '/site-links', { siteId: sql(`select md5('${NS}:site:SITE-01')::uuid`), organizationId: org('N-A11'), reason: 'محاولة مصنوعة' }],
+    ['تصحيح مصنوع', 'post', '/stationing/corrections', { organizationId: org('N-A11'), siteId: sql(`select md5('${NS}:site:SITE-01')::uuid`), reason: 'محاولة مصنوعة' }],
   ]);
   await check('p13.other', 'متابعة من فرع آخر', 'الطلب الذي وصله للعلم', req, [], [...ALL, 'إرجاع للتعديل', 'رفض', 'تعديل الطلب'], [decide, activate, fyi]);
   await check('p14.admin', 'مدير المنصة', 'مركز الصلاحيات', '#permissions', ['الصلاحيات المعروضة للطلب'], [...ALL, 'اعتماد وتفعيل', 'إرسال التوصية'], [decide, activate, fyi]);

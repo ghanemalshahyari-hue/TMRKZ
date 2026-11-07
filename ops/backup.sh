@@ -14,8 +14,21 @@ OUT="$OUT_ROOT/$PROJECT-$STAMP"
 mkdir -p "$OUT"
 dc() { docker compose -p "$PROJECT" "$@"; }
 
+# The fingerprint must describe what the dump holds. The application keeps writing (the HR sync, sign-ins), so the dump counts only
+# when the fingerprint before it equals the one after it; otherwise it is taken again.
+fingerprint() { dc exec -T db psql -U mover -d mover -At -f - < ops/sql/fingerprint.sql; }
 echo "[backup] database → $OUT/db.dump"
-dc exec -T db pg_dump -U mover -d mover -Fc --no-owner > "$OUT/db.dump"
+tries=0
+while :; do
+  fingerprint > "$OUT/fingerprint.txt"
+  dc exec -T db pg_dump -U mover -d mover -Fc --no-owner > "$OUT/db.dump"
+  fingerprint > "$OUT/fingerprint.after.txt"
+  cmp -s "$OUT/fingerprint.txt" "$OUT/fingerprint.after.txt" && break
+  tries=$((tries + 1))
+  [ "$tries" -lt 5 ] || { echo "[backup] the database kept changing during the dump; try again when it is quieter" >&2; exit 1; }
+  echo "[backup] the database changed during the dump; taking it again"
+done
+rm -f "$OUT/fingerprint.after.txt"
 
 echo "[backup] identity database → $OUT/keycloak.dump"
 dc exec -T db pg_dump -U mover -d keycloak -Fc --no-owner > "$OUT/keycloak.dump"
@@ -29,9 +42,6 @@ dc exec -T backend tar czf - -C /var/lib/mover . > "$OUT/files.tgz"
 
 echo "[backup] map packages → $OUT/map-packages.tgz"
 dc exec -T backend tar czf - -C /opt/mover/map-packages . > "$OUT/map-packages.tgz"
-
-echo "[backup] fingerprints"
-dc exec -T db psql -U mover -d mover -At -f - < ops/sql/fingerprint.sql > "$OUT/fingerprint.txt"
 
 sha() { (sha256sum "$1" 2>/dev/null || shasum -a 256 "$1") | cut -d' ' -f1; }
 # numeric order: versions are text, and max('9', '17') would report 9

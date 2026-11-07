@@ -43,7 +43,7 @@ const login = await browser.newContext({ viewport: SIZE });
 const lp = await login.newPage();
 await lp.goto(AUTH + '/api/v1/auth/oidc/start');
 await lp.waitForSelector('#kc-form-login', { timeout: 30000 });
-await lp.fill('#username', 't.requester');
+await lp.fill('#username', (process.env.ACC_USER ?? 't.requester'));
 await lp.fill('#password', PASSWORD);
 await lp.click('#kc-login');
 await lp.waitForURL((u) => u.toString().startsWith(AUTH) && !u.toString().includes('/auth/realms/'), { timeout: 30000 });
@@ -61,7 +61,8 @@ async function recording(name, run) {
   page.on('request', (q) => {
     const u = q.url();
     if (!u.startsWith(UI) && !u.startsWith(AUTH) && !u.startsWith('data:') && !u.startsWith('blob:')) external.push(u);
-    if (q.method() !== 'GET') writes.push(`${name}: ${q.method()} ${u}`);
+    // the terrain analysis is a read-only POST: it carries a geometry and saves nothing
+    if (q.method() !== 'GET' && !u.endsWith('/api/v1/stationing/terrain/assess')) writes.push(`${name}: ${q.method()} ${u}`);
   });
   page.on('console', (m) => m.type() === 'error' && consoleErrors.push(`${name}: ${m.text()}`));
   page.on('pageerror', (e) => consoleErrors.push(`${name}: ${e.message}`));
@@ -121,8 +122,11 @@ await recording('B-multipolygon', async (page) => {
 });
 
 // ---- C: marker-only current site: draw vertex by vertex ---------------------------------------------------------------
-await recording('C-point', async (page) => {
+// The drawing on a Point site now goes through «عدد الرؤوس»; geometry-old-mp-point.mjs C1–C5 checks it on the current page.
+if (process.env.ACC_SKIP_POINT !== '1') await recording('C-point', async (page) => {
   await toNewSiteStep(page, UI, rec.c.siteId, rec.c.orgName);
+  await page.getByRole('tab', { name: 'ب · رسم حدود جديدة' }).click();
+  await page.waitForTimeout(600);
   const msg = await page.locator('[data-testid=draw-readout]').textContent();
   await shot(page, 'C-1-draw-from-point.png');
   const c = await page.locator('.tz-mapframe canvas.maplibregl-canvas').first().boundingBox();
@@ -159,7 +163,7 @@ await recording('D-vertex-edit', async (page) => {
   const from = await toScreen(page, ringCentre(start[0][0]));
   await slowDrag(page, from, { x: from.x + 260, y: from.y - 60 }, { steps: 30, pause: 250 });
   const dropped = await proposedParts(page);
-  await page.getByRole('button', { name: 'تعديل الحدود' }).click();
+  await page.getByRole('button', { name: 'تعديل الرؤوس' }).click();
   await page.waitForTimeout(800);
   await shot(page, 'D-1-vertices.png');
   const areaBefore = await page.locator('[data-testid=site-readout]').textContent();
@@ -168,14 +172,14 @@ await recording('D-vertex-edit', async (page) => {
   const edited = await proposedParts(page);
   const areaAfter = await page.locator('[data-testid=site-readout]').textContent();
   await shot(page, 'D-2-vertex-moved.png');
-  await page.getByRole('button', { name: 'تراجع', exact: true }).click();
+  await page.getByRole('button', { name: '↶ تراجع' }).click();
   await page.waitForTimeout(700);
   const undone = await proposedParts(page);
-  await page.getByRole('button', { name: 'إعادة', exact: true }).click();
+  await page.getByRole('button', { name: '↷ إعادة' }).click();
   await page.waitForTimeout(700);
   const redone = await proposedParts(page);
   await shot(page, 'D-3-redo.png');
-  await page.getByRole('button', { name: 'استعادة البداية', exact: true }).click();
+  await page.getByRole('button', { name: 'إعادة الضبط', exact: true }).click();
   await page.waitForTimeout(900);
   const reset = await proposedParts(page);
   await shot(page, 'D-vertex-edit-final.png');

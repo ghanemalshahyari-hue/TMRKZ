@@ -10,7 +10,7 @@ if (!inForce?.values?.approvalStages) {
   const values = { ...(t.values ?? t) };
   for (const k of ['_note', 'reason', 'reference']) delete values[k];
   values.terrainSlopeClassification.datasetVersion = process.env.TERRAIN_VERSION ?? '2026.11-dev-unverified';
-  values.maxFootprintAreaM2 = 200000;
+  values.maxFootprintAreaM2 = Number(process.env.ACC_MAX_FOOTPRINT ?? 200000);
   values.deploymentRequirement = 'REQUIRED';
   values.primary = { ...values.primary, minM: 5000, maxM: 8000, terrainApplies: true };
   values.alternative = { ...values.alternative, minM: 3000, maxM: 5000, terrainApplies: true };
@@ -21,7 +21,8 @@ if (!inForce?.values?.approvalStages) {
   ] };
   values.deploymentAreaDefault = { shape: 'SQUARE', areaM2: 90000 };
   values.approvalStages = { unitOperations: true, finalByPermission: true, fyiBeforeActivation: true };
-  const r = await admin.post('/stationing/policy/versions', { values, reason: 'سياسة قبول وهمية لمراجعة المالك', reference: 'FICTIONAL / ACCEPTANCE' });
+  const note = process.env.ACC_POLICY_NOTE ?? 'FICTIONAL / ACCEPTANCE';
+  const r = await admin.post('/stationing/policy/versions', { values, reason: 'سياسة قبول وهمية — اختبار قبول — ليست قيم الإنتاج', reference: note });
   if (r.status !== 200) throw new Error('policy: ' + JSON.stringify(r.body).slice(0, 600));
   console.log('policy version', r.body.version?.version);
 }

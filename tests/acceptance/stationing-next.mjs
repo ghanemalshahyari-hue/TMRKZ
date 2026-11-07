@@ -9,8 +9,14 @@ import { fileURLToPath } from 'node:url';
 import { apiSession, BASE, consoleErrors, external, launch, newContext, signInManual, watch } from './lib/browser.mjs';
 import { partVectors, proposedParts, ringCentre, slowDrag, toScreen } from './geometry-helpers.mjs';
 
+// On the one application (ops/acceptance-main): ACC_NS and ACC_PREFIX name the loaded run; ACC_EVIDENCE keeps evidence out of Git,
+// because pages on :8088 can show real units. Defaults keep the separate fictional environments working.
+const NS = process.env.ACC_NS ?? 't';
+const SFX = process.env.ACC_SUFFIX ?? '' + SFX;
+const LABEL = (name) => (process.env.ACC_SUFFIX ? name + process.env.ACC_SUFFIX : name);
+const PFX = process.env.ACC_PREFIX ?? '';
 const DB = process.env.DB_CONTAINER ?? 'tmrkz-next-db-1';
-const evidence = fileURLToPath(new URL('../../docs/evidence/stationing-next/', import.meta.url));
+const evidence = process.env.ACC_EVIDENCE ?? fileURLToPath(new URL('../../docs/evidence/stationing-next/', import.meta.url));
 mkdirSync(evidence, { recursive: true });
 const sql = (q) => execFileSync('docker', ['exec', DB, 'psql', '-X', '-q', '-U', 'mover', '-d', 'mover', '-At', '-c', q], { encoding: 'utf8' }).trim();
 const results = [];
@@ -18,7 +24,7 @@ const ok = (pass, id, what, detail = '') => {
   results.push({ id, pass: !!pass, what, detail: String(detail).slice(0, 400) });
   console.log(`${pass ? 'PASS' : 'FAIL'} ${id} — ${what}${detail ? ' · ' + String(detail).slice(0, 220) : ''}`);
 };
-const org = (x) => sql(`select md5('t:org:${x}')::uuid`);
+const org = (x) => sql(`select md5('${NS}:org:${x}')::uuid`);
 const browser = await launch();
 const pages = new Map();
 const pageAs = async (user) => {
@@ -46,6 +52,8 @@ const buttons = async (p, id, what, yes, no) => {
   const bad = [...yes.filter((n) => !has[n]).map((n) => 'ناقص: ' + n), ...no.filter((n) => has[n]).map((n) => 'زائد: ' + n)];
   ok(bad.length === 0, id, what, bad.join(' | '));
 };
+// what a new person asks for: one of the roles the installation shows new people
+const ASK = process.env.ACC_ASK_ROLE ?? 'POSTURE_VIEWER';
 const FINAL_ACCESS = 'اعتماد وتفعيل';
 const RECOMMEND = 'إرسال التوصية';
 const DECISIONS = ['اعتماد', 'اعتماد عمليات الوحدة', 'اعتماد نهائي', 'تحديد وحدات العلم', 'تفعيل', 'إرجاع للتعديل', 'رفض'];
@@ -97,6 +105,8 @@ const submitted = async (p) => {
 
 try {
   // ---- ACCESS --------------------------------------------------------------------------------------------------------
+  // ACC_RESUME=1 continues a run whose access journey already passed on the same code, since it can run only once per load
+  if (process.env.ACC_RESUME !== '1') {
   const p01 = await pageAs('p01.new');
   await p01.getByTestId('access-request').waitFor({ timeout: 10000 });
   ok(true, 'ACCESS-01', 'مستخدم بلا صلاحيات يرى شاشة طلب الصلاحية فقط');
@@ -104,10 +114,10 @@ try {
   ok(nav === 'طلب صلاحية', 'ACCESS-02', 'القائمة لا تحوي غيرها', nav);
   await p01.locator('[data-role]').first().waitFor({ timeout: 10000 });
   const offered = await p01.locator('[data-role]').evaluateAll((l) => l.map((e) => e.getAttribute('data-role')));
-  ok(offered.includes('POSTURE_VIEWER') && !offered.includes('SITE_SETUP_ADMIN') && !offered.includes('STATIONING_UNIT_APPROVER'), 'ACCESS-03', 'يختار مما يعرضه مدير النظام، بأسماء عربية', offered.join());
+  ok(offered.includes(ASK) && !offered.includes('SITE_SETUP_ADMIN') && !offered.includes('STATIONING_UNIT_APPROVER'), 'ACCESS-03', 'يختار مما يعرضه مدير النظام، بأسماء عربية', offered.join());
   ok(!(await p01.locator('[data-role]').first().evaluate((e) => e.closest('label').innerText)).includes('VIEW'), 'ACCESS-04', 'لا تظهر أسماء داخلية');
   ok((await p01.locator('[data-scope=ALL]').count()) === 0, 'ACCESS-05', 'النظام بالكامل ليس خياراً');
-  await p01.locator('[data-role=POSTURE_VIEWER]').check();
+  await p01.locator(`[data-role=${ASK}]`).check();
   await p01.locator('[data-scope=UNIT_TREE]').check();
   await p01.getByLabel('سبب الطلب').fill('أتابع موقف وحدتي');
   await shot(p01, '01-no-access-request.png');
@@ -127,7 +137,7 @@ try {
   await go(p01, '#requestAccess');
   await p01.getByTestId('access-returned').waitFor({ timeout: 10000 });
   ok(true, 'ACCESS-09', 'أُعيد إليه الطلب نفسه للتعديل');
-  await p01.locator('[data-role=POSTURE_VIEWER]').check();
+  await p01.locator(`[data-role=${ASK}]`).check();
   await p01.locator('[data-scope=UNIT_TREE]').check();
   await p01.getByLabel('سبب الطلب').fill('أتابع موقف وحدتي وما يتبعها في عملي');
   await button(p01, 'إعادة إرسال الطلب').click();
@@ -135,16 +145,18 @@ try {
   ok(sql(`select count(*) from access_request a join person p on p.id = a.person_id where p.username = 'p01.new'`) === '1', 'ACCESS-10', 'طلب واحد لا طلبان');
   await go(p02, '#accessInbox');
   await p02.getByTestId('access-item').waitFor({ timeout: 10000 });
+  // the viewing right is a manager's extra here, so a new person's own list stays the owner's
+  if (ASK !== 'POSTURE_VIEWER') await p02.locator('[data-testid=access-extras] [data-role=POSTURE_VIEWER]').check();
   await shot(p02, '02-access-recommendation.png');
   await button(p02, RECOMMEND).click();
   await p02.getByText('لا توجد طلبات تنتظرك').waitFor({ timeout: 10000 });
   ok(sql(`select count(*) from membership m join person p on p.id = m.person_id where p.username = 'p01.new'`) === '0', 'ACCESS-11', 'التوصية لا تمنح شيئاً');
   const api01 = await apiSession('p01.new');
   const openTask = sql(`select id from task_assignment where request_id = '${accessId}' and status = 'OPEN'`);
-  const self = await api01.post(`/access-requests/${accessId}/decision`, { taskId: openTask, decision: 'APPROVE', roles: ['POSTURE_VIEWER'] });
+  const self = await api01.post(`/access-requests/${accessId}/decision`, { taskId: openTask, decision: 'APPROVE', roles: [ASK] });
   ok(self.status >= 400, 'ACCESS-12', 'مقدم الطلب لا يعتمد طلبه بطلب مصنوع', self.status);
   const api02 = await apiSession('p02.access');
-  const forged = await api02.post(`/access-requests/${accessId}/decision`, { taskId: openTask, decision: 'APPROVE', roles: ['POSTURE_VIEWER'] });
+  const forged = await api02.post(`/access-requests/${accessId}/decision`, { taskId: openTask, decision: 'APPROVE', roles: [ASK] });
   ok(forged.status >= 400, 'ACCESS-13', 'المراجع المحلي لا يفعّل بطلب مصنوع', forged.status);
   const p03 = await pageAs('p03.final');
   await go(p03, '#accessInbox');
@@ -162,6 +174,8 @@ try {
   ok(sql(`select count(*) from audit_event where entity_id = '${accessId}' and action in ('ACCESS_REQUEST_RECOMMENDED', 'ACCESS_REQUEST_FINAL_APPROVED', 'ACCESS_REQUEST_RESUBMITTED', 'ACCESS_REQUEST_SUBMITTED')`) === '4', 'ACCESS-17', 'سجل التدقيق كامل');
   ok(!after.includes('طلب جديد'), 'ACCESS-18', 'لا تظهر له طلبات أخرى', after.slice(0, 200));
 
+  }
+
   // ---- SITES ---------------------------------------------------------------------------------------------------------
   const p04 = await pageAs('p04.sites');
   await go(p04, '#siteSetup');
@@ -176,16 +190,16 @@ try {
     await p04.waitForTimeout(250);
   }
   await p04.waitForTimeout(800);
-  await p04.getByLabel('اسم الموقع').fill('موقع جديد للتجربة (وهمي)');
-  await p04.getByLabel('رمز الموقع').fill('SITE-NEW-1');
-  await p04.getByLabel('الموقع الرئيسي').selectOption({ label: 'مجمع الخدمات (وهمي)' });
+  await p04.getByLabel('اسم الموقع').fill('موقع جديد للتجربة' + SFX);
+  await p04.getByLabel('رمز الموقع').fill(PFX + 'SITE-NEW-1');
+  await p04.getByLabel('الموقع الرئيسي').selectOption({ label: 'مجمع الخدمات' + SFX });
   await p04.getByLabel('سبب تسجيل الموقع').fill('تهيئة أولى لموقع جديد');
   await p04.getByTestId('save-site').click();
-  await p04.locator('[data-site="SITE-NEW-1"]').waitFor({ timeout: 15000 });
+  await p04.locator(`[data-site="${PFX}SITE-NEW-1"]`).waitFor({ timeout: 15000 });
   ok(true, 'SITE-01', 'موقع يُرسم على الخريطة ويُسجل بسبب');
-  ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = 'SITE-NEW-1'`) === '1', 'SITE-02', 'بحدوده');
+  ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${PFX}SITE-NEW-1'`) === '1', 'SITE-02', 'بحدوده');
   ok(sql(`select count(*) from audit_event where action = 'SITE_CREATED' and detail::text like '%SITE-NEW-1%'`) === '1', 'SITE-03', 'مُدقَّق');
-  ok(sql(`select count(*) from site s join site p on p.id = s.parent_id where s.code = 'SITE-NEW-1' and p.code = 'SITE-02'`) === '1', 'SITE-04', 'موقع فرعي تحت موقع رئيسي، بلا هيكل Oracle');
+  ok(sql(`select count(*) from site s join site p on p.id = s.parent_id where s.code = '${PFX}SITE-NEW-1' and p.code = '${PFX}SITE-02'`) === '1', 'SITE-04', 'موقع فرعي تحت موقع رئيسي، بلا هيكل Oracle');
   // a site of two parts: drawn with the same editor, and it moves as one
   await p04.getByTestId('add-site').click();
   await p04.getByTestId('draw-site').click();
@@ -209,48 +223,48 @@ try {
   const moved2 = await proposedParts(p04);
   const vectors = partVectors(twoParts, moved2);
   ok(moved2.length === 2 && vectors.metres > 1 && vectors.spread < 1, 'SITE-12', 'يتحرك الجزءان معاً', JSON.stringify({ m: Math.round(vectors.metres), spread: vectors.spread }));
-  await p04.getByLabel('اسم الموقع').fill('موقع من جزأين للتجربة (وهمي)');
-  await p04.getByLabel('رمز الموقع').fill('SITE-NEW-2');
+  await p04.getByLabel('اسم الموقع').fill('موقع من جزأين للتجربة' + SFX);
+  await p04.getByLabel('رمز الموقع').fill(PFX + 'SITE-NEW-2');
   await p04.getByLabel('سبب تسجيل الموقع').fill('تهيئة موقع من جزأين');
   await p04.getByTestId('save-site').click();
-  await p04.locator('[data-site="SITE-NEW-2"]').waitFor({ timeout: 15000 });
-  ok(sql(`select GeometryType(g.geom) from site_geometry_version g join site s on s.id = g.site_id where s.code = 'SITE-NEW-2'`) === 'MULTIPOLYGON', 'SITE-13', 'يُسجل موقعاً واحداً متعدد الأجزاء');
-  await p04.locator('[data-site="SITE-NEW-1"]').click();
+  await p04.locator(`[data-site="${PFX}SITE-NEW-2"]`).waitFor({ timeout: 15000 });
+  ok(sql(`select GeometryType(g.geom) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${PFX}SITE-NEW-2'`) === 'MULTIPOLYGON', 'SITE-13', 'يُسجل موقعاً واحداً متعدد الأجزاء');
+  await p04.locator(`[data-site="${PFX}SITE-NEW-1"]`).click();
   await p04.getByTestId('edit-site').waitFor({ timeout: 10000 });
   await p04.getByTestId('edit-site').getByLabel('الموقع الرئيسي').selectOption('');
   await p04.getByTestId('edit-site').getByLabel('سبب التعديل').fill('صار موقعاً رئيسياً مستقلاً');
   await p04.getByTestId('save-edit').click();
   await p04.waitForTimeout(1500);
-  ok(sql(`select parent_id is null from site where code = 'SITE-NEW-1'`) === 't', 'SITE-04b', 'يتغير الموقع الرئيسي بسبب مسجل');
-  await p04.locator('[data-site="SITE-NEW-1"]').click();
+  ok(sql(`select parent_id is null from site where code = '${PFX}SITE-NEW-1'`) === 't', 'SITE-04b', 'يتغير الموقع الرئيسي بسبب مسجل');
+  await p04.locator(`[data-site="${PFX}SITE-NEW-1"]`).click();
   await p04.getByTestId('edit-shape').waitFor({ timeout: 10000 });
   await p04.getByTestId('edit-site').getByLabel('سبب التعديل').fill('حدود مصححة للتجربة');
   await p04.getByTestId('edit-shape').click();
   await p04.waitForTimeout(800);
   await p04.getByTestId('save-shape').click();
   await p04.waitForTimeout(1500);
-  ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = 'SITE-NEW-1'`) === '2', 'SITE-04c', 'نسخة حدود جديدة تُحفظ، والقديمة باقية');
-  await p04.locator('[data-site="SITE-02"]').first().click();
+  ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${PFX}SITE-NEW-1'`) === '2', 'SITE-04c', 'نسخة حدود جديدة تُحفظ، والقديمة باقية');
+  await p04.locator(`[data-site="${PFX}SITE-02"]`).first().click();
   await p04.waitForTimeout(800);
   await shot(p04, '06-main-sub-sites.png');
-  await p04.locator('[data-site="SITE-01"]').click();
+  await p04.locator(`[data-site="${PFX}SITE-01"]`).click();
   await p04.getByTestId('stationed-here').waitFor();
   await p04.waitForTimeout(1500);
   const here = await p04.getByTestId('stationed-here').innerText();
   ok(['القيادة الرئيسية أ', 'القيادة الرئيسية ب', 'القيادة الرئيسية ج', 'القيادة الرئيسية د'].every((n) => here.includes(n)), 'SITE-05', 'أربع جهات رئيسية في موقع واحد', here.slice(0, 200));
-  ok((await p04.locator('[data-site="SITE-01"]').count()) === 1, 'SITE-06', 'موقع واحد لا أربعة');
+  ok((await p04.locator(`[data-site="${PFX}SITE-01"]`).count()) === 1, 'SITE-06', 'موقع واحد لا أربعة');
   await p04.getByLabel('بحث وحدة الربط').fill('إدارة ب1');
-  await p04.getByLabel('وحدة الربط', { exact: true }).selectOption({ label: 'إدارة ب1' });
+  await p04.getByLabel('وحدة الربط', { exact: true }).selectOption({ label: LABEL('إدارة ب1') });
   await p04.getByLabel('سبب الربط').fill('ربط إداري للتجربة');
   await p04.getByTestId('add-link').click();
   await p04.waitForTimeout(1500);
   await shot(p04, '05-one-site-four-units.png');
   const links = await p04.getByTestId('linked-here').innerText();
   ok(links.includes('إدارة ب1'), 'SITE-07', 'الربط يُضاف');
-  ok(sql(`select count(*) from org_stationing where organization_id = md5('t:org:N-B1')::uuid and site_id = md5('t:site:SITE-01')::uuid`) === '0', 'SITE-08', 'الربط لا يصنع تمركزاً');
-  ok(sql(`select parent_id is null from organization where id = md5('t:org:N-B')::uuid`) === 't', 'SITE-09', 'لا يتغير هيكل Oracle بالمشاركة في الموقع');
+  ok(sql(`select count(*) from org_stationing where organization_id = md5('${NS}:org:N-B1')::uuid and site_id = md5('${NS}:site:SITE-01')::uuid`) === '0', 'SITE-08', 'الربط لا يصنع تمركزاً');
+  ok(sql(`select parent_id is null from organization where id = md5('${NS}:org:N-B')::uuid`) === 't', 'SITE-09', 'لا يتغير هيكل Oracle بالمشاركة في الموقع');
   const reqApi = await apiSession('p05.req');
-  const seen = await reqApi.get('/sites/' + sql(`select md5('t:site:SITE-01')::uuid`) + '/occupants');
+  const seen = await reqApi.get('/sites/' + sql(`select md5('${NS}:site:SITE-01')::uuid`) + '/occupants');
   ok(seen.status === 200 && !JSON.stringify(seen.body).includes('القيادة الرئيسية ب') && seen.body.otherStationed === 4, 'SITE-10', 'جهة من فرع آخر تُعد ولا تُسمّى', JSON.stringify(seen.body).slice(0, 180));
 
   // ---- THE HUB, INITIAL STATIONING --------------------------------------------------------------------------------------
@@ -268,7 +282,7 @@ try {
   ok(refused.status === 400, 'RESTATIONING-02', 'وحدة بلا تمركز لا تُعاد تمركزها بطلب مصنوع', refused.status);
   await row('N-A111').locator('[data-go=INITIAL_STATIONING]').click();
   await p05.getByTestId('initial-sites').waitFor({ timeout: 15000 });
-  await p05.locator('[data-testid=initial-sites] [data-site="SITE-01"]').click();
+  await p05.locator(`[data-testid=initial-sites] [data-site="${PFX}SITE-01"]`).click();
   await p05.waitForTimeout(1200);
   await shot(p05, '07b-initial-stationing.png');
   await p05.getByTestId('initial-next').click();
@@ -289,8 +303,8 @@ try {
   ok(selfDecide.body?.code === 'SEPARATION_OF_DUTIES', 'APPROVAL-04', 'مقدم الطلب لا يقرر طلبه', selfDecide.status);
   await wholeRoute(initial, 'APPROVAL-05', { shots: true, fyiUnit: org('N-B1') });
   ok(stateOf(initial) === 'ACTIVATED_PERMANENT', 'INITIAL-STATIONING-04', 'فُعّل');
-  ok(sql(`select s.code from org_stationing o join site s on s.id = o.site_id where o.organization_id = md5('t:org:N-A111')::uuid and o.valid_to is null`) === 'SITE-01', 'INITIAL-STATIONING-05', 'صار للوحدة تمركز معتمد');
-  ok(sql(`select count(*) from org_stationing where organization_id = md5('t:org:N-A113')::uuid`) === '0', 'INITIAL-STATIONING-06', 'لا تنتقل الوحدات الأخرى');
+  ok(sql(`select s.code from org_stationing o join site s on s.id = o.site_id where o.organization_id = md5('${NS}:org:N-A111')::uuid and o.valid_to is null`) === PFX + 'SITE-01', 'INITIAL-STATIONING-05', 'صار للوحدة تمركز معتمد');
+  ok(sql(`select count(*) from org_stationing where organization_id = md5('${NS}:org:N-A113')::uuid`) === '0', 'INITIAL-STATIONING-06', 'لا تنتقل الوحدات الأخرى');
 
   // ---- FYI -------------------------------------------------------------------------------------------------------------
   const p13Api = await apiSession('p13.other');
@@ -344,7 +358,7 @@ try {
   ok(partVectors(before, dragged).metres > 1, 'DEPLOYMENT-09', 'تُسحب المنطقة على الخريطة');
   ok(writes.length === 0, 'DEPLOYMENT-10', 'صفر كتابة أثناء التعديل على الخريطة', writes.join(' '));
   await shot(p05, '08-deployment-request.png');
-  await button(p05, '3D').click().catch(() => undefined);
+  await button(p05, '3D').click();
   await p05.waitForTimeout(3000);
   await shot(p05, '08b-deployment-3d.png');
   await button(p05, '2D').click().catch(() => undefined);
@@ -359,12 +373,12 @@ try {
   const deployment = await submitted(p05);
   const dup = await reqApi.post('/restationing-requests', { requestingUnitId: org('N-A11'), purpose: 'DEPLOYMENT_AREAS', content: { kind: 'PERMANENT', scope: [org('N-A11')], reason: 'طلب مكرر' } });
   ok(dup.status === 400, 'DEPLOYMENT-03', 'طلب مكرر مرفوض', dup.status);
-  ok(sql(`select count(*) from deployment_area where organization_id = md5('t:org:N-A11')::uuid`) === '0', 'DEPLOYMENT-04', 'لا شيء يُسجل قبل التفعيل');
+  ok(sql(`select count(*) from deployment_area where organization_id = md5('${NS}:org:N-A11')::uuid`) === '0', 'DEPLOYMENT-04', 'لا شيء يُسجل قبل التفعيل');
   await wholeRoute(deployment, 'APPROVAL-06');
   ok(stateOf(deployment) === 'ACTIVATED_PERMANENT', 'DEPLOYMENT-05', 'فُعّل');
-  ok(sql(`select count(*) from deployment_area where organization_id = md5('t:org:N-A11')::uuid and state = 'ACTIVE'`) === '2', 'DEPLOYMENT-06', 'منطقتان للوحدة نفسها');
-  ok(sql(`select count(*) from org_stationing where organization_id = md5('t:org:N-A11')::uuid and valid_to is null and site_id = md5('t:site:SITE-03')::uuid`) === '1', 'DEPLOYMENT-07', 'لم يتغير تمركزها');
-  ok(sql(`select count(*) from deployment_area a where a.organization_id = md5('t:org:N-A')::uuid and a.state = 'ACTIVE'`) === '2', 'DEPLOYMENT-08', 'مناطق الجهات الأخرى كما هي');
+  ok(sql(`select count(*) from deployment_area where organization_id = md5('${NS}:org:N-A11')::uuid and state = 'ACTIVE'`) === '2', 'DEPLOYMENT-06', 'منطقتان للوحدة نفسها');
+  ok(sql(`select count(*) from org_stationing where organization_id = md5('${NS}:org:N-A11')::uuid and valid_to is null and site_id = md5('${NS}:site:SITE-03')::uuid`) === '1', 'DEPLOYMENT-07', 'لم يتغير تمركزها');
+  ok(sql(`select count(*) from deployment_area a where a.organization_id = md5('${NS}:org:N-A')::uuid and a.state = 'ACTIVE'`) === '2', 'DEPLOYMENT-08', 'مناطق الجهات الأخرى كما هي');
 
   // ---- RE-STATIONING ---------------------------------------------------------------------------------------------------
   await go(p05, '#newRequest');
@@ -396,7 +410,7 @@ try {
   await p05.getByRole('tab', { name: 'منطقة الانتشار البديلة' }).click();
   await p05.waitForTimeout(900);
   await placeArea(p05, 55.945 + 0.0595, 24.9565);
-  await button(p05, '3D').click().catch(() => undefined);
+  await button(p05, '3D').click();
   await p05.waitForTimeout(3500);
   await shot(p05, '16-3d-current-proposed-deployment.png');
   await button(p05, '2D').click().catch(() => undefined);
@@ -410,8 +424,8 @@ try {
   ok(stateOf(moved) === 'UNDER_REVIEW', 'RESTATIONING-04', 'أُرسل');
   await wholeRoute(moved, 'APPROVAL-07');
   ok(stateOf(moved) === 'ACTIVATED_PERMANENT', 'RESTATIONING-05', 'فُعّل');
-  ok(sql(`select s.code from org_stationing o join site s on s.id = o.site_id where o.organization_id = md5('t:org:N-A112')::uuid and o.valid_to is null`).startsWith('RS-'), 'RESTATIONING-06', 'الموقع الجديد هو التمركز المعتمد الآن');
-  ok(sql(`select count(*) from deployment_area where organization_id = md5('t:org:N-A112')::uuid and state = 'ACTIVE' and site_id = md5('t:site:SITE-04')::uuid`) === '0', 'RESTATIONING-07', 'مناطق الموقع القديم تُحال مع تمركزها');
+  ok(sql(`select s.code from org_stationing o join site s on s.id = o.site_id where o.organization_id = md5('${NS}:org:N-A112')::uuid and o.valid_to is null`).startsWith('RS-'), 'RESTATIONING-06', 'الموقع الجديد هو التمركز المعتمد الآن');
+  ok(sql(`select count(*) from deployment_area where organization_id = md5('${NS}:org:N-A112')::uuid and state = 'ACTIVE' and site_id = md5('${NS}:site:SITE-04')::uuid`) === '0', 'RESTATIONING-07', 'مناطق الموقع القديم تُحال مع تمركزها');
 
   // ---- SITE REGISTRATION on the page ---------------------------------------------------------------------------------
   await go(p05, '#newRequest');
@@ -429,32 +443,32 @@ try {
     await p05.waitForTimeout(250);
   }
   await p05.waitForTimeout(1000);
-  await p05.getByLabel('اسم الموقع').fill('موقع مطلوب اعتماده (وهمي)');
-  await p05.getByLabel('رمز الموقع').fill('SITE-REG-1');
+  await p05.getByLabel('اسم الموقع').fill('موقع مطلوب اعتماده' + SFX);
+  await p05.getByLabel('رمز الموقع').fill(PFX + 'SITE-REG-1');
   await shot(p05, '18-site-registration.png');
   await p05.getByTestId('reg-next').click();
   await p05.waitForTimeout(1500);
   await p05.locator('.tz-flow-review textarea').fill('موقع جديد تحتاجه الوحدة');
   await button(p05, 'حفظ المسودة والفحص').click();
   await p05.waitForTimeout(1500);
-  ok(sql(`select count(*) from site where code = 'SITE-REG-1'`) === '0', 'SITE-14', 'لا يُسجل الموقع قبل الاعتماد والتفعيل');
+  ok(sql(`select count(*) from site where code = '${PFX}SITE-REG-1'`) === '0', 'SITE-14', 'لا يُسجل الموقع قبل الاعتماد والتفعيل');
   const regProblems = await p05.getByTestId('review-problems').innerText().catch(() => '');
   ok(regProblems === '', 'SITE-15', 'الفحوص مستوفاة', regProblems);
   await button(p05, 'إرسال للاعتماد').click();
   const registration = await submitted(p05);
   await wholeRoute(registration, 'APPROVAL-10');
   ok(stateOf(registration) === 'ACTIVATED_PERMANENT', 'SITE-16', 'فُعّل');
-  ok(sql(`select count(*) from site where code = 'SITE-REG-1'`) === '1', 'SITE-17', 'سُجل الموقع مرة واحدة');
-  ok(sql(`select count(*) from org_stationing o join site s on s.id = o.site_id where s.code = 'SITE-REG-1'`) === '0', 'SITE-18', 'التسجيل ليس تمركزاً');
+  ok(sql(`select count(*) from site where code = '${PFX}SITE-REG-1'`) === '1', 'SITE-17', 'سُجل الموقع مرة واحدة');
+  ok(sql(`select count(*) from org_stationing o join site s on s.id = o.site_id where s.code = '${PFX}SITE-REG-1'`) === '0', 'SITE-18', 'التسجيل ليس تمركزاً');
   // a point, up to the check: the same page, and a second request over the same place is told so
-  const again = await reqApi.post('/restationing-requests', { requestingUnitId: org('N-A11'), purpose: 'SITE_REGISTRATION', content: { kind: 'PERMANENT', scope: [org('N-A11')], reason: 'تسجيل مكرر للتجربة', site: { geometry: sql(`select g.geojson from site_geometry_version g join site s on s.id = g.site_id where s.code = 'SITE-REG-1'`) ? JSON.parse(sql(`select g.geojson from site_geometry_version g join site s on s.id = g.site_id where s.code = 'SITE-REG-1'`)) : null, shape: 'DRAWN' }, siteInfo: { name: 'مكرر', code: 'SITE-REG-2', kind: 'موقع' } } });
+  const again = await reqApi.post('/restationing-requests', { requestingUnitId: org('N-A11'), purpose: 'SITE_REGISTRATION', content: { kind: 'PERMANENT', scope: [org('N-A11')], reason: 'تسجيل مكرر للتجربة', site: { geometry: sql(`select g.geojson from site_geometry_version g join site s on s.id = g.site_id where s.code = '${PFX}SITE-REG-1'`) ? JSON.parse(sql(`select g.geojson from site_geometry_version g join site s on s.id = g.site_id where s.code = '${PFX}SITE-REG-1'`)) : null, shape: 'DRAWN' }, siteInfo: { name: 'مكرر', code: 'SITE-REG-2', kind: 'موقع' } } });
   const dupChecks = (await reqApi.get(`/restationing-requests/${again.body.id}/checks`)).body;
   ok(JSON.stringify(dupChecks.problems).includes('يتداخل مع موقع مسجل'), 'SITE-19', 'التسجيل المكرر يُبلَّغ ويُمنع', JSON.stringify(dupChecks.problems).slice(0, 160));
 
   // ---- occupied ground and terrain, by the server ------------------------------------------------------------------------
   const occupied = await reqApi.post('/restationing-requests', { requestingUnitId: org('N-A11'), content: { kind: 'PERMANENT', scope: [org('N-A111')], reason: 'محاولة على أرض مشغولة', site: { geometry: { type: 'Polygon', coordinates: [[[56.0085, 24.8025], [56.0100, 24.8025], [56.0100, 24.8040], [56.0085, 24.8040], [56.0085, 24.8025]]] }, shape: 'DRAWN' } } });
   const blocked = (await reqApi.get(`/restationing-requests/${occupied.body.id}/checks`)).body;
-  ok(!blocked.ok && JSON.stringify(blocked.problems).includes('أرض مشغولة (وهمي)'), 'RESTATIONING-08', 'الأرض المشغولة منع صريح', JSON.stringify(blocked.problems).slice(0, 200));
+  ok(!blocked.ok && JSON.stringify(blocked.problems).includes('أرض مشغولة' + SFX), 'RESTATIONING-08', 'الأرض المشغولة منع صريح', JSON.stringify(blocked.problems).slice(0, 200));
   ok((await reqApi.post(`/restationing-requests/${occupied.body.id}/submit`, {})).status === 400, 'RESTATIONING-09', 'ولا يُرسل');
   const rugged = await reqApi.post('/stationing/terrain/assess', { geometry: { type: 'Polygon', coordinates: [[[56.133614, 24.75809], [56.135173, 24.756104], [56.133922, 24.753811], [56.131232, 24.7546], [56.131, 24.7568], [56.133614, 24.75809]]] } });
   ok(rugged.status === 200 && rugged.body.controllingClass && rugged.body.controllingClass !== 'FLAT', 'TERRAIN-01', 'تحليل GLO-30 للموقع الوعر من الخادم', rugged.body.controllingClass);
@@ -471,14 +485,14 @@ try {
   ok(tree.includes('شعبة أ1') && !tree.includes('القيادة الرئيسية ب') && !tree.includes('إدارة ب1'), 'POSTURE-02', 'وحدته وما يتبعها فقط', tree.replace(/\s+/g, ' ').slice(0, 200));
   await buttons(p12, 'POSTURE-03', 'لا أزرار تعديل أو قرار', [], [...DECISIONS, 'حفظ المسودة والفحص', 'إرسال للاعتماد', 'إضافة ربط', 'تعديل الطلب']);
   ok(!(await p12.locator('.tz-top').innerText()).includes('طلب جديد'), 'POSTURE-04', 'لا طلب جديد');
-  await button(p12, '3D').click().catch(() => undefined);
+  await button(p12, '3D').click();
   await p12.waitForTimeout(3500);
   await shot(p12, '14b-operational-posture-3d.png');
   const p12Api = await apiSession('p12.view');
   const mutations = await Promise.all([
     p12Api.post('/restationing-requests', { requestingUnitId: org('N-A11'), purpose: 'DEPLOYMENT_AREAS', content: { kind: 'PERMANENT', scope: [org('N-A11')], reason: 'محاولة مصنوعة' } }),
-    p12Api.post('/site-links', { siteId: sql(`select md5('t:site:SITE-01')::uuid`), organizationId: org('N-A11'), reason: 'محاولة مصنوعة' }),
-    p12Api.post('/stationing/corrections', { organizationId: org('N-A11'), siteId: sql(`select md5('t:site:SITE-01')::uuid`), reason: 'محاولة مصنوعة' }),
+    p12Api.post('/site-links', { siteId: sql(`select md5('${NS}:site:SITE-01')::uuid`), organizationId: org('N-A11'), reason: 'محاولة مصنوعة' }),
+    p12Api.post('/stationing/corrections', { organizationId: org('N-A11'), siteId: sql(`select md5('${NS}:site:SITE-01')::uuid`), reason: 'محاولة مصنوعة' }),
     p12Api.post(`/restationing-requests/${moved}/activate`, {}),
   ]);
   ok(mutations.every((m) => m.status === 403 || m.status === 404), 'POSTURE-05', 'لا يغيّر شيئاً حتى بطلبات مصنوعة', mutations.map((m) => m.status).join());
