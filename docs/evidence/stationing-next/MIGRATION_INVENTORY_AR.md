@@ -1,4 +1,4 @@
-# جرد الترحيلات V21 إلى V30
+# جرد الترحيلات V21 إلى V31
 
 من الشجرة الحالية. الأرقام متصلة بلا فراغ، وكلها موجودة في المجلد `backend/src/main/resources/db/migration`.
 
@@ -14,6 +14,7 @@
 | V28 | `V28__access_requests.sql` | طلب الصلاحيات | نوع `ACCESS` في قيد `request_type`، وجدول `access_request` | لا | نعم إن لم توجد طلبات |
 | V29 | `V29__access_request_offer.sql` | القائمة المعروضة للطلب | جدول `access_request_offer` | **يزرع أربع صلاحيات تظهر لكل شخص جديد** | نعم |
 | V30 | `V30__stationing_next.sql` | أنواع الطلبات، والمراحل، ووحدات العلم، ومناطق الانتشار لكل وحدة، ونطاق طلب الصلاحية | انظر التفصيل | نعم، في `deployment_area` | انظر التفصيل |
+| V31 | `V31__stationing_routes.sql` | مسار لكل نوع طلب تمركز | جدول `stationing_route_version`، وعمود `restationing_request.route_version_id` | لا | نعم إن لم يُفعَّل مسار ولا أُرسل طلب بعده |
 
 ## لماذا لا يوجد قفز من V21 إلى V30
 

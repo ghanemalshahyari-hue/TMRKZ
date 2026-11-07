@@ -669,3 +669,12 @@ no measurement exists yet at 1,000 or 7,000 units. Scale phases wait for the own
 
 Delivered on the one app (:8088); the fictional environment is recreated with `sh ops/test-env/owner-review.sh up` when needed: initial stationing, deployment areas per unit, site registration, unit operations and final stages, FYI distribution, operational posture, the request hub, the unified list, setup of sites, scoped permission requests. Migration V30 was applied to `tmrkz-mover` on the owner's direct instruction of 7 Nov 2026, after a verified backup, and the fictional environment `tmrkz-next` was removed on the same instruction. Measured results, defects and open owner decisions: `docs/evidence/stationing-next/MORNING_HANDOFF_AR.md`. The owner's review is pending, and no enterprise service is connected.
 
+
+## Approval path per request type, and acceptance on the one application (2026-11-07, ADR-046)
+
+- **Delivered:** the four stationing request types on «مسار الموافقات», each with its own saved, tried and activated path (V31). No path is activated on :8088; without one a type follows the policy's route.
+- **Backup tools:** `ops/restore.sh` and `ops/verify-backup.sh` handle the image's tiger schema (`ops/sql/clear-postgis-init.sql`); `ops/backup.sh` retakes a dump the application wrote during.
+- **Acceptance on :8088:** fixtures marked `ACC-20261107-*` are loaded through `ops/acceptance-main/`. Results and limits are in `docs/evidence/stationing-next/MORNING_HANDOFF_AR.md`.
+- **While loaded:** the Oracle sync is paused, an acceptance policy is in force, and the access path is activated with an acceptance version.
+- **Limits:** true 3D is not accepted because the installed package is `DEV-UNVERIFIED-local-rebuild-not-a-release`. The real removal (`cleanup.mjs`) has run only as a dry run. `stationing-next` and `persona-buttons` ran on `d07acce`, not on the final `fdfd61b`; `access-requests` and `scope-approvals` were not run on :8088.
+- **Not production-ready.** Owner visual review is pending.

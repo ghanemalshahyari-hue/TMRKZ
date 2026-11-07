@@ -672,3 +672,13 @@ Evidence: `docs/evidence/stationing-next/` (`tests/acceptance/stationing-next.mj
 | Read-only operational posture, isolated by branch | `RequestHubService.posture`, `PosturePage.tsx` | `StationingNextIT.deploymentAndPosture`; POSTURE-01…07 |
 | One list by type; scoped home counts | `RequestHubService.overview`, `homeCards`, `AllRequestsPage.tsx`, `HomePage.tsx` | APPROVAL-08, APPROVAL-09 |
 
+
+## Approval path per request type, and acceptance on :8088 (2026-11-07, ADR-046)
+
+| Requirement | Code | Test | Evidence |
+|---|---|---|---|
+| Every request type on «مسار الموافقات», its path saved, tried, activated | `StationingRoutes`, `StationingRouteController`, `StationingRoutePanel`, `lib/stationingRoute.ts`, V31 | `StationingNextIT.aPathForEachType`, `stationingRoute.test.ts`, `main-8088-extra.mjs` PATH-01…05 | 255/255 backend, 200/200 frontend, 19/19 browser on `fdfd61b` |
+| A sent request stays on its path version | `RestationingService.pathOf`, `route_version_id` | `StationingNextIT.aPathForEachType` | same |
+| A backup restores with the tiger schema | `ops/restore.sh`, `ops/verify-backup.sh`, `ops/sql/clear-postgis-init.sql` | both run on a real :8088 backup, data only, no web port | fingerprints equal, V31, 137 tuples |
+| Posture 3D is reachable and tilted | `MapFrame.tsx`, `PosturePage.tsx` | `main-8088-extra.mjs` POSTURE-3D, POSTURE-3D-2, POSTURE-3D-RO | `fdfd61b` |
+| Removal by exact ids, real rows proven unchanged | `ops/acceptance-main/cleanup.mjs` | **dry run only** | real removal not yet run |
