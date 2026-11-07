@@ -678,3 +678,12 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **While loaded:** the Oracle sync is paused, an acceptance policy is in force, and the access path is activated with an acceptance version.
 - **Limits:** true 3D is not accepted because the installed package is `DEV-UNVERIFIED-local-rebuild-not-a-release`. The real removal (`cleanup.mjs`) has run only as a dry run. `stationing-next` and `persona-buttons` ran on `d07acce`, not on the final `fdfd61b`; `access-requests` and `scope-approvals` were not run on :8088.
 - **Not production-ready.** Owner visual review is pending.
+
+## Final acceptance on the one application (2026-11-07, ADR-047; code at `a4304c1`, not pushed)
+
+- **Results:** every suite ran on `a4304c1` on :8088: journeys 124, button matrix 18, access and scope 23, extra 25, editors 44, 3D 24, slope 17, backend 256, frontend 200. Gate table and limits: `docs/evidence/stationing-next/MORNING_HANDOFF_AR.md`.
+- **Map package:** `tmrkz-map-2026.11.2` built twice from clean commit `8114472` with identical bytes, installed, rollback proven, READY 23 checks. ADR-047. The earlier statement in this file that its release rebuild stays open is superseded.
+- **Key:** the HR settings key is rotated and the stored settings re-encrypted (`ops/rotate-hr-settings-key.mjs`). Earlier backups hold them under the old key.
+- **Still loaded on :8088:** acceptance data in four batches, the Oracle sync paused, an acceptance stationing policy, and an acceptance version of the access path. Removal has run only as a dry run.
+- **Not covered on :8088:** the facility request journey by scope (J01–J19 of `scope-approvals.mjs`), because no facility request type exists there.
+- **Not production-ready:** owner visual review is pending, and the production holders, FYI rule, levels and new-person defaults are undecided.

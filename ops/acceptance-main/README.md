@@ -20,17 +20,29 @@ sh ops/acceptance-main/provision.sh "$OUT"
 
 ## المستخدمون
 
-`p01.new` · `p02.access` · `p03.final` · `p04.sites` · `p05.req` · `p06.h1` · `p07.h2` · `p08.ops` · `p09.fin` · `p10.fyi` · `p11.act` · `p12.view` · `p13.other` · `p14.admin` · `p15.fyi` · `p16.branch` · `p17.new`
+`p01.new` · `p02.access` · `p03.final` · `p04.sites` · `p05.req` · `p06.h1` · `p07.h2` · `p08.ops` · `p09.fin` · `p10.fyi` · `p11.act` · `p12.view` · `p13.other` · `p14.admin` · `p15.fyi` · `p16.branch` · `p17.new`، وفي الدفعات الجديدة أيضاً `p18.new` و`p19.new`
 
 كلمة المرور في `ops/test-env/.generated/user-password`، وهو ملف لا يدخل Git. طريقة الدخول: «إدخال اسم المستخدم وكلمة المرور يدوياً».
+
+## دفعة جديدة بلا إزالة
+
+الرحلات تستهلك بياناتها، فلإعادتها أضف دفعة منفصلة:
+
+```sh
+node ops/acceptance-main/add-batch.mjs b5 1.0   # الاسم، ثم عدد الدرجات شمال الدفعة الأولى
+```
+
+حساباتها `b5.p01.new` وغيرها، ومواقعها على أرض أخرى، وتُسجَّل في ملف التشغيل نفسه فتشملها الإزالة.
 
 ## تشغيل الفحوص
 
 ```sh
 . ops/acceptance-main/env.sh
-node tests/acceptance/stationing-next.mjs     # مرة واحدة لكل تحميل، لأنه يغيّر الوحدات
-node tests/acceptance/persona-buttons.mjs     # مرة واحدة لكل تحميل
+. ops/acceptance-main/env-batch.sh b5
+node tests/acceptance/stationing-next.mjs     # مرة واحدة لكل دفعة
+node tests/acceptance/persona-buttons.mjs     # مرة واحدة لكل دفعة
 node tests/acceptance/main-8088-extra.mjs
+node tests/acceptance/access-scope-8088.mjs   # مرة واحدة لكل دفعة
 ```
 
 ## الإزالة

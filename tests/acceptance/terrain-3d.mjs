@@ -205,6 +205,7 @@ const drape = await mapEval(page, `
   const e = m.getSource('rs-edit').serialize().data.features;
   by.EDITED = spread(e.flatMap((f) => f.geometry.coordinates[0]));
   return { roles: [...roles], edited, occ, by, types: ['rs-fill', 'rs-area-fill', 'rs-line', 'rs-edit-fill', 'rs-edit-line', 'occ-fill'].map((l) => m.getLayer(l)?.type) };`);
+ok((await page.locator(MAP).getAttribute('data-bands')) === '0', 'T05b', 'zero range circles on the 3D map', await page.locator(MAP).getAttribute('data-bands'));
 ok(['CURRENT', 'SITE', 'PRIMARY'].every((r) => drape.roles.includes(r)) && drape.edited > 0, 'T05', 'current, proposed, primary and alternative rendered as draped fills in 3D', JSON.stringify({ roles: drape.roles, edited: drape.edited, types: drape.types }));
 ok(drape.occ > 0, 'T06', 'occupied ground (another unit\'s site) rendered as a draped fill in 3D', `${drape.occ} features`);
 const span = (r) => (drape.by[r] ? Math.round(drape.by[r][1] - drape.by[r][0]) : -1);

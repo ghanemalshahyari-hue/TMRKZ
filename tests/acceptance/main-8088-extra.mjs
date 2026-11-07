@@ -113,6 +113,7 @@ try {
   // ---- a boundary that overlaps a registered site: refused, and no site left behind -----------------------------------------
   const refusedCode = PFX + 'SITE-OVERLAP-' + Date.now().toString(36);
   await sites.getByTestId('add-site').click();
+  await sites.getByTestId('add-site-form').locator('.rs-tools button').first().click(); // the form remembers the last shape
   const [olat, olng] = sql(`select lat || ' ' || lng from site where id = md5('${NS}:site:SITE-07')::uuid`).split(' ').map(Number);
   await sites.evaluate(([x, y]) => document.querySelector('.tz-mapframe .tz-map-layer').tmrkzMap.jumpTo({ center: [x, y], zoom: 14 }), [olng, olat]);
   await sites.waitForTimeout(800);

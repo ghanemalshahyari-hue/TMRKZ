@@ -40,3 +40,16 @@
 - ما يظهر لكل شخص جديد. على :8088 أربع صلاحيات زرعها V29، وتتغير من «الصلاحيات المعروضة للطلب».
 
 لم تُضف صلاحية مكررة مثل `EDIT_SITE_LINKS`، ولا صلاحية خاصة للتهيئة، لأن دور `SITE_SETUP_ADMIN` يجمع صلاحيات قائمة.
+
+## قائمة الصلاحيات المعروضة للطلب (قرار المالك، 7 نوفمبر 2026)
+
+أدوار التمركز العشرة، تظهر منها **9** في القائمة:
+
+`POSTURE_VIEWER`، `STATIONING_REQUESTER`، `DEPLOYMENT_REQUESTER`، `SITE_REGISTRATION_REQUESTER`، `STATIONING_UNIT_APPROVER`، `STATIONING_OPS_APPROVER`، `STATIONING_FINAL_APPROVER`، `FYI_DISTRIBUTOR`، `SITE_LINK_MANAGER`.
+
+**لا يظهر منها** `SITE_SETUP_ADMIN`، لأنه دور تهيئة عالي الصلاحية.
+
+**خارج هذه العشرة وخارج الطلب العادي:** `UNIT_ACCESS_MANAGER` و`ACCESS_FINAL_APPROVER`، وهما من إدارة الصلاحيات.
+
+الأربع المعروضة لكل شخص جديد الآن هي `REQUESTER` و`CHAIN_APPROVER` و`UNIT_OPERATIONS_APPROVER` و`FYI_RECEIVER`، وتغييرها قرار لم يُتخذ بعد.
+

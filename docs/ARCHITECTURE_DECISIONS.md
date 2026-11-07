@@ -1791,3 +1791,11 @@ for narrow steep ground: `docs/evidence/terrain-3d/slope-inside/README.md`.
 **In force.** A request pins the version in force when it is first sent (`restationing_request.route_version_id`); returning and resending keeps it. A type with no activated version follows the stationing policy's route as before, so V31 changes nothing until someone activates a path. Distances, terrain and footprint stay in the stationing policy: a request still needs a policy in force.
 
 **Not decided here.** No levels or holders are seeded. A path names levels and stages, never people; who decides is what the grants say. Cross-branch stages remain policy settings.
+
+## ADR-047 The map package and its records come from a clean build on the current host (owner, 7 Nov 2026)
+
+**Decision.** `tmrkz-map-2026.11.2` is built from a clean commit on the current host, twice, and installed only when both builds are identical. The earlier Windows build is not used and is not needed. This settles the open question in `docs/STATUS.md` of which build host defines the record.
+
+**Consequence.** The terrain records now hold the new checksums, with the earlier ones kept under `buildRecord.earlierBuild`. The slope product is the dataset already loaded on :8088 (`8905e73c…`), not the `9a91d9af…` accepted in `2026.11.1`. Pixel and nodata counts are equal in all 28 cells; pixel-by-pixel equality with the Windows build cannot be shown.
+
+**Rejected.** Reloading the business terrain (it stays unchanged on :8088), and keeping the old records while installing different bytes (the builder refuses that, correctly).

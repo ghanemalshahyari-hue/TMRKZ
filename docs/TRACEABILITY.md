@@ -682,3 +682,15 @@ Evidence: `docs/evidence/stationing-next/` (`tests/acceptance/stationing-next.mj
 | A backup restores with the tiger schema | `ops/restore.sh`, `ops/verify-backup.sh`, `ops/sql/clear-postgis-init.sql` | both run on a real :8088 backup, data only, no web port | fingerprints equal, V31, 137 tuples |
 | Posture 3D is reachable and tilted | `MapFrame.tsx`, `PosturePage.tsx` | `main-8088-extra.mjs` POSTURE-3D, POSTURE-3D-2, POSTURE-3D-RO | `fdfd61b` |
 | Removal by exact ids, real rows proven unchanged | `ops/acceptance-main/cleanup.mjs` | **dry run only** | real removal not yet run |
+
+## Final acceptance on :8088 (2026-11-07, code at `a4304c1`, ADR-047)
+
+| Requirement | Code | Test | Evidence |
+|---|---|---|---|
+| Package from a clean commit, two identical builds | `build-terrain-clean.sh`, `build-package-clean.sh`, `compare-builds.py` | `compare-builds.py`: 47 files, 0 differ, same archive sha256 | `map-packages/tmrkz-map-2026.11.2/README.md` |
+| Install, rollback, reinstall | `install_package.py`, `readiness.py` | run on :8088, READY 23 checks | install log in `map-runtime/history` |
+| A new site and its boundary are one act | `BoundaryService.createWithBoundary`, `SiteSetupPage` | `StationingNextIT.aRefusedBoundaryLeavesNoSite`, `main-8088-extra` SITE-ATOMIC | 256/256, 25/25 |
+| Sand-theme contrast | `theme.css`, `workflowStudio.css` | `main-8088-extra` CONTRAST-3D, CONTRAST-RESULT | 5.17:1, 6.63:1 |
+| Refusal, chosen units and sites, final approver's removal, grant by levels | existing access code | `access-scope-8088.mjs` | 23/23 |
+| No range circles in 3D | `RequestMap` | `terrain-3d` T05b | 24/24 |
+| HR settings key rotation | `ops/rotate-hr-settings-key.mjs` | decrypt read through `/hr/source` after restart | settingsReadable true |
