@@ -185,6 +185,9 @@ describe('slope inside a shape (display only)', () => {
       const a = (i / 1500) * 2 * Math.PI;
       return { lat: 24.8 + 0.01 * Math.sin(a), lng: 56 + 0.01 * Math.cos(a) };
     });
+    // one untimed run first: a drag's frames run warm; a cold build container's first, unoptimised runs measured 69 ms
+    // on the owner's Windows PC (10 Nov 2026) and failed the image build. The budget per frame is unchanged.
+    slopeZones([[ring]], (px, py) => ((px + py) % 40) * 1.2, limits);
     const t0 = performance.now();
     for (let i = 0; i < 5; i++) slopeZones([[ring]], (px, py) => ((px + py) % 40) * 1.2, limits);
     expect((performance.now() - t0) / 5).toBeLessThan(40);

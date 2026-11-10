@@ -94,26 +94,30 @@ try {
   const sites = await as('p04.sites');
   await go(sites, '#siteSetup');
   await sites.getByTestId('setup-tree').waitFor({ timeout: 15000 });
+  // «موقع جديد» as in MOVER (10 Nov 2026): the data, «التالي», the shape, «التالي», the reason and «حفظ الموقع»
   await sites.getByTestId('add-site').click();
-  await button(sites, 'نقطة').click();
+  await sites.getByLabel('اسم الموقع').fill('موقع نقطة من الصفحة — اختبار قبول — وهمي');
+  await sites.getByTestId('wizard-next').click();
+  await sites.getByTestId('shape-point').click();
   await sites.getByTestId('place-point').click();
   await sites.waitForTimeout(500);
   const box = await sites.locator('.tz-mapframe .tz-map-layer canvas').first().boundingBox();
   await sites.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.25);
   await sites.waitForTimeout(800);
-  const code = PFX + 'SITE-POINT-' + Date.now().toString(36);
-  await sites.getByLabel('اسم الموقع').fill('موقع نقطة من الصفحة — اختبار قبول — وهمي');
-  await sites.getByLabel('رمز الموقع').fill(code);
+  await sites.getByTestId('wizard-next').click();
   await sites.getByLabel('سبب تسجيل الموقع').fill('تسجيل موقع نقطة في اختبار القبول');
   await sites.getByTestId('save-site').click();
+  // no code is typed (ADR-048): the server gives it, the finish card shows it
+  const code = (await sites.getByTestId('made-code').innerText({ timeout: 15000 })).trim();
   await sites.locator(`[data-site="${code}"]`).waitFor({ timeout: 15000 });
   ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${code}'`) === '0' && sql(`select lat is not null from site where code = '${code}'`) === 't', 'SITE-P1', 'موقع نقطة بلا حدود مخترعة');
   await sites.screenshot({ path: OUT + 'point-site.png' });
 
   // ---- a boundary that overlaps a registered site: refused, and no site left behind -----------------------------------------
-  const refusedCode = PFX + 'SITE-OVERLAP-' + Date.now().toString(36);
+  const refusedName = 'موقع متداخل — اختبار قبول — وهمي ' + Date.now().toString(36);
   await sites.getByTestId('add-site').click();
-  await sites.getByTestId('add-site-form').locator('.rs-tools button').first().click(); // the form remembers the last shape
+  await sites.getByLabel('اسم الموقع').fill(refusedName);
+  await sites.getByTestId('wizard-next').click(); // a new site starts as «منطقة لها حدود»
   const [olat, olng] = sql(`select lat || ' ' || lng from site where id = md5('${NS}:site:SITE-07')::uuid`).split(' ').map(Number);
   await sites.evaluate(([x, y]) => document.querySelector('.tz-mapframe .tz-map-layer').tmrkzMap.jumpTo({ center: [x, y], zoom: 14 }), [olng, olat]);
   await sites.waitForTimeout(800);
@@ -124,13 +128,13 @@ try {
     await sites.mouse.click(ob.x + ob.width * dx, ob.y + ob.height * dy);
     await sites.waitForTimeout(250);
   }
+  await sites.getByTestId('finish-draw').click(); // free drawing, closed on request
   await sites.waitForTimeout(800);
-  await sites.getByLabel('اسم الموقع').fill('موقع متداخل — اختبار قبول — وهمي');
-  await sites.getByLabel('رمز الموقع').fill(refusedCode);
+  await sites.getByTestId('wizard-next').click();
   await sites.getByLabel('سبب تسجيل الموقع').fill('موقع يتداخل مع موقع مسجل');
   await sites.getByTestId('save-site').click();
   await sites.waitForTimeout(1800);
-  ok(sql(`select count(*) from site where code = '${refusedCode}'`) === '0', 'SITE-ATOMIC', 'الحدود المرفوضة لا تترك موقعاً بلا حدود');
+  ok(sql(`select count(*) from site where name = '${refusedName}'`) === '0', 'SITE-ATOMIC', 'الحدود المرفوضة لا تترك موقعاً بلا حدود');
   ok((await sites.getByTestId('add-site-form').count()) === 1, 'SITE-ATOMIC-2', 'يبقى النموذج مفتوحاً ليعدّل المستخدم الحدود');
   await sites.reload();
 

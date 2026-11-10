@@ -83,7 +83,8 @@ public class MapService {
                           @JsonInclude(JsonInclude.Include.ALWAYS) Double lat, @JsonInclude(JsonInclude.Include.ALWAYS) Double lng,
                           @JsonInclude(JsonInclude.Include.ALWAYS) Boundary boundary, String boundaryStatus,
                           String availability, String administrative, Integer pendingCount, Ref responsibleOrg,
-                          List<Ref> occupants, List<String> relations, List<ResourceState> resources, boolean requestsVisible) {
+                          List<Ref> occupants, List<String> relations, List<ResourceState> resources, boolean requestsVisible,
+                          String symbol) {
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -179,6 +180,13 @@ public class MapService {
             boundaries = boundaries(siteIds, box);
         }
 
+        // the site's own map symbol (V32, ADR-048), display only
+        Map<UUID, String> symbols = new HashMap<>();
+        if (!siteIds.isEmpty()) {
+            jdbc.sql("select site_id, sidc from site_symbol where site_id = any(string_to_array(:ids, ',')::uuid[])")
+                    .param("ids", Db.ids(siteIds)).query((rs, n) -> { symbols.put(Db.uuid(rs, "site_id"), rs.getString("sidc")); return 1; }).list();
+        }
+
         List<Feature> features = new ArrayList<>();
         for (Row r : rows.values()) {
             List<String> relations = new ArrayList<>();
@@ -244,7 +252,8 @@ public class MapService {
                     r.parentId() == null ? null : r.parentId().toString(), r.view().name(), r.lat(), r.lng(), b,
                     registered.contains(r.id()) ? "REGISTERED" : "NOT_REGISTERED", availability, administrative,
                     r.requests() ? pending.size() : null, full && r.orgId() != null ? Ref.of(r.orgId(), r.orgName()) : null,
-                    full ? occupants.getOrDefault(r.id(), List.of()) : null, orgSet == null ? null : relations, states, r.requests()));
+                    full ? occupants.getOrDefault(r.id(), List.of()) : null, orgSet == null ? null : relations, states, r.requests(),
+                    "CONTEXT".equals(r.view().name()) ? null : symbols.get(r.id())));
         }
         String dataVersion = jdbc.sql("""
                 select greatest((select coalesce(max(updated_at), 'epoch') from reservation),

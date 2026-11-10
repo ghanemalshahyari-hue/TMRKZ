@@ -694,3 +694,22 @@ Evidence: `docs/evidence/stationing-next/` (`tests/acceptance/stationing-next.mj
 | Refusal, chosen units and sites, final approver's removal, grant by levels | existing access code | `access-scope-8088.mjs` | 23/23 |
 | No range circles in 3D | `RequestMap` | `terrain-3d` T05b | 24/24 |
 | HR settings key rotation | `ops/rotate-hr-settings-key.mjs` | decrypt read through `/hr/source` after restart | settingsReadable true |
+
+## «موقع جديد» as in MOVER, and the map on the home PC (2026-11-10, ADR-048)
+
+| Requirement | Code | Test | Evidence |
+|---|---|---|---|
+| Three steps, one question per card; «التالي» says what is missing | `SiteSetupPage.tsx`, `lib/siteWizard.ts` | `siteWizard.test.ts`; Edge walk WIZ-1…WIZ-9 | 8/8; 11/11, nothing saved |
+| Type, where it lies, responsible unit, area in the review | `SiteSetupPage.tsx`, `SiteService.create` | WIZ-6; `stationing-next.mjs` SITE-04, SITE-14 | WIZ-6 pass; SITE-* not yet run |
+| Outline from typed coordinates (`COORDINATES`) | `ringFromText`, `BoundaryService` | `siteWizard.test.ts`; WIZ-8 | pass |
+| Site list right, card left on this page | `OperationalWorkspace swapSides`, `shell.css` | WIZ-10 | rail x 1288, card x 12 at 1600 px |
+| 3D tilts with no site to frame | `SiteSetupPage` view effect | Edge: pitch 55, terrain on | Hajar screenshot |
+| Map package byte-identical on another host | `build_package.py`, `install_package.py`, `readiness.py` | archive sha256, readiness | `21e1558c…`; 22/23 (no policy in force) |
+| The site list on the left; «＋ إضافة موقع» and the steps on the right, the panel's full height | `SiteSetupPage` `listPanel` / `workPanel`, `shell.css` | Edge walk W2-01, W2-01b, W2-02 | pass on :8088 |
+| Saving through the page: code, boundary, unit, symbol | `SiteSetupPage.save`, `SiteService.create` | the owner's own site `S-0001` (10 Nov 2026), audit rows | saved, drawn with its symbol |
+| Site code given by the server (`S-0001`…), a typed one kept | `SiteService.nextCode` | `SiteMarkerIT.codeGeneratedWhenEmpty`; W2-03 | 43/43 |
+| Responsible unit from the hierarchy | `OrgTree` in step 1 | W2-04, W2-05 | pass |
+| Free drawing, any number of corners | `SiteEditor` target 0, «إنهاء الرسم» | W2-08, W2-09 | seven corners |
+| Coordinates table, every format, from the map, reorder, insert, remove | `PointsTable`, `lib/siteWizard.ts`, `lib/coordFormats.ts` | `coordFormats.test.ts` (PROJ and `mgrs` golden vectors), `siteWizard.test.ts`; W2-10…W2-14 | 17 + 12; pass |
+| Site map symbol, V32 | `V32__site_symbol.sql`, `SiteService.setSymbol`, `MapService` features, `SiteSymbolPicker`, `siteLayers` | `SiteMarkerIT.siteSymbol`, `siteWizard.test.ts` symbols; W2-15…W2-17 | 43/43; pass |
+| Panels moved, widened, folded; cards folded | `OperationalWorkspace panels`, `shell.css` | W2-06, W2-18…W2-21 | pass |

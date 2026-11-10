@@ -8,6 +8,9 @@ import { labelPoint } from './siteGeometry';
  * and display state, nothing that ranks, recommends or validates a site; the order is the server's; nothing is selected
  * unless the person selects it.
  */
+/** The map image id of a site symbol: «sym:» and the code (siteLayers draws it on first use). */
+export const SYMBOL_IMAGE = 'sym:';
+
 export type RefSite = {
   siteId: string;
   code: string;
@@ -21,9 +24,11 @@ export type RefSite = {
   parentId: string | null;
   /** false when the server gives no geometry or marker for it (known only from a stationing record): listed, not drawn. */
   onMap: boolean;
+  /** The site's map symbol (V32, ADR-048), drawn instead of the plain site mark. */
+  symbol?: string | null;
 };
 
-export type SiteRefProps = { role: 'REF_SITE' | 'REF_MARKER' | 'REF_LABEL'; siteId: string; name: string; label: string; sub: string; selected: boolean; related: boolean };
+export type SiteRefProps = { role: 'REF_SITE' | 'REF_MARKER' | 'REF_LABEL'; siteId: string; name: string; label: string; sub: string; selected: boolean; related: boolean; sym: string };
 export type SiteRefFeature = GeoJSON.Feature<GeoJSON.Geometry, SiteRefProps>;
 
 const shape = (g: GeoJsonGeometry | null | undefined) => !!g && (g.type === 'Polygon' || g.type === 'MultiPolygon');
@@ -39,6 +44,7 @@ export function registeredSites(features: MapFeature[], current: StationingRecor
     .map((f) => ({
       siteId: f.siteId, code: f.code, name: f.name, kind: f.kind, geometry: f.boundary?.geojson ?? null, lat: f.lat, lng: f.lng,
       responsibleOrg: f.responsibleOrg, parentId: f.parentId ?? null, onMap: shape(f.boundary?.geojson) || (f.lat != null && f.lng != null),
+      symbol: f.symbol ?? null,
     }));
   const seen = new Set(out.map((s) => s.siteId));
   for (const c of current) {
@@ -70,7 +76,7 @@ export function siteReferenceFeatures(sites: RefSite[], selectedId: string | nul
     const n = units.get(s.siteId) ?? 0;
     const isCurrent = currentIds.has(s.siteId);
     const sub = [isCurrent ? 'الموقع الحالي' : '', n ? unitCount(n) : ''].filter(Boolean).join(' · ');
-    const props = { siteId: s.siteId, name: s.name, label: n ? `${s.name} · ${unitCount(n)}` : s.name, sub, selected: s.siteId === selectedId, related: related.has(s.siteId) };
+    const props = { siteId: s.siteId, name: s.name, label: n ? `${s.name} · ${unitCount(n)}` : s.name, sub, selected: s.siteId === selectedId, related: related.has(s.siteId), sym: s.symbol ? SYMBOL_IMAGE + s.symbol : '' };
     if (shape(s.geometry)) {
       const g = s.geometry as unknown as SiteGeometry;
       if (!isCurrent) out.push({ type: 'Feature', geometry: g as GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: { role: 'REF_SITE', ...props } });

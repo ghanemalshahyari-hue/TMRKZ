@@ -123,6 +123,9 @@ describe('proposed site geometry (owner, 4 Nov 2026)', () => {
     t0 = performance.now();
     const v = validateSite(partsOf(moved));
     const validate = performance.now() - t0;
+    // once untimed first: a vertex drag runs warm; a cold build container's first run measured 57 ms on the owner's Windows PC
+    // (10 Nov 2026) and failed the image build. The budget per drag step is unchanged.
+    vertexConflicts(partsOf(moved), 0, 0, 10);
     t0 = performance.now();
     vertexConflicts(partsOf(moved), 0, 0, 10);
     const vertex = performance.now() - t0;

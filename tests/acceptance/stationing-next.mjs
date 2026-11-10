@@ -190,8 +190,14 @@ try {
     await p04.evaluate(([x, y]) => document.querySelector('.tz-mapframe .tz-map-layer').tmrkzMap.jumpTo({ center: [x, y], zoom: 12 }), [56.3, Y(24.86)]);
     await p04.waitForTimeout(800);
   };
+  // «موقع جديد» as in MOVER (10 Nov 2026): the data, «التالي», the shape, «التالي», the reason and «حفظ الموقع»
   await p04.getByTestId('add-site').click();
   await shot(p04, '04-site-bootstrap.png');
+  await p04.getByLabel('اسم الموقع').fill('موقع جديد للتجربة' + SFX);
+  await p04.getByTestId('where-inside').click();
+  await p04.getByLabel('بحث عن الموقع الأعلى').fill(PFX + 'SITE-02');
+  await p04.locator(`[data-parent-pick="${PFX}SITE-02"]`).click();
+  await p04.getByTestId('wizard-next').click();
   await freeGround();
   await p04.getByTestId('draw-site').click();
   await p04.waitForTimeout(500);
@@ -200,19 +206,23 @@ try {
     await p04.mouse.click(box.x + box.width * dx, box.y + box.height * dy);
     await p04.waitForTimeout(250);
   }
+  await p04.getByTestId('finish-draw').click(); // free drawing: as many corners as needed, closed on request
   await p04.waitForTimeout(800);
-  await p04.getByLabel('اسم الموقع').fill('موقع جديد للتجربة' + SFX);
-  await p04.getByLabel('رمز الموقع').fill(PFX + 'SITE-NEW-1');
-  await p04.getByLabel('الموقع الرئيسي').selectOption({ label: 'مجمع الخدمات' + SFX });
+  await p04.getByTestId('wizard-next').click();
   await p04.getByLabel('سبب تسجيل الموقع').fill('تهيئة أولى لموقع جديد');
   await p04.getByTestId('save-site').click();
-  await p04.locator(`[data-site="${PFX}SITE-NEW-1"]`).waitFor({ timeout: 15000 });
+  // no code is typed (ADR-048): the server gives the next S-number, shown on the finish card
+  const NEW1 = (await p04.getByTestId('made-code').innerText({ timeout: 15000 })).trim();
+  ok(/^S-\d{4,}$/.test(NEW1), 'SITE-01b', 'رمز الموقع يُعطى تلقائياً', NEW1);
+  await p04.locator(`[data-site="${NEW1}"]`).waitFor({ timeout: 15000 });
   ok(true, 'SITE-01', 'موقع يُرسم على الخريطة ويُسجل بسبب');
-  ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${PFX}SITE-NEW-1'`) === '1', 'SITE-02', 'بحدوده');
-  ok(sql(`select count(*) from audit_event where action = 'SITE_CREATED' and detail::text like '%${PFX}SITE-NEW-1%'`) === '1', 'SITE-03', 'مُدقَّق');
-  ok(sql(`select count(*) from site s join site p on p.id = s.parent_id where s.code = '${PFX}SITE-NEW-1' and p.code = '${PFX}SITE-02'`) === '1', 'SITE-04', 'موقع فرعي تحت موقع رئيسي، بلا هيكل Oracle');
+  ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${NEW1}'`) === '1', 'SITE-02', 'بحدوده');
+  ok(sql(`select count(*) from audit_event where action = 'SITE_CREATED' and detail::text like '%${NEW1}%'`) === '1', 'SITE-03', 'مُدقَّق');
+  ok(sql(`select count(*) from site s join site p on p.id = s.parent_id where s.code = '${NEW1}' and p.code = '${PFX}SITE-02'`) === '1', 'SITE-04', 'موقع فرعي تحت موقع رئيسي، بلا هيكل Oracle');
   // a site of two parts: drawn with the same editor, and it moves as one
   await p04.getByTestId('add-site').click();
+  await p04.getByLabel('اسم الموقع').fill('موقع من جزأين للتجربة' + SFX);
+  await p04.getByTestId('wizard-next').click();
   await freeGround();
   await p04.getByTestId('draw-site').click();
   await p04.waitForTimeout(400);
@@ -220,6 +230,7 @@ try {
     await p04.mouse.click(box.x + box.width * dx, box.y + box.height * dy);
     await p04.waitForTimeout(250);
   }
+  await p04.getByTestId('finish-draw').click();
   await p04.waitForTimeout(600);
   await p04.getByTestId('add-part').click();
   await p04.waitForTimeout(400);
@@ -227,6 +238,7 @@ try {
     await p04.mouse.click(box.x + box.width * dx, box.y + box.height * dy);
     await p04.waitForTimeout(250);
   }
+  await p04.getByTestId('finish-draw').click();
   await p04.waitForTimeout(1500);
   const twoParts = await proposedParts(p04);
   ok(twoParts.length === 2, 'SITE-11', 'موقع من جزأين', twoParts.length);
@@ -235,27 +247,28 @@ try {
   const moved2 = await proposedParts(p04);
   const vectors = partVectors(twoParts, moved2);
   ok(moved2.length === 2 && vectors.metres > 1 && vectors.spread < 1, 'SITE-12', 'يتحرك الجزءان معاً', JSON.stringify({ m: Math.round(vectors.metres), spread: vectors.spread }));
-  await p04.getByLabel('اسم الموقع').fill('موقع من جزأين للتجربة' + SFX);
-  await p04.getByLabel('رمز الموقع').fill(PFX + 'SITE-NEW-2');
+  await p04.getByTestId('wizard-next').click();
+  ok((await p04.getByTestId('site-summary').innerText()).includes('2 أجزاء'), 'SITE-14', 'المراجعة قبل الحفظ تذكر الجزأين');
   await p04.getByLabel('سبب تسجيل الموقع').fill('تهيئة موقع من جزأين');
   await p04.getByTestId('save-site').click();
-  await p04.locator(`[data-site="${PFX}SITE-NEW-2"]`).waitFor({ timeout: 15000 });
-  ok(sql(`select GeometryType(g.geom) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${PFX}SITE-NEW-2'`) === 'MULTIPOLYGON', 'SITE-13', 'يُسجل موقعاً واحداً متعدد الأجزاء');
-  await p04.locator(`[data-site="${PFX}SITE-NEW-1"]`).click();
+  const NEW2 = (await p04.getByTestId('made-code').innerText({ timeout: 15000 })).trim();
+  await p04.locator(`[data-site="${NEW2}"]`).waitFor({ timeout: 15000 });
+  ok(sql(`select GeometryType(g.geom) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${NEW2}'`) === 'MULTIPOLYGON', 'SITE-13', 'يُسجل موقعاً واحداً متعدد الأجزاء');
+  await p04.locator(`[data-site="${NEW1}"]`).click();
   await p04.getByTestId('edit-site').waitFor({ timeout: 10000 });
   await p04.getByTestId('edit-site').getByLabel('الموقع الرئيسي').selectOption('');
   await p04.getByTestId('edit-site').getByLabel('سبب التعديل').fill('صار موقعاً رئيسياً مستقلاً');
   await p04.getByTestId('save-edit').click();
   await p04.waitForTimeout(1500);
-  ok(sql(`select parent_id is null from site where code = '${PFX}SITE-NEW-1'`) === 't', 'SITE-04b', 'يتغير الموقع الرئيسي بسبب مسجل');
-  await p04.locator(`[data-site="${PFX}SITE-NEW-1"]`).click();
+  ok(sql(`select parent_id is null from site where code = '${NEW1}'`) === 't', 'SITE-04b', 'يتغير الموقع الرئيسي بسبب مسجل');
+  await p04.locator(`[data-site="${NEW1}"]`).click();
   await p04.getByTestId('edit-shape').waitFor({ timeout: 10000 });
   await p04.getByTestId('edit-site').getByLabel('سبب التعديل').fill('حدود مصححة للتجربة');
   await p04.getByTestId('edit-shape').click();
   await p04.waitForTimeout(800);
   await p04.getByTestId('save-shape').click();
   await p04.waitForTimeout(1500);
-  ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${PFX}SITE-NEW-1'`) === '2', 'SITE-04c', 'نسخة حدود جديدة تُحفظ، والقديمة باقية');
+  ok(sql(`select count(*) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${NEW1}'`) === '2', 'SITE-04c', 'نسخة حدود جديدة تُحفظ، والقديمة باقية');
   await p04.locator(`[data-site="${PFX}SITE-02"]`).first().click();
   await p04.waitForTimeout(800);
   await shot(p04, '06-main-sub-sites.png');

@@ -53,8 +53,15 @@ describe('registered sites as a reference layer (owner decisions of 5 Nov 2026)'
 
   it('is reference only: identity and display state, no ranking, recommendation or validity, the server\'s order', () => {
     const fc = siteReferenceFeatures(sites);
-    for (const f of fc.features) expect(Object.keys(f.properties).sort()).toEqual(['label', 'name', 'related', 'role', 'selected', 'siteId', 'sub']);
+    // `sym`: the site's own map symbol (V32, ADR-048) — display state too
+    for (const f of fc.features) expect(Object.keys(f.properties).sort()).toEqual(['label', 'name', 'related', 'role', 'selected', 'siteId', 'sub', 'sym']);
     expect(fc.features.map((f) => f.properties.siteId)).toEqual(['b', 'b', 'm', 'later']);
+  });
+
+  it('a site with a map symbol carries its image id, and a site without one carries none', () => {
+    const fc = siteReferenceFeatures(sites.map((s, i) => (i === 0 ? { ...s, symbol: 'SFGPIB----H----' } : s)));
+    expect(fc.features.filter((f) => f.properties.siteId === sites[0].siteId).every((f) => f.properties.sym === 'sym:SFGPIB----H----')).toBe(true);
+    expect(fc.features.filter((f) => f.properties.siteId !== sites[0].siteId).every((f) => f.properties.sym === '')).toBe(true);
   });
 
   it('selects nothing by itself, and only the site the person selected', () => {

@@ -87,6 +87,7 @@ public class SiteService {
         out.put("occupancy", d.occupancy());
         out.put("path", path(ctx, id));
         out.put("canManage", d.canManage());
+        out.put("symbol", symbolOf(id));
         return out;
     }
 
@@ -312,23 +313,25 @@ public class SiteService {
                 where g.geometry_type <> 'Point'""").query(String.class).list());
     }
 
+    /** {@code symbol}: optional, display only (ADR-048): a MIL-STD-2525C or APP-6D code, as MOVER stores it; set on creation only. */
     public record SiteInput(String code, String name, String kind, String parentId, String responsibleOrgId, Integer capacity,
-                            Location location, String notes, String reason) {
+                            Location location, String notes, String reason, String symbol) {
     }
 
     @Transactional
     public SiteView create(AccessContext ctx, SiteInput in) {
-        validate(in);
+        validate(in, false);
         // a site need not name a responsible organisation (ADR-045): only a manager of everything then registers it
         UUID responsible = in.responsibleOrgId() == null || in.responsibleOrgId().isBlank() ? null : UUID.fromString(in.responsibleOrgId());
         requireFacilityManager(ctx, responsible);
+        String code = in.code() == null || in.code().isBlank() ? nextCode() : in.code().trim();
         UUID id = UUID.randomUUID();
         Instant now = clock.instant();
         try {
             jdbc.sql("""
                     insert into site(id, code, name, kind, parent_id, capacity, lat, lng, created_at, notes)
                     values (:id, :code, :name, :kind, :parent, :cap, :lat, :lng, :now, :notes)""")
-                    .param("id", id).param("code", in.code().trim()).param("name", in.name().trim()).param("kind", in.kind().trim())
+                    .param("id", id).param("code", code).param("name", in.name().trim()).param("kind", in.kind().trim())
                     .param("parent", in.parentId() == null ? null : UUID.fromString(in.parentId())).param("cap", in.capacity())
                     .param("lat", in.location() == null ? null : in.location().lat())
                     .param("lng", in.location() == null ? null : in.location().lng()).param("now", Db.ts(now)).param("notes", in.notes()).update();
@@ -338,8 +341,17 @@ public class SiteService {
         if (responsible != null) {
             setResponsibility(id, responsible, now);
         }
+        String symbol = in.symbol() == null || in.symbol().isBlank() ? null : in.symbol().trim();
+        if (symbol != null) {
+            jdbc.sql("insert into site_symbol(site_id, sidc, standard, updated_by, updated_at) values (:s, :sidc, :st, :by, :now)")
+                    .param("s", id).param("sidc", symbol).param("st", symbolStandard(symbol)).param("by", ctx.personId())
+                    .param("now", Db.ts(now)).update();
+        }
         Map<String, Object> made = new LinkedHashMap<>();
-        made.put("code", in.code());
+        made.put("code", code);
+        if (symbol != null) {
+            made.put("symbol", symbol);
+        }
         made.put("parentId", in.parentId());
         made.put("responsibleOrgId", in.responsibleOrgId());
         audit.recordAs(ctx.actor(), "SITE_CREATED", "SITE", id.toString(), in.name(), made, in.reason());
@@ -348,7 +360,7 @@ public class SiteService {
 
     @Transactional
     public SiteView update(AccessContext ctx, UUID id, SiteInput in) {
-        validate(in);
+        validate(in, true);
         SiteRow current = rows("where s.id = :id", Map.of("id", id)).stream().findFirst().orElseThrow(ApiException::notFound);
         requireFacilityManager(ctx, current.orgId());
         if (in.responsibleOrgId() != null) {
@@ -570,10 +582,87 @@ public class SiteService {
         }
     }
 
-    private void validate(SiteInput in) {
-        if (in == null || in.code() == null || in.code().isBlank() || in.name() == null || in.name().isBlank()
+    public record SymbolInput(String symbol, String reason) {
+    }
+
+    /** The site's map symbol ({@code sidc}, {@code standard}) or null. Display only. */
+    public Map<String, Object> symbolOf(UUID siteId) {
+        return jdbc.sql("select sidc, standard from site_symbol where site_id = :s").param("s", siteId).query()
+                .listOfRows().stream().findFirst().map(r -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("sidc", r.get("sidc"));
+                    m.put("standard", r.get("standard"));
+                    return m;
+                }).orElse(null);
+    }
+
+    /**
+     * «رمز الموقع على الخريطة» changed from the site's card: replaced, or removed with an empty symbol. Needs the facility right on
+     * the site's responsible organisation and a reason, as every other register edit; recorded in the audit log.
+     */
+    @Transactional
+    public Map<String, Object> setSymbol(AccessContext ctx, UUID siteId, SymbolInput in) {
+        SiteRow current = rows("where s.id = :id", Map.of("id", siteId)).stream().findFirst().orElseThrow(ApiException::notFound);
+        requireFacilityManager(ctx, current.orgId());
+        if (in == null || in.reason() == null || in.reason().trim().length() < 5) {
+            throw ApiException.validation("اكتب سبب تغيير رمز الموقع.");
+        }
+        String symbol = in.symbol() == null || in.symbol().isBlank() ? null : in.symbol().trim();
+        Map<String, Object> before = symbolOf(siteId);
+        if (symbol == null) {
+            jdbc.sql("delete from site_symbol where site_id = :s").param("s", siteId).update();
+        } else {
+            jdbc.sql("""
+                    insert into site_symbol(site_id, sidc, standard, updated_by, updated_at) values (:s, :sidc, :st, :by, :now)
+                    on conflict (site_id) do update set sidc = :sidc, standard = :st, updated_by = :by, updated_at = :now""")
+                    .param("s", siteId).param("sidc", symbol).param("st", symbolStandard(symbol)).param("by", ctx.personId())
+                    .param("now", Db.ts(clock.instant())).update();
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("before", before == null ? null : before.get("sidc"));
+        detail.put("after", symbol);
+        audit.recordAs(ctx.actor(), symbol == null ? "SITE_SYMBOL_CLEARED" : "SITE_SYMBOL_SET", "SITE", siteId.toString(), current.name(), detail, in.reason());
+        return symbolOf(siteId);
+    }
+
+    /**
+     * The standard of a symbol code, or a refusal: MIL-STD-2525C (15 characters) or APP-6D (20 or 30 digits). Tactical graphics
+     * and control measures (2525C «G…», APP-6D symbol set 25) and METOC (2525C «W…», sets 45 and 46) are refused: this
+     * application registers facilities, it does not draw operations (CLAUDE.md scope).
+     */
+    static String symbolStandard(String sidc) {
+        if (sidc.matches("^[A-Z][A-Z-][A-Z-][A-Z-][A-Z0-9-]{6}[A-Z0-9-]{5}$")) {
+            if (sidc.charAt(0) == 'G' || sidc.charAt(0) == 'W') {
+                throw ApiException.validation("الرسوم التكتيكية وإجراءات السيطرة ورموز الطقس ليست رموز مواقع في هذا النظام.");
+            }
+            return "2525C";
+        }
+        if (sidc.matches("^[0-9]{20}([0-9]{10})?$")) {
+            String set = sidc.substring(4, 6);
+            if (set.equals("25") || set.equals("45") || set.equals("46")) {
+                throw ApiException.validation("الرسوم التكتيكية وإجراءات السيطرة ورموز الطقس ليست رموز مواقع في هذا النظام.");
+            }
+            return "APP6D";
+        }
+        throw ApiException.validation("رمز غير صالح: يُقبل رمز MIL-STD-2525C من 15 حرفاً أو رمز APP-6D من 20 رقماً.");
+    }
+
+    /**
+     * «رمز الموقع» when the person leaves it empty (owner, 10 Nov 2026: a simple user cannot know one): S-0001, S-0002, … — one
+     * more than the highest such code, serialised by a transaction lock so two sites saved at once never get the same one. A code
+     * typed by hand is kept as it is.
+     */
+    private String nextCode() {
+        jdbc.sql("select pg_advisory_xact_lock(hashtext('tmrkz.site-code'))").query().listOfRows();
+        int last = jdbc.sql("select coalesce(max(substring(code from '^S-([0-9]{1,9})$')::int), 0) from site where code ~ '^S-[0-9]{1,9}$'")
+                .query(Integer.class).single();
+        return String.format("S-%04d", last + 1);
+    }
+
+    private void validate(SiteInput in, boolean codeRequired) {
+        if (in == null || (codeRequired && (in.code() == null || in.code().isBlank())) || in.name() == null || in.name().isBlank()
                 || in.kind() == null || in.kind().isBlank()) {
-            throw ApiException.validation("أكمل رمز الموقع واسمه وتصنيفه.");
+            throw ApiException.validation(codeRequired ? "أكمل رمز الموقع واسمه وتصنيفه." : "أكمل اسم الموقع وتصنيفه.");
         }
         if (in.location() != null && (!Double.isFinite(in.location().lat()) || !Double.isFinite(in.location().lng())
                 || Math.abs(in.location().lat()) > 90 || Math.abs(in.location().lng()) > 180)) {

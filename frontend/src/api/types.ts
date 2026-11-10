@@ -166,6 +166,8 @@ export type SiteDetail = Site & {
   occupancy: OccupancyItem[];
   path: Ref[];
   canManage: boolean;
+  /** The site's map symbol (V32, ADR-048), display only. */
+  symbol?: { sidc: string; standard: '2525C' | 'APP6D' } | null;
 };
 export type PackageKind = 'ROADS' | 'AERIAL' | 'FACILITY_PLAN' | 'SOURCE_DATA';
 export type PackageStatus = 'PENDING_REVIEW' | 'ACTIVE' | 'DISABLED' | 'REJECTED' | 'RETIRED';
@@ -223,6 +225,8 @@ export type MapFeature = {
   relations?: ('RESPONSIBLE' | 'OCCUPANT')[];
   resources: ResourceState[];
   requestsVisible: boolean;
+  /** The site's map symbol (V32, ADR-048), display only. */
+  symbol?: string | null;
 };
 export type CoverageStatus = 'FULL' | 'PARTIAL' | 'NONE' | 'NO_PACKAGE' | 'ZOOM_OUT_OF_RANGE' | 'UNKNOWN';
 export type Coverage = { status: CoverageStatus; message: string | null; fraction?: number; packageId?: string; packageName?: string };

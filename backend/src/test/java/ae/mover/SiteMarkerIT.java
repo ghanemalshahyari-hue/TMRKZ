@@ -69,6 +69,71 @@ class SiteMarkerIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("A site saved without a code gets the next free S-number, one each, and keeps a code typed by hand (ADR-048)")
+    void codeGeneratedWhenEmpty() {
+        var fma = login("fma");
+        java.util.function.Function<String, Map<String, Object>> body = code -> {
+            Map<String, Object> b = new java.util.HashMap<>(Map.of("name", "موقع بلا رمز " + sfx, "kind", "معسكر", "responsibleOrgId", orgA.toString(),
+                    "location", Map.of("lat", lat0 + 0.02, "lng", lng0 + 0.02), "reason", "تهيئة موقع بلا رمز"));
+            if (code != null) b.put("code", code);
+            return b;
+        };
+        var first = fma.post("/sites", body.apply(""));
+        var second = fma.post("/sites", body.apply(null));
+        var typed = fma.post("/sites", body.apply("BY-HAND-" + sfx));
+        assertThat(first.status()).as(first.toString()).isEqualTo(200);
+        assertThat(second.status()).as(second.toString()).isEqualTo(200);
+        String a = first.body().path("code").asText(), b = second.body().path("code").asText();
+        assertThat(a).matches("S-\\d{4,}");
+        assertThat(Integer.parseInt(b.substring(2))).isEqualTo(Integer.parseInt(a.substring(2)) + 1);
+        assertThat(typed.body().path("code").asText()).isEqualTo("BY-HAND-" + sfx);
+        var audited = lastAudit(UUID.fromString(first.body().path("id").asText()), "SITE_CREATED");
+        assertThat(audited.path("detail").path("code").asText()).isEqualTo(a);
+        // an update still needs its code
+        var noCode = fma.put("/sites/" + first.body().path("id").asText(), Map.of("code", "", "name", "x", "kind", "معسكر", "reason", "تعديل بلا رمز"));
+        assertThat(noCode.status()).isEqualTo(400);
+    }
+
+    @Test
+    @DisplayName("A site's map symbol (V32): saved with the site, shown on the map, changed and cleared with a reason; tactical graphics refused")
+    void siteSymbol() {
+        var fma = login("fma");
+        Map<String, Object> body = new java.util.HashMap<>(Map.of("name", "معسكر برمز " + sfx, "kind", "معسكر", "responsibleOrgId", orgA.toString(),
+                "location", Map.of("lat", lat0 + 0.03, "lng", lng0 + 0.03), "reason", "تهيئة موقع برمز", "symbol", "SFGPIB----H----"));
+        var made = fma.post("/sites", body);
+        assertThat(made.status()).as(made.toString()).isEqualTo(200);
+        String id = made.body().path("id").asText();
+        var detail = fma.get("/sites/" + id);
+        assertThat(detail.body().path("symbol").path("sidc").asText()).isEqualTo("SFGPIB----H----");
+        assertThat(detail.body().path("symbol").path("standard").asText()).isEqualTo("2525C");
+        var features = fma.get("/map/features?bbox=" + (lng0 - 1) + "," + (lat0 - 1) + "," + (lng0 + 1) + "," + (lat0 + 1));
+        boolean onMap = false;
+        for (JsonNode f : features.body().path("features")) {
+            if (f.path("siteId").asText().equals(id)) onMap = "SFGPIB----H----".equals(f.path("symbol").asText());
+        }
+        assertThat(onMap).as(features.toString()).isTrue();
+        // a tactical graphic (a checkpoint) or a malformed code is no site symbol
+        body.put("symbol", "GFGPGPPK------X");
+        assertThat(fma.post("/sites", body).status()).isEqualTo(400);
+        body.put("symbol", "not-a-code");
+        assertThat(fma.post("/sites", body).status()).isEqualTo(400);
+        // changed from the card, with a reason; then cleared; someone without the right is refused
+        assertThat(fma.put("/sites/" + id + "/symbol", Map.of("symbol", "SFGPUSM--------", "reason", "x")).status()).isEqualTo(400);
+        var changed = fma.put("/sites/" + id + "/symbol", Map.of("symbol", "SFGPUSM--------", "reason", "عيادة في الموقع"));
+        assertThat(changed.status()).as(changed.toString()).isEqualTo(200);
+        assertThat(changed.body().path("sidc").asText()).isEqualTo("SFGPUSM--------");
+        assertThat(lastAudit(UUID.fromString(id), "SITE_SYMBOL_SET").path("detail").path("before").asText()).isEqualTo("SFGPIB----H----");
+        assertThat(login("vw").put("/sites/" + id + "/symbol", Map.of("symbol", "SFGPIB----H----", "reason", "محاولة بلا صلاحية")).status()).isEqualTo(403);
+        assertThat(login("fmb").put("/sites/" + id + "/symbol", Map.of("symbol", "SFGPIB----H----", "reason", "جهة أخرى")).status()).isEqualTo(403);
+        Map<String, Object> clear = new java.util.HashMap<>();
+        clear.put("symbol", null);
+        clear.put("reason", "بلا رمز");
+        assertThat(fma.put("/sites/" + id + "/symbol", clear).status()).isEqualTo(200);
+        assertThat(fma.get("/sites/" + id).body().path("symbol").isNull()).isTrue();
+        assertThat(lastAudit(UUID.fromString(id), "SITE_SYMBOL_CLEARED")).isNotNull();
+    }
+
+    @Test
     @DisplayName("A facility manager adds a new site by placing a marker; it is stored with its coordinates and audited")
     void createSiteAtPoint() {
         var fma = login("fma");

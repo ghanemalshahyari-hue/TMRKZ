@@ -93,6 +93,13 @@ public class FacilityController {
         return sites.update(access.context(actor), id, in);
     }
 
+    /** The site's map symbol (ADR-048): replaced, or removed with an empty symbol; display only, audited with its reason. */
+    @PutMapping("/sites/{id}/symbol")
+    public Map<String, Object> setSymbol(Actor actor, @PathVariable UUID id, @RequestBody SiteService.SymbolInput in) {
+        Map<String, Object> out = sites.setSymbol(access.context(actor), id, in);
+        return out == null ? Map.of() : out;
+    }
+
     /** Direct, audited move of the site's point marker (facility register edit), separate from a relocation request. */
     @PostMapping("/sites/{id}/location")
     public SiteService.SiteView moveMarker(Actor actor, @PathVariable UUID id, @RequestBody SiteService.MoveMarkerInput in) {

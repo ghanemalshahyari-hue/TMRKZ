@@ -1,7 +1,9 @@
 import { Popup, type GeoJSONSource, type Map as MlMap, type MapMouseEvent } from 'maplibre-gl';
 import { addOverlayLayer } from '../map/maplibre';
 import { LABEL_FONT } from '../map/maplibre/offlineStyle';
-import type { SiteRefProps } from '../../lib/sitesLayer';
+import { rendererStandard } from '../../lib/siteSymbols';
+import { SYMBOL_IMAGE, type SiteRefProps } from '../../lib/sitesLayer';
+import { renderSymbol } from '../../lib/unitSymbols';
 
 /** Reference colours: neutral slate, amber when the person selects a site (never the proposed site's teal). */
 export const REF_COLOUR = '#2f4f6f';
@@ -79,7 +81,33 @@ function addSiteGlyph(m: MlMap): void {
   m.addImage(SITE_GLYPH, g.getImageData(0, 0, n, n), { pixelRatio: 2 });
 }
 
-const glyphLayout = { 'icon-image': SITE_GLYPH, 'icon-size': sel(1.15, 0.95), 'icon-allow-overlap': true, 'icon-ignore-placement': true } as never;
+// a site with its own map symbol (V32, ADR-048) shows it instead of the plain site mark, drawn offline on first use
+const glyphLayout = {
+  'icon-image': ['case', ['!=', ['coalesce', ['get', 'sym'], ''], ''], ['get', 'sym'], SITE_GLYPH],
+  'icon-size': ['case', ['!=', ['coalesce', ['get', 'sym'], ''], ''], sel(0.62, 0.52), sel(1.15, 0.95)],
+  'icon-allow-overlap': true,
+  'icon-ignore-placement': true,
+} as never;
+
+/** The map image of a site symbol, drawn by the bundled milsymbol when a layer first asks for it (never fetched). */
+function drawSymbolsOnDemand(m: MlMap): void {
+  const pending = new Set<string>();
+  m.on('styleimagemissing', (e: { id: string }) => {
+    if (!e.id.startsWith(SYMBOL_IMAGE) || pending.has(e.id) || m.hasImage(e.id)) return;
+    pending.add(e.id);
+    const sidc = e.id.slice(SYMBOL_IMAGE.length);
+    renderSymbol(sidc, rendererStandard(sidc), 60)
+      .then(({ url, valid }) => {
+        if (!valid) return;
+        const img = new Image();
+        img.onload = () => {
+          if (!m.hasImage(e.id)) m.addImage(e.id, img, { pixelRatio: 2 });
+        };
+        img.src = url;
+      })
+      .catch(() => undefined);
+  });
+}
 const nameLayout = {
   // the name, and under it what kind of site it is here and how many units are stationed there: one object per site
   'text-field': ['format', ['get', 'name'], {}, ['case', ['==', ['coalesce', ['get', 'sub'], ''], ''], '', ['concat', '\n', ['get', 'sub']]], { 'font-scale': 0.82, 'text-color': '#4f6377' }],
@@ -109,6 +137,7 @@ const namePaint = { 'text-color': sel('#7a4f00', '#14304d') } as never;
 export function addSiteLayers(m: MlMap): void {
   addLabelPill(m);
   addSiteGlyph(m);
+  drawSymbolsOnDemand(m);
   m.addSource('ref-sites', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'siteId' });
   m.addSource('ref-points', {
     type: 'geojson',

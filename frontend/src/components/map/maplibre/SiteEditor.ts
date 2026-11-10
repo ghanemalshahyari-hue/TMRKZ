@@ -320,7 +320,8 @@ export class SiteEditor {
    */
   startDrawing(centre?: LatLng | null, target = this.target) {
     this.endDrawing();
-    this.target = Math.max(3, Math.min(20, Math.round(target)));
+    // 0: free drawing, as many corners as the person places, closed on the first vertex, a double click or Enter (ADR-048)
+    this.target = target === 0 ? 0 : Math.max(3, Math.min(20, Math.round(target)));
     this.drawing = startDraw();
     this.drawRedo = [];
     this.pointer = null;
@@ -384,7 +385,7 @@ export class SiteEditor {
   }
 
   private afterVertex() {
-    if (this.drawing && this.drawing.vertices.length >= this.target) this.finishDrawing();
+    if (this.drawing && this.target > 0 && this.drawing.vertices.length >= this.target) this.finishDrawing();
     else this.renderDraw();
   }
 
