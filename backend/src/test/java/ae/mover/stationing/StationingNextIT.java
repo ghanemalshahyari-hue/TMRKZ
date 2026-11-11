@@ -155,10 +155,23 @@ class StationingNextIT extends RestationingTestBase {
         JsonNode atOps = login("ops").get("/restationing-requests/" + id).body();
         assertThat(atOps.path("can").path("decide").asBoolean()).isTrue();
         assertThat(atOps.path("can").path("decideAs").asText()).isEqualTo("اعتماد عمليات الوحدة");
+        // the stamps (ADR-055): none before the stage is approved
+        JsonNode noStamp = login("rq").get("/restationing-requests/" + id + "/stamps").body();
+        assertThat(noStamp.path("unitOperations").isNull()).isTrue();
+        assertThat(noStamp.path("final").isNull()).isTrue();
         assertThat(decide("ops", id, "APPROVE").status()).isEqualTo(200);
+        JsonNode opsStamp = login("rq").get("/restationing-requests/" + id + "/stamps").body();
+        assertThat(opsStamp.path("unitOperations").path("name").asText()).as("the approver as recorded").isEqualTo("شخص ops");
+        assertThat(opsStamp.path("unitOperations").path("at").asText()).isNotBlank();
+        assertThat(opsStamp.path("final").isNull()).isTrue();
         assertThat(login("fin").get("/restationing-requests/" + id).body().path("can").path("decideAs").asText()).isEqualTo("اعتماد نهائي");
         assertThat(decide("ops", id, "APPROVE").status()).as("one human decides one stage").isIn(403, 409);
         assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        JsonNode both = login("rq").get("/restationing-requests/" + id + "/stamps").body();
+        assertThat(both.path("final").path("name").asText()).isEqualTo("شخص fin");
+        assertThat(both.path("number").asText()).isEqualTo(login("rq").get("/restationing-requests/" + id).body().path("number").asText());
+        assertThat(both.path("mainUnit").asText()).isNotBlank();
+        assertThat(login("stranger").get("/restationing-requests/" + id + "/stamps").status()).as("only on a request one may see").isEqualTo(404);
 
         // FYI comes before activation here, because the policy version says so
         assertThat(login("activator").get("/restationing-requests/" + id).body().path("can").path("activate").asBoolean()).isFalse();

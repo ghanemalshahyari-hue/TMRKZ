@@ -32,8 +32,12 @@ membership once their HR record is mirrored.
 
 - Only the `web` service publishes a port (`MOVER_HTTP_PORT`, default 8088). The database and backend are reachable
   only on the internal compose network.
-- Terminate TLS on the organisation's internal reverse proxy in front of `web`, then set `MOVER_SECURE_COOKIE=true`.
-  Use the organisation's internal CA; nothing in MOVER contacts external certificate services.
+- **https (ADR-051):** TMRKZ serves it itself, as TNQL: `ops/tls/make-csr.sh` (key on the server, request to the PKI
+  team), `ops/tls/install-cert.sh` (checks the issued certificate), `ops/tls/enable.sh` (sets `.env` and the identity
+  provider), then restart; see `ops/tls/README.md`. The plain port is then bound to this host only. An organisation that
+  prefers its own reverse proxy may instead terminate TLS there, in front of `web`, and set `TMRKZ_PUBLIC_URL` and
+  `MOVER_SECURE_COOKIE=true`. Either way the organisation's internal CA is used; nothing contacts external certificate
+  services.
 - **Docker networking is not isolation.** A default bridge network can still reach the outside. Enforce egress
   denial at the host/firewall level and verify it, e.g. from inside the backend container:
   `docker compose exec backend wget -T 5 -qO- https://example.com` must fail.

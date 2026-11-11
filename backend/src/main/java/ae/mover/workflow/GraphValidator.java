@@ -29,7 +29,7 @@ public final class GraphValidator {
     private static final Pattern KEY = Pattern.compile("^[a-z][a-z0-9_]{1,39}$");
     private static final Set<String> TYPES = Set.of(WorkflowDefinition.START, WorkflowDefinition.APPROVAL, WorkflowDefinition.DECISION, WorkflowDefinition.NOTIFY,
             WorkflowDefinition.PARALLEL, WorkflowDefinition.JOIN, WorkflowDefinition.END_APPROVED, WorkflowDefinition.END_REJECTED);
-    private static final Set<String> ORG_FROM = Set.of("BY_SCOPE", "REQUEST_ORG", "RESOURCE_ORG", "ANY", "UP", "AT_LEVEL", "FIXED", "RESPONSIBLE");
+    private static final Set<String> ORG_FROM = Set.of("BY_SCOPE", "REQUEST_ORG", "RESOURCE_ORG", "ANY", "UP", "AT_LEVEL", "FIXED", "RESPONSIBLE", "PROVIDER");
 
     /** What the rules need to know about places outside the definition. */
     public interface Places {

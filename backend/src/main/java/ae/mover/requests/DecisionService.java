@@ -136,9 +136,12 @@ public class DecisionService {
                    String status, Instant createdAt, Instant dueAt, UUID assignedPersonId, boolean awaitingAssignment, boolean strictPlace,
                    boolean byScope, boolean independentOfEarlier, List<UUID> pinned) {
 
-        /** A chart's step going to a unit is for those who hold the role at that unit (ADR-041). */
-        boolean placeAllows(AccessContext ctx) {
-            return !strictPlace || targetOrgId == null || ctx.holdsRoleAt(roleCode, targetOrgId);
+        /**
+         * A chart's step going to a unit is for the approvers of that station (ADR-041, ADR-058): its own, or when it has none
+         * the nearest approver above whose grant covers it, and a holder over everything.
+         */
+        boolean placeAllows(AccessContext ctx, ae.mover.workflow.PlaceResolver places) {
+            return !strictPlace || targetOrgId == null || places.station(roleCode, targetOrgId).allows(ctx.personId());
         }
     }
 
@@ -216,6 +219,7 @@ public class DecisionService {
         SeparationOfDuties.Independence independent = separation.of(ctx);
         Instant now = clock.instant();
         List<TaskItem> out = new ArrayList<>();
+        Map<String, ae.mover.access.Stations.Station> stationsSeen = new java.util.HashMap<>();
         for (Map<String, Object> m : rows) {
             UUID requestId = (UUID) m.get("request_id");
             RequestScope scope = scopes.get(requestId);
@@ -226,7 +230,9 @@ public class DecisionService {
             if (independent.taskGrant((String) m.get("role_code"), (UUID) m.get("target_org_id"), scope, fin, excluded).isEmpty()
                     || ((Boolean) m.get("by_scope") && !nearest(ctx, (String) m.get("role_code"), (UUID) m.get("target_org_id"), pinned(m.get("scope_orgs"))))
                     || !ctx.assignedToMe((UUID) m.get("assigned_person_id"), (Boolean) m.get("awaiting_assignment"))
-                    || ((Boolean) m.get("strict_place") && !ctx.holdsRoleAt((String) m.get("role_code"), (UUID) m.get("target_org_id")))) {
+                    || ((Boolean) m.get("strict_place") && m.get("target_org_id") != null
+                        && !stationsSeen.computeIfAbsent(m.get("role_code") + "|" + m.get("target_org_id"),
+                                k -> places.station((String) m.get("role_code"), (UUID) m.get("target_org_id"))).allows(ctx.personId()))) {
                 continue;
             }
             Instant due = Db.toInstant(m.get("due_at"));
@@ -303,7 +309,7 @@ public class DecisionService {
         }
         Set<UUID> excluded = t.independentOfEarlier() ? plus(requesters, separation.earlierApprovers(t.requestId(), t.stageKey())) : requesters;
         if (independent.taskGrant(t.roleCode(), t.targetOrgId(), scope, t.finalStage(), excluded).isEmpty()
-                || !ctx.assignedToMe(t.assignedPersonId(), t.awaitingAssignment()) || !t.placeAllows(ctx)
+                || !ctx.assignedToMe(t.assignedPersonId(), t.awaitingAssignment()) || !t.placeAllows(ctx, places)
                 || (t.byScope() && !nearest(ctx, t.roleCode(), t.targetOrgId(), t.pinned()))) {
             throw ApiException.notFound();
         }
@@ -339,7 +345,7 @@ public class DecisionService {
             throw ApiException.validation("هذه المرحلة لا تتطلب توقيعاً بالشهادة.");
         }
         Grant grant = separation.of(ctx).require(t.roleCode(), t.targetOrgId(), scope, t.finalStage(), separation.requester(t.requestId()));
-        if (!t.placeAllows(ctx)) {
+        if (!t.placeAllows(ctx, places)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "هذه الخطوة لمن يحمل الدور في الجهة المحددة لها.");
         }
         if (t.byScope() && !nearest(ctx, t.roleCode(), t.targetOrgId(), t.pinned())) {
@@ -456,7 +462,7 @@ public class DecisionService {
         // Separation of duties (ADR-027): the requester — any record of the same human — never decides, nor does a grant
         // delegated by them; checked before the assignment, so a task assigned to the requester still refuses them.
         Grant grant = separation.of(ctx).require(t.roleCode(), t.targetOrgId(), scope, t.finalStage(), separation.requester(t.requestId()));
-        if (!t.placeAllows(ctx)) {
+        if (!t.placeAllows(ctx, places)) {
             throw new ApiException(ErrorCode.FORBIDDEN, "هذه الخطوة لمن يحمل الدور في الجهة المحددة لها.");
         }
         if (t.byScope() && !nearest(ctx, t.roleCode(), t.targetOrgId(), t.pinned())) {

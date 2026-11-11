@@ -13,7 +13,8 @@ const RUN_STATUS: Record<HrRun['status'], [string, string]> = {
   SKIPPED: ['مؤجل', ''],
 };
 const ENTITY: Record<HrEntity, string> = { UNIT: 'الجهات', PERSON: 'الأشخاص' };
-const TRANSFORMS = ['none', 'trim', 'upper', 'lower', 'first_non_empty'];
+// path_parent: the parent unit from TNQL's ID path UNIT_PATH, for the parent field only (as TNQL reads it)
+const TRANSFORMS = ['none', 'trim', 'upper', 'lower', 'first_non_empty', 'path_parent'];
 
 const EMPTY: HrSourceInput = {
   name: 'مصدر الموارد البشرية',

@@ -378,6 +378,30 @@ class WorkflowGraphIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("Climbing (ADR-058, as TNQL): a level with no approver of its own is signed by the nearest approver above covering it, who then signs his own; never early where a level has its own")
+    void inheritedStation() {
+        hierarchy();
+        Map<String, Object> strict = climbing("chain", "ORG_MANAGER", "stop", "MAIN_UNIT");
+        ((Map<String, Object>) strict.get("chain")).put("skipEmpty", false);
+        String type = withClimb(strict);
+        UUID first = submittedBy("rSquad", squad, type);
+        assertThat(openTarget(first)).isEqualTo(team);
+        Api mSec = login("mSec");
+        assertThat(mSec.taskFor(first)).as("the team has its own approver: the section's waits for its own level").isNull();
+        String step = jdbc.sql("select id::text from task_assignment where request_id = :id and status = 'OPEN'").param("id", first).query(String.class).single();
+        assertThat(mSec.approve(step, 1).status()).isEqualTo(403);
+
+        // the team's approver leaves: the request is not refused, the section's approver signs the team's level, then his own
+        jdbc.sql("update membership set valid_to = now() where person_id = (select id from person where username = 'mTeam-" + sfx + "')").update();
+        UUID second = submittedBy("rSquad", squad, type);
+        assertThat(openTarget(second)).isEqualTo(team);
+        assertThat(mSec.approve(mSec.taskFor(second), 1).status()).isEqualTo(200);
+        assertThat(openTarget(second)).isEqualTo(section);
+        assertThat(mSec.approve(mSec.taskFor(second), 1).status()).isEqualTo(200);
+        assertThat(openStages(second)).containsExactly("fin");
+    }
+
+    @Test
     @DisplayName("Climbing: the main unit itself has nothing to climb and goes on; a level above it does not climb past its stop")
     void mainUnitGoesOn() {
         hierarchy();

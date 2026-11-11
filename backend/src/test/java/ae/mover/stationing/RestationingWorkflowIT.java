@@ -31,6 +31,20 @@ class RestationingWorkflowIT extends RestationingTestBase {
     // ---- permanent journey ---------------------------------------------------------------------------------
 
     @Test
+    @DisplayName("ADR-058 (as TNQL): a level with no seat of its own is decided by the nearest approver above covering it, who then decides his own")
+    void inheritedSeat() {
+        jdbc.sql("update membership set valid_to = now() where person_id = :p").param("p", personId("apSec")).update();
+        String id = create("req", permanent(List.of(sec, team)));
+        Res s = login("req").post("/restationing-requests/" + id + "/submit", Map.of());
+        assertThat(s.status()).as(s.toString()).isEqualTo(200);
+        assertThat(keys(s.body().path("route"))).containsExactly("H:" + sec, "H:" + dept, "H:" + top);
+        assertThat(decide("apTop", id, "APPROVE").status()).as("the nearest covering approver, not any above").isEqualTo(403);
+        assertThat(decide("apDept", id, "APPROVE").status()).as("the section has nobody: the department's approver decides it").isEqualTo(200);
+        assertThat(decide("apDept", id, "APPROVE").status()).as("and then his own level").isEqualTo(200);
+        assertThat(decide("apTop", id, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+    }
+
+    @Test
     @DisplayName("Permanent: route from the requesting unit, seat decisions, separation of duties, independent activation")
     void permanentJourney() {
         UUID link = UUID.randomUUID();

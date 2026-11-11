@@ -18,8 +18,8 @@ FROM nginx:1.28.3-alpine
 COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY docs /usr/share/nginx/docs
-# Authoritative handoff and the approved prototype, served offline under /docs/handoff/
+# Authoritative handoff, served offline under /docs/handoff/. The concept prototype is no longer served or linked
+# (owner, 11 Nov 2026); its file stays in the repository as the preserved concept (dist/, unified/).
 COPY handoff /usr/share/nginx/docs/handoff
-COPY dist/prototype.html /usr/share/nginx/docs/handoff/prototype.html
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -qO- http://127.0.0.1/healthz || exit 1

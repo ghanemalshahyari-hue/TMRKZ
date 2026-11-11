@@ -1,0 +1,117 @@
+{
+  "okf_version": "0.2",
+  "bundle": "tmrkz-okf",
+  "description": "TMRKZ's own guide, in TNQL's OKF format (ADR-054)",
+  "documents": [
+    {
+      "path": "concept/offline-map.md",
+      "resource": "tmrkz://okf/concept/offline-map",
+      "sha256": "1719c48222be20c4d948961d36f592fa194484f403471b8bc2f864bba005cce9",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "how-to/add-user.md",
+      "resource": "tmrkz://okf/how-to/add-user",
+      "sha256": "ee116777acb6c441d68b456bad1d1936026cd9d2ac64b880b4e091212c515226",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "how-to/desktop-notifications.md",
+      "resource": "tmrkz://okf/how-to/desktop-notifications",
+      "sha256": "1413bb1bf8221949d504fcbca667a260d890f718c4e2915ebd5f15bba98b63c6",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "how-to/new-site.md",
+      "resource": "tmrkz://okf/how-to/new-site",
+      "sha256": "07227e6e97abfd5d946b2796765c2cc4f88097847fa4924f05c351f7e51fa18e",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "how-to/permissions-matrix.md",
+      "resource": "tmrkz://okf/how-to/permissions-matrix",
+      "sha256": "60000882e9d016a96804a3318ac17d3b0ec0f1fa127882b2cc22ba507035f26f",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "how-to/request-access.md",
+      "resource": "tmrkz://okf/how-to/request-access",
+      "sha256": "67c8d6f11902721b8d5ec20fc60cf5a1ddb63c1063d2d5ae27cc2f8960b4c0ba",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "how-to/restationing.md",
+      "resource": "tmrkz://okf/how-to/restationing",
+      "sha256": "9aad63871748778eb05e7701ecc39134b5196d0ee49728b2ee8f4287ff765330",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "how-to/sign-in.md",
+      "resource": "tmrkz://okf/how-to/sign-in",
+      "sha256": "91be431f7c5fa60c1d9db0942219d9d56ab11b0944263a52de5c1152613dce8e",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "how-to/support-report.md",
+      "resource": "tmrkz://okf/how-to/support-report",
+      "sha256": "487900e91a4e4c62fd816497bf85aa63a8dd188e8a3d7b3bf965ab42c8acc86d",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "reference/support-console.md",
+      "resource": "tmrkz://okf/reference/support-console",
+      "sha256": "3c855f7f0a3305aea1fdd8f4f962ab3c87a8f0955bc65f6543350d9ad30b27e8",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    },
+    {
+      "path": "troubleshooting/sign-in-refused.md",
+      "resource": "tmrkz://okf/troubleshooting/sign-in-refused",
+      "sha256": "262d9c47a1043789f9e8fd73a5cd819108bde55fa24c2d1b55e7377fad592cd0",
+      "provenance": {
+        "origin": "owner 2026-11-11",
+        "review_state": "verified-current",
+        "freshness": "2026-11-11"
+      }
+    }
+  ]
+}

@@ -49,3 +49,8 @@ docs/evidence/flow-studio/climb/
 docs/evidence/theme/
 # Acceptance fixtures on the one application: manifests, passwords, evidence with real unit names (ops/acceptance-main)
 ops/acceptance-main/.generated/
+# https: key, request and issued certificate (ops/tls/make-csr.sh, install-cert.sh); never committed
+ops/tls/private/
+.env.before-https-*
+# demo HR source secrets (ops/hr-demo/up.sh)
+ops/hr-demo/.generated/

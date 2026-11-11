@@ -5,3 +5,5 @@
 *.ttf binary
 *.zip binary
 *.tar binary
+# the OKF knowledge bundle is hash-pinned (ADR-054): its bytes must not change with the platform
+backend/src/main/resources/okf/** text eol=lf

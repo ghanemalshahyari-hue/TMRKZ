@@ -29,12 +29,34 @@ public class AccessController {
     private final AccessPolicyService policies;
     private final GrantAdminService grants;
     private final AuthzSync sync;
+    private final UnitMemberService members;
 
-    public AccessController(AccessService access, AccessPolicyService policies, GrantAdminService grants, AuthzSync sync) {
+    public AccessController(AccessService access, AccessPolicyService policies, GrantAdminService grants, AuthzSync sync,
+                            UnitMemberService members) {
         this.access = access;
         this.policies = policies;
         this.grants = grants;
         this.sync = sync;
+        this.members = members;
+    }
+
+    /** «إضافة مستخدم» (ADR-049): the HR card of one person found by employee number or User ID, inside the manager's reach. */
+    @GetMapping("/unit-members/lookup")
+    public Map<String, Object> lookupUnitMember(Actor actor, @RequestParam UUID organizationId, @RequestParam String key) {
+        return members.lookup(access.context(actor), organizationId, key);
+    }
+
+    /** Adds an HR person, or a User ID without HR, to the unit's matrix with no role. */
+    @PostMapping("/unit-members")
+    public Map<String, Object> addUnitMember(Actor actor, @RequestBody UnitMemberService.AddInput in) {
+        return members.add(access.context(actor), in);
+    }
+
+    /** Removes an added person from the unit's matrix; their grants are not ended. */
+    @PostMapping("/unit-members/{personId}/end")
+    public ResponseEntity<Void> endUnitMember(Actor actor, @PathVariable UUID personId, @RequestBody UnitMemberService.EndInput in) {
+        members.end(access.context(actor), personId, in);
+        return ResponseEntity.noContent().build();
     }
 
     public record NoteInput(String note) {

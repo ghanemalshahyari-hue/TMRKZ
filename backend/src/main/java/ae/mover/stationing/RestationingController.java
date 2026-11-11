@@ -73,6 +73,12 @@ public class RestationingController {
         return view(ctx, id);
     }
 
+    /** «ختم عمليات الوحدة» and «ختم الاعتماد النهائي» of the request (ADR-055): visual stamps from the recorded approvals. */
+    @GetMapping("/{id}/stamps")
+    public Map<String, Object> stamps(Actor actor, @PathVariable UUID id) {
+        return service.stamps(access.context(actor), id);
+    }
+
     /** The submission checks of the current content (validation against the policy version, never a recommendation). */
     @GetMapping("/{id}/checks")
     public Map<String, Object> checks(Actor actor, @PathVariable UUID id) {

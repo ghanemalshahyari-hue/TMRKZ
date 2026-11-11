@@ -122,7 +122,7 @@ public class WorkflowRuntime {
             List<UUID> orgs = places.chainOrgs(role, chain, ctx.ownerOrgId(), separation.requester(ctx.requestId()));
             orgs.forEach(o -> out.add(role + "|" + o));
             // units to climb, and every one skipped for having nobody: open to the role, never approved by nobody
-            if (orgs.isEmpty() && places.chain(chain, ctx.ownerOrgId()).stream().anyMatch(u -> places.holders(role, PlaceResolver.Place.of(u.id())).isEmpty())) {
+            if (orgs.isEmpty() && places.chain(chain, ctx.ownerOrgId()).stream().anyMatch(u -> places.station(role, u.id()).empty())) {
                 out.add(role + "|*");
             }
             return new ArrayList<>(out);

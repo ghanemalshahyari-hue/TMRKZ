@@ -11,9 +11,17 @@ const STATIONING_REQUEST_RIGHTS: Permission[] = ['CREATE_RESTATIONING', 'CREATE_
 const STATIONING_RIGHTS: Permission[] = [...STATIONING_REQUEST_RIGHTS, 'VIEW', 'APPROVE', 'ACTIVATE_STATIONING', 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION', 'DECIDE_PRE_ACTIVATION_CANCELLATION',
   'ACTIVATE_TEMPORARY_EXTENSION', 'DECIDE_EARLY_RETURN', 'DECIDE_BEFORE_START_CANCELLATION', 'DECIDE_UNIT_OPERATIONS', 'FINAL_APPROVE_STATIONING', 'MANAGE_FYI_DISTRIBUTION'];
 
+let supportSeat: string | null = null;
+/** «لوحة الدعم» opens for a support seat (ADR-053), which is not a permission: the shell tells navigation who holds one. */
+export function setSupportSeat(seat: string | null | undefined) {
+  supportSeat = seat ?? null;
+}
+
 /** Server-enforced permissions decide what each screen shows; this mirrors them for navigation only. */
 export function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: boolean): boolean {
-  if (view === 'docs' || view === 'home' || view === 'requestAccess') return false;
+  if (view === 'docs' || view === 'home' || view === 'requestAccess' || view === 'support') return false;
+  // a configuration administrator opens it to give the first seats; the queue itself answers seat holders only
+  if (view === 'supportConsole') return !supportSeat && !can('CONFIGURE');
   // the read-only posture opens with its own right, and that right opens nothing else
   if (view === 'posture') return !can('VIEW_OPERATIONAL_POSTURE');
   if (view === 'siteSetup') return !(can('MANAGE_FACILITIES') || can('MANAGE_SITE_LINKS') || can('CORRECT_STATIONING'));
@@ -44,7 +52,10 @@ export type NavLink = { view: View; label: string; icon: string };
  */
 const PRIMARY: { label: string; icon: string; views: View[] }[] = [
   { label: 'الرئيسية', icon: 'home', views: ['home'] },
-  { label: 'الطلبات', icon: 'file', views: ['allRequests', 'restationing', 'requests'] },
+  // next to «الرئيسية» (owner, 11 Nov 2026), out of «المزيد»
+  { label: 'تهيئة المواقع', icon: 'boundary', views: ['siteSetup'] },
+  { label: 'إعادة التمركز', icon: 'layers', views: ['restationing'] },
+  { label: 'الطلبات', icon: 'file', views: ['allRequests', 'requests'] },
   { label: 'المواقع', icon: 'pin', views: ['stationing'] },
   { label: 'الوحدات', icon: 'tree', views: ['org'] },
   { label: 'التقارير', icon: 'chart', views: ['audit', 'calendar'] },

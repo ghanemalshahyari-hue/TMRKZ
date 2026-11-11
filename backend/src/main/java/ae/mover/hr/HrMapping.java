@@ -46,9 +46,15 @@ public final class HrMapping {
             new Canonical(Entity.PERSON, "domain_account", false, "حساب النطاق"),
             new Canonical(Entity.PERSON, "position_id", false, "معرف المنصب"),
             new Canonical(Entity.PERSON, "position", false, "المنصب"),
-            new Canonical(Entity.PERSON, "job", false, "الوظيفة"));
+            new Canonical(Entity.PERSON, "job", false, "الوظيفة"),
+            // TNQL leaves out approvers HR marks away; any value here means away now, empty means available (ADR-059)
+            new Canonical(Entity.PERSON, "leave_status", false, "حالة الإجازة أو الغياب (فارغ = متاح)"));
 
-    public static final Set<String> TRANSFORMS = Set.of("none", "trim", "upper", "lower", "first_non_empty");
+    /**
+     * {@code path_parent} (TNQL compatibility, owner 11 Nov 2026): TNQL's unit view carries no direct parent column; the
+     * parent is the second-to-last segment of the ID path UNIT_PATH («\1\2\3»), as TNQL's own organisation sync reads it.
+     */
+    public static final Set<String> TRANSFORMS = Set.of("none", "trim", "upper", "lower", "first_non_empty", "path_parent");
     public static final Set<String> OPERATORS = Set.of("EQUALS", "IN", "NOT_EQUALS");
 
     /** View names may be schema-qualified; columns are plain identifiers. Both are checked against metadata too. */
@@ -86,6 +92,9 @@ public final class HrMapping {
             String t = f.transform() == null ? "none" : f.transform();
             if (!TRANSFORMS.contains(t)) {
                 problems.add("تحويل غير مسموح للحقل " + f.field());
+            }
+            if ("path_parent".equals(t) && !(f.entity() == Entity.UNIT && "parent_external_unit_id".equals(f.field()))) {
+                problems.add("التحويل path_parent لحقل الجهة الأم فقط");
             }
             if ("first_non_empty".equals(t) && (f.alternates() == null || f.alternates().isEmpty())) {
                 problems.add("التحويل first_non_empty يحتاج عموداً بديلاً واحداً على الأقل للحقل " + f.field());
@@ -186,7 +195,9 @@ public final class HrMapping {
                     }
                 } else {
                     value = text(row.get(exact.get(e + ":" + f.column().toUpperCase(Locale.ROOT))));
-                    if (value != null && "upper".equals(f.transform())) {
+                    if (value != null && "path_parent".equals(f.transform())) {
+                        value = pathParent(value);
+                    } else if (value != null && "upper".equals(f.transform())) {
                         value = value.toUpperCase(Locale.ROOT);
                     } else if (value != null && "lower".equals(f.transform())) {
                         value = value.toLowerCase(Locale.ROOT);
@@ -194,12 +205,27 @@ public final class HrMapping {
                 }
                 out.put(f.field(), value);
             }
+            // a unit is never its own parent (a path of one segment, or a source that repeats the unit)
+            if (e == Entity.UNIT && out.get("parent_external_unit_id") != null && out.get("parent_external_unit_id").equals(out.get("external_unit_id"))) {
+                out.put("parent_external_unit_id", null);
+            }
             Rule r = rules.get(e);
             String actual = text(row.get(exact.get(e + ":" + r.column().toUpperCase(Locale.ROOT))));
             boolean match = actual != null && r.values().stream().anyMatch(v -> v.trim().equals(actual));
             out.put("active", String.valueOf("NOT_EQUALS".equals(r.operator()) ? actual != null && !match : match));
             return out;
         }
+    }
+
+    /** The second-to-last segment of an ID path («\1\2\3» → «2»); null for a root (one segment). */
+    static String pathParent(String path) {
+        List<String> parts = new ArrayList<>();
+        for (String s : path.split("[\\\\/]")) {
+            if (!s.isBlank()) {
+                parts.add(s.trim());
+            }
+        }
+        return parts.size() >= 2 ? parts.get(parts.size() - 2) : null;
     }
 
     public static Compiled compile(Definition def, Map<Entity, List<String>> discovered) {

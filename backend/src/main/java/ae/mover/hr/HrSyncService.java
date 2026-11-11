@@ -249,6 +249,10 @@ public class HrSyncService {
             if (dup[0] + dup[1] > 0) {
                 throw new Rejection("DUPLICATE_KEYS", "المصدر أعاد معرفات مكررة؛ لا يمكن تحديد السجل الصحيح فرُفضت النتيجة.");
             }
+            // the rows just staged have no statistics yet: without them a large source (200,000 people) gets plans that
+            // never finish in the checks and the projection below (owner's demo HR, 11 Nov 2026)
+            jdbc.sql("analyze hr_unit").update();
+            jdbc.sql("analyze hr_person").update();
             Set<String> cycles = validate(runId, snapshot, counts);
             protect(snapshot, src, counts, trigger, overrideReason);
             HrProjection.Result result = tx.execute(s -> publish(snapshot, cycles));
@@ -366,12 +370,12 @@ public class HrSyncService {
             }
             args.add(new Object[]{snapshot, v.get("external_person_id"), v.get("employee_number"), v.get("legacy_employee_number"),
                     v.get("domain_account"), v.get("full_name"), v.get("unit_external_id"), v.get("position_id"), v.get("position"),
-                    v.get("job"), v.get("status_text"), Boolean.parseBoolean(v.get("active"))});
+                    v.get("job"), v.get("status_text"), Boolean.parseBoolean(v.get("active")), v.get("leave_status")});
         }
         int[] done = batch.batchUpdate("""
                 insert into hr_person(snapshot_id, external_id, employee_number, legacy_employee_number, domain_account, full_name,
-                                      unit_external_id, position_id, position_title, job_title, status_text, active)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing""", args);
+                                      unit_external_id, position_id, position_title, job_title, status_text, active, leave_status)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing""", args);
         for (int i = 0; i < done.length; i++) {
             if (done[i] == 0) {
                 dup[1]++;
@@ -431,9 +435,13 @@ public class HrSyncService {
                 select count(*) from hr_person h where h.snapshot_id = :s and h.unit_external_id is not null
                   and not exists (select 1 from hr_unit u where u.snapshot_id = :s and u.external_id = h.unit_external_id)""")
                 .param("s", snapshot).query(Integer.class).single();
+        // one grouped pass (owner's 200,000-person demo HR, 11 Nov 2026): the per-person count it replaced could fall into a
+        // full scan per row and never finish, holding the hourly sync and later migrations behind it
         List<String> ambiguous = jdbc.sql("""
-                select external_id from hr_person h where h.snapshot_id = :s
-                  and (select count(*) from hr_person d where d.snapshot_id = :s and d.employee_number = h.employee_number) > 1""")
+                select h.external_id from hr_person h
+                join (select employee_number from hr_person where snapshot_id = :s group by employee_number having count(*) > 1) d
+                  on d.employee_number = h.employee_number
+                where h.snapshot_id = :s""")
                 .param("s", snapshot).query(String.class).list();
         ambiguous.forEach(a -> issue(runId, "DUPLICATE_NUMBER", "PERSON", a,
                 "الرقم الوظيفي مشترك بين أكثر من سجل؛ لن يُربط آلياً ويحتاج معالجة مخولة."));

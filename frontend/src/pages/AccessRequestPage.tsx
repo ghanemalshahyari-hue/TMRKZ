@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, type AccessMine, type AccessScope, type OverviewItem } from '../api/client';
+import { MyPermits } from '../components/access/AccessAdmin';
 import { Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
@@ -100,6 +101,7 @@ export function AccessRequestPage() {
   return (
     <section data-testid="access-request">
       <Heading title="طلب صلاحية" description={none ? 'دخلت البرنامج، ولا توجد لك صلاحيات بعد. اطلب ما يلزم عملك، وتُفعَّل بعد الموافقة.' : 'اطلب صلاحية إضافية يحتاجها عملك.'} />
+      <MyPermits />
       {mine && !mine.available && <div className="empty" data-testid="access-unavailable">لم يُفعَّل بعد مسار طلب الصلاحيات؛ راجع مدير النظام.</div>}
       {mine?.available && (
         <div className="card padding">

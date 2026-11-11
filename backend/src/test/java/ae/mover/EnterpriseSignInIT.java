@@ -434,6 +434,35 @@ class EnterpriseSignInIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("A User ID added without HR (ADR-049) links on its first directory sign-in; a second identity for it is refused")
+    void localUserFirstSignIn() throws Exception {
+        String login = "local" + sfx;
+        UUID local = UUID.randomUUID();
+        jdbc.sql("insert into person(id, employee_no, display_name, username, source) values (:id, :e, :l, :l, 'LOCAL')")
+                .param("id", local).param("e", "USER-" + login).param("l", login).update();
+        Browser b = new Browser();
+        assertThat(location(b.get(callbackWithRoles(authorizationOf(b.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(),
+                login.toUpperCase(), null)))).isEqualTo("/");
+        com.fasterxml.jackson.databind.JsonNode me = JSON.readTree(b.get("/api/v1/me").body());
+        assertThat(me.path("id").asText()).isEqualTo(local.toString());
+        assertThat(me.path("permissions").size()).as("nothing until an access manager ticks a cell").isZero();
+        assertThat(jdbc.sql("select method from identity_link where person_id = :p").param("p", local).query(String.class).single()).isEqualTo("LOCAL_USER");
+        assertThat(jdbc.sql("select display_name from person where id = :p").param("p", local).query(String.class).single())
+                .as("the placeholder name takes the directory's").isEqualTo("حساب " + login.toUpperCase());
+
+        Browser other = new Browser();
+        assertThat(location(other.get(callbackWithRoles(authorizationOf(other.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(),
+                login, null)))).startsWith("/#auth-error=IDENTITY_NOT_LINKED");
+        // a LOCAL person not created through «إضافة مستخدم» never links this way
+        String plain = "plain" + sfx;
+        jdbc.sql("insert into person(id, employee_no, display_name, username, source) values (:id, :e, :l, :l, 'LOCAL')")
+                .param("id", UUID.randomUUID()).param("e", "T-" + plain).param("l", plain).update();
+        Browser p = new Browser();
+        assertThat(location(p.get(callbackWithRoles(authorizationOf(p.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(),
+                plain, null)))).startsWith("/#auth-error=IDENTITY_NOT_LINKED");
+    }
+
+    @Test
     @DisplayName("No local password or demo sign-in exists in the build; approval needs a fresh provider authentication")
     void noLocalSignInAndStepUp() throws Exception {
         Browser anon = new Browser();

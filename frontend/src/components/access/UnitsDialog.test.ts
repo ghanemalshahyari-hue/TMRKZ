@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { coveredText, unitCount } from './UnitsDialog';
-import { cellText } from './UnitMatrix';
+import { cellText } from './assign';
 
 describe('what a chosen unit covers', () => {
   it('counts units in Arabic', () => expect([1, 2, 3, 11].map(unitCount)).toEqual(['وحدة واحدة', 'وحدتان', '3 وحدات', '11 وحدة']));

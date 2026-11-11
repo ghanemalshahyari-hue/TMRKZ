@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import ae.mover.access.AccessContext;
+import ae.mover.access.AccessRights;
+import ae.mover.access.AccessRights.Right;
 import ae.mover.access.AccessService;
 import ae.mover.access.DirectoryScope;
 import ae.mover.access.Grant;
@@ -42,14 +44,23 @@ public class GrantAdminService {
     /** Actions only a global access manager may hand out, whatever the role's grantable list says. */
     private static final Set<Permission> SYSTEM_ACTIONS = EnumSet.of(Permission.CONFIGURE, Permission.VIEW_SOURCE_IDENTIFIERS);
 
+    /** Final approval is given and taken by a global access manager only, as in the movement programme (ADR-058). */
+    public static final Set<String> FINAL_ROLES = Set.of("FINAL_APPROVER", "ACCESS_FINAL_APPROVER", "STATIONING_FINAL_APPROVER");
+
     public record TargetInput(String kind, String id, Boolean includeDescendants, List<Integer> levels) {
     }
 
     public record ScopeInput(String mode, Boolean all, String combine, List<TargetInput> targets) {
     }
 
+    /** {@code rights}: for a role that manages access, the separate rights of the grant (ADR-059); null: every right. */
     public record GrantInput(String personId, String organizationId, String roleCode, String positionTitle,
-                             String siteScopeId, String validFrom, String validTo, ScopeInput scope) {
+                             String siteScopeId, String validFrom, String validTo, ScopeInput scope, List<String> rights) {
+
+        public GrantInput(String personId, String organizationId, String roleCode, String positionTitle,
+                          String siteScopeId, String validFrom, String validTo, ScopeInput scope) {
+            this(personId, organizationId, roleCode, positionTitle, siteScopeId, validFrom, validTo, scope, null);
+        }
     }
 
     public record TargetView(String kind, String id, String name, boolean includeDescendants, List<Integer> levels) {
@@ -58,7 +69,7 @@ public class GrantAdminService {
     public record GrantView(String id, Map<String, String> person, Map<String, String> role, Ref organization,
                             String positionTitle, String scopeMode, boolean all, String combine, List<TargetView> targets,
                             String scopeText, String validFrom, String validTo, boolean active, Ref grantedBy,
-                            String endedReason) {
+                            String endedReason, List<String> rights, boolean delegated) {
     }
 
     private final JdbcClient jdbc;
@@ -69,9 +80,11 @@ public class GrantAdminService {
     private final DirectoryScope directory;
     private final PersonKeys keys;
     private final Json json;
+    private final AccessRights rightsOf;
 
     public GrantAdminService(JdbcClient jdbc, Clock clock, AccessService access, AuditService audit, GrantSource source,
-                             DirectoryScope directory, PersonKeys keys, Json json) {
+                             DirectoryScope directory, PersonKeys keys, Json json, AccessRights rightsOf) {
+        this.rightsOf = rightsOf;
         this.keys = keys;
         this.json = json;
         this.jdbc = jdbc;
@@ -82,10 +95,19 @@ public class GrantAdminService {
         this.directory = directory;
     }
 
+    PersonKeys keys() {
+        return keys;
+    }
+
     // ---- create -------------------------------------------------------------------------------------------------
 
     @Transactional
     public Map<String, Object> create(AccessContext ctx, GrantInput in) {
+        return create(ctx, in, null);
+    }
+
+    /** {@code batch}: the audit reference of a saved batch of the access workspace (ADR-058), written on each entry. */
+    Map<String, Object> create(AccessContext ctx, GrantInput in, String batch) {
         ctx.require(Permission.MANAGE_ACCESS);
         if (in == null || in.personId() == null || in.organizationId() == null || in.roleCode() == null) {
             throw ApiException.validation("حدد الشخص والجهة والدور.");
@@ -149,16 +171,20 @@ public class GrantAdminService {
         }
         RawGrant proposed = new RawGrant(null, person, null, null, null, in.roleCode(), (String) role.get("name"), perms,
                 roleScope, false, home, null, siteScope, null, mode, "AND".equals(combine), all, from, to, targets);
-        requireAuthority(ctx, proposed);
+        boolean manages = perms.contains(Permission.MANAGE_ACCESS);
+        Set<Right> rights = manages ? AccessRights.parse(in.rights()) : null;
+        UUID sponsor = authority(ctx, proposed, rights);
         UUID id = UUID.randomUUID();
         try {
             jdbc.sql("""
                     insert into membership(id, person_id, organization_id, role_code, position_title, site_scope_id, valid_from, valid_to,
-                                           scope_mode, scope_combine, scope_all, granted_by)
-                    values (:id, :p, :o, :r, :t, :s, :f, :to, :m, :c, :a, :by)""")
+                                           scope_mode, scope_combine, scope_all, granted_by, access_rights, sponsor_id)
+                    values (:id, :p, :o, :r, :t, :s, :f, :to, :m, :c, :a, :by, string_to_array(:rights, ',')::text[], :sponsor)""")
                     .param("id", id).param("p", person).param("o", home).param("r", in.roleCode()).param("t", in.positionTitle())
                     .param("s", siteScope).param("f", Db.ts(from)).param("to", Db.ts(to)).param("m", mode).param("c", combine)
-                    .param("a", all).param("by", ctx.personId()).update();
+                    .param("a", all).param("by", ctx.personId())
+                    .param("rights", rights == null ? null : String.join(",", rights.stream().map(Enum::name).toList()))
+                    .param("sponsor", sponsor).update();
             for (GrantTarget t : targets) {
                 jdbc.sql("""
                         insert into membership_scope_target(membership_id, kind, target_id, include_descendants, levels)
@@ -173,8 +199,49 @@ public class GrantAdminService {
         detail.put("organizationId", home.toString());
         detail.put("role", in.roleCode());
         detail.put("scope", describe(proposed));
+        if (batch != null) {
+            detail.put("batch", batch);
+        }
+        if (rights != null) {
+            detail.put("rights", rights.stream().map(Enum::name).toList());
+        }
+        if (sponsor != null) {
+            detail.put("delegatedFrom", sponsor.toString());
+        }
         audit.recordAs(ctx.actor(), "MEMBERSHIP_CREATED", "PERSON", person.toString(), null, detail, null);
+        if (rights != null && rights.contains(Right.FINALIZE)) {
+            finalCompanion(ctx, id, person, home, targets, all, from, to);
+        }
         return Map.of("id", id.toString(), "scopeText", describe(proposed));
+    }
+
+    /**
+     * «اعتماد نهائي لطلبات الصلاحيات» (FINALIZE): the access manager also takes the final step of permission requests over the
+     * same units, as a grant of «معتمد طلبات الصلاحية» tied to the access manager's grant: made and ended with it, never alone.
+     */
+    private void finalCompanion(AccessContext ctx, UUID sponsor, UUID person, UUID home, List<GrantTarget> targets, boolean all, Instant from, Instant to) {
+        if (jdbc.sql("select count(*) from role_def where code = 'ACCESS_FINAL_APPROVER'").query(Long.class).single() == 0) {
+            return;
+        }
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                insert into membership(id, person_id, organization_id, role_code, valid_from, valid_to, scope_mode, scope_combine, scope_all,
+                                       granted_by, sponsor_id)
+                values (:id, :p, :o, 'ACCESS_FINAL_APPROVER', :f, :to, 'CUSTOM', 'AND', :a, :by, :sponsor)""")
+                .param("id", id).param("p", person).param("o", home).param("f", Db.ts(from)).param("to", Db.ts(to)).param("a", all)
+                .param("by", ctx.personId()).param("sponsor", sponsor).update();
+        List<GrantTarget> units = targets.stream().filter(t -> GrantTarget.ORGANIZATION.equals(t.kind())).toList();
+        if (!all) {
+            for (GrantTarget t : units.isEmpty() ? List.of(new GrantTarget(GrantTarget.ORGANIZATION, home, true)) : units) {
+                jdbc.sql("""
+                        insert into membership_scope_target(membership_id, kind, target_id, include_descendants, levels)
+                        values (:m, 'ORGANIZATION', :t, :d, string_to_array(nullif(:l, ''), ',')::int[])""")
+                        .param("m", id).param("t", t.id()).param("d", t.includeDescendants())
+                        .param("l", String.join(",", t.levels().stream().map(String::valueOf).toList())).update();
+            }
+        }
+        audit.recordAs(ctx.actor(), "MEMBERSHIP_CREATED", "PERSON", person.toString(), null,
+                Map.of("organizationId", home.toString(), "role", "ACCESS_FINAL_APPROVER", "companionOf", sponsor.toString()), null);
     }
 
     /**
@@ -204,13 +271,18 @@ public class GrantAdminService {
      * to whoever holds the position, so it is a grant and is limited exactly like one.
      */
     public void requireAuthorityForRole(AccessContext ctx, UUID orgId, String roleCode, UUID siteScope) {
+        requireAuthorityForRole(ctx, orgId, roleCode, siteScope, null);
+    }
+
+    /** The same bound with another right than «منح الصلاحيات», e.g. «إدارة صلاحية المناوبة» for a duty permit. */
+    public void requireAuthorityForRole(AccessContext ctx, UUID orgId, String roleCode, UUID siteScope, Right instead) {
         Map<String, Object> role = jdbc.sql("select code, name, permissions, scope from role_def where code = :c")
                 .param("c", roleCode).query().listOfRows().stream().findFirst()
                 .orElseThrow(() -> ApiException.validation("الدور غير موجود في السياسة المنشورة."));
         RawGrant proposed = new RawGrant(null, null, null, null, null, roleCode, (String) role.get("name"),
                 permissions(role.get("permissions")), (String) role.get("scope"), false, orgId, null, siteScope, null, "ROLE", true,
                 false, clock.instant(), null, List.of());
-        requireAuthority(ctx, proposed);
+        authority(ctx, proposed, null, instead);
     }
 
     /**
@@ -220,9 +292,35 @@ public class GrantAdminService {
      * combined to widen what may be handed out.
      */
     public void requireAuthority(AccessContext ctx, RawGrant proposed) {
+        authority(ctx, proposed, null);
+    }
+
+    /**
+     * {@link #requireAuthority} with the separate rights of ADR-059: giving or ending a role needs «منح الصلاحيات» (GRANT) on the
+     * grant used; a role that manages access is delegated, needing «تفويض إدارة الصلاحيات» (DELEGATE) on a grant whose rights
+     * include every right handed on ({@code rights}, null = all) and whose end is not before the new one's. Returns that grant
+     * (the sponsor of a delegation), or null for a global manager.
+     */
+    UUID authority(AccessContext ctx, RawGrant proposed, Set<Right> rights) {
+        return authority(ctx, proposed, rights, null);
+    }
+
+    UUID authority(AccessContext ctx, RawGrant proposed, Set<Right> rights, Right instead) {
         if (ctx.canEverywhere(Permission.MANAGE_ACCESS)) {
-            return;
+            return null;
         }
+        if (FINAL_ROLES.contains(proposed.roleCode())) {
+            throw ApiException.forbidden("الاعتماد النهائي يمنحه ويسحبه مدير الصلاحيات العام فقط.");
+        }
+        // «معتمد التوفر» at a unit that does not provide the department is a standby only a global manager gives (TNQL)
+        if (proposed.roleCode().startsWith("AVAILABILITY_") && jdbc.sql("select count(*) from provider_unit where organization_id = :o and role_code = :r")
+                .param("o", proposed.orgId()).param("r", proposed.roleCode()).query(Long.class).single() == 0) {
+            throw ApiException.forbidden("هذه الوحدة ليست مزوّدة لهذه الإدارة؛ يمنحها احتياطياً مدير الصلاحيات العام.");
+        }
+        boolean manages = proposed.permissions().contains(Permission.MANAGE_ACCESS);
+        boolean delegating = manages && instead == null;
+        Right needed = instead != null ? instead : manages ? Right.DELEGATE : Right.GRANT;
+        Map<UUID, Set<Right>> known = rightsOf.of(ctx.grants().stream().map(Grant::membershipId).toList());
         RawGrant.Spec spec = proposed.spec();
         if (spec.all()) {
             throw ApiException.forbidden("النطاق الشامل يمنحه مدير صلاحيات عام فقط.");
@@ -235,8 +333,16 @@ public class GrantAdminService {
                 Db.strings(rs, "grantable_roles"))).list();
         Map<UUID, Set<UUID>> trees = new HashMap<>();
         Map<UUID, UUID> responsible = new HashMap<>();
+        boolean rightMissing = false;
         for (Grant g : ctx.grants()) {
             if (!g.has(Permission.MANAGE_ACCESS) || !grantable.getOrDefault(g.roleCode(), List.of()).contains(proposed.roleCode())) {
+                continue;
+            }
+            Set<Right> held = rightsOf.of(g, known);
+            boolean wider = delegating && !held.containsAll(rights == null ? AccessRights.ALL : rights);
+            boolean longer = delegating && g.validTo() != null && (proposed.validTo() == null || proposed.validTo().isAfter(g.validTo()));
+            if (!held.contains(needed) || wider || longer) {
+                rightMissing = true;
                 continue;
             }
             if (!g.actsFor(proposed.orgId())) {
@@ -256,8 +362,13 @@ public class GrantAdminService {
                 reaches &= g.resources().contains(r) || siteWithin(g, site, responsible);
             }
             if (reaches && ctx.canFor(Permission.MANAGE_ACCESS, proposed.orgId())) {
-                return;
+                return g.membershipId();
             }
+        }
+        if (rightMissing) {
+            throw ApiException.forbidden(delegating
+                    ? "التفويض لا يتجاوز ما فُوِّض لك: يلزم حق «تفويض إدارة الصلاحيات»، والحقوق نفسها أو أقل، وحتى نهاية منحتك."
+                    : "لا تملك حق «" + needed.label + "» على هذه المنحة؛ يمنحه لك من فوّضك أو مدير الصلاحيات العام.");
         }
         throw ApiException.forbidden("لا يمكنك منح هذا الدور أو هذا النطاق: يتجاوز ما تملك إدارته من الصلاحيات.");
     }
@@ -293,24 +404,45 @@ public class GrantAdminService {
 
     @Transactional
     public Map<String, Object> end(AccessContext ctx, UUID id, String endAt, String reason) {
+        return end(ctx, id, endAt, reason, null);
+    }
+
+    Map<String, Object> end(AccessContext ctx, UUID id, String endAt, String reason, String batch) {
+        return end(ctx, id, endAt, reason, batch, true);
+    }
+
+    /** {@code cascade}: also end what was delegated from it and its tied final step (not when it is being replaced). */
+    private Map<String, Object> end(AccessContext ctx, UUID id, String endAt, String reason, String batch, boolean cascade) {
         ctx.require(Permission.MANAGE_ACCESS);
         if (reason == null || reason.isBlank()) {
             throw ApiException.validation("اذكر سبب إنهاء العضوية.");
         }
         Map<String, Object> m = jdbc.sql("""
                 select m.person_id, m.organization_id, m.role_code, m.valid_from, m.valid_to, m.site_scope_id, m.scope_mode,
-                       m.scope_combine, m.scope_all, r.name as role_name, r.permissions, r.scope as role_scope
+                       m.scope_combine, m.scope_all, r.name as role_name, r.permissions, r.scope as role_scope, m.granted_by,
+                       array_to_string(m.access_rights, ',') as access_rights, m.sponsor_id
                 from membership m join role_def r on r.code = m.role_code where m.id = :id for update of m""")
                 .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         if (!ctx.canFor(Permission.MANAGE_ACCESS, (UUID) m.get("organization_id"))) {
             throw ApiException.notFound();
         }
+        boolean manages = permissions(m.get("permissions")).contains(Permission.MANAGE_ACCESS);
+        // a delegated access manager's grant is edited or ended only by its issuer or a global manager (TNQL)
+        if (manages && !ctx.canEverywhere(Permission.MANAGE_ACCESS) && !ctx.personId().equals(m.get("granted_by"))) {
+            throw ApiException.forbidden("منحة مسؤول الصلاحيات يعدّلها أو يسحبها من أصدرها أو مدير الصلاحيات العام.");
+        }
+        // the final step tied to an access manager's grant goes with it; it is changed through that grant's rights
+        if (m.get("sponsor_id") != null && "ACCESS_FINAL_APPROVER".equals(m.get("role_code")) && !ctx.canEverywhere(Permission.MANAGE_ACCESS)) {
+            throw ApiException.forbidden("هذه المنحة مرتبطة بحق «اعتماد نهائي لطلبات الصلاحيات» لمسؤول الصلاحيات؛ عدّل حقوقه بدلاً منها.");
+        }
+        String stored = (String) m.get("access_rights");
+        Set<Right> endedRights = stored == null ? null : stored.isEmpty() ? java.util.EnumSet.noneOf(Right.class) : AccessRights.parse(List.of(stored.split(",")));
         // ending a grant needs the authority to give it (ADR-027), as for a position seat (audit P0-1)
-        requireAuthority(ctx, new RawGrant(id, (UUID) m.get("person_id"), id, null, null, (String) m.get("role_code"),
+        authority(ctx, new RawGrant(id, (UUID) m.get("person_id"), id, null, null, (String) m.get("role_code"),
                 (String) m.get("role_name"), permissions(m.get("permissions")), (String) m.get("role_scope"), false,
                 (UUID) m.get("organization_id"), null, (UUID) m.get("site_scope_id"), null, (String) m.get("scope_mode"),
                 "AND".equals(m.get("scope_combine")), (Boolean) m.get("scope_all"), Db.toInstant(m.get("valid_from")),
-                Db.toInstant(m.get("valid_to")), source.targets(List.of(id)).getOrDefault(id, List.of())));
+                Db.toInstant(m.get("valid_to")), source.targets(List.of(id)).getOrDefault(id, List.of())), manages ? endedRights : null);
         Instant end = endAt == null ? clock.instant() : Times.parse(endAt, "endAt");
         Instant from = Db.toInstant(m.get("valid_from"));
         if (!end.isAfter(from)) {
@@ -326,8 +458,23 @@ public class GrantAdminService {
                 select count(*) from task_assignment where status = 'OPEN' and role_code = :role
                   and (target_org_id is null or target_org_id = :org)""")
                 .param("role", m.get("role_code")).param("org", m.get("organization_id")).query(Integer.class).single();
-        audit.recordAs(ctx.actor(), "MEMBERSHIP_ENDED", "PERSON", m.get("person_id").toString(), null,
-                Map.of("membershipId", id.toString(), "endAt", end.toString()), reason);
+        Map<String, Object> ended = new LinkedHashMap<>();
+        ended.put("membershipId", id.toString());
+        ended.put("endAt", end.toString());
+        ended.put("organizationId", m.get("organization_id").toString());
+        ended.put("role", m.get("role_code"));
+        if (batch != null) {
+            ended.put("batch", batch);
+        }
+        audit.recordAs(ctx.actor(), "MEMBERSHIP_ENDED", "PERSON", m.get("person_id").toString(), null, ended, reason);
+        // what was delegated from this grant, and the final step tied to it, end with it (ADR-059)
+        for (UUID child : !cascade ? List.<UUID>of() : jdbc.sql("select id from membership where sponsor_id = :id and (valid_to is null or valid_to > :e)")
+                .param("id", id).param("e", Db.ts(end)).query(UUID.class).list()) {
+            jdbc.sql("update membership set valid_to = greatest(valid_from + interval '1 millisecond', :e), ended_reason = :r where id = :c")
+                    .param("e", Db.ts(end)).param("r", "انتهت المنحة التي بُنيت عليها").param("c", child).update();
+            audit.recordAs(ctx.actor(), "MEMBERSHIP_ENDED", "PERSON", m.get("person_id").toString(), null,
+                    Map.of("membershipId", child.toString(), "endedWith", id.toString(), "organizationId", m.get("organization_id").toString()), reason);
+        }
         if (pooled > 0) {
             audit.recordAs(ctx.actor(), "TASKS_REALIGNED", "PERSON", m.get("person_id").toString(), null,
                     Map.of("openTasks", pooled, "rule", "المهام مسندة إلى الدور وتبقى لدى شاغليه الحاليين"), reason);
@@ -347,7 +494,7 @@ public class GrantAdminService {
             throw ApiException.notFound();
         }
         List<Map<String, Object>> rows = jdbc.sql("""
-                select m.*, p.display_name, p.employee_no, r.name as role_name, r.permissions, r.scope as role_scope, r.summary_only,
+                select m.*, array_to_string(m.access_rights, ',') as rights_text, p.display_name, p.employee_no, r.name as role_name, r.permissions, r.scope as role_scope, r.summary_only,
                        o.name as org_name, s.name as site_name, g.display_name as granted_by_name,
                        (m.valid_from <= now() and (m.valid_to is null or m.valid_to > now())) as active
                 from membership m join person p on p.id = m.person_id join role_def r on r.code = m.role_code
@@ -384,7 +531,9 @@ public class GrantAdminService {
                     (String) r.get("scope_combine"), tv, describe(g, names),
                     Db.toInstant(r.get("valid_from")).toString(), g.validTo() == null ? null : g.validTo().toString(),
                     (Boolean) r.get("active"), Ref.of((UUID) r.get("granted_by"), (String) r.get("granted_by_name")),
-                    (String) r.get("ended_reason")));
+                    (String) r.get("ended_reason"),
+                    r.get("rights_text") == null ? null : ((String) r.get("rights_text")).isEmpty() ? List.of() : List.of(((String) r.get("rights_text")).split(",")),
+                    r.get("sponsor_id") != null));
         }
         return out;
     }
@@ -454,7 +603,10 @@ public class GrantAdminService {
                 }).toList();
     }
 
-    /** One unit's people and their grants, for the matrix: those posted in it, and those granted a role with it as home. */
+    /**
+     * One unit's people and their grants, for the matrix: those posted in it, those granted a role with it as home, and those
+     * added to it through «إضافة مستخدم» (ADR-049, marked {@code added}, {@code acting} when posted elsewhere).
+     */
     public Map<String, Object> unitMatrix(AccessContext ctx, UUID orgId, String q, Integer page) {
         ctx.require(Permission.MANAGE_ACCESS);
         if (!ctx.canFor(Permission.MANAGE_ACCESS, orgId)) {
@@ -462,20 +614,28 @@ public class GrantAdminService {
         }
         String like = q == null || q.isBlank() ? null : "%" + q.trim() + "%";
         String people = """
-                from person p where p.status = 'ACTIVE'
+                from person p left join unit_member um on um.person_id = p.id and um.organization_id = :o and um.ended_at is null
+                where p.status = 'ACTIVE'
                   and (exists (select 1 from affiliation a where a.person_id = p.id and a.organization_id = :o and a.valid_to is null)
-                    or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and (m.valid_to is null or m.valid_to > now())))
-                  and (cast(:q as text) is null or p.display_name ilike :q or p.employee_no ilike :q)""";
+                    or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and (m.valid_to is null or m.valid_to > now()))
+                    or um.id is not null)
+                  and (cast(:q as text) is null or p.display_name ilike :q or p.employee_no ilike :q or coalesce(p.username, '') ilike :q)""";
         long total = jdbc.sql("select count(*) " + people).param("o", orgId).param("q", like).query(Long.class).single();
         int from = Math.max(0, page == null ? 0 : page) * 25;
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (Map<String, Object> p : jdbc.sql("select p.id, p.display_name, p.employee_no " + people + " order by p.display_name limit 25 offset :from")
+        for (Map<String, Object> p : jdbc.sql("select p.id, p.display_name, p.employee_no, p.username, um.id is not null as added, coalesce(um.acting, false) as acting "
+                        + people + " order by p.display_name limit 25 offset :from")
                 .param("o", orgId).param("q", like).param("from", from).query().listOfRows()) {
             UUID id = (UUID) p.get("id");
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", id.toString());
             row.put("displayName", p.get("display_name"));
-            row.put("employeeNo", p.get("employee_no"));
+            String no = (String) p.get("employee_no");
+            // a User ID added without HR is shown by its login, not its internal key
+            row.put("employeeNo", no != null && no.startsWith(UnitMemberService.LOCAL_USER_PREFIX) && p.get("username") != null ? p.get("username") : no);
+            row.put("added", p.get("added"));
+            row.put("acting", p.get("acting"));
+            row.put("withoutHr", no != null && no.startsWith(UnitMemberService.LOCAL_USER_PREFIX));
             row.put("grants", list(ctx, orgId, id, false));
             rows.add(row);
         }
@@ -532,8 +692,25 @@ public class GrantAdminService {
     /** A different scope is a new grant (V9): ends the old one and makes the new one together, or changes nothing. */
     @Transactional
     public Map<String, Object> replace(AccessContext ctx, UUID oldId, GrantInput in, String reason) {
-        end(ctx, oldId, null, reason == null || reason.isBlank() ? "تحديث النطاق من مصفوفة الصلاحيات" : reason);
-        return create(ctx, in);
+        String why = reason == null || reason.isBlank() ? "تحديث النطاق من مصفوفة الصلاحيات" : reason;
+        end(ctx, oldId, null, why, null, false);
+        Map<String, Object> made = create(ctx, in);
+        UUID next = UUID.fromString((String) made.get("id"));
+        // an access manager's grant changed: its delegations move to the new one unless now wider than it, its old final
+        // step ends (the new grant makes its own when it keeps FINALIZE)
+        String kept = jdbc.sql("select array_to_string(access_rights, ',') from membership where id = :n").param("n", next).query(String.class).optional().orElse(null);
+        Set<Right> now = kept == null ? AccessRights.ALL : kept.isEmpty() ? java.util.EnumSet.noneOf(Right.class) : AccessRights.parse(List.of(kept.split(",")));
+        for (Map<String, Object> child : jdbc.sql("""
+                select id, role_code, array_to_string(access_rights, ',') as r from membership
+                where sponsor_id = :o and (valid_to is null or valid_to > now())""").param("o", oldId).query().listOfRows()) {
+            String r = (String) child.get("r");
+            Set<Right> theirs = r == null ? AccessRights.ALL : r.isEmpty() ? java.util.EnumSet.noneOf(Right.class) : AccessRights.parse(List.of(r.split(",")));
+            boolean keep = !"ACCESS_FINAL_APPROVER".equals(child.get("role_code")) && now.containsAll(theirs);
+            jdbc.sql(keep ? "update membership set sponsor_id = :n where id = :c"
+                            : "update membership set valid_to = greatest(valid_from + interval '1 millisecond', now()), ended_reason = 'تغيّرت المنحة التي بُنيت عليها' where id = :c")
+                    .param("n", next).param("c", child.get("id")).update();
+        }
+        return made;
     }
 
     public record RouteInput(String name, String from, String to, List<Integer> days, Boolean active, List<String> targets) {
@@ -571,6 +748,7 @@ public class GrantAdminService {
         if (!ctx.canFor(Permission.MANAGE_ACCESS, command)) {
             throw ApiException.notFound();
         }
+        rightsOf.require(ctx, Right.UNIT_OPERATIONS, command);
         Set<UUID> inside = access.orgSubtree(command);
         jdbc.sql("delete from unit_ops_route where command_org_id = :c").param("c", command).update();
         for (RouteInput r : routes == null ? List.<RouteInput>of() : routes) {

@@ -1,0 +1,5 @@
+/* A fixed set of sites on the installed offline map (StaticMap without an uploaded background; owner, 11 Nov 2026). */
+.offline-feature-map { position: relative; overflow: hidden; border-radius: inherit; }
+.offline-feature-map .ofm-gl { position: absolute; inset: 0; }
+/* the road-names notice sits top-right on the offline map: the colour switch goes to the other corner */
+.offline-feature-map .map-toolbar { justify-content: flex-end; }

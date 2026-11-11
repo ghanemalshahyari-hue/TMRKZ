@@ -58,12 +58,13 @@ public class GrantSource {
                 select m.id as grant_id, m.person_id, m.id as membership_id, null::uuid as delegation_id, null as delegator_name,
                        r.code, r.name, r.permissions, r.scope, r.summary_only,
                        o.id as org_id, o.name as org_name, s.id as site_id, s.name as site_name,
-                       m.scope_mode, m.scope_combine, m.scope_all, m.valid_from, m.valid_to, null::uuid as seat_id
+                       m.scope_mode, m.scope_combine, m.scope_all, m.valid_from, m.valid_to, null::uuid as seat_id,
+                       null::uuid as unit_grant_id
                 from membership m
                 join role_def r on r.code = m.role_code
                 join organization o on o.id = m.organization_id and o.status = 'ACTIVE'
                 left join site s on s.id = m.site_scope_id
-                join person p on p.id = m.person_id and p.status = 'ACTIVE'
+                join person p on p.id = m.person_id and p.status = 'ACTIVE' and not p.access_disabled
                 where (cast(:pid as uuid) is null or m.person_id = :pid) and (m.valid_to is null or m.valid_to > :at)"""
                 + started.formatted("m") + "\n" + """
                 union all
@@ -72,11 +73,12 @@ public class GrantSource {
                        o.id, o.name, s.id, s.name,
                        m.scope_mode, m.scope_combine, m.scope_all,
                        greatest(d.valid_from, m.valid_from),
-                       case when m.valid_to is null or d.valid_to < m.valid_to then d.valid_to else m.valid_to end, null::uuid
+                       case when m.valid_to is null or d.valid_to < m.valid_to then d.valid_to else m.valid_to end, null::uuid,
+                       null::uuid
                 from delegation d
                 join membership m on m.id = d.membership_id
                 join person dp on dp.id = d.delegator_id and dp.status = 'ACTIVE'
-                join person dd on dd.id = d.delegate_id and dd.status = 'ACTIVE'
+                join person dd on dd.id = d.delegate_id and dd.status = 'ACTIVE' and not dd.access_disabled
                 join role_def r on r.code = m.role_code
                 join organization o on o.id = m.organization_id and o.status = 'ACTIVE'
                 left join site s on s.id = m.site_scope_id
@@ -87,15 +89,43 @@ public class GrantSource {
                 select null::uuid, a.person_id, null::uuid, null::uuid, null,
                        r.code, r.name, r.permissions, r.scope, r.summary_only,
                        o.id, o.name, s.id, s.name,
-                       'ROLE', 'AND', false, a.valid_from, a.valid_to, ps.id
+                       'ROLE', 'AND', false, a.valid_from, a.valid_to, ps.id, null::uuid
                 from affiliation a
                 join position_seat ps on ps.organization_id = a.organization_id and ps.position_id = a.position_id and ps.active
                 join role_def r on r.code = ps.role_code
                 join organization o on o.id = ps.organization_id and o.status = 'ACTIVE'
                 left join site s on s.id = ps.site_scope_id
-                join person p on p.id = a.person_id and p.status = 'ACTIVE'
+                join person p on p.id = a.person_id and p.status = 'ACTIVE' and not p.access_disabled
                 where (cast(:pid as uuid) is null or a.person_id = :pid) and (a.valid_to is null or a.valid_to > :at)"""
                 + started.formatted("a") + "\n" + """
+                union all
+                -- unit grants («موروثة من الوحدة», V36): every member of the unit holds the role there, at the role's own reach
+                select null::uuid, mem.person_id, null::uuid, null::uuid, null,
+                       r.code, r.name, r.permissions, r.scope, r.summary_only,
+                       o.id, o.name, null::uuid, null,
+                       'ROLE', 'AND', false, ug.valid_from, ug.valid_to, null::uuid, ug.id
+                from unit_grant ug
+                join role_def r on r.code = ug.role_code
+                join organization o on o.id = ug.organization_id and o.status = 'ACTIVE'
+                join (select person_id, organization_id from affiliation where valid_to is null or valid_to > :at
+                      union select person_id, organization_id from unit_member where ended_at is null) mem
+                  on mem.organization_id = ug.organization_id
+                join person p on p.id = mem.person_id and p.status = 'ACTIVE' and not p.access_disabled
+                where (cast(:pid as uuid) is null or mem.person_id = :pid) and (ug.valid_to is null or ug.valid_to > :at)"""
+                + started.formatted("ug") + "\n" + """
+                union all
+                -- duty permits («تصاريح المناوبة», V37): in force once activated by their holder, inside their window only
+                select null::uuid, dp.person_id, null::uuid, null::uuid, null,
+                       r.code, r.name, r.permissions, r.scope, r.summary_only,
+                       o.id, o.name, null::uuid, null,
+                       'ROLE', 'AND', false, dp.valid_from, dp.valid_to, null::uuid, dp.id
+                from duty_permit dp
+                join role_def r on r.code = dp.role_code
+                join organization o on o.id = dp.organization_id and o.status = 'ACTIVE'
+                join person p on p.id = dp.person_id and p.status = 'ACTIVE' and not p.access_disabled
+                where (cast(:pid as uuid) is null or dp.person_id = :pid) and dp.activated_at is not null and dp.ended_at is null
+                  and dp.valid_to > :at"""
+                + started.formatted("dp") + "\n" + """
                 order by 2, 4 nulls first, 6""")
                 .param("pid", personId).param("at", Db.ts(at)).param("role", roleCode)
                 .query().listOfRows();
@@ -106,8 +136,10 @@ public class GrantSource {
         for (Map<String, Object> row : rows) {
             UUID person = (UUID) row.get("person_id");
             UUID seat = (UUID) row.get("seat_id");
-            UUID grantId = seat == null ? (UUID) row.get("grant_id")
-                    : UUID.nameUUIDFromBytes(("seat:" + seat + ":" + person).getBytes(StandardCharsets.UTF_8));
+            UUID unitGrant = (UUID) row.get("unit_grant_id");
+            UUID grantId = seat != null ? UUID.nameUUIDFromBytes(("seat:" + seat + ":" + person).getBytes(StandardCharsets.UTF_8))
+                    : unitGrant != null ? UUID.nameUUIDFromBytes(("unit:" + unitGrant + ":" + person).getBytes(StandardCharsets.UTF_8))
+                    : (UUID) row.get("grant_id");
             String code = (String) row.get("code");
             RoleOverride o = roles.get(code);
             UUID membership = (UUID) row.get("membership_id");

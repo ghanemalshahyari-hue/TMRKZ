@@ -3,10 +3,26 @@
 # TMRKZ_PUBLIC_URL (default http://localhost:8088), started empty, with no test data and no test accounts. Only the two
 # lasting platform accounts exist (admin, developer; passwords in .env, see ops/platform-accounts.sh). Until the
 # enterprise directory is configured, a local stand-in directory with no people is used (compose.local-directory.yml).
+# Once .env names the enterprise directory (LDAP_URL set and not the stand-in, ADR-052), the stand-in is left out: the
+# directory settings, the organisation's CA in TMRKZ_TRUSTSTORE_DIR (default ops/keycloak/truststores) and .env apply as in
+# production. The federation inside Keycloak is then pointed at it with ops/keycloak/set-directory.sh.
 # Usage: sh ops/local/up.sh
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
+sh ops/init-env.sh >/dev/null
+URL="$(sed -n 's/^TMRKZ_PUBLIC_URL=//p' .env | tail -n 1)"; URL="${URL:-http://localhost:8088}"
+# readiness is checked on this host's plain port: an https name may resolve only in the organisation's DNS (ADR-051)
+PORT="$(sed -n 's/^MOVER_HTTP_PORT=//p' .env | tail -n 1)"; LOCAL="http://127.0.0.1:${PORT:-8088}"
+DIRECTORY="$(sed -n 's/^LDAP_URL=//p' .env | tail -n 1 | tr -d '\r')"
+case "$DIRECTORY" in
+  ""|ldap://openldap*) ;;
+  *)
+    echo "[up] enterprise directory from .env: $DIRECTORY (no stand-in)"
+    docker compose -p tmrkz-mover -f docker-compose.yml up -d --build "$@"
+    STANDIN=no ;;
+esac
+if [ "${STANDIN:-yes}" = yes ]; then
 G=ops/local/.generated
 mkdir -p "$G/certs" "$G/ldap" "$G/truststore"
 rand() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c "$1"; }
@@ -24,17 +40,16 @@ cp "$G/certs/ca.crt" "$G/truststore/tmrkz-local-directory-ca.pem"
 # the users container only: no person is created here
 printf 'dn: ou=people,dc=tmrkz,dc=local\nobjectClass: organizationalUnit\nou: people\n' > "$G/ldap/50-people-container.ldif"
 
-sh ops/init-env.sh >/dev/null
 export LOCAL_LDAP_ADMIN_PASSWORD="$(cat "$G/ldap-admin-password")"
 export LDAP_URL="ldap://openldap:389" LDAP_START_TLS="true" LDAP_BIND_DN="cn=admin,dc=tmrkz,dc=local"
 export LDAP_BIND_CREDENTIAL="$LOCAL_LDAP_ADMIN_PASSWORD" LDAP_USERS_DN="ou=people,dc=tmrkz,dc=local"
 export TMRKZ_TRUSTSTORE_DIR="./$G/truststore"
-URL="$(sed -n 's/^TMRKZ_PUBLIC_URL=//p' .env | tail -n 1)"; URL="${URL:-http://localhost:8088}"
 
 docker compose -p tmrkz-mover -f docker-compose.yml -f ops/local/compose.local-directory.yml up -d --build "$@"
+fi
 i=0
-until [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/auth/realms/tmrkz/.well-known/openid-configuration")" = 200 ] \
-   && [ "$(curl -s -o /dev/null -w '%{http_code}' "$URL/api/v1/auth/status")" = 200 ]; do
+until [ "$(curl -s -o /dev/null -w '%{http_code}' "$LOCAL/auth/realms/tmrkz/.well-known/openid-configuration")" = 200 ] \
+   && [ "$(curl -s -o /dev/null -w '%{http_code}' "$LOCAL/api/v1/auth/status")" = 200 ]; do
   i=$((i + 1)); [ $i -gt 120 ] && { echo "TMRKZ did not become ready at $URL"; exit 1; }; sleep 3
 done
 # right after its first start Keycloak may still refuse the administration login for a few seconds

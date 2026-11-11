@@ -31,6 +31,7 @@ import ae.mover.common.Db;
 import ae.mover.common.Json;
 import ae.mover.common.PageResult;
 import ae.mover.integrations.IntegrationService;
+import ae.mover.notify.DesktopFeed;
 import ae.mover.outbox.OutboxProcessor;
 import ae.mover.policy.PolicyService;
 import ae.mover.policy.Settings;
@@ -51,9 +52,12 @@ public class SystemController {
     private final Json json;
     private final Clock clock;
     private final String version;
+    private final DesktopFeed desktop;
 
     public SystemController(AccessService access, PolicyService policies, IntegrationService integrations,
-                            ReportService reports, OutboxProcessor outbox, JdbcClient jdbc, Json json, Clock clock, @Value("${mover.version:1.0.0}") String version) {
+                            ReportService reports, OutboxProcessor outbox, JdbcClient jdbc, Json json, Clock clock, @Value("${mover.version:1.0.0}") String version,
+                            DesktopFeed desktop) {
+        this.desktop = desktop;
         this.access = access;
         this.policies = policies;
         this.integrations = integrations;
@@ -225,10 +229,17 @@ public class SystemController {
                     m.put("title", rs.getString("title"));
                     m.put("body", rs.getString("body"));
                     m.put("requestId", rs.getString("request_id"));
+                    m.put("link", rs.getString("link"));
                     m.put("createdAt", Db.iso(rs, "created_at"));
                     m.put("readAt", Db.iso(rs, "read_at"));
                     return m;
                 }).list();
+    }
+
+    /** Desktop notifications (ADR-050): new unread items after the browser's cursor, with lock-screen-safe text. */
+    @GetMapping("/notifications/desktop-feed")
+    public Map<String, Object> desktopFeed(Actor actor, @RequestParam(required = false) Long since) {
+        return desktop.feed(actor.personId(), since);
     }
 
     @PostMapping("/notifications/{id}/read")

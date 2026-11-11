@@ -29,9 +29,14 @@ public class PlaceResolver {
     private final OrgHierarchy hierarchy;
     private final Clock clock;
     private final ae.mover.access.GrantSource grants;
+    private final ae.mover.access.Stations stations;
+    private final ae.mover.access.AccessRights rights;
 
-    public PlaceResolver(JdbcClient jdbc, OrgHierarchy hierarchy, Clock clock, ae.mover.access.GrantSource grants) {
+    public PlaceResolver(JdbcClient jdbc, OrgHierarchy hierarchy, Clock clock, ae.mover.access.GrantSource grants,
+                         ae.mover.access.Stations stations, ae.mover.access.AccessRights rights) {
+        this.rights = rights;
         this.grants = grants;
+        this.stations = stations;
         this.jdbc = jdbc;
         this.hierarchy = hierarchy;
         this.clock = clock;
@@ -63,6 +68,11 @@ public class PlaceResolver {
             case "AT_LEVEL" -> hierarchy.path(requestOrg).stream().filter(u -> a.level() != null && a.level().equals(u.level())).findFirst()
                     .map(u -> Place.of(u.id())).orElse(Place.any(true));
             case "FIXED" -> a.orgId() == null ? Place.any(true) : Place.of(UUID.fromString(a.orgId()));
+            // «معتمد التوفر» (ADR-059): the units providing the role's department, in the requester's main unit first
+            case "PROVIDER" -> {
+                List<UUID> providers = providers(a.role(), requestOrg);
+                yield providers.isEmpty() ? Place.any(true) : new Place(providers, false, false);
+            }
             case "RESPONSIBLE" -> {
                 Map<UUID, UUID> rules = rules(a.responsibility());
                 yield hierarchy.path(requestOrg).stream().filter(u -> rules.containsKey(u.id())).findFirst()
@@ -70,6 +80,19 @@ public class PlaceResolver {
             }
             default -> Place.any(false);
         };
+    }
+
+    /** The units providing a department: those under the requester's main unit, or else every one. */
+    public List<UUID> providers(String role, UUID requestOrg) {
+        List<UUID> all = jdbc.sql("select organization_id from provider_unit where role_code = :r order by 1").param("r", role).query(UUID.class).list();
+        if (all.isEmpty() || requestOrg == null) {
+            return all;
+        }
+        List<OrgUnit> path = hierarchy.path(requestOrg);
+        UUID command = path.stream().filter(OrgUnit::main).map(OrgUnit::id).findFirst()
+                .orElse(path.isEmpty() ? requestOrg : path.get(path.size() - 1).id());
+        List<UUID> near = all.stream().filter(u -> hierarchy.isUnder(u, command)).toList();
+        return near.isEmpty() ? all : near;
     }
 
     public List<UUID> resourceOrgs(List<UUID> resourceIds) {
@@ -132,21 +155,42 @@ public class PlaceResolver {
     }
 
     /**
-     * The slots of a climbing approval. A level where the requester is the only holder is passed, as a unit never approves
-     * through its own applicant. A level with nobody stays, and waits for the access managers, unless the flow says to skip it.
+     * The slots of a climbing approval. Each level is a station (ADR-058): its own approvers, or when it has none the nearest
+     * approver above whose grant covers its branch. A level where the requester is the only approver is passed, as a unit
+     * never approves through its own applicant. A level with nobody stays, and waits for the access managers, unless the flow
+     * says to skip it.
      */
     public List<UUID> chainOrgs(String role, com.fasterxml.jackson.databind.JsonNode chain, UUID requestOrg, Set<UUID> requesters) {
         boolean skipEmpty = chain.path("skipEmpty").asBoolean(false);
         return chain(chain, requestOrg).stream().map(OrgUnit::id).filter(id -> {
-            Set<UUID> people = holders(role, Place.of(id));
-            return people.isEmpty() ? !skipEmpty : !requesters.containsAll(people);
+            var st = station(role, id);
+            if (st.empty()) {
+                return !skipEmpty;
+            }
+            // appointed but all away: the level stays and waits, as TNQL's (ADR-059)
+            return st.away() || !requesters.containsAll(st.people());
         }).toList();
     }
 
-    /** A unit on the climb where nobody holds the role, for refusing a request before it is sent. */
+    /** A unit on the climb that nobody approves, not even from above, for refusing a request before it is sent. */
     public java.util.Optional<OrgUnit> chainGap(String role, com.fasterxml.jackson.databind.JsonNode chain, UUID requestOrg) {
         return chain.path("skipEmpty").asBoolean(false) ? java.util.Optional.empty()
-                : chain(chain, requestOrg).stream().filter(u -> holders(role, Place.of(u.id())).isEmpty()).findFirst();
+                : chain(chain, requestOrg).stream().filter(u -> station(role, u.id()).empty()).findFirst();
+    }
+
+    /** Who approves a step going to this unit (ADR-058): its own approvers, else the nearest covering approver above. */
+    public ae.mover.access.Stations.Station station(String role, UUID unit) {
+        return stations.of(role, unit);
+    }
+
+    /** The people of a place found by unit: the station of each unit, or every holder when any unit will do. */
+    public Set<UUID> peopleAt(String role, Place place) {
+        if (place.anyOrg()) {
+            return holders(role, place);
+        }
+        Set<UUID> out = new LinkedHashSet<>();
+        place.orgs().forEach(o -> out.addAll(station(role, o).people()));
+        return out;
     }
 
     /** What a flow's questions can ask about the requesting unit. */
@@ -244,6 +288,12 @@ public class PlaceResolver {
         int best = Integer.MAX_VALUE;
         Set<UUID> people = new LinkedHashSet<>();
         List<ae.mover.access.RawGrant> held = grants.ofRole(role, clock.instant());
+        // a permission request is reviewed only by access managers holding «مراجعة طلبات الصلاحية» (ADR-059)
+        if (held.stream().anyMatch(g -> g.permissions().contains(ae.mover.access.Permission.MANAGE_ACCESS))) {
+            var known = rights.of(held.stream().map(ae.mover.access.RawGrant::membershipId).toList());
+            held = held.stream().filter(g -> g.membershipId() == null
+                    || known.getOrDefault(g.membershipId(), ae.mover.access.AccessRights.ALL).contains(ae.mover.access.AccessRights.Right.REVIEW)).toList();
+        }
         for (ae.mover.access.RawGrant g : held) {
             int d = reach(g, path);
             if (d < 0 || d > best) {
@@ -308,7 +358,7 @@ public class PlaceResolver {
 
     /** The people of a step's place, however it is found. */
     public Set<UUID> holdersOf(Assignee a, UUID requestOrg, List<UUID> resourceIds) {
-        return "BY_SCOPE".equals(a.orgFrom()) ? scope(a.role(), requestOrg).people() : holders(a.role(), resolve(a, requestOrg, resourceIds));
+        return "BY_SCOPE".equals(a.orgFrom()) ? scope(a.role(), requestOrg).people() : peopleAt(a.role(), resolve(a, requestOrg, resourceIds));
     }
 
     /** Active people who hold the role at the place, through a membership, a delegation or a seat. At most 500. */

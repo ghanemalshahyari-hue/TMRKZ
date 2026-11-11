@@ -256,6 +256,9 @@ public class AuthController {
         me.put("signInMethod", directory.issuer().equals(auth.issuer(actor.sessionId()).orElse(null)) ? "DIRECTORY" : "PROVIDER");
         me.put("serverTime", clock.instant().toString());
         me.put("timezone", policies.settings().timezone());
+        // «لوحة الدعم» (ADR-053): the person's support seat, if any; the server checks it on every console call
+        me.put("supportSeat", jdbc.sql("select role from support_seat where person_id = :p and ended_at is null")
+                .param("p", actor.personId()).query(String.class).optional().orElse(null));
         return me;
     }
 

@@ -52,8 +52,11 @@ public class TaskRealignment {
     private final SeparationOfDuties separation;
     private final DirectoryScope directory;
 
+    private final ae.mover.access.AccessRights rights;
+
     public TaskRealignment(JdbcClient jdbc, AccessService access, AuditService audit, Clock clock, SeparationOfDuties separation,
-                           DirectoryScope directory, ae.mover.workflow.PlaceResolver places) {
+                           DirectoryScope directory, ae.mover.workflow.PlaceResolver places, ae.mover.access.AccessRights rights) {
+        this.rights = rights;
         this.places = places;
         this.jdbc = jdbc;
         this.access = access;
@@ -178,7 +181,7 @@ public class TaskRealignment {
                 var match = places.scope(t.roleCode(), t.targetOrgId());
                 present = match.people();
             } else if (Boolean.TRUE.equals(how.get("strict_place")) && t.targetOrgId() != null) {
-                present = places.holders(t.roleCode(), ae.mover.workflow.PlaceResolver.Place.of(t.targetOrgId()));
+                present = places.station(t.roleCode(), t.targetOrgId()).people();
             }
             if (present != null && present.isEmpty()) {
                 route(t, scope, "NO_HOLDER", List.of(), List.of(), requesters, now, contexts, "مهمة بلا معتمد",
@@ -408,6 +411,7 @@ public class TaskRealignment {
         if (!ctx.canFor(Permission.MANAGE_ACCESS, (UUID) routed.get("routed_to_org"))) {
             throw ApiException.notFound();
         }
+        rights.require(ctx, ae.mover.access.AccessRights.Right.ROUTING, (UUID) routed.get("routed_to_org"));
         OpenTask t = taskOf(routed);
         Set<UUID> requesters = separation.requester(t.requestId());
         if (requesters.contains(ctx.personId())) {
@@ -471,6 +475,7 @@ public class TaskRealignment {
         if (!ctx.canFor(Permission.MANAGE_ACCESS, org)) {
             throw ApiException.notFound();
         }
+        rights.require(ctx, ae.mover.access.AccessRights.Right.ROUTING, org);
         OpenTask t = taskOf(routed);
         Set<UUID> requesters = separation.requester(t.requestId());
         if (requesters.contains(ctx.personId())) {

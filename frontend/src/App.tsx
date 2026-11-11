@@ -25,6 +25,12 @@ import { ReviewPage } from './pages/ReviewPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SitesPage } from './pages/SitesPage';
 import { WorkflowStudio } from './pages/WorkflowStudio';
+import { clearDesktopUser, startDesktopNotifications } from './lib/desktopNotifications';
+import { LAST_VIEW_KEY } from './lib/support';
+import { setSupportSeat } from './lib/navigation';
+import { SupportConsolePage } from './pages/SupportConsolePage';
+import { SupportPage } from './pages/SupportPage';
+import { FloatingAssist } from './components/assist/FloatingAssist';
 
 // Stationing V3 (behind VITE_STATIONING_V3): loaded on demand, so the offline map code is a separate chunk
 const StationingPolicyPage = lazy(() => import('./pages/StationingPolicyPage').then((m) => ({ default: m.StationingPolicyPage })));
@@ -58,6 +64,13 @@ export function App() {
       .finally(() => setChecking(false));
     return onUnauthorized(() => setMe(null));
   }, []);
+
+  // desktop notifications as in TNQL (ADR-050): for the signed-in person; at the sign-in page every toast closes
+  useEffect(() => {
+    if (checking) return;
+    if (!me) return clearDesktopUser();
+    return startDesktopNotifications(me.id);
+  }, [checking, me?.id]);
 
   if (checking) return <div className="login-shell"><div className="empty">جارٍ التحقق من الجلسة…</div></div>;
   if (!me) return <LoginPage onLogin={setMe} />;
@@ -115,6 +128,17 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
   useEffect(() => {
     document.body.classList.toggle('nav-open', navOpen);
   }, [navOpen]);
+
+  // «مركز الدعم» (ADR-053): a report names the screen the person came from; the console opens for a support seat
+  useEffect(() => {
+    if (view === 'support' || view === 'supportConsole') return;
+    try {
+      sessionStorage.setItem(LAST_VIEW_KEY, view);
+    } catch {
+      /* private window */
+    }
+  }, [view]);
+  setSupportSeat(me.supportSeat);
 
   // reference data shared by screens; reloaded after mutations and identity changes
   // each list is asked for only with a right its endpoint accepts (a user holding one single action asks for none)
@@ -223,13 +247,19 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     docs: () => <DocsPage />,
     requestAccess: () => <AccessRequestPage />,
     accessInbox: () => <AccessInboxPage />,
+    support: () => <SupportPage />,
+    supportConsole: () => <SupportConsolePage />,
   };
   // signing in is not a permission: a person with none has only the page to ask (ADR-044)
   const noAccess = me.permissions.length === 0;
   // one request sent «للعلم» opens by its address even with no permission at all; the server decides whether it is this person's
   const fyiAddress = /^#restationing\/[0-9a-f-]{36}$/.test(location.hash);
-  const shownView: View = noAccess && !fyiAddress ? 'requestAccess' : view;
-  const links = useMemo(() => (noAccess ? [{ view: 'requestAccess' as View, label: 'طلب صلاحية', icon: 'shield' }] : primaryNav(can, me.summaryOnly)), [can, me.summaryOnly, noAccess]);
+  // «مركز الدعم» stays open to someone with no permission yet: they are the ones who most need help
+  const shownView: View = noAccess && !fyiAddress && view !== 'support' ? 'requestAccess' : view;
+  const links = useMemo(
+    () => (noAccess ? [{ view: 'requestAccess' as View, label: 'طلب صلاحية', icon: 'shield' }, { view: 'support' as View, label: 'مركز الدعم', icon: 'help' }] : primaryNav(can, me.summaryOnly)),
+    [can, me.summaryOnly, noAccess],
+  );
   const more = useMemo(() => (noAccess ? [] : moreNav(can, me.summaryOnly)), [can, me.summaryOnly, noAccess]);
   // the operational views fill the screen below the top bar; every other page keeps its own layout inside the shell
   const console = shownView === 'home' || shownView === 'restationing' || shownView === 'stationing' || shownView === 'posture' || shownView === 'siteSetup';
@@ -254,6 +284,8 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
           <ScreenBoundary resetKey={shownView}>{restriction(shownView, can, me.summaryOnly) ? <NoAccess /> : pages[shownView]()}</ScreenBoundary>
         </main>
       </div>
+      {/* TNQL's floating «الدعم» and «المساعد الذكي» on every signed-in screen (ADR-056) */}
+      <FloatingAssist view={shownView} />
       <RequestWizard request={wizard} update={wizardUpdate} onUpdateHandled={() => setWizardUpdate(null)} onClose={() => (setWizard(null), setWizardUpdate(null))} />
       <div id="toast" className="toast" role="status" hidden={!toastMsg}>
         {toastMsg}

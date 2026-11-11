@@ -147,9 +147,10 @@ configuration changes never require data migration of in-flight requests.
   (default `uid`; `sAMAccountName` for Active Directory with `LDAP_VENDOR=ad`, `LDAP_UUID_ATTRIBUTE=objectGUID`,
   `LDAP_USER_OBJECT_CLASSES=person, organizationalPerson, user`). Put the organisation's CA certificates (PEM) in
   `ops/keycloak/truststores/`. Certificate validation is never disabled.
-- `TMRKZ_PUBLIC_URL` is the address users open (behind the organisation's TLS proxy in production, then set
-  `MOVER_SECURE_COOKIE=true`). The realm is created from these values on the first start only; later changes are made
-  in the Keycloak administration console.
+- `TMRKZ_PUBLIC_URL` is the address users open (https in production: `ops/tls/README.md`, which also sets
+  `MOVER_SECURE_COOKIE=true`). The realm is created from these values on the first start only; after the address changes,
+  `sh ops/keycloak/set-public-url.sh <project>` gives the client `tmrkz-web` the new sign-in and sign-out addresses, and `ops/keycloak/set-directory.sh` points the directory federation at the directory now in `.env` (ADR-052)
+  (`ops/tls/enable.sh` runs it).
 - The administration console is not served through the web entry point. Reach it from the host only, for example
   `docker compose exec keycloak /opt/keycloak/bin/kcadm.sh …`, or a temporary SSH tunnel to `keycloak:8080/auth/admin/`.
   The bootstrap account `tmrkz-bootstrap` uses `TMRKZ_KEYCLOAK_ADMIN_PASSWORD`: replace it with a named administrator

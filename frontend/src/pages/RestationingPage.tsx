@@ -1,4 +1,5 @@
 import { PURPOSE_TITLE, isPurpose, type Purpose } from '../lib/requestPurpose';
+import { ApprovalStamps } from '../components/workspace/ApprovalStamps';
 import type { RestationingUnit } from '../api/types';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../api/client';
@@ -115,9 +116,30 @@ export function RestationingPage() {
 
   const canCreate = (['CREATE_RESTATIONING', 'CREATE_INITIAL_STATIONING', 'CREATE_DEPLOYMENT_REQUEST', 'REQUEST_SITE_REGISTRATION'] as const).some((p) => app.can(p));
   const canAccess = !restriction('permissions', app.can, app.summaryOnly) || !restriction('audit', app.can, app.summaryOnly);
+  // one action is lit at a time, the view in front: the approval route over the linked sites over the request list (owner, 11 Nov 2026)
+  const current = historyOpen ? 'route' : !editing && tab === 'sites' ? 'links' : drawerOpen ? 'map' : null;
   const actions: RailAction[] = [
-    { key: 'links', label: 'ربط الوحدات بالمواقع', hint: 'التمركز الحالي وارتباطات المواقع', icon: 'link', active: !editing && tab === 'sites', onClick: () => (setEditing(null), setTab('sites')) },
-    { key: 'map', label: 'إعادة التمركز عبر الخريطة', hint: 'الطلبات، وطلب جديد', icon: 'map', active: drawerOpen, onClick: () => setDrawerOpen((o) => !o) },
+    {
+      key: 'links',
+      label: 'ربط الوحدات بالمواقع',
+      hint: 'التمركز الحالي وارتباطات المواقع',
+      icon: 'link',
+      active: current === 'links',
+      onClick: () => (setEditing(null), setHistoryOpen(false), setTab('sites')),
+    },
+    {
+      key: 'map',
+      label: 'إعادة التمركز عبر الخريطة',
+      hint: 'الطلبات، وطلب جديد',
+      icon: 'map',
+      active: current === 'map',
+      onClick: () => {
+        setHistoryOpen(false);
+        if (current === 'map') return setDrawerOpen(false);
+        setDrawerOpen(true);
+        if (tab === 'sites') setTab('request');
+      },
+    },
     {
       key: 'bounds',
       label: 'الحدود والمناطق',
@@ -125,7 +147,7 @@ export function RestationingPage() {
       icon: 'boundary',
       onClick: () => (editing ? document.getElementById('rs-step-4')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : setFitKey((k) => k + 1)),
     },
-    { key: 'route', label: 'مسار الاعتماد', hint: 'المراحل والسجل الكامل', icon: 'route', active: historyOpen, onClick: () => setHistoryOpen((o) => !o) },
+    { key: 'route', label: 'مسار الاعتماد', hint: 'المراحل والسجل الكامل', icon: 'route', active: current === 'route', onClick: () => setHistoryOpen((o) => !o) },
     ...(canAccess
       ? [{ key: 'access', label: 'الصلاحيات والتدقيق', hint: 'حسب صلاحياتك', icon: 'shield', onClick: () => (location.hash = app.can('MANAGE_ACCESS') ? 'permissions' : 'audit') }]
       : []),
@@ -369,6 +391,21 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
           )}
         </dl>
       </section>
+
+      {/* «ختم عمليات الوحدة» and «ختم الاعتماد النهائي», as TNQL's (ADR-055) */}
+      <ApprovalStamps
+        requestId={r.id}
+        state={r.state}
+        title={isPurpose(r.purpose) ? PURPOSE_TITLE[r.purpose] : PURPOSE_TITLE.RESTATIONING}
+        facts={[
+          ['الوحدات', r.units.map((u) => u.name).join('، ') || '—'],
+          ['الموقع الحالي', r.currentSites.map((x) => x.site.name).join('، ') || '—'],
+          ['الموقع المطلوب', r.purpose === 'INITIAL_STATIONING' ? r.targetSite?.name ?? '—' : r.purpose === 'SITE_REGISTRATION' ? c.siteInfo?.name ?? '—' : r.purpose === 'DEPLOYMENT_AREAS' ? 'منطقتا الانتشار فقط' : proposedSite(r)],
+          [c.kind === 'TEMPORARY' ? 'المدة' : 'النفاذ', c.kind === 'TEMPORARY' ? `${fullDate(c.start ?? '')} ← ${fullDate(c.end ?? '')}` : 'عند التفعيل المستقل'],
+          ['مقدم الطلب', r.requester.name],
+          ['السبب', c.reason],
+        ]}
+      />
 
       {(r.can.edit || r.can.submit || r.can.decide || r.can.activate || !hasLifecycle(r)) && (
       <section className="tz-card rs-actions" aria-label="الإجراءات">

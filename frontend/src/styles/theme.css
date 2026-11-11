@@ -110,3 +110,12 @@ body { transition: background-color 0.15s; }
 /* Text on a strong colour stays white in the sand theme: the active 2D/3D button, and a trial's result on «مسار الموافقات». */
 :root[data-theme='light'] .tz-view-switch button.on,
 :root[data-theme='light'] .fs-outcome { color: #fff; }
+
+/* Switches (owner, 11 Nov 2026): the generated track colour (theme.generated.css, !important and more specific) also covered the
+   on state, so on and off looked the same. On is the theme's accent with a white knob; off keeps an edge and a knob that shows. */
+:root[data-theme] .toggle { box-shadow: inset 0 0 0 1px var(--tz-line-2); }
+:root[data-theme] .toggle:checked { background: var(--accent) !important; box-shadow: none; }
+:root[data-theme] .toggle:checked:after { background: #ffffff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); }
+:root[data-theme='dark'] .toggle:not(:checked):after { background: #6f8796; }
+:root[data-theme] .toggle:disabled { opacity: 0.55; cursor: default; }
+:root[data-theme] .toggle:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }

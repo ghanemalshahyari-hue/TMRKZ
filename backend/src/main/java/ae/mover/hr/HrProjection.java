@@ -28,8 +28,9 @@ import ae.mover.security.Actor;
 public class HrProjection {
 
     /** Source people whose employee number is unique in the snapshot (FROM-clause fragment over alias {@code h}). */
+    // a grouped semi-join, not a count per person: with 200,000 people the per-row count could fall into a full scan per row
     private static final String UNIQUE_NUMBER = "hr_person h where h.snapshot_id = :s"
-            + " and (select count(*) from hr_person d where d.snapshot_id = :s and d.employee_number = h.employee_number) = 1";
+            + " and h.employee_number in (select employee_number from hr_person where snapshot_id = :s group by employee_number having count(*) = 1)";
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -147,6 +148,11 @@ public class HrProjection {
                   and (p.display_name <> h.full_name or p.employee_no <> h.employee_number
                        or p.status <> case when h.active then 'ACTIVE' else 'DISABLED' end)"""
                 .formatted(UNIQUE_NUMBER)).params(s).update();
+        // away per HR (leave, absence): left out of who a step goes to, still appointed (ADR-059)
+        jdbc.sql("""
+                update person p set hr_unavailable = nullif(btrim(h.leave_status), '')
+                from hr_person h where h.snapshot_id = :s and p.source = 'HR' and p.source_external_id = h.external_id
+                  and p.hr_unavailable is distinct from nullif(btrim(h.leave_status), '')""").params(s).update();
         int disabled = jdbc.sql("""
                 update person p set status = 'DISABLED'
                 where p.source = 'HR' and p.status = 'ACTIVE'

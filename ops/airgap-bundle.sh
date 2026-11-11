@@ -26,6 +26,8 @@ done
 
 cp docker-compose.yml .env.example "$OUT/"
 mkdir -p "$OUT/ops/keycloak" && cp -r ops/*.sh ops/sql ops/db "$OUT/ops/" && cp -r ops/keycloak/truststores "$OUT/ops/keycloak/"
+# https entry point and its steps (ADR-051); never the private key directory
+mkdir -p "$OUT/ops/tls" && cp ops/tls/*.sh ops/tls/proxy.conf.template ops/tls/README.md "$OUT/ops/tls/" && cp ops/keycloak/set-public-url.sh ops/keycloak/set-directory.sh "$OUT/ops/keycloak/"
 # map package tools (standard-library Python) and the terrain loader
 cp -r ops/map-package ops/terrain "$OUT/ops/" && find "$OUT/ops" -name __pycache__ -prune -exec rm -rf {} +
 if [ -n "${MAP_PACKAGE:-}" ]; then

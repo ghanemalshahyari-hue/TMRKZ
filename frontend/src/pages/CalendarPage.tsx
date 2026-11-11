@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import type { AvailabilityGrid, GridCell, MapFeature, ReservationItem } from '../api/types';
 import { StaticMap } from '../components/map/StaticMap';
+import { WeekPicker } from '../components/WeekPicker';
 import { Heading } from '../components/ui';
 import { facilitySites, useApp } from '../lib/app';
 import { addDays, dayLabel, dubaiISO, fullDate, todayDubai } from '../lib/dates';
@@ -68,19 +69,8 @@ export function CalendarPage() {
         en="CALENDAR / SPACE OVER TIME"
         title="الإشغال عبر الزمن"
         description="حالة المرفق تتبع الفترة؛ سجل الموقع يحتفظ بهويته."
-        actions={
-          <>
-            <button className="button compact" onClick={() => setWeekStart(addDays(weekStart, -7))} aria-label="الأسبوع السابق">
-              → السابق
-            </button>
-            <span className="pill">
-              {fullDate(dubaiISO(weekStart))} — {fullDate(dubaiISO(addDays(weekStart, 6)))}
-            </span>
-            <button className="button compact" onClick={() => setWeekStart(addDays(weekStart, 7))} aria-label="الأسبوع التالي">
-              التالي ←
-            </button>
-          </>
-        }
+        // the seven days are chosen by click: year, month and day (owner, 11 Nov 2026)
+        actions={<WeekPicker start={weekStart} onChange={setWeekStart} />}
       />
       {error && <div className="note red" style={{ marginBottom: 15 }}>{error}</div>}
       <div className="calendar-layout">

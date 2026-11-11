@@ -39,9 +39,6 @@ export function DocsPage() {
             <Icon name="download" />
             تصفح جميع الوثائق
           </a>
-          <a className="button ghost full" style={{ marginTop: 10 }} href="/docs/handoff/prototype.html">
-            النموذج الأولي المعتمد
-          </a>
         </aside>
       </section>
       <div className="handoff-files">

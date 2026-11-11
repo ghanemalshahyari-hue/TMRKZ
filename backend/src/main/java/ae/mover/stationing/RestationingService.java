@@ -139,10 +139,12 @@ public class RestationingService {
     private final TransactionTemplate tx;
     private final PlaceInfo placeInfo;
     private final StationingRoutes routes;
+    private final ae.mover.access.Stations stations;
 
     public RestationingService(JdbcClient jdbc, Json json, AuditService audit, StationingPolicyStore policies, RestationingChecks checks,
                                OrgHierarchy hierarchy, StationingOutbox outbox, PersonKeys keys, TransactionTemplate tx, PlaceInfo placeInfo,
-                               StationingRoutes routes) {
+                               StationingRoutes routes, ae.mover.access.Stations stations) {
+        this.stations = stations;
         this.routes = routes;
         this.placeInfo = placeInfo;
         this.jdbc = jdbc;
@@ -477,7 +479,9 @@ public class RestationingService {
             throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES, "مقدم الطلب لا يقرر مراحل طلبه.", Map.of());
         }
         Set<UUID> others = new HashSet<>();
-        route.stream().filter(x -> x.marked() && !x.key().equals(stage.key())).forEach(x -> others.addAll(humans(x.decidedBy())));
+        // the approver who signed a lower station because it had nobody of its own still signs his own (ADR-058, as in TNQL)
+        route.stream().filter(x -> x.marked() && !x.key().equals(stage.key()) && !inheritedBy(x, stage))
+                .forEach(x -> others.addAll(humans(x.decidedBy())));
         if (intersects(actor, others)) {
             throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES,
                     "قرر هذا الشخص مرحلة أخرى في الطلب نفسه؛ يقرر «" + stage.label() + "» إنسان آخر.", Map.of());
@@ -486,8 +490,9 @@ public class RestationingService {
         excluded.addAll(others);
         Map<UUID, UUID> delegators = delegators(ctx);
         Permission p = Permission.valueOf(stage.permission());
+        ae.mover.access.Stations.Station station = stage.unit() == null ? null : stations.byPermission(p, stage.unit());
         Optional<Grant> g = ctx.grants().stream()
-                .filter(x -> x.has(p) && seat(x, stage, r))
+                .filter(x -> x.has(p) && seat(x, stage, r, station, ctx.personId()))
                 .filter(x -> x.delegationId() == null || !excluded.contains(delegators.get(x.delegationId())))
                 .findFirst();
         UUID target = stage.unit() != null ? stage.unit() : r.unit();
@@ -497,12 +502,31 @@ public class RestationingService {
         return g.get();
     }
 
-    /** A hierarchy or cross-branch stage is the stage unit's own approver seat; the exception acts for the requesting unit. */
-    private static boolean seat(Grant g, StageRow stage, Req r) {
+    /**
+     * A hierarchy or cross-branch stage is the stage unit's own approver seat — or, when the unit has no approver of its own,
+     * the seat of the nearest unit above it whose approver's grant covers its branch (ADR-058, TNQL's inherited station). The
+     * exception acts for the requesting unit.
+     */
+    private static boolean seat(Grant g, StageRow stage, Req r, ae.mover.access.Stations.Station station, UUID actor) {
         if (stage.unit() != null) {
-            return !g.isAll() && stage.unit().equals(g.orgId());
+            if (g.isAll() || station == null || !station.people().contains(actor)) {
+                return false;
+            }
+            boolean inherited = station.via() == ae.mover.access.Stations.Via.INHERITED;
+            UUID at = inherited ? station.from() : stage.unit();
+            return at.equals(g.orgId()) || g.targets().stream().anyMatch(t -> ae.mover.access.GrantTarget.ORGANIZATION.equals(t.kind())
+                    && (t.id().equals(at) || (!inherited && t.reached().contains(at))));
         }
         return g.actsFor(r.unit());
+    }
+
+    /** Whether {@code earlier} is a lower hierarchy station that had no approver of its own and was inherited from {@code stage}'s unit. */
+    private boolean inheritedBy(StageRow earlier, StageRow stage) {
+        if (!"HIERARCHY".equals(earlier.kind()) || !"HIERARCHY".equals(stage.kind()) || earlier.unit() == null || stage.unit() == null) {
+            return false;
+        }
+        var st = stations.byPermission(Permission.valueOf(earlier.permission()), earlier.unit());
+        return st.via() == ae.mover.access.Stations.Via.INHERITED && stage.unit().equals(st.from());
     }
 
     private void settle(AccessContext ctx, UUID id, String number, int routeNo, Instant now) {
@@ -1323,6 +1347,56 @@ public class RestationingService {
             m.put("fyiPending", fyiPending(r) && ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit()));
             m.put("activatable", "APPROVED_NOT_ACTIVATED".equals(r.state()) && !fyiPending(r) && mayActivate(ctx, r));
             out.add(m);
+        }
+        return out;
+    }
+
+    /**
+     * The two approval stamps of a request, as TNQL's «ختم عمليات الوحدة» and «ختم الاعتماد النهائي» (owner, 11 Nov 2026;
+     * ADR-055): for each of the stages UNIT_OPERATIONS and FINAL of the current route that was approved, who approved it, in
+     * which capacity and unit (as recorded at that moment in the audit), and when. Visual only: no signature, never the
+     * certificate seal of ADR-020. Null for a stage not approved (yet). The person sees them only on a request they may see.
+     */
+    public Map<String, Object> stamps(AccessContext ctx, UUID id) {
+        Req r = load(id).orElseThrow(ApiException::notFound);
+        requireVisible(ctx, r);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("number", r.number());
+        out.put("state", r.state());
+        out.put("requestingUnit", jdbc.sql("select name from organization where id = :o").param("o", r.unit()).query(String.class).optional().orElse(null));
+        // the main unit: the requesting unit's ancestor right under the root (itself when it is one)
+        out.put("mainUnit", jdbc.sql("""
+                with recursive up(id, parent_id, name, depth) as (
+                  select id, parent_id, name, 0 from organization where id = :o
+                  union all select o.id, o.parent_id, o.name, up.depth + 1 from organization o join up on o.id = up.parent_id)
+                select name from up where parent_id is null or parent_id in (select id from organization where parent_id is null)
+                order by depth limit 1""").param("o", r.unit()).query(String.class).optional().orElse(null));
+        for (String kind : List.of("UNIT_OPERATIONS", "FINAL")) {
+            Map<String, Object> s = jdbc.sql("""
+                    select st.stage_key, st.decided_by, st.decided_at, st.via_delegation, p.display_name,
+                           (select a.position_title from affiliation a where a.person_id = st.decided_by and a.valid_to is null
+                             order by a.valid_from desc limit 1) as position_title
+                    from restationing_stage st join person p on p.id = st.decided_by
+                    where st.request_id = :id and st.route_no = :route and st.kind = :k and st.mark = 'APPROVED'
+                    order by st.decided_at desc limit 1""")
+                    .param("id", id).param("route", r.routeNo()).param("k", kind).query().listOfRows().stream().findFirst().orElse(null);
+            if (s == null) {
+                out.put(kind.equals("FINAL") ? "final" : "unitOperations", null);
+                continue;
+            }
+            Map<String, Object> audit = jdbc.sql("""
+                    select actor_name, actor_role, actor_org from audit_event
+                    where action = 'RESTATIONING_STAGE_APPROVED' and entity_id = :id and detail->>'stage' = :stage
+                    order by id desc limit 1""")
+                    .param("id", id.toString()).param("stage", s.get("stage_key")).query().listOfRows().stream().findFirst().orElse(Map.of());
+            Map<String, Object> stamp = new LinkedHashMap<>();
+            stamp.put("name", audit.get("actor_name") != null ? audit.get("actor_name") : s.get("display_name"));
+            stamp.put("position", s.get("position_title"));
+            stamp.put("role", audit.get("actor_role"));
+            stamp.put("unit", audit.get("actor_org"));
+            stamp.put("at", ((java.sql.Timestamp) s.get("decided_at")).toInstant().toString());
+            stamp.put("onBehalf", s.get("via_delegation") != null);
+            out.put(kind.equals("FINAL") ? "final" : "unitOperations", stamp);
         }
         return out;
     }

@@ -713,3 +713,42 @@ Evidence: `docs/evidence/stationing-next/` (`tests/acceptance/stationing-next.mj
 | Coordinates table, every format, from the map, reorder, insert, remove | `PointsTable`, `lib/siteWizard.ts`, `lib/coordFormats.ts` | `coordFormats.test.ts` (PROJ and `mgrs` golden vectors), `siteWizard.test.ts`; W2-10…W2-14 | 17 + 12; pass |
 | Site map symbol, V32 | `V32__site_symbol.sql`, `SiteService.setSymbol`, `MapService` features, `SiteSymbolPicker`, `siteLayers` | `SiteMarkerIT.siteSymbol`, `siteWizard.test.ts` symbols; W2-15…W2-17 | 43/43; pass |
 | Panels moved, widened, folded; cards folded | `OperationalWorkspace panels`, `shell.css` | W2-06, W2-18…W2-21 | pass |
+
+## Work PC: map package, slope, «إضافة مستخدم» and desktop notifications (2026-11-11, ADR-049, ADR-050; owner)
+
+| Requirement | Code | Test | Result |
+|---|---|---|---|
+| Official map package on this PC, byte for byte | `build_terrain.py`, `build_terrain_3d.py`, `package_source.py`, `check_absent_tiles.py`, `build_package.py`, `install_package.py` | archive and product sha256 against `map-packages/tmrkz-map-2026.11.2` | `21e1558c…`, `8905e73c…`, `f9f4c387…`; installed, `2026.11.1` kept |
+| Slope loaded from the installed package | `ops/terrain/load-slope.sh` | the loader's own checks | 6,300 tiles, 362,880,000 cells |
+| «موقع جديد» smaller text and cards | `shell.css` `.sw-*` | headless Edge on :8088 (computed sizes) | pass |
+| One lit action card on «إعادة التمركز» | `RestationingPage` `current` | headless Edge on :8088, five clicks | 5/5 |
+| HR search inside the manager's directory, same answer outside | `UnitMemberService.lookup` | `UnitMemberIT` UM-1 | pass |
+| HR person added with no role; cells ticked afterwards | `UnitMemberService.add`, `GrantAdminService.unitMatrix`, `UnitMatrix`, `AddUserDialog` | `UnitMemberIT` UM-2 | pass |
+| User ID without HR; no take-over of another manager's account | `UnitMemberService.add`, `normalLogin` | `UnitMemberIT` UM-3; `AddUserDialog.test.ts` | pass; 3/3 |
+| Removing an added person, with a reason; grants kept | `UnitMemberService.end` | `UnitMemberIT` UM-4 | pass |
+| A User ID links on its first directory sign-in only | `IdentityService.localUser`, V33 | `EnterpriseSignInIT.localUserFirstSignIn` | pass |
+| Reach, people search and matrix unchanged for everyone else | `DirectoryScope.MEMBER`, `OrganizationService.people` | `IdentityScopeIT`, `AuthorizationIT`, `WorkflowGraphIT`, `SecurityRemediationIT`, `DirectorySignInIT` | 58/58 |
+| Desktop feed: no replay, five oldest first, safe text, read and other people's never | `DesktopFeed`, V34 | `DesktopFeedIT` DN-1 | pass |
+| Permission on the first gesture, 7-day re-ask, no toast in front, per-person cursor | `lib/desktopNotifications.ts`, `public/sw.js`, `nginx.conf` `/sw.js` | `desktopNotifications.test.ts` | 9/9 |
+| https served by TMRKZ, as TNQL (ADR-051) | `docker-compose.yml` `proxy`, `ops/tls/proxy.conf.template`, `frontend/nginx.conf` scheme map | `ops/tls/test-tls.sh` (TLS 1.2/1.3, trust via CA only, HSTS, redirect, app/backend/IdP over https) | 18/18 with a test CA |
+| Key on the server, request to the internal CA, issued certificate checked | `ops/tls/make-csr.sh`, `ops/tls/install-cert.sh` | `ops/tls/test-tls.sh` (refusals: other key, missing name, foreign CA; DER and PKCS#7 input) | pass |
+| New address in `.env` and Keycloak | `ops/tls/enable.sh`, `ops/keycloak/set-public-url.sh` | not yet run: needs the issued certificate | open |
+| Directory switched after the first start, tested before applied (ADR-052) | `ops/keycloak/set-directory.sh`, `ops/local/up.sh` | rehearsal on the stand-in: PASS/PASS, wrong password, unknown host, apply refused; re-apply with same values | pass; values unchanged |
+| The organisation's CA trusted for the directory | `ops/keycloak/truststores/organisation-ca-0N.pem`, `DirectoryAuthenticator.sslContext` | not yet against the real directory | open |
+| Support case, conversation, seats, response times (ADR-053) | V35, `SupportService`, `SupportController`, `SupportPage`, `SupportConsolePage` | `SupportIT` SUP-1, SUP-2; `support.test.ts` | pass |
+| Knowledge bundle in OKF, verified-only, audience, Arabic search with citations (ADR-054) | `KnowledgeService`, `KnowledgeController`, `okf/`, `ops/knowledge/okf.py` | `KnowledgeServiceTest` KB-1…KB-3, `SupportIT` KB-4, `okf.py validate` | pass; 11 documents, 0 problems |
+| Stamps of the unit-operations and final approvals (ADR-055) | `RestationingService.stamps`, `ApprovalStamps.tsx` | `StationingNextIT.initialStationing` stamp checks; `ApprovalStamps.test.ts` | pass |
+| The assistant: grounded, cited, model on the site's server, fallback, audit (ADR-056) | `AssistantService`, `AssistantController`, `FloatingAssist.tsx` | `AssistantServiceTest` AI-1, AI-2; `SupportIT` AI-3; live 9/9 on :8088 | pass |
+| Parent unit from an ID path, as TNQL (ADR-057) | `HrMapping.pathParent`, transform `path_parent` | `HrMappingTest`; `HrSyncAcceptanceIT`, `RestationingHrSyncIT` unchanged | pass |
+| Station approver: own first, else nearest covering approver above, never mixed; inherited approver signs his own level too (ADR-058) | `Stations`, `PlaceResolver.station/peopleAt`, `DecisionService.placeAllows`, `RestationingService.seat/inheritedBy`, `StationingRoutes.simulate` | `WorkflowGraphIT.inheritedStation`, `RestationingWorkflowIT.inheritedSeat`; `WorkflowGraphIT` 32/32, `SeparationOfDutiesIT` | pass |
+| Access workspace: reach-bound counts, tree, search with paths, unit file (ADR-058) | `AccessWorkspaceService`, `AccessWorkspaceController`, `AccessWorkspace.tsx` | `AccessWorkspaceIT` AW-1; live 20/20 on :8088 | pass |
+| Staged matrix save: review, fingerprint, all or nothing, one audit reference (ADR-058) | `AccessWorkspaceService.preview/apply`, `stage.ts` | `AccessWorkspaceIT` AW-2; `stage.test.ts` | pass |
+| Cell states and roles given to a unit, V36 (ADR-058) | `unit_grant`, `GrantSource` unit branch, `AccessWorkspaceService.matrix/setUnitGrant` | `AccessWorkspaceIT` AW-3 | pass |
+| Final approval given by a global manager only (ADR-058) | `GrantAdminService.FINAL_ROLES` | `AccessWorkspaceIT` AW-4 | pass |
+| Separate rights of an access manager; REVIEW routing; delegation never wider or longer; issuer-only edit; cascade (ADR-059) | `AccessRights`, `GrantAdminService.authority/replace/end`, `PlaceResolver.scope`, `UnitMemberService`, `TaskRealignment` | `AccessAdminIT` AA-1, AA-2 | pass |
+| FINALIZE gives the tied final step of permission requests (ADR-059) | `GrantAdminService.finalCompanion` | `AccessAdminIT` AA-3 | pass |
+| Duty permits: DUTY right, at most 7 days, holder activation, additive, ended (ADR-059) | `AccessAdminService` permits, `GrantSource` permit branch, `PermitsTab`, `MyPermits` | `AccessAdminIT` AA-4 | pass |
+| Account card: access off/on, local profile, retire local by global only (ADR-059) | `AccessAdminService.card/setActive/profile/retire`, `AccountCardDialog` | `AccessAdminIT` AA-5 | pass |
+| «معتمد التوفر» per providing department; standby by global only; PROVIDER place (ADR-059) | `AccessAdminService.addDepartment/setProvider`, `GrantAdminService.authority`, `PlaceResolver.providers`, `AvailabilityChips` | `AccessAdminIT` AA-6; `adminText.test.ts` | pass |
+| Approvers HR marks away: appointed, not routed, no inheritance past them (ADR-059) | `HrMapping` leave_status, `HrProjection`, `Stations.available` | `AccessAdminIT` AA-7 | pass |
+| Whole-unit acknowledgement on a staged bulk change (ADR-059) | `AccessWorkspaceService.wholeUnit` | `AccessWorkspaceIT` AW-2 | pass |

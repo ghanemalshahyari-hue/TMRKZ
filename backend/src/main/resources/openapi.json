@@ -595,6 +595,124 @@
         }
       }
     },
+    "/api/v1/access/permits": {
+      "post": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "issue",
+        "summary": "issue",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/permits/{id}/end": {
+      "post": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "endPermit",
+        "summary": "end permit",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/access/policy/draft": {
       "post": {
         "tags": [
@@ -1029,6 +1147,38 @@
         ]
       }
     },
+    "/api/v1/access/rights-catalogue": {
+      "get": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "rightsCatalogue",
+        "summary": "rights catalogue",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
     "/api/v1/access/scope-preview": {
       "get": {
         "tags": [
@@ -1125,6 +1275,156 @@
         }
       }
     },
+    "/api/v1/access/unit-members": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "addUnitMember",
+        "summary": "add unit member",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/unit-members/lookup": {
+      "get": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "lookupUnitMember",
+        "summary": "lookup unit member",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/access/unit-members/{personId}/end": {
+      "post": {
+        "tags": [
+          "Access"
+        ],
+        "operationId": "endUnitMember",
+        "summary": "end unit member",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "personId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/access/unit-ops-routes": {
       "get": {
         "tags": [
@@ -1206,6 +1506,965 @@
                 "type": "object"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/departments": {
+      "get": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "departments",
+        "summary": "departments",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "addDepartment",
+        "summary": "add department",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/people/{id}": {
+      "get": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "card",
+        "summary": "card",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/access/workspace/people/{id}/active": {
+      "put": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "active",
+        "summary": "active",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/people/{id}/profile": {
+      "put": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "profile",
+        "summary": "profile",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/people/{id}/retire": {
+      "post": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "retire",
+        "summary": "retire",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/search": {
+      "get": {
+        "tags": [
+          "AccessWorkspace"
+        ],
+        "operationId": "search",
+        "summary": "search",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/summary": {
+      "get": {
+        "tags": [
+          "AccessWorkspace"
+        ],
+        "operationId": "summary",
+        "summary": "summary",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/tree": {
+      "get": {
+        "tags": [
+          "AccessWorkspace"
+        ],
+        "operationId": "tree",
+        "summary": "tree",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/units/{id}": {
+      "get": {
+        "tags": [
+          "AccessWorkspace"
+        ],
+        "operationId": "unit",
+        "summary": "unit",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/access/workspace/units/{id}/apply": {
+      "post": {
+        "tags": [
+          "AccessWorkspace"
+        ],
+        "operationId": "apply",
+        "summary": "apply",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/units/{id}/history": {
+      "get": {
+        "tags": [
+          "AccessWorkspace"
+        ],
+        "operationId": "history",
+        "summary": "history",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/access/workspace/units/{id}/inherited": {
+      "put": {
+        "tags": [
+          "AccessWorkspace"
+        ],
+        "operationId": "setUnitGrant",
+        "summary": "set unit grant",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/units/{id}/matrix": {
+      "get": {
+        "tags": [
+          "AccessWorkspace"
+        ],
+        "operationId": "matrix",
+        "summary": "matrix",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/access/workspace/units/{id}/permits": {
+      "get": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "permits",
+        "summary": "permits",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/access/workspace/units/{id}/preview": {
+      "post": {
+        "tags": [
+          "AccessWorkspace"
+        ],
+        "operationId": "preview",
+        "summary": "preview",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/access/workspace/units/{id}/providers": {
+      "get": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "providers",
+        "summary": "providers",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "put": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "setProvider",
+        "summary": "set provider",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assistant/ask": {
+      "post": {
+        "tags": [
+          "Assistant"
+        ],
+        "operationId": "ask",
+        "summary": "ask",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assistant/status": {
+      "get": {
+        "tags": [
+          "Assistant"
+        ],
+        "operationId": "status",
+        "summary": "status",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
         }
       }
@@ -2362,6 +3621,134 @@
                 "type": "object"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/help/doc": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "doc",
+        "summary": "doc",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/help/index": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "index",
+        "summary": "index",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/help/search": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "search",
+        "summary": "search",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/help/status": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "status",
+        "summary": "status",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
         }
       }
@@ -3668,6 +5055,154 @@
         }
       }
     },
+    "/api/v1/me/permits": {
+      "get": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "myPermits",
+        "summary": "my permits",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/me/permits/{id}/activate": {
+      "post": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "activate",
+        "summary": "activate",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/me/permits/{id}/end": {
+      "post": {
+        "tags": [
+          "AccessAdmin"
+        ],
+        "operationId": "endMine",
+        "summary": "end mine",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/memberships": {
       "post": {
         "tags": [
@@ -3793,6 +5328,38 @@
         ],
         "operationId": "notifications",
         "summary": "notifications",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/desktop-feed": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "operationId": "desktopFeed",
+        "summary": "desktop feed",
         "responses": {
           "200": {
             "description": "OK — see docs/api/API_V1.md for the JSON shape"
@@ -7079,6 +8646,48 @@
         }
       }
     },
+    "/api/v1/restationing-requests/{id}/stamps": {
+      "get": {
+        "tags": [
+          "Restationing"
+        ],
+        "operationId": "stamps",
+        "summary": "stamps",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/restationing-requests/{id}/start-cancellation": {
       "post": {
         "tags": [
@@ -8821,6 +10430,534 @@
           }
         },
         "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/support/cases": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "open",
+        "summary": "open",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "mine",
+        "summary": "mine",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/support/cases/{id}": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "get",
+        "summary": "get",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/support/cases/{id}/confirm": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "confirm",
+        "summary": "confirm",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/support/cases/{id}/messages": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "reply",
+        "summary": "reply",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/support/console/cases": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "queue",
+        "summary": "queue",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/support/console/cases/{id}/act": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "act",
+        "summary": "act",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/support/console/counts": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "counts",
+        "summary": "counts",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      }
+    },
+    "/api/v1/support/seats": {
+      "get": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "seats",
+        "summary": "seats",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "grantSeat",
+        "summary": "grant seat",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/support/seats/{id}/end": {
+      "post": {
+        "tags": [
+          "Support"
+        ],
+        "operationId": "endSeat",
+        "summary": "end seat",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
           {
             "name": "X-Requested-With",
             "in": "header",

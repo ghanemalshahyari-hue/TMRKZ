@@ -53,8 +53,10 @@ public class StationingRoutes {
     private final Json json;
     private final AuditService audit;
     private final OrgHierarchy hierarchy;
+    private final ae.mover.access.Stations stations;
 
-    public StationingRoutes(JdbcClient jdbc, Json json, AuditService audit, OrgHierarchy hierarchy) {
+    public StationingRoutes(JdbcClient jdbc, Json json, AuditService audit, OrgHierarchy hierarchy, ae.mover.access.Stations stations) {
+        this.stations = stations;
         this.jdbc = jdbc;
         this.json = json;
         this.audit = audit;
@@ -222,7 +224,14 @@ public class StationingRoutes {
                 m.put("kind", s.kind().name());
                 m.put("label", s.label());
                 m.put("unit", s.unit() == null ? null : path.stream().filter(u -> u.id().equals(s.unit())).map(OrgUnit::name).findFirst().orElse(null));
-                m.put("holders", s.unit() != null ? seatHolders(s.unit()) : holders(s.kind() == RouteDerivation.Kind.UNIT_OPERATIONS ? "DECIDE_UNIT_OPERATIONS" : "FINAL_APPROVE_STATIONING", ids));
+                if (s.unit() != null) {
+                    // the stage unit's own seat, or when it has none the nearest approver above covering it (ADR-058)
+                    var st = stations.byPermission(Permission.APPROVE, s.unit());
+                    m.put("holders", (long) st.people().size());
+                    m.put("inheritedFrom", st.via() == ae.mover.access.Stations.Via.INHERITED ? st.fromName() : null);
+                } else {
+                    m.put("holders", holders(s.kind() == RouteDerivation.Kind.UNIT_OPERATIONS ? "DECIDE_UNIT_OPERATIONS" : "FINAL_APPROVE_STATIONING", ids));
+                }
                 stages.add(m);
             }
             if (Boolean.TRUE.equals(in.stages().fyiBeforeActivation())) {
@@ -234,13 +243,6 @@ public class StationingRoutes {
         out.put("complete", complete);
         out.put("problems", problems);
         return out;
-    }
-
-    private long seatHolders(UUID unit) {
-        return jdbc.sql("""
-                select count(distinct m.person_id) from membership m join role_def r on r.code = m.role_code
-                 where m.organization_id = :u and r.scope <> 'ALL' and 'APPROVE' = any(r.permissions)
-                   and m.valid_from <= now() and (m.valid_to is null or m.valid_to > now())""").param("u", unit).query(Long.class).single();
     }
 
     /** People holding the right through a grant at this unit, one above it, or across everything. A grant's narrower targets are not read here: it is a guide, and the decision itself checks them. */

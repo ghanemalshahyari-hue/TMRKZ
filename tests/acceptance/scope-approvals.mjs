@@ -146,10 +146,14 @@ try {
   await page.locator('td.scope-text', { hasText: 'نطاق شامل' }).first().waitFor({ timeout: 10000 });
 
   // ---- the matrix of a unit --------------------------------------------------------------------------------------------
-  await page.getByRole('tab', { name: 'مصفوفة الوحدات' }).click();
-  const matrix = page.getByTestId('unit-matrix');
-  await matrix.getByPlaceholder(/ابحث/).first().fill('إدارة المشاريع');
-  await matrix.locator('button', { hasText: 'إدارة المشاريع' }).first().click();
+  // «إدارة الصلاحيات والوحدات» (ADR-058): search the unit, then its «إدارة الصلاحيات» tab
+  await page.getByTestId('aw-open').click();
+  const workspace = page.getByTestId('access-workspace');
+  await workspace.getByLabel('ابحث عن وحدة بالاسم').fill('إدارة المشاريع');
+  await workspace.locator('.aw-find .aw-hits button', { hasText: 'إدارة المشاريع' }).first().click();
+  await workspace.getByRole('tab', { name: 'إدارة الصلاحيات' }).click();
+  const matrix = page.getByTestId('aw-matrix');
+  await matrix.waitFor();
   await page.waitForTimeout(800);
   const managerRow = matrix.locator(`tr[data-person="${managerId}"]`);
   ok((await managerRow.locator('[data-cell=UNIT_OPERATIONS_APPROVER]').innerText()) === 'وحدة واحدة', 'M01', 'the matrix shows the unit’s people and how many units a grant covers');

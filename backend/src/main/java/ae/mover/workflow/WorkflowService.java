@@ -153,7 +153,10 @@ public class WorkflowService {
     private List<SimulatedPlace> chainPlaces(String role, JsonNode chain, UUID org) {
         List<SimulatedPlace> out = new ArrayList<>();
         for (var u : places.chain(chain, org)) {
-            out.add(new SimulatedPlace(role, List.of(u.name()), false, false, places.holders(role, new PlaceResolver.Place(List.of(u.id()), false, false)).size()));
+            var st = places.station(role, u.id());
+            // a level with no approver of its own is signed by the nearest approver above whose grant covers it (ADR-058)
+            String name = st.via() == ae.mover.access.Stations.Via.INHERITED ? u.name() + " — يعتمدها معتمد «" + st.fromName() + "»" : u.name();
+            out.add(new SimulatedPlace(role, List.of(name), false, false, st.people().size()));
         }
         return out;
     }
@@ -173,7 +176,7 @@ public class WorkflowService {
             var p = org == null ? new PlaceResolver.Place(List.of(), true, false) : places.resolve(a, org, List.of());
             List<String> names = p.orgs().isEmpty() ? List.of() : jdbc.sql("select name from organization where id = any(string_to_array(:ids, ',')::uuid[]) order by name")
                     .param("ids", Db.ids(p.orgs())).query(String.class).list();
-            out.add(new SimulatedPlace(a.role(), names, p.anyOrg(), p.unresolved(), places.holders(a.role(), p).size()));
+            out.add(new SimulatedPlace(a.role(), names, p.anyOrg(), p.unresolved(), places.peopleAt(a.role(), p).size()));
         }
         return out;
     }

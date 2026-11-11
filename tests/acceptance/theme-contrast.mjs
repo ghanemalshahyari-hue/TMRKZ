@@ -16,7 +16,7 @@ const ok = (pass, id, what, detail = '') => {
   results.push({ id, pass: !!pass, what, detail: String(detail).slice(0, 600) });
   console.log(`${pass ? 'PASS' : 'FAIL'} ${id} — ${what}${detail ? ' · ' + String(detail).slice(0, 260) : ''}`);
 };
-const VIEWS = (process.env.VIEWS ?? 'home,map,org,requests,review,calendar,stationing,restationing,workflow,forms,permissions,permissions/matrix,settings,audit,reports,docs').split(',');
+const VIEWS = (process.env.VIEWS ?? 'home,map,org,requests,review,calendar,stationing,restationing,workflow,forms,permissions,permissions/policy,settings,audit,reports,docs').split(',');
 
 /** In the page: text whose contrast on what is behind it is under WCAG AA. */
 function audit() {
@@ -129,10 +129,12 @@ for (const theme of ['dark', 'light']) {
     await page.goto(UI + '/#' + view);
     if (view.includes('/')) await page.reload(); // a tab is read when the page opens
     await page.waitForTimeout(1500);
-    if (view === 'permissions/matrix') {
-      const matrix = page.getByTestId('unit-matrix');
-      await matrix.getByPlaceholder(/ابحث/).first().fill(process.env.MATRIX_UNIT ?? 'عمليات');
-      await matrix.locator('.tree-note, button').filter({ hasText: process.env.MATRIX_UNIT ?? 'عمليات' }).first().click();
+    if (view === 'permissions') {
+      // «إدارة الصلاحيات والوحدات» (ADR-058): one unit's matrix
+      const workspace = page.getByTestId('access-workspace');
+      await workspace.getByLabel('ابحث عن وحدة بالاسم').fill(process.env.MATRIX_UNIT ?? 'عمليات');
+      await workspace.locator('.aw-find .aw-hits button').first().click();
+      await workspace.getByRole('tab', { name: 'إدارة الصلاحيات' }).click();
       await page.waitForTimeout(1500);
     }
     const name = view.replace('/', '-');

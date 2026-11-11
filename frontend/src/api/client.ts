@@ -289,6 +289,179 @@ export type SiteOccupants = { stationed: { orgId: string; orgName: string }[]; l
 export type AccessOfferRow = { code: string; name: string; audience: string | null };
 
 export type UnitOpsRoute = { id: string; name: string; from: string; to: string; days: number[]; active: boolean; targets: { id: string; name: string }[] };
+/** A request's approval stamps (ADR-055): who approved each stamped stage, in which capacity and unit, when. */
+export type RestationingStamp = { name: string; position: string | null; role: string | null; unit: string | null; at: string; onBehalf: boolean };
+export type RestationingStamps = {
+  number: string;
+  state: string;
+  requestingUnit: string | null;
+  mainUnit: string | null;
+  unitOperations: RestationingStamp | null;
+  final: RestationingStamp | null;
+};
+/** «مركز الدعم» (ADR-053). */
+export type SupportCategory = 'SIGN_IN' | 'PERMISSIONS' | 'REQUESTS' | 'MAP' | 'STATIONING' | 'DATA' | 'NOTIFICATIONS' | 'PERFORMANCE' | 'OTHER';
+export type SupportPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+export type SupportStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_USER' | 'RESOLVED' | 'CLOSED';
+export type SupportCaseRow = {
+  id: string;
+  number: string;
+  title: string;
+  category: SupportCategory;
+  priority: SupportPriority;
+  status: SupportStatus;
+  screen: string | null;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  requesterName?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  responseDue: string;
+  firstResponseAt: string | null;
+  resolvedAt: string | null;
+  closedAt: string | null;
+};
+export type SupportMessage = { id: string; author: string; fromSupport: boolean; internal: boolean; body: string; createdAt: string };
+export type SupportCase = SupportCaseRow & {
+  requesterId: string;
+  requesterNo?: string;
+  clientInfo?: Record<string, string> | null;
+  messages: SupportMessage[];
+  events?: { kind: string; actor: string | null; at: string; detail: Record<string, unknown> | null }[];
+  staff: boolean;
+};
+export type SupportSeat = { id: string; personId: string; displayName: string; employeeNo: string; role: 'AGENT' | 'SUPERVISOR'; grantedAt: string; openCases: number };
+/** «المساعد الذكي» (ADR-056): the model's answer from the cited guides, or the guides alone (GUIDE) when it is off or away. */
+export type AssistantAnswer = {
+  mode: 'MODEL' | 'GUIDE';
+  answer: string | null;
+  model: string | null;
+  degraded: 'OFF' | 'BUSY' | 'UNREACHABLE' | null;
+  sources: { resource: string; title: string; screen: string | null; snippet: string }[];
+};
+/** «دليل تمركز» (ADR-054): a verified knowledge document, cited by its resource. */
+export type HelpHit = { resource: string; title: string; type: string; screen: string | null; snippet?: string; score?: number };
+export type HelpDoc = HelpHit & { verified: string; origin: string; body: string };
+/** One answer of the desktop notification feed (ADR-050). */
+export type DesktopFeedItem = { seq: number; kind: string; title: string; body: string; url: string; requireInteraction: boolean; createdAt: string };
+export type DesktopFeed = { personId: string; latestSeq: number; items: DesktopFeedItem[] };
+/** The HR card shown by «إضافة مستخدم» before saving (ADR-049). */
+export type UnitMemberCard = {
+  personId: string;
+  employeeNo: string;
+  displayName: string;
+  userId: string | null;
+  positionTitle: string | null;
+  jobTitle: string | null;
+  hrStatus: string | null;
+  unitName: string | null;
+  inUnit: boolean;
+  acting: boolean;
+};
+
+export type WorkspaceSummary = { units: number; people: number; active: number; pageSize: number; global: boolean };
+export type WorkspaceNode = { id: string; name: string; code: string | null; main: boolean; childCount: number; peopleCount: number };
+export type WorkspaceHit = { id: string; name?: string; code?: string | null; displayName?: string; employeeNo?: string; active?: boolean; unit?: { id: string; name: string }; path: string };
+export type WorkspaceUnit = {
+  id: string;
+  name: string;
+  code: string | null;
+  level: number | null;
+  main: boolean;
+  parent: { id: string; name: string } | null;
+  managers: string[];
+  people: number;
+  active: number;
+  children: number;
+  path: string;
+  inherited: { code: string; name: string; scope: string; since: string; grantedBy: string | null }[];
+  unitRoles: { code: string; name: string; on: boolean; lock: string | null }[];
+  providers: string[];
+  myRights: string[];
+};
+export type AccessRightDef = { key: string; label: string; byDefault: boolean };
+export type DutyPermit = {
+  id: string;
+  person: { id: string; displayName: string; employeeNo: string };
+  organization: { id: string; name: string };
+  role: { code: string; name: string };
+  validFrom: string;
+  validTo: string;
+  reason: string;
+  issuedBy: string | null;
+  issuedAt: string;
+  activatedAt: string | null;
+  endReason: string | null;
+  state: 'ISSUED' | 'ACTIVATED' | 'ACTIVE' | 'ENDED' | 'EXPIRED';
+};
+export type AccountCard = {
+  id: string;
+  displayName: string;
+  employeeNo: string;
+  username: string | null;
+  source: 'HR' | 'LOCAL';
+  hrStatus: string;
+  accessDisabled: boolean;
+  accessDisabledReason: string | null;
+  hrUnavailable: string | null;
+  linked: boolean;
+  system: boolean;
+  createdAt: string;
+  units: { id: string; name: string; how: 'HR' | 'ADDED' | 'ACTING' }[];
+  grants: { id: string; role: { code: string; name: string }; system: boolean; organization: string; validTo: string | null; delegated: boolean; rights: string[] | null }[];
+  permits: DutyPermit[];
+  history: { at: string; action: string; by: string | null; reason: string | null }[];
+  systemRoles: { code: string; name: string }[];
+  canEdit: boolean;
+  canRetire: boolean;
+  canEditProfile: boolean;
+};
+export type ProvidingDepartment = { code: string; name: string; providers: number };
+export type WorkspaceColumn = { code: string; name: string; mode: 'CHECK' | 'ASSIGN' | 'ADMIN' | 'AVAIL'; finalOnly: boolean; lock: string | null };
+export type WorkspaceCell = {
+  direct: { id: string; scopeText: string; validTo: string; all: boolean; units: number } | null;
+  inherited: 'UNIT' | 'SEAT' | null;
+  temporary: boolean;
+};
+export type WorkspacePerson = {
+  id: string;
+  displayName: string;
+  employeeNo: string;
+  active: boolean;
+  added: boolean;
+  acting: boolean;
+  withoutHr: boolean;
+  lock: string | null;
+  hrUnavailable?: string | null;
+  accessDisabled?: boolean;
+  cells: Record<string, WorkspaceCell>;
+  effective: number;
+  grants: GrantView[];
+};
+export type WorkspaceMatrix = { total: number; page: number; pageSize: number; columns: WorkspaceColumn[]; people: WorkspacePerson[]; providers: string[] };
+export type StagedOp = { personId: string; roleCode: string; action: 'GRANT' | 'REVOKE' };
+export type BatchPreview = {
+  fingerprint: string;
+  grants: number;
+  revokes: number;
+  people: number;
+  ok: boolean;
+  wholeUnit: boolean;
+  lines: { personId: string; person: string; roleCode: string; role: string; action: 'GRANT' | 'REVOKE'; problem: string | null }[];
+};
+export type WorkspaceHistoryRow = {
+  id: number;
+  at: string;
+  action: string;
+  by: string | null;
+  person: string | null;
+  employeeNo: string | null;
+  role: string | null;
+  reference: string | null;
+  reason: string | null;
+  grants: string | null;
+  revokes: string | null;
+};
 
 export type GrantBody = {
   personId: string;
@@ -298,6 +471,8 @@ export type GrantBody = {
   validFrom: string;
   validTo?: string | null;
   scope: GrantScopeInput;
+  /** for a role that manages access: its separate rights (ADR-059) */
+  rights?: string[];
 };
 
 export const api = {
@@ -357,7 +532,14 @@ export const api = {
     get<{ units: number }>('/access/scope-preview' + query({ organizationId, descendants, levels: levels?.length ? levels.join(',') : undefined })),
   grantRoots: () => get<OrgBranch[]>('/access/grant-roots'),
   unitMatrix: (organizationId: string, q?: string, page?: number) =>
-    get<{ total: number; people: { id: string; displayName: string; employeeNo: string; grants: GrantView[] }[] }>('/access/unit-matrix' + query({ organizationId, q, page })),
+    get<{ total: number; people: { id: string; displayName: string; employeeNo: string; added?: boolean; acting?: boolean; withoutHr?: boolean; grants: GrantView[] }[] }>(
+      '/access/unit-matrix' + query({ organizationId, q, page }),
+    ),
+  /** «إضافة مستخدم» (ADR-049): the HR card of one person, by employee number or User ID, inside the manager's reach. */
+  unitMemberLookup: (organizationId: string, key: string) => get<UnitMemberCard>('/access/unit-members/lookup' + query({ organizationId, key })),
+  addUnitMember: (body: { organizationId: string; personId?: string | null; userId?: string | null; displayName?: string | null }) =>
+    post<{ personId: string; created: boolean; already: boolean }>('/access/unit-members', body),
+  endUnitMember: (personId: string, organizationId: string, reason: string) => post<void>(`/access/unit-members/${personId}/end`, { organizationId, reason }),
   replaceGrant: (id: string, grant: GrantBody, reason?: string) =>
     post<{ id: string; scopeText: string }>(`/access/grants/${id}/replace`, { grant, reason }),
   unitOpsRoutes: (commandId: string) => get<UnitOpsRoute[]>('/access/unit-ops-routes' + query({ commandId })),
@@ -368,6 +550,36 @@ export const api = {
   removeFyiMain: (id: string) => del<void>(`/access/fyi-mains/${id}`),
   explainAccess: (q: { personId: string; organizationId?: string; siteId?: string; resourceId?: string }) =>
     get<AccessExplain>('/access/explain' + query(q)),
+
+  // «إدارة الصلاحيات والوحدات», TNQL's access workspace (ADR-058)
+  workspaceSummary: () => get<WorkspaceSummary>('/access/workspace/summary'),
+  workspaceTree: (parent?: string) => get<WorkspaceNode[]>('/access/workspace/tree' + query({ parent })),
+  workspaceSearch: (q: string, kind: 'UNITS' | 'PEOPLE') => get<WorkspaceHit[]>('/access/workspace/search' + query({ q, kind })),
+  workspaceUnit: (id: string) => get<WorkspaceUnit>(`/access/workspace/units/${id}`),
+  workspaceUnitGrant: (id: string, roleCode: string, on: boolean, reason?: string) =>
+    put<WorkspaceUnit>(`/access/workspace/units/${id}/inherited`, { roleCode, on, reason }),
+  workspaceMatrix: (id: string, q?: string, page?: number, role?: string) =>
+    get<WorkspaceMatrix>(`/access/workspace/units/${id}/matrix` + query({ q, page, role })),
+  workspacePreview: (id: string, ops: StagedOp[]) => post<BatchPreview>(`/access/workspace/units/${id}/preview`, { ops }),
+  workspaceApply: (id: string, ops: StagedOp[], fingerprint: string, wholeUnit = false) =>
+    post<{ reference: string; applied: number; affected: number }>(`/access/workspace/units/${id}/apply`, { ops, fingerprint, wholeUnit }),
+  // ADR-059: rights of an access manager, duty permits, the account card, providing departments
+  rightsCatalogue: () => get<AccessRightDef[]>('/access/rights-catalogue'),
+  unitPermits: (id: string) => get<DutyPermit[]>(`/access/workspace/units/${id}/permits`),
+  issuePermit: (body: { personId: string; organizationId: string; roleCode: string; validFrom?: string; validTo: string; reason: string }) =>
+    post<DutyPermit>('/access/permits', body),
+  endPermit: (id: string, reason?: string) => post<DutyPermit>(`/access/permits/${id}/end`, { reason }),
+  myPermits: () => get<DutyPermit[]>('/me/permits'),
+  activatePermit: (id: string) => post<DutyPermit>(`/me/permits/${id}/activate`, {}),
+  endMyPermit: (id: string) => post<DutyPermit>(`/me/permits/${id}/end`, {}),
+  accountCard: (id: string) => get<AccountCard>(`/access/workspace/people/${id}`),
+  setAccountActive: (id: string, active: boolean, reason?: string) => put<AccountCard>(`/access/workspace/people/${id}/active`, { active, reason }),
+  setAccountProfile: (id: string, displayName: string) => put<AccountCard>(`/access/workspace/people/${id}/profile`, { displayName }),
+  retireAccount: (id: string, reason: string) => post<AccountCard>(`/access/workspace/people/${id}/retire`, { reason }),
+  departments: () => get<ProvidingDepartment[]>('/access/workspace/departments'),
+  addDepartment: (code: string, name: string) => post<ProvidingDepartment[]>('/access/workspace/departments', { code, name }),
+  setProvider: (id: string, roleCode: string, on: boolean) => put<string[]>(`/access/workspace/units/${id}/providers`, { roleCode, on }),
+  workspaceHistory: (id: string, page?: number) => get<{ total: number; page: number; rows: WorkspaceHistoryRow[] }>(`/access/workspace/units/${id}/history` + query({ page })),
 
   // facilities & map
   sites: () => get<Site[]>('/sites'),
@@ -589,6 +801,29 @@ export const api = {
   kpis: (from: string, to: string) => get<Kpis>('/reports/kpis' + query({ from, to })),
   createExport: (status: string | undefined, key: string) => post<ExportJob>('/exports', { kind: 'REQUESTS_CSV', filter: status ? { status } : {} }, key),
   notifications: () => get<Notification[]>('/notifications'),
+  // «مركز الدعم» and «لوحة الدعم» (ADR-053)
+  supportOpen: (body: { title: string; category: SupportCategory; priority: SupportPriority; body: string; screen?: string | null; clientInfo?: Record<string, string> }) =>
+    post<{ id: string; number: string }>('/support/cases', body),
+  supportMine: () => get<SupportCaseRow[]>('/support/cases'),
+  supportCase: (id: string) => get<SupportCase>(`/support/cases/${id}`),
+  supportReply: (id: string, body: string) => post<void>(`/support/cases/${id}/messages`, { body }),
+  supportConfirm: (id: string, solved: boolean, note?: string) => post<void>(`/support/cases/${id}/confirm`, { solved, note }),
+  supportQueue: (filter: string) => get<SupportCaseRow[]>('/support/console/cases' + query({ filter })),
+  supportCounts: () => get<Record<string, number>>('/support/console/counts'),
+  supportAct: (id: string, body: { action: string; assigneeId?: string; priority?: SupportPriority; body?: string; internal?: boolean }) =>
+    post<void>(`/support/console/cases/${id}/act`, body),
+  supportSeats: () => get<SupportSeat[]>('/support/seats'),
+  supportGrantSeat: (personId: string, role: 'AGENT' | 'SUPERVISOR') => post<{ id: string }>('/support/seats', { personId, role }),
+  supportEndSeat: (id: string, reason: string) => post<void>(`/support/seats/${id}/end`, { reason }),
+  // «المساعد الذكي» (ADR-056)
+  assistantStatus: () => get<{ enabled: boolean; model: string | null; reachable: boolean }>('/assistant/status'),
+  assistantAsk: (question: string, screen?: string | null) => post<AssistantAnswer>('/assistant/ask', { question, screen }),
+  // «دليل تمركز» (ADR-054)
+  helpSearch: (q: string) => get<HelpHit[]>('/help/search' + query({ q })),
+  helpIndex: () => get<HelpHit[]>('/help/index'),
+  helpDoc: (resource: string) => get<HelpDoc>('/help/doc' + query({ resource })),
+  /** Desktop notifications (ADR-050): unread items after the cursor, with lock-screen-safe text; no cursor = the current number. */
+  desktopFeed: (since?: number) => get<DesktopFeed>('/notifications/desktop-feed' + query({ since })),
   markRead: (id: string) => post<void>(`/notifications/${id}/read`),
 
   // Stationing V3 re-stationing requests (ADR-033)
@@ -606,6 +841,8 @@ export const api = {
     post<RestationingRequest>('/restationing-requests', { requestingUnitId, content, purpose }),
   editRestationing: (id: string, content: RestationingContent) => put<RestationingRequest>(`/restationing-requests/${id}/content`, content),
   restationingChecks: (id: string) => get<RestationingChecks>(`/restationing-requests/${id}/checks`),
+  /** «ختم عمليات الوحدة» and «ختم الاعتماد النهائي» (ADR-055): drawn from the recorded approvals; visual only. */
+  restationingStamps: (id: string) => get<RestationingStamps>(`/restationing-requests/${id}/stamps`),
   submitRestationing: (id: string, reason?: string) => post<RestationingRequest>(`/restationing-requests/${id}/submit`, { reason }),
   decideRestationing: (id: string, decision: 'APPROVE' | 'RETURN' | 'REJECT', reason?: string) =>
     post<RestationingRequest>(`/restationing-requests/${id}/decision`, { decision, reason }),

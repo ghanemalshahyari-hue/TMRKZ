@@ -1,0 +1,51 @@
+{
+  "okf_version": "0.2",
+  "bundle": "test",
+  "documents": [
+    {
+      "path": "how-to/good.md",
+      "resource": "tmrkz://okf/how-to/good",
+      "sha256": "d110d4dc7b9b3448041d98844b3179dab45199b135a5a98f8b809f60824d2d41",
+      "provenance": {
+        "origin": "test",
+        "review_state": "verified-current"
+      }
+    },
+    {
+      "path": "how-to/tampered.md",
+      "resource": "tmrkz://okf/how-to/tampered",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "provenance": {
+        "origin": "test",
+        "review_state": "verified-current"
+      }
+    },
+    {
+      "path": "how-to/draft.md",
+      "resource": "tmrkz://okf/how-to/draft",
+      "sha256": "0b5edde2ecc4c1070a7bcb08266d615644fee9f930dbf0d1a890981965de2238",
+      "provenance": {
+        "origin": "test",
+        "review_state": "verified-current"
+      }
+    },
+    {
+      "path": "how-to/unverified.md",
+      "resource": "tmrkz://okf/how-to/unverified",
+      "sha256": "f7b780bb7b978115dd1075a2088adad7e31e80b51dcf7c77a2142098c6c78244",
+      "provenance": {
+        "origin": "test",
+        "review_state": "unverified-draft"
+      }
+    },
+    {
+      "path": "how-to/missing.md",
+      "resource": "tmrkz://okf/how-to/missing",
+      "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "provenance": {
+        "origin": "test",
+        "review_state": "verified-current"
+      }
+    }
+  ]
+}

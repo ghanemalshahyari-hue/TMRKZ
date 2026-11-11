@@ -83,6 +83,8 @@ export type Me = {
   summaryOnly: boolean;
   grants: Grant[];
   signInMethod: 'PROVIDER' | 'DIRECTORY';
+  /** «لوحة الدعم» (ADR-053): the person's support seat, if any. */
+  supportSeat?: 'AGENT' | 'SUPERVISOR' | null;
   serverTime: string;
   timezone: string;
 };
@@ -369,7 +371,7 @@ export type FormField = {
 };
 export type FormSchema = { fields: FormField[] };
 
-export type OrgFrom = 'BY_SCOPE' | 'REQUEST_ORG' | 'RESOURCE_ORG' | 'ANY' | 'UP' | 'AT_LEVEL' | 'FIXED' | 'RESPONSIBLE';
+export type OrgFrom = 'BY_SCOPE' | 'REQUEST_ORG' | 'RESOURCE_ORG' | 'ANY' | 'UP' | 'AT_LEVEL' | 'FIXED' | 'RESPONSIBLE' | 'PROVIDER';
 /** A role at a place, found per request (ADR-041). {@code orgName} only keeps the name on screen. */
 export type WfPlace = { role: string; orgFrom: OrgFrom; levelsUp?: number; level?: number; orgId?: string; orgName?: string; responsibility?: string };
 export type FlowNodeType = 'start' | 'approval' | 'decision' | 'notify' | 'parallel' | 'join' | 'end_approved' | 'end_rejected';
@@ -806,6 +808,8 @@ export type Notification = {
   title: string;
   body: string;
   requestId: string | null;
+  /** A page of its own, e.g. #support/<id> (V35). */
+  link?: string | null;
   createdAt: string;
   readAt: string | null;
 };
@@ -987,6 +991,8 @@ export type GrantView = {
   active: boolean;
   grantedBy: Ref | null;
   endedReason: string | null;
+  rights?: string[] | null;
+  delegated?: boolean;
 };
 export type GrantScopeInput = {
   mode: 'ROLE' | 'CUSTOM';

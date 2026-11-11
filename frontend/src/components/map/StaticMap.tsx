@@ -5,6 +5,8 @@ import type { MapFeature, MapPackage } from '../../api/types';
 import type { MapMode } from '../../lib/mapState';
 import { MapCanvas, featureBounds, type FitTarget } from './MapCanvas';
 import { Legend } from './MapPanels';
+import { OfflineFeatureMap } from './OfflineFeatureMap';
+import { installedPackage } from './maplibre';
 
 /**
  * A map of a fixed set of sites (a request's sites, a calendar day). It frames that set when the set changes, uses the
@@ -30,8 +32,11 @@ export function StaticMap({
   const [mode, setMode] = useState<MapMode>('availability');
   const [background, setBackground] = useState<MapPackage | null>(null);
   const [fit, setFit] = useState<FitTarget | null>(null);
+  // the installed offline package (ADR-036) first; the Leaflet canvas only with an uploaded background and no package
+  const [offline, setOffline] = useState<boolean | null>(null);
   useEffect(() => {
     let live = true;
+    installedPackage().then((p) => live && setOffline(!!p.packageId));
     api
       .mapContext()
       .then((c) => live && setBackground(c.backgrounds.find((b) => b.kind === 'ROADS') ?? c.backgrounds[0] ?? null))
@@ -48,6 +53,32 @@ export function StaticMap({
     setFit({ bounds: [[b.getSouth(), b.getWest()], [b.getNorth(), b.getEast()]], key: Date.now(), maxZoom: 16 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+  const overlays = (
+    <>
+      {modeToggle && (
+        <div className="map-toolbar">
+          <div className="map-mode" role="radiogroup" aria-label="وضع الألوان">
+            <button role="radio" aria-checked={mode === 'availability'} className={mode === 'availability' ? 'active' : ''} onClick={() => setMode('availability')}>
+              الإتاحة
+            </button>
+            <button role="radio" aria-checked={mode === 'requests'} className={mode === 'requests' ? 'active' : ''} onClick={() => setMode('requests')}>
+              حالة الطلبات
+            </button>
+          </div>
+        </div>
+      )}
+      <Legend mode={mode} stale={false} />
+      {caption && <div className="map-caption">{caption}</div>}
+    </>
+  );
+  if (offline == null) return <div className={'offline-feature-map ' + (className ?? '')} aria-busy="true" />;
+  if (offline || !background) {
+    return (
+      <OfflineFeatureMap className={className} features={features} selectedSiteId={selectedSiteId} onSelect={onSelect} mode={mode} label={label}>
+        {overlays}
+      </OfflineFeatureMap>
+    );
+  }
   return (
     <MapCanvas className={className} features={features} selectedSiteId={selectedSiteId} onSelect={onSelect} mode={mode} background={background} fitTarget={fit} label={label}>
       {modeToggle && (

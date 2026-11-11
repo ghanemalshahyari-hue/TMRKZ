@@ -363,6 +363,9 @@ public class OrganizationService {
                    select m.person_id, true from membership m
                    where (m.valid_to is null or m.valid_to > now()) and m.organization_id = any(string_to_array(:dir_orgs, ',')::uuid[])
                    union all
+                   select u.person_id, true from unit_member u
+                   where u.ended_at is null and u.organization_id = any(string_to_array(:dir_orgs, ',')::uuid[])
+                   union all
                    select m.person_id, false from membership m
                    where (m.valid_to is null or m.valid_to > now())
                      and (m.site_scope_id = any(string_to_array(:dir_sites, ',')::uuid[])

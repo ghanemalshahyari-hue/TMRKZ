@@ -27,6 +27,8 @@ export const ICONS: Record<string, string> = {
   "boundary": "<path d=\"M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3\"/><path d=\"m9 15 1.5-4.5L15 9l-1.5 4.5L9 15Z\"/>",
   "user": "<circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6\"/>",
   "logout": "<path d=\"M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3\"/><path d=\"M10 17 5 12l5-5M5 12h11\"/>",
+  "eye": "<path d=\"M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/>",
+  "edit": "<path d=\"M4 20h4L19 9l-4-4L4 16v4Z\"/><path d=\"m13.5 6.5 4 4\"/>",
   "menu": "<path d=\"M4 7h16M4 12h16M4 17h16\"/>",
   "chevron": "<path d=\"m6 9 6 6 6-6\"/>",
   "units": "<rect x=\"9\" y=\"3\" width=\"6\" height=\"5\" rx=\"1\"/><rect x=\"3\" y=\"16\" width=\"6\" height=\"5\" rx=\"1\"/><rect x=\"15\" y=\"16\" width=\"6\" height=\"5\" rx=\"1\"/><path d=\"M12 8v4M6 16v-2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2\"/>",
@@ -34,4 +36,8 @@ export const ICONS: Record<string, string> = {
   "target": "<circle cx=\"12\" cy=\"12\" r=\"8\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3\"/>",
   "lock": "<rect x=\"5\" y=\"11\" width=\"14\" height=\"10\" rx=\"2\"/><path d=\"M8 11V8a4 4 0 0 1 8 0v3\"/>",
   "folder": "<path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z\"/>",
+  // «مركز الدعم» (ADR-053): drawn for TMRKZ in the same stroke style
+  "help": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14\"/><path d=\"M12 17.2v.1\"/>",
+  "robot": "<rect x=\"4\" y=\"8\" width=\"16\" height=\"12\" rx=\"3\"/><path d=\"M12 4v4M9 13v1M15 13v1M9 17h6M2 13v3M22 13v3\"/><circle cx=\"12\" cy=\"3.5\" r=\"1\"/>",
+  "headset": "<path d=\"M4 14v-2a8 8 0 0 1 16 0v2\"/><rect x=\"3\" y=\"14\" width=\"4\" height=\"6\" rx=\"1.5\"/><rect x=\"17\" y=\"14\" width=\"4\" height=\"6\" rx=\"1.5\"/><path d=\"M19 20a3 3 0 0 1-3 2h-3\"/>",
 };

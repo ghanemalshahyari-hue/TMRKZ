@@ -30,6 +30,9 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     restart: unless-stopped
+    # the assistant's model server on this host (ADR-056); in the isolated network TMRKZ_AI_BASE_URL names the real one
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       db:
         condition: service_healthy
@@ -56,6 +59,12 @@ services:
       TMRKZ_OIDC_LINK_KEY: ${TMRKZ_OIDC_LINK_KEY:-DOMAIN_ACCOUNT}
       # The two lasting platform accounts (Keycloak local users with the realm role tmrkz-platform; ops/platform-accounts.sh)
       TMRKZ_PLATFORM_ACCOUNTS: ${TMRKZ_PLATFORM_ACCOUNTS:-admin,developer}
+      # «المساعد الذكي» (ADR-056), as TNQL: an OpenAI-compatible model server the site runs (Ollama on a development PC, the
+      # organisation's own server in the isolated network). Off unless .env turns it on; the guide answers without it.
+      TMRKZ_AI_ENABLED: ${TMRKZ_AI_ENABLED:-false}
+      TMRKZ_AI_BASE_URL: ${TMRKZ_AI_BASE_URL:-http://host.docker.internal:11434/v1}
+      TMRKZ_AI_MODEL: ${TMRKZ_AI_MODEL:-qwen2.5:7b}
+      TMRKZ_AI_API_KEY: ${TMRKZ_AI_API_KEY:-}
       # Manual sign-in: username and password verified by the same directory (LDAP bind over TLS), as in TNQL.
       LDAP_URL: ${LDAP_URL:?set LDAP_URL to the enterprise directory (ldaps://... or ldap://... with LDAP_START_TLS=true)}
       LDAP_START_TLS: ${LDAP_START_TLS:-true}
@@ -191,10 +200,36 @@ services:
       keycloak:
         condition: service_started
     ports:
-      - "${MOVER_HTTP_PORT:-8088}:80"
+      # with https (profile tls) set MOVER_HTTP_BIND=127.0.0.1 so the plain port is reachable from this host only
+      - "${MOVER_HTTP_BIND:-0.0.0.0}:${MOVER_HTTP_PORT:-8088}:80"
     # The offline map root (ops/map-package/install_package.py): only its current/ package is served under /map-data/.
     volumes:
       - ${TMRKZ_MAP_ROOT:-./map-runtime}:/srv/tmrkz-map:ro
+    networks: [internal]
+
+  # https entry point, as TNQL's proxy (ADR-051): runs only with COMPOSE_PROFILES=tls in .env. It reuses the web image's nginx
+  # (no further image in the offline bundle) with ops/tls/proxy.conf.template, and reads server.crt / server.key from
+  # TMRKZ_TLS_DIR (ops/tls/make-csr.sh, ops/tls/install-cert.sh). Plain http on TMRKZ_HTTP_REDIRECT_PORT only redirects.
+  proxy:
+    image: mover/web:1.0.0
+    profiles: [tls]
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    environment:
+      TMRKZ_HTTPS_PORT: ${TMRKZ_HTTPS_PORT:-443}
+    ports:
+      - "${TMRKZ_HTTPS_PORT:-443}:8443"
+      - "${TMRKZ_HTTP_REDIRECT_PORT:-80}:8080"
+    volumes:
+      - ./ops/tls/proxy.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${TMRKZ_TLS_DIR:-./ops/tls/private}:/etc/tmrkz-tls:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nginx -t -q && pidof nginx >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks: [internal]
 
 volumes:

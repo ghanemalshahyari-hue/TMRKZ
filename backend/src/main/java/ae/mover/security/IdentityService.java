@@ -92,6 +92,10 @@ public class IdentityService {
             link(m.person(), id.issuer(), id.subject(), "ENTERPRISE_KEY", null);
             return m.person();
         }
+        UUID local = localUser(id);
+        if (local != null) {
+            return local;
+        }
         UUID boot = bootstrap(id);
         if (boot != null) {
             return boot;
@@ -137,6 +141,38 @@ public class IdentityService {
             return new Match(null, "ALREADY_LINKED", "سجل الموارد البشرية مرتبط بحساب آخر؛ أُحيل الدخول إلى مسؤول الصلاحيات.");
         }
         return new Match(person, null, null);
+    }
+
+    /**
+     * A User ID an access manager added without HR (ADR-049, «إضافة مستخدم»): the first sign-in under exactly that directory
+     * login links to it. The password was verified by the directory or the identity provider before this point, and the
+     * account holds only what an access manager granted it. An HR match always comes first; a second identity claiming the
+     * same account goes to the review list.
+     */
+    private UUID localUser(OidcClient.Identity id) {
+        String login = ae.mover.authz.UnitMemberService.normalLogin(id.username());
+        if (login == null) {
+            return null;
+        }
+        Map<String, Object> p = jdbc.sql("""
+                select id, display_name from person
+                where source = 'LOCAL' and status = 'ACTIVE' and not bootstrap and lower(username) = :l and employee_no = :e""")
+                .param("l", login).param("e", "USER-" + login).query().listOfRows().stream().findFirst().orElse(null);
+        if (p == null) {
+            return null;
+        }
+        UUID person = (UUID) p.get("id");
+        boolean taken = jdbc.sql("select count(*) from identity_link where person_id = :p and issuer = :i")
+                .param("p", person).param("i", id.issuer()).query(Integer.class).single() > 0;
+        if (taken) {
+            throw refuse(id, "ALREADY_LINKED", "رقم المستخدم مرتبط بحساب دخول آخر؛ أُحيل الدخول إلى مسؤول الصلاحيات.");
+        }
+        link(person, id.issuer(), id.subject(), "LOCAL_USER", null);
+        // the name typed by the manager stays; a login used as a placeholder takes the directory's display name
+        if (login.equals(p.get("display_name")) && id.displayName() != null && !id.displayName().isBlank()) {
+            jdbc.sql("update person set display_name = :n where id = :p").param("n", id.displayName().trim()).param("p", person).update();
+        }
+        return person;
     }
 
     /**

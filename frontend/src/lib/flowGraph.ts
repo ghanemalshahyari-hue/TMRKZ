@@ -39,6 +39,7 @@ export const PLACE_KINDS: { value: OrgFrom; label: string; hint: string }[] = [
   { value: 'FIXED', label: 'جهة محددة', hint: 'كل الطلبات تمر عليها' },
   { value: 'RESPONSIBLE', label: 'الجهة المسؤولة عن…', hint: 'حسب قواعد المسؤوليات' },
   { value: 'RESOURCE_ORG', label: 'الجهة المسؤولة عن الموقع', hint: 'مسؤول الموقع المطلوب' },
+  { value: 'PROVIDER', label: 'الوحدة المزوّدة (معتمد التوفر)', hint: 'الوحدات المزوّدة لإدارة هذا الدور في وحدة مقدم الطلب الرئيسية' },
   { value: 'ANY', label: 'أي جهة', hint: 'أي شخص يملك الدور' },
 ];
 

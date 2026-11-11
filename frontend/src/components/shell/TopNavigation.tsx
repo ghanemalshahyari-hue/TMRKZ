@@ -199,7 +199,11 @@ function Notifications() {
       }
       load();
     }
-    if (n.requestId) {
+    // a notification with a page of its own (a support case, V35) opens it; a request's opens the request list
+    if (n.link) {
+      setOpen(false);
+      location.hash = n.link;
+    } else if (n.requestId) {
       setOpen(false);
       location.hash = 'requests';
     }
@@ -207,6 +211,9 @@ function Notifications() {
   return (
     <div className="notif-wrap">
       <ThemeToggle />
+      <a className="tz-icon-btn" href="#support" aria-label="مركز الدعم" title="مركز الدعم" data-testid="help-button">
+        <Icon name="help" />
+      </a>
       <button className="tz-icon-btn" aria-label={'الإشعارات' + (unread ? ' — ' + unread + ' غير مقروءة' : '')} onClick={() => setOpen((o) => !o)}>
         <Icon name="bell" />
         {unread > 0 && <span className="notif-badge">{unread}</span>}

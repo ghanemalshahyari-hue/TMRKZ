@@ -1,0 +1,31 @@
+# TMRKZ's demo HR source, as TNQL's «mover-oracle-hr» (owner, 11 Nov 2026; ADR-057): a real Oracle Database Free with 100 %
+# synthetic data (ops/hr-demo/build_oracle_hr.py, TNQL's builder). On the one application's internal network, so the backend
+# reaches it as tmrkz-hr-demo-oracle:1521/FREEPDB1; on this host only at 127.0.0.1:1531. Never in production.
+services:
+  oracle:
+    image: gvenzl/oracle-free:23-slim
+    container_name: tmrkz-hr-demo-oracle
+    restart: unless-stopped
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_SYSTEM_PASSWORD:?run ops/hr-demo/up.sh}
+      APP_USER: ${ORACLE_HR_SCHEMA:?run ops/hr-demo/up.sh}
+      APP_USER_PASSWORD: ${ORACLE_HR_SCHEMA_PASSWORD:?run ops/hr-demo/up.sh}
+    ports:
+      - "127.0.0.1:1531:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 60s
+    networks: [tmrkz]
+
+volumes:
+  oracle-data:
+
+networks:
+  tmrkz:
+    external: true
+    name: tmrkz-mover_internal

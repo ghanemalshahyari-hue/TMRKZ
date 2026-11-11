@@ -5,7 +5,7 @@ import { STATIONING_V3_ENABLED } from './stationingV3';
 /** The chart studio's page is a rollout of its own. Only a build that says «false» leaves it out (docker-compose defaults to that). */
 export const FLOW_STUDIO_UI_ENABLED = import.meta.env.VITE_FLOW_STUDIO !== 'false';
 
-export type View = 'home' | 'newRequest' | 'allRequests' | 'posture' | 'siteSetup' | 'stationing' | 'restationing' | 'stationingPolicy' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs' | 'requestAccess' | 'accessInbox';
+export type View = 'home' | 'newRequest' | 'allRequests' | 'posture' | 'siteSetup' | 'stationing' | 'restationing' | 'stationingPolicy' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs' | 'requestAccess' | 'accessInbox' | 'support' | 'supportConsole';
 
 /**
  * The views, in the prototype NAV's order (the last entry replaces «حزمة البناء»). #stationing is now «المواقع», the
@@ -39,6 +39,9 @@ export const NAV: [View, string, string][] = [
   ['settings', 'filter', 'إعدادات النظام'],
   ['audit', 'clock', 'سجل الإجراءات'],
   ['docs', 'download', 'التوثيق والتشغيل'],
+  // «مركز الدعم» for everyone, «لوحة الدعم» for support seats (ADR-053)
+  ['support', 'help', 'مركز الدعم'],
+  ['supportConsole', 'headset', 'لوحة الدعم'],
 ];
 
 /** Selection carried from the map into the request form (validated again by the server). */

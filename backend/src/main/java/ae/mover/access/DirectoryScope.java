@@ -65,7 +65,9 @@ public class DirectoryScope {
             (exists (select 1 from affiliation da where da.person_id = x.id and da.valid_to is null
                        and da.organization_id = any(string_to_array(:dir_orgs, ',')::uuid[]))
              or exists (select 1 from membership dm where dm.person_id = x.id and (dm.valid_to is null or dm.valid_to > now())
-                       and dm.organization_id = any(string_to_array(:dir_orgs, ',')::uuid[])))""";
+                       and dm.organization_id = any(string_to_array(:dir_orgs, ',')::uuid[]))
+             or exists (select 1 from unit_member du where du.person_id = x.id and du.ended_at is null
+                       and du.organization_id = any(string_to_array(:dir_orgs, ',')::uuid[])))""";
 
     /** SQL: person {@code x} holds a current grant on a site of the reach (parameter {@code dir_sites}). */
     public static final String BRIDGE = """
