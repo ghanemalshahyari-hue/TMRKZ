@@ -370,12 +370,12 @@ public class HrSyncService {
             }
             args.add(new Object[]{snapshot, v.get("external_person_id"), v.get("employee_number"), v.get("legacy_employee_number"),
                     v.get("domain_account"), v.get("full_name"), v.get("unit_external_id"), v.get("position_id"), v.get("position"),
-                    v.get("job"), v.get("status_text"), Boolean.parseBoolean(v.get("active")), v.get("leave_status")});
+                    v.get("job"), v.get("status_text"), Boolean.parseBoolean(v.get("active")), v.get("leave_status"), v.get("rank")});
         }
         int[] done = batch.batchUpdate("""
                 insert into hr_person(snapshot_id, external_id, employee_number, legacy_employee_number, domain_account, full_name,
-                                      unit_external_id, position_id, position_title, job_title, status_text, active, leave_status)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing""", args);
+                                      unit_external_id, position_id, position_title, job_title, status_text, active, leave_status, rank_name)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing""", args);
         for (int i = 0; i < done.length; i++) {
             if (done[i] == 0) {
                 dup[1]++;

@@ -27,3 +27,11 @@ describe('how a grant reads in its matrix cell', () => {
     expect(cellText(grant({ targets: [{ kind: 'ORGANIZATION' }, { kind: 'ORGANIZATION' }] }))).toBe('وحدتان');
   });
 });
+
+describe('«معتمد السلسلة الهرمية» in TNQL words', () => {
+  it('reads «هذا المستوى فقط» and «مع جميع الوحدات التابعة (حيث لا معتمد مباشر)»', async () => {
+    const { chainCoveredText } = await import('./UnitsDialog');
+    expect(chainCoveredText({ id: 'a', name: 'قسم صحة 1-أ', mode: 'ONE', levels: [] }, undefined)).toBe('مستوى قسم صحة 1-أ فقط');
+    expect(chainCoveredText({ id: 'a', name: 'مركز صحة واحد', mode: 'BRANCH', levels: [] }, 3)).toBe('مركز صحة واحد + 2 تابعة (حيث لا معتمد مباشر)');
+  });
+});

@@ -45,6 +45,15 @@ class AccessWorkspaceIT extends IntegrationTest {
         hrA1 = hrPerson("hra1", orgA1);
         hrA2 = hrPerson("hra2", orgA1);
         hrB = hrPerson("hrb", orgB);
+        // a posting is not enough to be one of the unit's users (owner, 16 Nov 2026): they were added from «إضافة مستخدم»
+        added(hrA1, orgA1);
+        added(hrA2, orgA1);
+        added(hrB, orgB);
+    }
+
+    private void added(UUID person, UUID org) {
+        jdbc.sql("insert into unit_member(id, person_id, organization_id, acting, added_by, added_at) values (:id, :p, :o, false, :by, now())")
+                .param("id", UUID.randomUUID()).param("p", person).param("o", org).param("by", admin).update();
     }
 
     private UUID hrPerson(String code, UUID org) {
@@ -105,7 +114,7 @@ class AccessWorkspaceIT extends IntegrationTest {
         Api m = login("mgr");
         JsonNode summary = m.get("/access/workspace/summary").body();
         assertThat(summary.path("units").asLong()).as("A and A1").isEqualTo(2);
-        assertThat(summary.path("people").asLong()).isEqualTo(2);
+        assertThat(summary.path("people").asLong()).as("mgr's own grant at A, and the two added to A1").isEqualTo(3);
         assertThat(summary.path("pageSize").asInt()).isEqualTo(25);
         JsonNode top = m.get("/access/workspace/tree").body();
         assertThat(top).hasSize(1);
@@ -123,7 +132,46 @@ class AccessWorkspaceIT extends IntegrationTest {
         assertThat(found.get(0).path("unit").path("id").asText()).isEqualTo(orgA1.toString());
         JsonNode file = m.get("/access/workspace/units/" + orgA1).body();
         assertThat(file.path("parent").path("name").asText()).isEqualTo("جهة A");
+        // the tree opens these to show the unit (MOVER's revealUnit): its ancestors, the top first, without the unit itself
+        assertThat(java.util.stream.StreamSupport.stream(file.path("trail").spliterator(), false).map(JsonNode::asText).toList())
+                .containsExactly(root.toString(), orgA.toString());
         assertThat(file.path("people").asLong()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("AW-5: an HR posting alone lists no one (owner, as TNQL); «إضافة مستخدم» makes the person a user, counted and found; a grant made at the unit does too")
+    void usersOnly() {
+        UUID posted = hrPerson("hra3", orgA1);
+        Api m = login("mgr");
+        long people = m.get("/access/workspace/summary").body().path("people").asLong();
+        JsonNode before = m.get("/access/workspace/units/" + orgA1 + "/matrix").body();
+        assertThat(row(before, posted)).as("posted only: not in the matrix").isNull();
+        assertThat(before.path("total").asLong()).isEqualTo(2);
+        assertThat(m.get("/access/workspace/units/" + orgA1).body().path("people").asLong()).isEqualTo(2);
+        assertThat(m.get("/access/workspace/tree?parent=" + orgA).body().get(0).path("peopleCount").asInt()).isEqualTo(2);
+        assertThat(m.get("/access/workspace/search?kind=PEOPLE&q=hra3-" + sfx).body()).as("not found among users").isEmpty();
+        // the HR card still finds them, as someone to add, not yet a user
+        Res card = m.get("/access/unit-members/lookup?organizationId=" + orgA1 + "&key=E-hra3-" + sfx);
+        assertThat(card.status()).as(String.valueOf(card.body())).isEqualTo(200);
+        assertThat(card.body().path("inUnit").asBoolean()).isFalse();
+        assertThat(card.body().path("acting").asBoolean()).as("posted in this very unit").isFalse();
+
+        Res added = m.post("/access/unit-members", Map.of("organizationId", orgA1.toString(), "personId", posted.toString()));
+        assertThat(added.status()).as(String.valueOf(added.body())).isEqualTo(200);
+        assertThat(added.body().path("already").asBoolean()).isFalse();
+        JsonNode after = m.get("/access/workspace/units/" + orgA1 + "/matrix").body();
+        assertThat(row(after, posted)).isNotNull();
+        assertThat(row(after, posted).path("acting").asBoolean()).isFalse();
+        assertThat(m.get("/access/workspace/summary").body().path("people").asLong()).isEqualTo(people + 1);
+        assertThat(m.get("/access/workspace/search?kind=PEOPLE&q=hra3-" + sfx).body()).hasSize(1);
+        assertThat(m.post("/access/unit-members", Map.of("organizationId", orgA1.toString(), "personId", posted.toString())).body().path("already").asBoolean()).isTrue();
+
+        // a person with a grant made at the unit is one of its users without being added
+        UUID granted = hrPerson("hra4", orgA1);
+        jdbc.sql("insert into membership(id, person_id, organization_id, role_code, valid_from) values (:id, :p, :o, :r, now())")
+                .param("id", UUID.randomUUID()).param("p", granted).param("o", orgA1).param("r", viewer).update();
+        assertThat(row(m.get("/access/workspace/units/" + orgA1 + "/matrix").body(), granted)).isNotNull();
+        assertThat(m.post("/access/unit-members", Map.of("organizationId", orgA1.toString(), "personId", granted.toString())).body().path("already").asBoolean()).isTrue();
     }
 
     @Test
@@ -194,6 +242,10 @@ class AccessWorkspaceIT extends IntegrationTest {
 
         JsonNode matrix = m.get("/access/workspace/units/" + orgA1 + "/matrix").body();
         assertThat(row(matrix, hrA1).path("cells").path(requester).path("inherited").asText()).isEqualTo("UNIT");
+        // TNQL's separate columns: no HR record here, so no rank and the position from the current affiliation; the sign-in id
+        assertThat(row(matrix, hrA1).path("position").asText()).isEqualTo("وظيفة");
+        assertThat(row(matrix, hrA1).path("rank").isNull() || row(matrix, hrA1).path("rank").isMissingNode()).isTrue();
+        assertThat(row(matrix, hrA1).path("username").asText()).isEqualTo("hra1-" + sfx);
         JsonNode t = row(matrix, hrA2).path("cells").path(viewer);
         assertThat(t.path("direct").isNull()).isFalse();
         assertThat(t.path("temporary").asBoolean()).isTrue();

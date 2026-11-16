@@ -77,7 +77,7 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         exec("create schema " + schema,
                 "create table " + schema + ".units_t (id text, name text, parent_id text, status int, code text)",
                 "create table " + schema + ".people_t (person_id text, emp_no text, full_name text, unit_id text, status_desc text,"
-                        + " account text, position_id text, position_name text, mobile text)",
+                        + " account text, position_id text, position_name text, mobile text, grade_name text)",
                 "create view " + schema + ".units_v as select * from " + schema + ".units_t",
                 "create view " + schema + ".people_v as select * from " + schema + ".people_t",
                 "create role " + reader + " login password 'Reader#" + sfx + "'",
@@ -391,6 +391,9 @@ class HrSyncAcceptanceIT extends IntegrationTest {
                 .status()).isEqualTo(200);
         UUID site = site("HRS", null, unit3);
         UUID grant = membership(person4, "REQUESTER", orgOf("1"), null);
+        // person 4 was added to their unit (one of its users, owner 16 Nov 2026); a transfer moves that entry with them
+        jdbc.sql("insert into unit_member(id, person_id, organization_id, acting, added_by, added_at) values (:id, :p, :o, false, :p, '2026-01-01T00:00:00Z')")
+                .param("id", UUID.randomUUID()).param("p", person4).param("o", oldAffiliation).update();
         // a unit identity symbol is local metadata as well (map brief §10)
         jdbc.sql("""
                 insert into org_unit_symbol(organization_id, standard, edition, sidc, description_ar, source, updated_by, updated_at)
@@ -417,6 +420,10 @@ class HrSyncAcceptanceIT extends IntegrationTest {
                 .query(UUID.class).single()).isEqualTo(unit3);
         assertThat(jdbc.sql("select ended_reason from affiliation where person_id = :p and organization_id = :o and valid_to is not null")
                 .param("p", person4).param("o", oldAffiliation).query(String.class).single()).isEqualTo("HR_TRANSFER");
+        assertThat(jdbc.sql("select ended_reason from unit_member where person_id = :p and organization_id = :o").param("p", person4).param("o", oldAffiliation)
+                .query(String.class).single()).as("the old unit's entry ends").isEqualTo("HR_TRANSFER");
+        assertThat(jdbc.sql("select count(*) from unit_member where person_id = :p and organization_id = :o and ended_at is null and not acting")
+                .param("p", person4).param("o", unit3).query(Long.class).single()).as("a user of the new unit").isEqualTo(1);
         // The grant on the parent organisation still covers the new unit, so it is kept.
         assertThat(jdbc.sql("select valid_to is null from membership where id = :id").param("id", grant).query(Boolean.class).single()).isTrue();
         // Source identifiers are for authorised administrators only.
@@ -590,5 +597,32 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         assertThat(login("e2").taskFor(f.request())).isNull();
         assertThat(jdbc.sql("select count(*) from audit_event where action = 'TASK_ASSIGNED_BY_ACCESS_MANAGER' and entity_id = :r")
                 .param("r", f.request().toString()).query(Long.class).single()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("PA-RANK: an optional rank mapped to the view's grade column reaches the mirror and its own column in «إدارة الصلاحيات»")
+    void rankReachesTheMatrix() {
+        standardSource();
+        jdbc.sql("update " + schema + ".people_t set grade_name = 'رائد' where person_id = :p").param("p", p("4")).update();
+        List<Map<String, Object>> f = fields();
+        f.add(field("PERSON", "rank", "GRADE_NAME"));
+        configure(f);
+        assertThat(status(run("SCHEDULED", null))).isEqualTo("SUCCEEDED");
+        assertThat(jdbc.sql("select rank_name from hr_person where external_id = :x").param("x", p("4")).query(String.class).single())
+                .isEqualTo("رائد");
+        // person 4 sits in unit 2 + 4 % 9 = 6; an HR posting alone does not list them (owner, 16 Nov 2026): they are added first
+        assertThat(admin.post("/access/unit-members", Map.of("organizationId", orgOf("6").toString(), "personId", personOf("4").toString())).status())
+                .isEqualTo(200);
+        JsonNode matrix = admin.get("/access/workspace/units/" + orgOf("6") + "/matrix").body();
+        JsonNode row = null;
+        for (JsonNode r : matrix.path("people")) {
+            if (r.path("id").asText().equals(personOf("4").toString())) {
+                row = r;
+            }
+        }
+        assertThat(row).as(matrix.toString()).isNotNull();
+        assertThat(row.path("rank").asText()).isEqualTo("رائد");
+        assertThat(row.path("position").asText()).isEqualTo("منصب POS4");
+        assertThat(row.has("username")).isTrue();
     }
 }

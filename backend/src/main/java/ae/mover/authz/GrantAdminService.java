@@ -164,6 +164,23 @@ public class GrantAdminService {
             }
             requireExisting(targets);
         }
+        if (CHAIN_APPROVER.equals(in.roleCode())) {
+            // «معتمد السلسلة الهرمية» as TNQL's (ADR-061): one level — «هذا المستوى فقط» — or a level with every unit below it
+            // that has no direct approver; no scope means the home unit only, never every unit, levels or sites; never a main unit
+            if (!"CUSTOM".equals(mode)) {
+                mode = "CUSTOM";
+                targets.clear();
+                targets.add(new GrantTarget(GrantTarget.ORGANIZATION, home, false));
+            }
+            if (all || targets.stream().anyMatch(t -> !GrantTarget.ORGANIZATION.equals(t.kind()) || !t.levels().isEmpty())) {
+                throw ApiException.validation("معتمد السلسلة الهرمية يُعيَّن على مستوى بعينه: «هذا المستوى فقط» أو «هذا المستوى ومع جميع الوحدات التابعة».");
+            }
+            for (GrantTarget t : targets) {
+                if (mainUnit(t.id())) {
+                    throw ApiException.validation("الوحدة الرئيسية ليست مستوى في السلسلة الهرمية — اختر مستوى تحتها");
+                }
+            }
+        }
         Instant from = in.validFrom() == null || in.validFrom().isBlank() ? clock.instant() : Times.parse(in.validFrom(), "validFrom");
         Instant to = in.validTo() == null || in.validTo().isBlank() ? null : Times.parse(in.validTo(), "validTo");
         if (to != null && !to.isAfter(from)) {
@@ -616,8 +633,8 @@ public class GrantAdminService {
         String people = """
                 from person p left join unit_member um on um.person_id = p.id and um.organization_id = :o and um.ended_at is null
                 where p.status = 'ACTIVE'
-                  and (exists (select 1 from affiliation a where a.person_id = p.id and a.organization_id = :o and a.valid_to is null)
-                    or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and (m.valid_to is null or m.valid_to > now()))
+                  -- the unit's users only (owner, 16 Nov 2026, as AccessWorkspaceService.USERS): added there or holding a grant there
+                  and (exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and (m.valid_to is null or m.valid_to > now()))
                     or um.id is not null)
                   and (cast(:q as text) is null or p.display_name ilike :q or p.employee_no ilike :q or coalesce(p.username, '') ilike :q)""";
         long total = jdbc.sql("select count(*) " + people).param("o", orgId).param("q", like).query(Long.class).single();
@@ -664,24 +681,46 @@ public class GrantAdminService {
                 continue;
             }
             UUID id = UUID.randomUUID();
+            // «معتمد السلسلة الهرمية» without a unit choice is «هذا المستوى فقط», as TNQL (ADR-061): never every unit, never sites
+            String m = CHAIN_APPROVER.equals(role) && (mode == null || "ALL".equals(mode) || "SITES".equals(mode)) ? "UNIT" : mode;
             jdbc.sql("""
                     insert into membership(id, person_id, organization_id, role_code, valid_from, scope_mode, scope_combine, scope_all, granted_by)
                     values (:id, :p, :o, :r, :f, :m, 'AND', :all, :by)""")
                     .param("id", id).param("p", person).param("o", unit).param("r", role).param("f", Db.ts(now))
-                    .param("m", mode == null ? "ROLE" : "CUSTOM").param("all", "ALL".equals(mode)).param("by", ctx.personId()).update();
+                    .param("m", m == null ? "ROLE" : "CUSTOM").param("all", "ALL".equals(m)).param("by", ctx.personId()).update();
             // what the final approver approved is what is written, through the same scope tables every grant uses
-            if ("UNIT".equals(mode) || "UNIT_TREE".equals(mode)) {
-                scopeTarget(id, GrantTarget.ORGANIZATION, unit, "UNIT_TREE".equals(mode));
-            } else if (("UNITS".equals(mode) || "SITES".equals(mode)) && scope.get("ids") instanceof List<?> ids) {
+            if ("UNIT".equals(m) || "UNIT_TREE".equals(m)) {
+                scopeTarget(id, GrantTarget.ORGANIZATION, unit, "UNIT_TREE".equals(m));
+            } else if (("UNITS".equals(m) || "SITES".equals(m)) && scope.get("ids") instanceof List<?> ids) {
                 for (Object t : ids) {
-                    scopeTarget(id, "SITES".equals(mode) ? GrantTarget.SITE : GrantTarget.ORGANIZATION, UUID.fromString(t.toString()), false);
+                    scopeTarget(id, "SITES".equals(m) ? GrantTarget.SITE : GrantTarget.ORGANIZATION, UUID.fromString(t.toString()), false);
                 }
             }
             audit.recordAs(ctx.actor(), "MEMBERSHIP_CREATED", "PERSON", person.toString(), null,
-                    Map.of("organizationId", unit.toString(), "role", role, "accessRequest", requestId.toString(), "scope", mode == null ? "ROLE" : mode), null);
+                    Map.of("organizationId", unit.toString(), "role", role, "accessRequest", requestId.toString(), "scope", m == null ? "ROLE" : m), null);
             made.add(role);
         }
+        // an approved request makes the person one of the unit's users (owner, 16 Nov 2026, as TNQL: «من خلال طلب الصلاحيات»);
+        // they stay listed after their grants end, as a TNQL account does, until removed from the unit
+        if (unit != null && jdbc.sql("""
+                insert into unit_member(id, person_id, organization_id, acting, added_by, added_at)
+                select :id, :p, :o, false, coalesce(cast(:by as uuid), :p), :now
+                where not exists (select 1 from unit_member where person_id = :p and organization_id = :o and ended_at is null)""")
+                .param("id", UUID.randomUUID()).param("p", person).param("o", unit).param("by", ctx.personId()).param("now", Db.ts(now)).update() > 0) {
+            audit.recordAs(ctx.actor(), "UNIT_MEMBER_ADDED", "PERSON", person.toString(), null,
+                    Map.of("organizationId", unit.toString(), "acting", false, "accessRequest", requestId.toString()), null);
+        }
         return made;
+    }
+
+    static final String CHAIN_APPROVER = "CHAIN_APPROVER";
+
+    /** A main unit of the published HR snapshot: the top of a chain, never a level in it (TNQL's rule). */
+    private boolean mainUnit(UUID org) {
+        return jdbc.sql("""
+                select count(*) from organization o join hr_unit h on h.external_id = o.source_external_id and h.is_main
+                  and h.snapshot_id = (select s.id from hr_snapshot s where s.status = 'PUBLISHED') where o.id = :o""")
+                .param("o", org).query(Long.class).single() > 0;
     }
 
     private void scopeTarget(UUID membership, String kind, UUID target, boolean descendants) {

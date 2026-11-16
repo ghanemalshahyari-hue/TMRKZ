@@ -40,3 +40,9 @@
 .um-remove:hover { color: var(--ink); }
 .unit-matrix tr.um-fresh td { background: color-mix(in srgb, var(--accent) 12%, var(--paper)); }
 @media (max-width: 560px) { .au-card dl { grid-template-columns: 1fr; } }
+/* «معتمد السلسلة الهرمية» (TNQL's dialog, ADR-061) */
+.ud-info { padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--accent) 9%, transparent); border-inline-start: 3px solid var(--accent); font-size: 12.5px; line-height: 1.8; margin-bottom: 10px; }
+.ud-tree-head { margin: 0 0 6px; font-size: 13px; display: flex; gap: 8px; align-items: baseline; }
+.ud-count { margin-inline-end: auto; font-size: 12px; color: var(--muted); }
+.ud-node label:has(input:disabled), .ud-hit:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+

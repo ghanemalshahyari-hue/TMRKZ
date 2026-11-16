@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
 import {
   ApiError,
   api,
@@ -22,6 +22,7 @@ import { AddUserDialog } from './AddUserDialog';
 import { rightsText } from './adminText';
 import { cellText, existingUnits } from './assign';
 import { bulk, cellKey, changes, counts, lockOf, ticked, toggle, type Pending } from './stage';
+import { loadWidths, resize, saveWidths, widthAt, DEFAULT_WIDTHS, type Panel, type PanelWidths } from './panelWidths';
 import { FyiMains, UnitOpsRoutes } from './UnitRouting';
 import { UnitsDialog, type UnitChoice } from './UnitsDialog';
 import './accessWorkspace.css';
@@ -65,6 +66,17 @@ export function AccessWorkspace({ onStudio }: { onStudio: () => void }) {
   const [fresh, setFresh] = useState<string | null>(null);
   const [account, setAccount] = useState<string | null>(null);
   const catalogue = useRightsCatalogue();
+  const colsRef = useRef<HTMLDivElement>(null);
+  const [widths, setWidths] = useState<PanelWidths>(loadWidths);
+  const total = () => colsRef.current?.getBoundingClientRect().width ?? window.innerWidth;
+  const setWidth = (panel: Panel, px: number) => setWidths((w) => resize(w, panel, px, total()));
+  const keep = () => setWidths((w) => (saveWidths(w), w));
+  const reset = (panel: Panel) =>
+    setWidths((w) => {
+      const next = { ...w, [panel]: DEFAULT_WIDTHS[panel] };
+      saveWidths(next);
+      return next;
+    });
 
   useEffect(() => {
     api.workspaceSummary().then(setSummary).catch(() => setSummary(null));
@@ -126,8 +138,9 @@ export function AccessWorkspace({ onStudio }: { onStudio: () => void }) {
         onPerson={(h) => h.unit && choose(h.unit, { q: h.employeeNo ?? '', tab: 'manage' })}
       />
 
-      <div className="aw-cols">
-        <UnitTree selected={unit?.id ?? null} onSelect={(u) => choose(u)} revision={app.revision + reloadKey} />
+      <div className="aw-cols" ref={colsRef} style={{ '--aw-tree': widths.tree + 'px', '--aw-file': widths.file + 'px' } as CSSProperties}>
+        <UnitTree selected={unit?.id ?? null} trail={file && file.id === unit?.id ? file.trail : undefined} onSelect={(u) => choose(u)} revision={app.revision + reloadKey} />
+        <Divider panel="tree" label="عرض لوحة الوحدات" value={widths.tree} box={colsRef} onWidth={setWidth} onDone={keep} onReset={() => reset('tree')} />
 
         <section className="aw-card aw-main" aria-label="الوحدة المحددة">
           <header className="aw-head">
@@ -164,6 +177,11 @@ export function AccessWorkspace({ onStudio }: { onStudio: () => void }) {
             <PermitsTab unit={unit} matrix={matrix} onChanged={reload} />
           ) : (
             <>
+              <div className="aw-add-row">
+                <button className="button compact aw-add-user" data-testid="add-user" onClick={() => setAdding(true)}>
+                  <Icon name="user-plus" /> إضافة مستخدم
+                </button>
+              </div>
               <div className="aw-tools">
                 <label className="aw-search-in">
                   <Icon name="search" />
@@ -175,24 +193,14 @@ export function AccessWorkspace({ onStudio }: { onStudio: () => void }) {
                     <option key={c.code} value={c.code}>{c.name}</option>
                   ))}
                 </select>
-                <button className="button compact primary" data-testid="add-user" onClick={() => setAdding(true)}>
-                  <Icon name="plus" /> إضافة مستخدم
-                </button>
               </div>
               {error && <div className="error-text" role="alert">{error}</div>}
-              {matrix && (
-                <div className="aw-pager">
-                  <button className="button compact" disabled={page === 0} onClick={() => setPage(page - 1)}>السابق</button>
-                  <span>صفحة {n(page + 1)} من {n(pages)}</span>
-                  <button className="button compact" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>التالي</button>
-                </div>
-              )}
               {matrix && tab === 'cards' && (
                 <Cards
                   matrix={matrix}
+                  filtered={!!q || !!roleFilter}
                   onView={setViewing}
                   onAccount={(p) => setAccount(p.id)}
-                  onEdit={(p) => (setTab('manage'), setQ(p.employeeNo), setPage(0))}
                 />
               )}
               {matrix && tab === 'manage' && (
@@ -208,6 +216,13 @@ export function AccessWorkspace({ onStudio }: { onStudio: () => void }) {
                   onSaved={() => (reload(), app.bump())}
                 />
               )}
+              {matrix && pages > 1 && (
+                <div className="aw-pager" data-testid="aw-pager">
+                  <button className="button compact" disabled={page === 0} onClick={() => setPage(page - 1)}>السابق</button>
+                  <span>صفحة {n(page + 1)} من {n(pages)} — الإجمالي {n(matrix.total)}</span>
+                  <button className="button compact" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>التالي</button>
+                </div>
+              )}
               {tab === 'manage' && (
                 <div className="aw-routing">
                   <UnitOpsRoutes command={unit} />
@@ -218,13 +233,14 @@ export function AccessWorkspace({ onStudio }: { onStudio: () => void }) {
           )}
         </section>
 
+        <Divider panel="file" label="عرض ملف الوحدة" value={widths.file} box={colsRef} onWidth={setWidth} onDone={keep} onReset={() => reset('file')} />
         <UnitFile file={file} global={!!summary?.global} onChanged={(f) => (setFile(f), reload())} onReload={reload} />
       </div>
 
       <section className="aw-note" role="note">
         <Icon name="shield" />
         <div>
-          <b>لا تُطبَّق التغييرات حتى الضغط على «حفظ التعديلات» وتأكيد العملية.</b>
+          <b>لا تُطبَّق التغييرات حتى الضغط على «حفظ التعديلات».</b>
           <span>جميع التغييرات تخضع لقواعد التفويض والتدقيق المعتمدة، وتُسجَّل بمرجع تدقيق واحد لكل حفظة.</span>
         </div>
       </section>
@@ -319,24 +335,73 @@ function TaskSearch({ total, onUnit, onPerson }: { total: number | undefined; on
 
 // ---- 02 tree ---------------------------------------------------------------------------------------------------------
 
-function UnitTree({ selected, onSelect, revision }: { selected: string | null; onSelect: (u: Unit) => void; revision: number }) {
+function UnitTree({ selected, trail, onSelect, revision }: { selected: string | null; trail?: string[]; onSelect: (u: Unit) => void; revision: number }) {
   const [roots, setRoots] = useState<WorkspaceNode[] | null>(null);
   const [kids, setKids] = useState<Record<string, WorkspaceNode[]>>({});
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [text, setText] = useState('');
   const [hits, setHits] = useState<WorkspaceHit[] | null>(null);
+  const openRef = useRef(open);
+  openRef.current = open;
+  const kidsRef = useRef(kids);
+  kidsRef.current = kids;
+  const first = useRef(true);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const shown = useRef<string | null>(null);
   useEffect(() => {
+    let live = true;
     api
       .workspaceTree()
-      .then((r) => {
+      .then(async (r) => {
+        if (!live) return;
         setRoots(r);
+        const ids = new Set(openRef.current);
         // a single top unit opens by itself, as in the movement programme
-        if (r.length === 1 && r[0].childCount) expand(r[0].id, true);
+        if (first.current && r.length === 1 && r[0].childCount) ids.add(r[0].id);
+        first.current = false;
+        // a refresh (a save, a new member…) keeps the tree as the person left it: every open branch is read again, so its
+        // counts are current; before 16 Nov 2026 the branches were dropped and stayed marked open with nothing under them
+        const loaded = await Promise.all([...ids].map((id) => api.workspaceTree(id).then((c) => [id, c] as const).catch(() => null)));
+        if (!live) return;
+        const next: Record<string, WorkspaceNode[]> = {};
+        for (const x of loaded) if (x) next[x[0]] = x[1];
+        setKids(next);
+        setOpen(new Set(Object.keys(next)));
       })
-      .catch(() => setRoots([]));
-    setKids({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch(() => live && setRoots([]));
+    return () => {
+      live = false;
+    };
   }, [revision]);
+  // a unit chosen from a search, a person or the file opens its branch down to it, as MOVER's revealUnit
+  const trailKey = trail?.join() ?? '';
+  useEffect(() => {
+    if (!selected || !trail?.length) return;
+    let live = true;
+    (async () => {
+      const add: Record<string, WorkspaceNode[]> = {};
+      for (const id of trail) {
+        if (kidsRef.current[id]) continue;
+        const c = await api.workspaceTree(id).catch(() => null);
+        if (!live) return;
+        if (c) add[id] = c;
+      }
+      setKids((k) => ({ ...k, ...add }));
+      setOpen((o) => new Set([...o, ...trail.filter((id) => add[id] || kidsRef.current[id])]));
+    })();
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, trailKey]);
+  // …and brings it into view once it is drawn
+  useEffect(() => {
+    if (!selected || shown.current === selected) return;
+    const el = listRef.current?.querySelector<HTMLElement>(`[data-node="${selected}"]`);
+    if (!el) return;
+    shown.current = selected;
+    el.scrollIntoView({ block: 'nearest' });
+  }, [selected, kids, open, roots]);
   useEffect(() => {
     if (!text.trim()) return setHits(null);
     const t = window.setTimeout(() => api.workspaceSearch(text.trim(), 'UNITS').then(setHits).catch(() => setHits([])), 250);
@@ -353,7 +418,7 @@ function UnitTree({ selected, onSelect, revision }: { selected: string | null; o
   };
   const node = (u: WorkspaceNode, depth: number): React.ReactNode => (
     <li key={u.id}>
-      <div className={'aw-node' + (selected === u.id ? ' on' : '')} style={{ paddingInlineStart: 6 + depth * 14 }}>
+      <div className={'aw-node' + (selected === u.id ? ' on' : '')} data-node={u.id} style={{ paddingInlineStart: 6 + depth * 14 }}>
         {u.childCount ? (
           <button className="aw-twist" aria-label={(open.has(u.id) ? 'طي ' : 'فتح ') + u.name} aria-expanded={open.has(u.id)} onClick={() => expand(u.id)}>
             {open.has(u.id) ? '−' : '+'}
@@ -400,7 +465,7 @@ function UnitTree({ selected, onSelect, revision }: { selected: string | null; o
           ))}
         </ul>
       ) : (
-        <ul className="aw-nodes" role="tree" aria-label="شجرة الوحدات">
+        <ul className="aw-nodes" role="tree" aria-label="شجرة الوحدات" ref={listRef}>
           {roots === null && <li className="aw-muted">جارٍ التحميل…</li>}
           {roots?.map((r) => node(r, 0))}
         </ul>
@@ -417,36 +482,62 @@ function effectiveRoles(p: WorkspacePerson, columns: WorkspaceColumn[]) {
     .filter(({ cell }) => cell && (cell.direct || cell.inherited || cell.temporary));
 }
 
-function Cards({ matrix, onView, onEdit, onAccount }: { matrix: WorkspaceMatrix; onView: (p: WorkspacePerson) => void; onEdit: (p: WorkspacePerson) => void; onAccount: (p: WorkspacePerson) => void }) {
-  if (!matrix.people.length) return <div className="aw-empty small">لا يوجد مستخدمون مطابقون في هذه الوحدة.</div>;
+function Cards({ matrix, filtered, onView, onAccount }: { matrix: WorkspaceMatrix; filtered: boolean; onView: (p: WorkspacePerson) => void; onAccount: (p: WorkspacePerson) => void }) {
+  // a unit's users are the people added to it, never every HR employee (owner, 16 Nov 2026; ADR-061)
+  if (!matrix.people.length)
+    return (
+      <div className="aw-empty small" data-testid="aw-no-users">
+        {filtered
+          ? 'لا يوجد مستخدمون مطابقون في هذه الوحدة.'
+          : 'لا يوجد مستخدمون في هذه الوحدة بعد. يُضاف المستخدم من «إضافة مستخدم» بالبحث بالرقم العسكري أو رقم المستخدم، أو بطلب صلاحيات معتمد.'}
+      </div>
+    );
   return (
     <ul className="aw-people" data-testid="aw-cards">
-      {matrix.people.map((p) => (
-        <li key={p.id} className="aw-person">
-          <span className="aw-avatar" aria-hidden="true">{initials(p.displayName)}</span>
-          <div className="aw-who">
-            <b>
-              <i className={'aw-dot' + (p.active ? ' on' : '')} title={p.active ? 'نشط' : 'غير نشط'} />
-              {p.displayName}
-            </b>
-            <small className="latin">{p.employeeNo} · {n(p.effective)} صلاحية فعالة</small>
-          </div>
-          <div className="aw-chips">
-            {effectiveRoles(p, matrix.columns).map(({ c, cell }) => (
-              <span key={c.code} className={'aw-chip' + (cell.direct ? ' direct' : cell.temporary ? ' temp' : ' inherit')}>{c.name}</span>
-            ))}
-            {p.acting && <span className="aw-chip tag">بالإنابة</span>}
-            {p.withoutHr && <span className="aw-chip tag">بدون موارد</span>}
-            {p.hrUnavailable && <span className="aw-chip temp">غائب: {p.hrUnavailable}</span>}
-            {p.accessDisabled && <span className="aw-chip tag">موقوف</span>}
-          </div>
-          <div className="aw-acts">
-            <button className="icon-button" aria-label={'عرض صلاحيات ' + p.displayName} onClick={() => onView(p)}><Icon name="eye" /></button>
-            <button className="icon-button" aria-label={'تعديل صلاحيات ' + p.displayName} onClick={() => onEdit(p)}><Icon name="edit" /></button>
-            <button className="icon-button" aria-label={'بطاقة حساب ' + p.displayName} onClick={() => onAccount(p)}><Icon name="user" /></button>
-          </div>
-        </li>
-      ))}
+      {matrix.people.map((p) => {
+        // as MOVER's cards: up to three direct grants, then up to two inherited or temporary ones; the eye shows them all
+        const held = effectiveRoles(p, matrix.columns);
+        const direct = held.filter(({ cell }) => cell.direct).slice(0, 3);
+        const other = held.filter(({ cell }) => !cell.direct).slice(0, 2);
+        const more = held.length - direct.length - other.length;
+        const ident = [p.employeeNo, p.position].filter(Boolean).join(' · ');
+        return (
+          <li key={p.id} className="aw-person" data-person={p.id}>
+            <span className="aw-avatar" aria-hidden="true">{initials(p.displayName)}</span>
+            <div className="aw-who">
+              <b>
+                <i className={'aw-dot' + (p.active && !p.accessDisabled ? ' on' : '')} title={p.active ? 'نشط' : 'غير نشط'} />
+                {p.displayName}
+              </b>
+              {ident && <small className="aw-ident">{ident}</small>}
+              <small>
+                {p.username ? <span className="latin">{p.username} · </span> : null}
+                {n(p.effective)} صلاحية فعّالة
+              </small>
+            </div>
+            <div className="aw-chips">
+              {[...direct, ...other].map(({ c, cell }) => (
+                <span key={c.code} className={'aw-chip' + (cell.direct ? ' direct' : cell.temporary ? ' temp' : ' inherit')} title={cell.direct ? 'منح مباشر' : cell.temporary ? 'مؤقتة' : 'موروثة من الوحدة'}>
+                  {c.name}
+                </span>
+              ))}
+              {more > 0 && <span className="aw-chip tag">+{n(more)}</span>}
+              {p.acting && <span className="aw-chip tag">بالإنابة</span>}
+              {p.withoutHr && <span className="aw-chip tag">بدون موارد</span>}
+              {p.hrUnavailable && <span className="aw-chip temp">غائب: {p.hrUnavailable}</span>}
+              {p.accessDisabled && <span className="aw-chip tag">موقوف</span>}
+            </div>
+            <div className="aw-acts">
+              <button className="icon-button" aria-label={'عرض الصلاحيات الفعّالة: ' + p.displayName} title="عرض الصلاحيات الفعّالة" onClick={() => onView(p)}>
+                <Icon name="eye" />
+              </button>
+              <button className="icon-button" aria-label={'فتح بطاقة الحساب وتعديلها: ' + p.displayName} title="فتح بطاقة الحساب وتعديلها" onClick={() => onAccount(p)}>
+                <Icon name="edit" />
+              </button>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -527,30 +618,41 @@ function Manage({
     setReview(null);
     setPending(toggle(pending, p, col.code));
   };
-  const startReview = async () => {
-    if (!c.total) return;
-    setBusy(true);
+  // owner, 16 Nov 2026: «حفظ الصلاحيات لا يحتاج تأكيد» — «حفظ التعديلات» checks on the server and saves in one step. The bar stays only
+  // when the server refuses a line, or when the change reaches every member of the unit (the server asks that to be acknowledged).
+  const apply = async (fingerprint: string, whole: boolean) => {
     try {
-      setWholeOk(false);
-      setReview(await api.workspacePreview(unit.id, Object.values(pending)));
-    } catch (e) {
-      app.toast((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const confirm = async () => {
-    if (!review) return;
-    setBusy(true);
-    try {
-      const r = await api.workspaceApply(unit.id, Object.values(pending), review.fingerprint, wholeOk);
+      const r = await api.workspaceApply(unit.id, Object.values(pending), fingerprint, whole);
       setSaved({ reference: r.reference, affected: r.affected });
       setPending({});
       setReview(null);
       onSaved();
     } catch (e) {
       setReview(null);
-      app.toast(e instanceof ApiError && e.status === 409 ? 'تغيّرت هذه الصلاحيات منذ المراجعة؛ راجع ثم احفظ مجدداً.' : (e as Error).message);
+      app.toast(e instanceof ApiError && e.status === 409 ? 'تغيّرت هذه الصلاحيات أثناء الحفظ؛ اضغط «حفظ التعديلات» مجدداً.' : (e as Error).message);
+    }
+  };
+  const save = async () => {
+    if (!c.total) return;
+    setBusy(true);
+    try {
+      const r = await api.workspacePreview(unit.id, Object.values(pending));
+      if (r.ok && !r.wholeUnit) await apply(r.fingerprint, false);
+      else {
+        setWholeOk(false);
+        setReview(r);
+      }
+    } catch (e) {
+      app.toast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const confirmWhole = async () => {
+    if (!review) return;
+    setBusy(true);
+    try {
+      await apply(review.fingerprint, wholeOk);
     } finally {
       setBusy(false);
     }
@@ -598,33 +700,35 @@ function Manage({
           <button className="button compact" onClick={() => setSaved(null)}>إغلاق</button>
         </div>
       ) : review ? (
-        <div className={'aw-bar ' + (review.ok ? 'confirm' : 'bad')} role="alertdialog" aria-label="تأكيد تعديل الصلاحيات">
+        <div className={'aw-bar ' + (review.ok ? 'confirm' : 'bad')} role="alert" aria-label={review.ok ? 'تعديل يشمل كل مستخدمي الوحدة' : 'لم تُحفظ التعديلات'}>
           <div>
             <b>
-              حفظ {changes(c.total)}
+              {review.ok ? 'هذا التعديل يشمل كل مستخدمي الوحدة' : 'لم تُحفظ التعديلات'} — {changes(c.total)}
               {review.grants > 0 && ' · إضافة ' + review.grants}
-              {review.revokes > 0 && ' · سحب ' + review.revokes}؟
+              {review.revokes > 0 && ' · سحب ' + review.revokes}
             </b>
-            <small>سيتم تطبيق العملية بعد التأكيد وتسجيلها في سجل التدقيق.</small>
+            {!review.ok && <small>صحّح ما يلي أو ألغِ هذه التعديلات، ثم احفظ مجدداً.</small>}
             {review.lines.filter((l) => l.problem).map((l) => (
               <small key={l.personId + l.roleCode} className="aw-bad-line">✗ {l.person} — {l.role}: {l.problem}</small>
             ))}
-            {review.wholeUnit && (
+            {review.ok && review.wholeUnit && (
               <label className="aw-whole">
                 <input type="checkbox" checked={wholeOk} onChange={(e) => setWholeOk(e.target.checked)} data-testid="aw-whole" /> أؤكد أن هذا التعديل يشمل كل مستخدمي الوحدة
               </label>
             )}
           </div>
-          <button className="button compact primary" disabled={!review.ok || busy || (review.wholeUnit && !wholeOk)} onClick={confirm} data-testid="aw-confirm">تأكيد</button>
-          <button className="button compact" onClick={() => setReview(null)}>إلغاء</button>
+          {review.ok && (
+            <button className="button compact primary" disabled={busy || !wholeOk} onClick={confirmWhole} data-testid="aw-confirm">حفظ</button>
+          )}
+          <button className="button compact" onClick={() => setReview(null)}>{review.ok ? 'إلغاء' : 'إغلاق'}</button>
         </div>
       ) : (
         <div className="aw-bar">
           <span>لا تعدل معلّقاً — أشّر مربعات الصلاحيات ثم اضغط «حفظ التعديلات» أسفل الجدول.</span>
           {c.total > 0 && (
             <>
-              <button className="button compact primary" disabled={busy} onClick={startReview}>تأكيد</button>
-              <button className="button compact" onClick={discard}>إلغاء</button>
+              <button className="button compact primary" disabled={busy} onClick={save}>حفظ التعديلات</button>
+              <button className="button compact" onClick={discard}>إلغاء التعديلات</button>
             </>
           )}
         </div>
@@ -657,10 +761,16 @@ function Manage({
                   onChange={() => setChosen(allChosen ? new Set() : new Set(matrix.people.map((p) => p.id)))}
                 />
               </th>
-              <th className="aw-user">المستخدم</th>
+              <th className="aw-c-mil">الرقم العسكري</th>
+              <th className="aw-c-rank">الرتبة العسكرية</th>
+              <th className="aw-user">الاسم</th>
+              <th className="aw-c-uid">رقم الـــU</th>
+              <th className="aw-c-pos">المنصب</th>
               {shown.map((col) => (
-                <th key={col.code} title={col.lock ?? (col.mode !== 'CHECK' ? 'يُحفظ فوراً عند الضغط' : undefined)}>
+                <th key={col.code} title={col.lock ?? (col.mode !== 'CHECK' ? 'يُحفظ فوراً عند الضغط' : undefined)} data-col={col.code}>
                   {col.lock && <Icon name="lock" />} {col.name}
+                  {col.mode !== 'CHECK' && <span className="aw-instant" title="يُحفظ فوراً عند الضغط">⚡فوري</span>}
+                  {HELP[col.code] && <ColumnHelp code={col.code} name={col.name} />}
                 </th>
               ))}
               {avail.length > 0 && <th title="لكل إدارة توفير: فعالة في وحدة مزوّدة، احتياطية في غيرها. يُحفظ فوراً">معتمد التوفر</th>}
@@ -669,7 +779,7 @@ function Manage({
           <tbody>
             {matrix.people.length === 0 && (
               <tr>
-                <td colSpan={shown.length + (avail.length ? 3 : 2)} className="aw-muted">لا يوجد مستخدمون مطابقون.</td>
+                <td colSpan={shown.length + (avail.length ? 7 : 6)} className="aw-muted">لا يوجد مستخدمون مطابقون.</td>
               </tr>
             )}
             {matrix.people.map((p) => (
@@ -687,18 +797,21 @@ function Manage({
                     })}
                   />
                 </td>
+                <td className="aw-c-mil"><span className="latin">{p.employeeNo || '—'}</span></td>
+                <td className="aw-c-rank" title={p.rank ? undefined : 'غير متوفر من مصدر الموارد البشرية'}>{p.rank || '—'}</td>
                 <td className="aw-user">
                   <button className="aw-name" onClick={() => onAccount(p)} title="بطاقة الحساب">
                     <i className={'aw-dot' + (p.active && !p.accessDisabled ? ' on' : '')} title={p.active ? 'نشط' : 'غير نشط'} />
                     {p.displayName}
                   </button>
-                  <small className="latin">{p.employeeNo}</small>
                   {p.acting && <span className="um-tag">بالإنابة</span>}
                   {p.withoutHr && <span className="um-tag">بدون موارد</span>}
                   {p.hrUnavailable && <span className="um-tag aw-away" title="لا تذهب إليه الخطوات حتى يعود">غائب</span>}
                   {p.accessDisabled && <span className="um-tag">موقوف</span>}
                   {p.added && <RemoveMember unit={unit} person={p} onDone={onSaved} />}
                 </td>
+                <td className="aw-c-uid"><span className="latin">{p.username || '—'}</span></td>
+                <td className="aw-c-pos" title={p.position ?? undefined}>{p.position || '—'}</td>
                 {shown.map((col) => {
                   const cell = p.cells[col.code];
                   const key = cellKey(p.id, col.code);
@@ -788,7 +901,7 @@ function Manage({
           <b className="aw-count latin">{c.total}</b> {c.total === 1 ? 'تعديل' : 'تعديلاً'} معلقاً — لا يُحفظ شيء قبل الضغط على «حفظ التعديلات»
         </span>
         <button className="button compact" disabled={!c.total} onClick={discard}>تراجع</button>
-        <button className="button primary" disabled={!c.total || busy} onClick={startReview} data-testid="aw-save">حفظ التعديلات</button>
+        <button className="button primary" disabled={!c.total || busy} onClick={save} data-testid="aw-save">حفظ التعديلات</button>
       </div>
 
       {admin && (
@@ -798,7 +911,9 @@ function Manage({
         <UnitsDialog
           roleName={editing.column.name}
           home={unit}
-          finalApprover={!!roles.find((r) => r.code === editing.column.code)?.permissions.includes('APPROVE')}
+          chain={editing.column.code === 'CHAIN_APPROVER'}
+          person={editing.person.displayName}
+          finalApprover={editing.column.code !== 'CHAIN_APPROVER' && !!roles.find((r) => r.code === editing.column.code)?.permissions.includes('APPROVE')}
           everything={!!editing.grant?.all}
           value={existingUnits(editing.grant)}
           onSave={saveUnits}
@@ -976,3 +1091,117 @@ function UnitFile({ file, global, onChanged, onReload }: { file: WorkspaceUnit |
     </section>
   );
 }
+
+// ---- the dividers between the panels (owner, 16 Nov 2026) ------------------------------------------------------------
+
+/** A vertical divider the person drags (or moves with the arrow keys) to widen or narrow a side panel; double-click resets it. */
+function Divider({ panel, label, value, box, onWidth, onDone, onReset }: {
+  panel: Panel;
+  label: string;
+  value: number;
+  box: RefObject<HTMLDivElement | null>;
+  onWidth: (panel: Panel, px: number) => void;
+  onDone: () => void;
+  onReset: () => void;
+}) {
+  const [dragging, setDragging] = useState(false);
+  const rtl = () => (box.current ? getComputedStyle(box.current).direction === 'rtl' : true);
+  const down = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const host = box.current;
+    if (!host || e.button !== 0) return;
+    e.preventDefault();
+    el.setPointerCapture(e.pointerId);
+    setDragging(true);
+    const dir = rtl();
+    const move = (ev: PointerEvent) => onWidth(panel, widthAt(panel, ev.clientX, host.getBoundingClientRect(), dir));
+    const up = () => {
+      el.removeEventListener('pointermove', move);
+      el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up);
+      setDragging(false);
+      onDone();
+    };
+    el.addEventListener('pointermove', move);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
+  };
+  const key = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    // the divider moves the way the arrow points: the tree grows when it moves away from the tree's edge, the file likewise
+    const dx = (e.key === 'ArrowLeft' ? -1 : 1) * (e.shiftKey ? 64 : 16);
+    const growsRight = panel === 'tree' ? !rtl() : rtl();
+    onWidth(panel, value + (growsRight ? dx : -dx));
+    onDone();
+  };
+  return (
+    <div
+      className={'aw-divider' + (dragging ? ' dragging' : '')}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={label}
+      aria-valuenow={value}
+      tabIndex={0}
+      title={label + ' — اسحب لتغيير العرض، ونقرتان للعرض الأصلي'}
+      data-divider={panel}
+      onPointerDown={down}
+      onKeyDown={key}
+      onDoubleClick={onReset}
+    >
+      <span aria-hidden="true" />
+    </div>
+  );
+}
+
+// ---- a column's «?», as TNQL's permission help (app/permission_help.py) -------------------------------------------------
+
+const HELP: Record<string, { allows: string; who: string; covers: string; excludes: string; sensitive: string }> = {
+  CHAIN_APPROVER: {
+    allows: 'اعتماد الطلب أو ردّه عند وصوله إلى مستوى الوحدة في السلسلة الهرمية.',
+    who: 'قائد الوحدة أو من يُكلَّف بالاسم.',
+    covers: 'الطلبات التي تمر بمستوى هذه الوحدة؛ ومع «هذا المستوى ومع جميع الوحدات التابعة» كل وحدة تابعة ليس لها معتمد مباشر.',
+    excludes: 'لا يرد على التوفر، ولا يتخذ القرار التشغيلي النهائي، ولا يدير الصلاحيات.',
+    sensitive: 'توقيع اعتماد: يُمنح لشخص بالاسم لا لوحدة كاملة.',
+  },
+};
+
+function ColumnHelp({ code, name }: { code: string; name: string }) {
+  // drawn above the page at the button's place: inside the table the pinned columns and the scroll box would cover it
+  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
+  const h = HELP[code];
+  const toggle = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (at) return setAt(null);
+    const r = e.currentTarget.getBoundingClientRect();
+    setAt({ top: r.bottom + 6, left: Math.min(Math.max(8, r.left + r.width / 2 - 150), window.innerWidth - 308) });
+  };
+  useEffect(() => {
+    if (!at) return;
+    const close = () => setAt(null);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [at]);
+  const open = !!at;
+  const setOpen = (v: boolean) => !v && setAt(null);
+  return (
+    <span className="aw-help">
+      <button type="button" className="aw-help-btn" aria-label={'شرح ' + name} aria-expanded={open} onClick={toggle}>?</button>
+      {at && (
+        <span className="aw-help-pop" role="dialog" aria-label={'شرح ' + name} style={{ top: at.top, left: at.left }}>
+          <b>{name}</b>
+          <span><i>ما تتيحه:</i> {h.allows}</span>
+          <span><i>لمن:</i> {h.who}</span>
+          <span><i>ما تشمله:</i> {h.covers}</span>
+          <span><i>ما لا تشمله:</i> {h.excludes}</span>
+          <span className="aw-help-warn">{h.sensitive}</span>
+          <button type="button" className="button compact" onClick={() => setOpen(false)}>إغلاق</button>
+        </span>
+      )}
+    </span>
+  );
+}
+

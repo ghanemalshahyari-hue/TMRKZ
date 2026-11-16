@@ -81,8 +81,8 @@ public class AccessWorkspaceService {
         }
 
         boolean assign() {
-            return !"CHAIN_APPROVER".equals(code)
-                    && (permissions.contains(Permission.REVIEW) || permissions.contains(Permission.APPROVE) || "FYI_RECEIVER".equals(code));
+            // «معتمد السلسلة الهرمية» too since 16 Nov 2026 (ADR-061): a «تعيين» cell with its levels, saved at once, as TNQL's
+            return permissions.contains(Permission.REVIEW) || permissions.contains(Permission.APPROVE) || "FYI_RECEIVER".equals(code);
         }
 
         boolean unitGrantable() {
@@ -127,9 +127,21 @@ public class AccessWorkspaceService {
         }
     }
 
-    private static final String MEMBERS = """
-            (select person_id, organization_id from affiliation where valid_to is null
-             union select person_id, organization_id from unit_member where ended_at is null)""";
+    /**
+     * «مستخدمو الوحدة» as TNQL's (owner, 16 Nov 2026: «لا تضيف بشكل آلي — تم إضافتهم من خلال طلب الصلاحيات أو البحث»): a person
+     * added to the unit — from «إضافة مستخدم» or an approved access request ({@code unit_member}) — or holding a grant made at it.
+     * An HR posting, an HR position (a responsibility seat) or a sign-in alone never makes a user; those people still hold what
+     * HR gives them (GrantSource), they are only not listed or counted here.
+     */
+    static final String USERS = """
+            (select person_id, organization_id from unit_member where ended_at is null
+             union select person_id, organization_id from membership where valid_to is null or valid_to > now())""";
+
+    /** The platform and first-setup accounts are listed only for a manager over everything, as TNQL hides them from a scoped one. */
+    private static String platformFilter(DirectoryScope.Reach r, String person) {
+        return r.global() ? "" : " and not (coalesce(" + person + ".bootstrap, false) or (" + person + ".source = 'LOCAL' and "
+                + person + ".employee_no like 'PLATFORM-%'))";
+    }
 
     /** The four counters of the page: units in reach, their people, the active among them, and the rows a page shows. */
     public Map<String, Object> summary(AccessContext ctx) {
@@ -137,8 +149,8 @@ public class AccessWorkspaceService {
         String reachIds = Db.ids(r.orgs());
         long units = jdbc.sql("select count(*) from organization o where o.status = 'ACTIVE'" + orgFilter(r, "o.id"))
                 .param("reach", reachIds).query(Long.class).single();
-        Map<String, Object> people = jdbc.sql("select count(distinct p.id) as total, count(distinct p.id) filter (where p.status = 'ACTIVE') as active from "
-                        + MEMBERS + " mem join person p on p.id = mem.person_id where true" + orgFilter(r, "mem.organization_id"))
+        Map<String, Object> people = jdbc.sql("select count(distinct p.id) as total, count(distinct p.id) filter (where p.status = 'ACTIVE' and not p.access_disabled) as active from "
+                        + USERS + " mem join person p on p.id = mem.person_id where true" + orgFilter(r, "mem.organization_id") + platformFilter(r, "p"))
                 .param("reach", reachIds).query().singleRow();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("units", units);
@@ -165,8 +177,9 @@ public class AccessWorkspaceService {
         return jdbc.sql("""
                 select o.id, o.name, o.code, coalesce(h.is_main, false) as main,
                        (select count(*) from organization c where c.parent_id = o.id and c.status = 'ACTIVE') as children,
-                       (select count(distinct mem.person_id) from """ + MEMBERS + """
-                         mem where mem.organization_id = o.id) as people
+                       (select count(distinct mem.person_id) from """ + USERS + """
+                         mem join person p on p.id = mem.person_id where mem.organization_id = o.id""" + platformFilter(r, "p") + """
+                       ) as people
                 from organization o
                 left join hr_unit h on h.external_id = o.source_external_id and h.snapshot_id = (select s.id from hr_snapshot s where s.status = 'PUBLISHED')
                 where o.status = 'ACTIVE'""" + " and " + where + " order by o.name limit 500")
@@ -188,6 +201,13 @@ public class AccessWorkspaceService {
         return String.join(" / ", p.stream().map(OrgUnit::name).toList());
     }
 
+    /** The unit's ancestors as ids, the top first, without the unit: the tree opens them to show it (MOVER's revealUnit). */
+    private List<String> trail(UUID org) {
+        List<OrgUnit> p = new ArrayList<>(hierarchy.path(org));
+        java.util.Collections.reverse(p);
+        return p.stream().filter(u -> !u.id().equals(org)).map(u -> u.id().toString()).toList();
+    }
+
     /** «ابحث أولاً»: units by name or code, or people by name, employee number or login — inside the reach, each with its path. */
     public List<Map<String, Object>> search(AccessContext ctx, String q, String kind) {
         DirectoryScope.Reach r = reach(ctx);
@@ -203,9 +223,9 @@ public class AccessWorkspaceService {
             }
             for (Map<String, Object> row : jdbc.sql("""
                     select distinct on (p.id) p.id, p.display_name, p.employee_no, p.username, p.status, o.id as org_id, o.name as org_name
-                    from person p join """ + MEMBERS + """
+                    from person p join """ + USERS + """
                      mem on mem.person_id = p.id join organization o on o.id = mem.organization_id and o.status = 'ACTIVE'
-                    where (p.display_name ilike :q or p.employee_no ilike :q or coalesce(p.username, '') ilike :q)""" + orgFilter(r, "mem.organization_id") + """
+                    where (p.display_name ilike :q or p.employee_no ilike :q or coalesce(p.username, '') ilike :q)""" + orgFilter(r, "mem.organization_id") + platformFilter(r, "p") + """
                      order by p.id limit 25""").param("q", like).param("reach", reachIds).query().listOfRows()) {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("id", row.get("id").toString());
@@ -272,8 +292,9 @@ public class AccessWorkspaceService {
                 from organization o left join organization po on po.id = o.parent_id
                 left join hr_unit h on h.external_id = o.source_external_id and h.snapshot_id = (select s.id from hr_snapshot s where s.status = 'PUBLISHED')
                 where o.id = :o""").param("o", org).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
-        Map<String, Object> people = jdbc.sql("select count(distinct p.id) as total, count(distinct p.id) filter (where p.status = 'ACTIVE') as active from "
-                + MEMBERS + " mem join person p on p.id = mem.person_id where mem.organization_id = :o").param("o", org).query().singleRow();
+        Map<String, Object> people = jdbc.sql("select count(distinct p.id) as total, count(distinct p.id) filter (where p.status = 'ACTIVE' and not p.access_disabled) as active from "
+                + USERS + " mem join person p on p.id = mem.person_id where mem.organization_id = :o" + platformFilter(directory.reach(ctx), "p"))
+                .param("o", org).query().singleRow();
         List<String> managers = jdbc.sql("""
                 select distinct p.display_name from membership m join role_def r on r.code = m.role_code join person p on p.id = m.person_id
                 where m.organization_id = :o and 'MANAGE_ACCESS' = any(r.permissions) and not r.system and p.status = 'ACTIVE'
@@ -290,6 +311,7 @@ public class AccessWorkspaceService {
         out.put("active", ((Number) people.get("active")).longValue());
         out.put("children", ((Number) u.get("children")).intValue());
         out.put("path", path(org));
+        out.put("trail", trail(org));
         Map<String, Map<String, Object>> given = new HashMap<>();
         jdbc.sql("""
                 select ug.id, ug.role_code, ug.valid_from, g.display_name from unit_grant ug left join person g on g.id = ug.granted_by
@@ -369,17 +391,17 @@ public class AccessWorkspaceService {
         requireUnit(ctx, org);
         String like = q == null || q.isBlank() ? null : "%" + q.trim() + "%";
         String role = roleFilter == null || roleFilter.isBlank() ? null : roleFilter;
+        String hide = platformFilter(directory.reach(ctx), "p");
         String people = """
                 from person p left join unit_member um on um.person_id = p.id and um.organization_id = :o and um.ended_at is null
-                where (exists (select 1 from affiliation a where a.person_id = p.id and a.organization_id = :o and a.valid_to is null)
-                    or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and (m.valid_to is null or m.valid_to > now()))
-                    or um.id is not null)
+                where (um.id is not null
+                    or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and (m.valid_to is null or m.valid_to > now())))
                   and (cast(:q as text) is null or p.display_name ilike :q or p.employee_no ilike :q or coalesce(p.username, '') ilike :q)
                   and (cast(:role as text) is null
                     or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and m.role_code = :role
                                  and m.valid_from <= now() and (m.valid_to is null or m.valid_to > now()))
                     or exists (select 1 from unit_grant ug where ug.organization_id = :o and ug.role_code = :role and ug.valid_to is null
-                                 and (um.id is not null or exists (select 1 from affiliation a where a.person_id = p.id and a.organization_id = :o and a.valid_to is null))))""";
+                                 and (um.id is not null or exists (select 1 from affiliation a where a.person_id = p.id and a.organization_id = :o and a.valid_to is null))))""" + hide;
         long total = jdbc.sql("select count(*) " + people).param("o", org).param("q", like).param("role", role).query(Long.class).single();
         int pageNo = Math.max(0, page == null ? 0 : page);
         List<Map<String, Object>> rows = jdbc.sql("""
@@ -406,6 +428,21 @@ public class AccessWorkspaceService {
         List<UUID> ids = rows.stream().map(r -> (UUID) r.get("id")).toList();
         Map<UUID, Set<String>> seats = new HashMap<>();
         Map<UUID, Set<String>> delegated = new HashMap<>();
+        // TNQL's separate columns (owner, 16 Nov 2026): rank and position from the published HR record, the position falling
+        // back to the person's current affiliation (this unit's first); one query for the page, by primary key
+        Map<UUID, String[]> hr = new HashMap<>();
+        if (!ids.isEmpty()) {
+            jdbc.sql("""
+                    select p.id, h.rank_name,
+                           coalesce(h.position_title, (select a.position_title from affiliation a where a.person_id = p.id and a.valid_to is null
+                                                        order by (a.organization_id = :o) desc, a.valid_from desc limit 1)) as position
+                    from person p
+                    left join hr_person h on p.source = 'HR' and h.external_id = p.source_external_id
+                                         and h.snapshot_id in (select id from hr_snapshot where status = 'PUBLISHED')
+                    where p.id = any(string_to_array(:ids, ',')::uuid[])""")
+                    .param("o", org).param("ids", Db.ids(ids))
+                    .query((rs, n) -> hr.put(Db.uuid(rs, "id"), new String[] {rs.getString("rank_name"), rs.getString("position")})).list();
+        }
         if (!ids.isEmpty()) {
             jdbc.sql("""
                     select a.person_id, ps.role_code from affiliation a
@@ -436,6 +473,10 @@ public class AccessWorkspaceService {
             row.put("id", id.toString());
             row.put("displayName", p.get("display_name"));
             row.put("employeeNo", shownNumber(no, (String) p.get("username")));
+            String[] hrInfo = hr.getOrDefault(id, new String[2]);
+            row.put("rank", hrInfo[0]);
+            row.put("position", hrInfo[1]);
+            row.put("username", p.get("username"));
             row.put("active", "ACTIVE".equals(p.get("status")));
             row.put("added", p.get("added"));
             row.put("acting", p.get("acting"));
@@ -644,7 +685,7 @@ public class AccessWorkspaceService {
 
     /** Whether one change (a role, granted or removed) reaches every member of the unit, more than one (TNQL's acknowledgement). */
     private boolean wholeUnit(UUID org, List<Checked> checked) {
-        long members = jdbc.sql("select count(distinct person_id) from " + MEMBERS + " mem where mem.organization_id = :o").param("o", org).query(Long.class).single();
+        long members = jdbc.sql("select count(distinct person_id) from " + USERS + " mem where mem.organization_id = :o").param("o", org).query(Long.class).single();
         if (members < 2) {
             return false;
         }

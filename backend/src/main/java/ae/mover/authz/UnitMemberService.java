@@ -118,7 +118,9 @@ public class UnitMemberService {
                        (select o.name from affiliation a join organization o on o.id = a.organization_id
                          where a.person_id = p.id and a.valid_to is null order by a.valid_from desc limit 1) as unit_name,
                        exists (select 1 from affiliation a where a.person_id = p.id and a.valid_to is null and a.organization_id = :o) as posted_here,
-                       exists (select 1 from unit_member u where u.person_id = p.id and u.organization_id = :o and u.ended_at is null) as added_here
+                       exists (select 1 from unit_member u where u.person_id = p.id and u.organization_id = :o and u.ended_at is null)
+                         or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o
+                                      and (m.valid_to is null or m.valid_to > now())) as user_here
                 from person p
                 left join hr_person h on h.external_id = p.source_external_id
                   and h.snapshot_id = (select id from hr_snapshot where status = 'PUBLISHED')
@@ -133,7 +135,8 @@ public class UnitMemberService {
         m.put("jobTitle", p.get("job_title"));
         m.put("hrStatus", p.get("status_text"));
         m.put("unitName", p.get("unit_name"));
-        boolean here = Boolean.TRUE.equals(p.get("posted_here")) || Boolean.TRUE.equals(p.get("added_here"));
+        // «مستخدم الوحدة» (owner, 16 Nov 2026): added or granted there — an HR posting alone is not; acting = posted elsewhere
+        boolean here = Boolean.TRUE.equals(p.get("user_here"));
         m.put("inUnit", here);
         m.put("acting", !here && !Boolean.TRUE.equals(p.get("posted_here")) && p.get("unit_name") != null);
         return m;
@@ -143,8 +146,10 @@ public class UnitMemberService {
     }
 
     /**
-     * Adds a person to the unit with no role: an HR person by id (from {@link #lookup}), or a User ID without HR. A person already
-     * posted to or added to the unit is answered with their id so the matrix can show them; nothing is duplicated.
+     * Adds a person to the unit with no role: an HR person by id (from {@link #lookup}), or a User ID without HR. Since 16 Nov 2026
+     * (owner, as TNQL) this is how a person becomes one of the unit's users, together with an approved access request: an HR posting
+     * alone lists no one. A person already a user of the unit (added, or holding a grant made there) is answered with their id so
+     * the matrix can show them; nothing is duplicated. Acting means posted by HR in another unit.
      */
     @Transactional
     public Map<String, Object> add(AccessContext ctx, AddInput in) {
@@ -208,12 +213,14 @@ public class UnitMemberService {
         }
         boolean posted = jdbc.sql("select count(*) from affiliation where person_id = :p and organization_id = :o and valid_to is null")
                 .param("p", person).param("o", orgId).query(Integer.class).single() > 0;
-        boolean added = jdbc.sql("select count(*) from unit_member where person_id = :p and organization_id = :o and ended_at is null")
+        boolean user = jdbc.sql("""
+                select count(*) from (select person_id from unit_member where person_id = :p and organization_id = :o and ended_at is null
+                  union all select person_id from membership where person_id = :p and organization_id = :o and (valid_to is null or valid_to > now())) u""")
                 .param("p", person).param("o", orgId).query(Integer.class).single() > 0;
-        if (posted || added) {
+        if (user) {
             return Map.of("personId", person.toString(), "created", false, "already", true);
         }
-        boolean acting = jdbc.sql("select count(*) from affiliation where person_id = :p and valid_to is null")
+        boolean acting = !posted && jdbc.sql("select count(*) from affiliation where person_id = :p and valid_to is null")
                 .param("p", person).query(Integer.class).single() > 0;
         try {
             jdbc.sql("""

@@ -374,6 +374,8 @@ export type WorkspaceUnit = {
   active: number;
   children: number;
   path: string;
+  /** The unit's ancestors, the top first, without the unit: the tree opens them to show it. */
+  trail?: string[];
   inherited: { code: string; name: string; scope: string; since: string; grantedBy: string | null }[];
   unitRoles: { code: string; name: string; on: boolean; lock: string | null }[];
   providers: string[];
@@ -434,6 +436,10 @@ export type WorkspacePerson = {
   lock: string | null;
   hrUnavailable?: string | null;
   accessDisabled?: boolean;
+  /** From the person's current HR record (MOVER's «الرتبة العسكرية» and «المنصب»), and the sign-in ID («رقم الـU»). */
+  rank?: string | null;
+  position?: string | null;
+  username?: string | null;
   cells: Record<string, WorkspaceCell>;
   effective: number;
   grants: GrantView[];

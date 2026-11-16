@@ -46,6 +46,20 @@ class HrMappingTest {
         Map<String, String> root = c.convert(Entity.UNIT, Map.of("ID", 100000, "NAME", "الجذر", "SORT_ORDER", "\\100000", "STATUS", 1));
         assertThat(root.get("parent_external_unit_id")).isNull();
 
+        // the rank (owner, 16 Nov 2026): optional, mapped to TNQL's grade column
+        HrMapping.Canonical rank = HrMapping.canonical(Entity.PERSON, "rank");
+        assertThat(rank).isNotNull();
+        assertThat(rank.required()).isFalse();
+        assertThat(rank.label()).isEqualTo("الرتبة");
+        List<HrMapping.Field> ranked = new ArrayList<>(fields);
+        ranked.add(new HrMapping.Field(Entity.PERSON, "rank", "GRADE_NAME", "none", List.of(), true));
+        assertThat(HrMapping.structuralProblems(new HrMapping.Definition(ranked, rules))).isEmpty();
+        Map<Entity, List<String>> withGrade = new EnumMap<>(discovered);
+        withGrade.put(Entity.PERSON, List.of("PRS_ID", "MIL_NUMBER", "FULL_NAME", "ORG_UNIT_ID", "EMP_STATUS_DESC", "EMP_STATUS", "GRADE_NAME"));
+        Map<String, String> person = HrMapping.compile(new HrMapping.Definition(ranked, rules), withGrade).convert(Entity.PERSON,
+                Map.of("PRS_ID", 7, "MIL_NUMBER", "3001", "FULL_NAME", "اسم", "ORG_UNIT_ID", 100007, "EMP_STATUS_DESC", "في الخدمة", "EMP_STATUS", 1, "GRADE_NAME", "رائد"));
+        assertThat(person.get("rank")).isEqualTo("رائد");
+
         List<HrMapping.Field> wrong = new ArrayList<>(fields);
         wrong.set(1, new HrMapping.Field(Entity.UNIT, "name", "NAME", "path_parent", List.of(), true));
         assertThat(HrMapping.structuralProblems(new HrMapping.Definition(wrong, rules))).contains("التحويل path_parent لحقل الجهة الأم فقط");

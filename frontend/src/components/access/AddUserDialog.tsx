@@ -96,10 +96,12 @@ export function AddUserDialog({ unit, onClose, onAdded }: { unit: { id: string; 
                   {card.userId && <div><dt>رقم المستخدم</dt><dd className="latin">{card.userId}</dd></div>}
                 </dl>
                 {card.inUnit ? (
-                  <p className="au-note">هذا الموظف ضمن «{unit.name}» بالفعل؛ الحفظ يعرض صفه في المصفوفة.</p>
+                  <p className="au-note">هذا الموظف من مستخدمي «{unit.name}» بالفعل؛ الحفظ يعرض صفه في المصفوفة.</p>
                 ) : card.acting ? (
                   <p className="au-note">يعمل في «{card.unitName}»؛ يُضاف إلى «{unit.name}» بالإنابة، ولا تتغير وحدته في الموارد البشرية.</p>
-                ) : null}
+                ) : (
+                  <p className="au-note">يُضاف إلى مستخدمي «{unit.name}» بلا أي صلاحية؛ لا يظهر موظفو الوحدة في القائمة إلا بإضافتهم أو بطلب صلاحيات معتمد.</p>
+                )}
               </div>
             )}
           </>

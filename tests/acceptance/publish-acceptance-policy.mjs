@@ -65,26 +65,23 @@ try {
   await page.locator('label', { hasText: 'مسموح بمرحلة اعتماد منفصلة' }).locator('input').check();
   await page.locator('label', { hasText: 'أقصى زيادة (م)' }).locator('input').fill('2000');
 
-  const routing = page.locator('section', { has: page.locator('h3', { hasText: 'مسار الاعتماد' }) });
-  await routing.locator('label', { hasText: 'معتمد الوحدة الطالبة' }).locator('input').check();
-  const rows = routing.locator('tbody tr');
-  const n = await rows.count();
-  const seen = [];
-  for (let i = 0; i < n; i++) {
-    const row = rows.nth(i);
-    const level = Number(await row.locator('td').nth(0).locator('input').inputValue());
-    seen.push(level);
-    if (!APPROVING.includes(level)) continue;
-    await row.locator('td').nth(2).locator('input').check();
-    await row.locator('td').nth(3).locator('input').fill(`اعتماد المستوى L${level}`);
-    if (level === FINAL) await row.locator('td').nth(4).locator('input').check();
+  // «مسار الاعتماد» is a ladder of the HR levels since 16 Nov 2026 (components/RoutingLadder.tsx): one row per level
+  const routing = page.getByTestId('policy-routing');
+  await routing.locator('[data-start="SELF"]').click();
+  const seen = (await routing.locator('[data-level]').evaluateAll((rows) => rows.map((r) => Number(r.getAttribute('data-level')))));
+  for (const level of APPROVING) {
+    const row = routing.locator(`[data-level="${level}"]`);
+    if ((await row.locator('[data-approves]').getAttribute('aria-checked')) !== 'true') await row.locator('[data-approves]').click();
+    await row.locator(`[data-label="${level}"]`).fill(`اعتماد المستوى L${level}`);
   }
+  await routing.locator(`[data-final="${FINAL}"]`).click();
   // facts are offered only on the non-final rows (the final stage rests on every fact)
-  for (let i = 0; i < n; i++) {
-    const row = rows.nth(i);
-    const level = Number(await row.locator('td').nth(0).locator('input').inputValue());
-    if (level === FINAL || !APPROVING.includes(level)) continue;
-    for (const f of HIERARCHY_FACTS) await row.locator('td').nth(5).locator('label', { hasText: f }).first().locator('input').check();
+  for (const level of APPROVING) {
+    if (level === FINAL) continue;
+    for (const f of HIERARCHY_FACTS) {
+      const chip = routing.locator(`[data-level="${level}"] .rt-fact`, { hasText: f }).first();
+      if ((await chip.getAttribute('aria-pressed')) !== 'true') await chip.click();
+    }
   }
   ok(APPROVING.every((l) => seen.includes(l)), 'P3', 'routing rows for every HR level L6–L10 on the page', seen.map((l) => 'L' + l).join(' '));
 

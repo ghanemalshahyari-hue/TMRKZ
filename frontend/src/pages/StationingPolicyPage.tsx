@@ -3,13 +3,12 @@ import { api } from '../api/client';
 import type {
   HierarchyLevel,
   PolicyChange,
-  RoutingLevelValue,
-  StationingFact,
   StationingPolicyValues,
   StationingPolicyVersion,
   TerrainDatasetView,
 } from '../api/types';
 import { NumberField } from '../components/NumberField';
+import { RoutingLadder } from '../components/RoutingLadder';
 import { TerrainExtraField, type ExtraUnit } from '../components/TerrainExtraField';
 import { Heading } from '../components/ui';
 import { useApp } from '../lib/app';
@@ -17,14 +16,6 @@ import { fullDate } from '../lib/dates';
 import { INITIAL_SLOPE_LIMITS } from '../lib/terrainRgb';
 import './restationing.css';
 
-const FACTS: [StationingFact, string][] = [
-  ['SCOPE', 'الوحدات المنتقلة'],
-  ['CLASSIFICATION', 'النوع (دائم / مؤقت)'],
-  ['DURATION', 'المدة'],
-  ['SITE', 'الموقع المقترح'],
-  ['DEPLOYMENT', 'الانتشار'],
-  ['AVAILABILITY', 'الإتاحة'],
-];
 const AUTHORITIES: [StationingPolicyValues['crossBranch']['authorities'][number], string][] = [
   ['OTHER_UNIT', 'موافقة الوحدة المضافة'],
   ['OTHER_UNIT_PARENT', 'موافقة الجهة الأعلى للوحدة المضافة'],
@@ -95,8 +86,6 @@ export function StationingPolicyPage() {
   };
   const classes = values.terrainSlopeClassification.classes;
   const slopeLimits = values.slopeDisplay ?? INITIAL_SLOPE_LIMITS;
-  const setLevel = (i: number, patch: Partial<RoutingLevelValue>) =>
-    set({ routing: { ...values.routing, levels: values.routing.levels.map((l, j) => (j === i ? { ...l, ...patch } : l)) } });
 
   const importFile = async (f: File) => {
     try {
@@ -356,43 +345,9 @@ export function StationingPolicyPage() {
           </fieldset>
         </section>
 
-        <section className="card rs-form">
+        <section className="card rs-form rs-routing-card">
           <h3>مسار الاعتماد (من الوحدة الطالبة صعوداً في الهيكل التنظيمي)</h3>
-          <fieldset className="rs-inline">
-            <legend>المرحلة الأولى</legend>
-            <label><input type="radio" checked={values.routing.startAt === 'SELF'} onChange={() => set({ routing: { ...values.routing, startAt: 'SELF' } })} /> معتمد الوحدة الطالبة</label>
-            <label><input type="radio" checked={values.routing.startAt === 'PARENT'} onChange={() => set({ routing: { ...values.routing, startAt: 'PARENT' } })} /> الجهة الأعلى للوحدة الطالبة</label>
-          </fieldset>
-          <table className="rs-table">
-            <thead>
-              <tr><th>المستوى</th><th>في الهيكل</th><th>يعتمد</th><th>التسمية</th><th>نهائي</th><th>تُعاد الموافقة إذا تغيّر</th><th /></tr>
-            </thead>
-            <tbody>
-              {values.routing.levels.map((l, i) => (
-                <tr key={i}>
-                  <td><NumberField value={l.level} onChange={(v) => setLevel(i, { level: Math.trunc(v ?? 0) })} /></td>
-                  <td className="muted">{levels.find((x) => x.level === l.level)?.examples.join('، ') ?? '—'}</td>
-                  <td><input type="checkbox" checked={l.approves} onChange={(e) => setLevel(i, { approves: e.target.checked })} /></td>
-                  <td><input value={l.label} placeholder="مثل: اعتماد الإدارة" onChange={(e) => setLevel(i, { label: e.target.value })} /></td>
-                  <td><input type="radio" name="final" checked={l.finalStage} onChange={() => set({ routing: { ...values.routing, levels: values.routing.levels.map((x, j) => ({ ...x, finalStage: j === i })) } })} /></td>
-                  <td className="rs-facts-cell">
-                    {l.finalStage ? (
-                      <span className="muted">أي تغيير (المرحلة النهائية)</span>
-                    ) : (
-                      FACTS.map(([f, label]) => (
-                        <label key={f} className="rs-check">
-                          <input type="checkbox" checked={l.dependsOn.includes(f)} onChange={(e) => setLevel(i, { dependsOn: e.target.checked ? [...l.dependsOn, f] : l.dependsOn.filter((x) => x !== f) })} /> {label}
-                        </label>
-                      ))
-                    )}
-                  </td>
-                  <td><button className="chip" onClick={() => set({ routing: { ...values.routing, levels: values.routing.levels.filter((_, j) => j !== i) } })}>✕</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button className="button" onClick={() => set({ routing: { ...values.routing, levels: [...values.routing.levels, { level: 0, approves: false, label: '', finalStage: false, dependsOn: [] }] } })}>＋ مستوى</button>
-          <small className="muted">المستويات في الهيكل التنظيمي: {levels.map((l) => `L${l.level} (${l.units})`).join('، ') || 'تظهر بعد استيراد الوحدات'}. المستوى بلا صف لا يعتمد؛ والمسار يقف عند المستوى النهائي.</small>
+          <RoutingLadder routing={values.routing} levels={levels} stages={values.approvalStages} onChange={(routing) => set({ routing })} />
         </section>
 
         <section className="card rs-form">

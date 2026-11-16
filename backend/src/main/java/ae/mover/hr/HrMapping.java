@@ -15,8 +15,9 @@ import java.util.regex.Pattern;
 /**
  * The HR read contract, compatible with TNQL: business semantics are fixed in code (canonical fields and which are
  * required); the source implementation (view and column names) comes from a published mapping version. Only identity,
- * affiliation, status and position fields exist here — health, passport, contact, rank and similar data cannot be
- * mapped, so they are never selected.
+ * affiliation, status, position and rank fields exist here — health, passport, contact and similar data cannot be
+ * mapped, so they are never selected. Rank was added on the owner's request of 16 Nov 2026 (separate الرتبة column in
+ * «إدارة الصلاحيات», as TNQL), optional.
  */
 public final class HrMapping {
 
@@ -47,6 +48,8 @@ public final class HrMapping {
             new Canonical(Entity.PERSON, "position_id", false, "معرف المنصب"),
             new Canonical(Entity.PERSON, "position", false, "المنصب"),
             new Canonical(Entity.PERSON, "job", false, "الوظيفة"),
+            // TNQL's GRADE_NAME; shown in its own column of «إدارة الصلاحيات» (owner, 16 Nov 2026)
+            new Canonical(Entity.PERSON, "rank", false, "الرتبة"),
             // TNQL leaves out approvers HR marks away; any value here means away now, empty means available (ADR-059)
             new Canonical(Entity.PERSON, "leave_status", false, "حالة الإجازة أو الغياب (فارغ = متاح)"));
 

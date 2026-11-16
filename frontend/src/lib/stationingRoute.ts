@@ -61,3 +61,74 @@ export function routeGraph(r: RouteValues): FlowGraph {
   });
   return autoLayout({ nodes, edges });
 }
+
+// ---- «مسار الاعتماد» on «سياسة التمركز»: the ladder of levels (owner redesign, 16 Nov 2026) -----------------------------
+
+export type RoutingValue = RouteValues['routing'];
+export const defaultLevelLabel = (level: number) => 'اعتماد المستوى L' + level;
+
+export type LadderRow = { level: number; cfg: RoutingLevelValue | null; duplicates: number; info: HierarchyLevel | null };
+
+/**
+ * Every level the hierarchy has, and any configured level it no longer has, deepest first: the order a request climbs.
+ * A level configured twice counts by its first entry, as on the server (RouteDerivation.derive).
+ */
+export function ladder(routing: RoutingValue, levels: HierarchyLevel[]): LadderRow[] {
+  const numbers = new Set([...levels.map((l) => l.level), ...routing.levels.map((l) => l.level)]);
+  return [...numbers]
+    .sort((a, b) => b - a)
+    .map((level) => {
+      const all = routing.levels.filter((l) => l.level === level);
+      return { level, cfg: all[0] ?? null, duplicates: Math.max(0, all.length - 1), info: levels.find((l) => l.level === level) ?? null };
+    });
+}
+
+/** Changes one level: its first entry is patched, later entries of the same level dropped, a missing level added. */
+export function patchLevel(routing: RoutingValue, level: number, patch: Partial<RoutingLevelValue>): RoutingValue {
+  let seen = false;
+  const out: RoutingLevelValue[] = [];
+  for (const l of routing.levels) {
+    if (l.level !== level) out.push(l);
+    else if (!seen) {
+      seen = true;
+      out.push({ ...l, ...patch, level });
+    }
+  }
+  if (!seen) out.push({ level, approves: false, label: '', finalStage: false, dependsOn: [], ...patch });
+  return { ...routing, levels: out };
+}
+
+/** A level that starts approving gets the standing name «اعتماد المستوى Lx» if it has none; one that stops is no longer the last. */
+export function switchApproves(routing: RoutingValue, level: number, approves: boolean): RoutingValue {
+  const cur = routing.levels.find((l) => l.level === level);
+  const label = approves && !cur?.label?.trim() ? defaultLevelLabel(level) : (cur?.label ?? '');
+  return patchLevel(routing, level, { approves, label, finalStage: approves && !!cur?.finalStage });
+}
+
+/** One level closes the hierarchy, and it approves. */
+export function makeFinal(routing: RoutingValue, level: number): RoutingValue {
+  const cur = routing.levels.find((l) => l.level === level);
+  const cleared = { ...routing, levels: routing.levels.map((l) => ({ ...l, finalStage: false })) };
+  return patchLevel(cleared, level, { approves: true, finalStage: true, label: cur?.label?.trim() ? cur.label : defaultLevelLabel(level) });
+}
+
+/** Keeps the first entry of each level, the one the server reads. */
+export function withoutDuplicates(routing: RoutingValue): RoutingValue {
+  const seen = new Set<number>();
+  return { ...routing, levels: routing.levels.filter((l) => !seen.has(l.level) && !!seen.add(l.level)) };
+}
+
+/**
+ * The hierarchy stages the server builds for a request from a unit at level `from` whose ancestors sit on the levels above
+ * it (RouteDerivation.derive): from the unit itself or its parent, every approving level, up to and including the last one.
+ */
+export function previewRoute(routing: RoutingValue, levels: number[], from: number): { stages: RoutingLevelValue[]; stopped: boolean } {
+  const walk = levels.filter((l) => (routing.startAt === 'PARENT' ? l < from : l <= from)).sort((a, b) => b - a);
+  const stages: RoutingLevelValue[] = [];
+  for (const level of walk) {
+    const cfg = routing.levels.find((l) => l.level === level);
+    if (cfg?.approves) stages.push(cfg);
+    if (cfg?.finalStage) return { stages, stopped: true };
+  }
+  return { stages, stopped: false };
+}

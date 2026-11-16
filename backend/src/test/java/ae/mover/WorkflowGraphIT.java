@@ -893,6 +893,11 @@ class WorkflowGraphIT extends IntegrationTest {
         assertThat(done.body().path("status").asText()).isEqualTo("APPROVED");
         assertThat(jdbc.sql("select role_code from membership where person_id = :p and organization_id = :o").param("p", asker).param("o", squad).query(String.class).list())
                 .as("what the final approver granted").containsExactlyInAnyOrder("REQUESTER", "CHAIN_APPROVER");
+        // the approved request makes the person one of the unit's users (owner, 16 Nov 2026, as TNQL)
+        assertThat(jdbc.sql("select count(*) from unit_member where person_id = :p and organization_id = :o and ended_at is null and not acting")
+                .param("p", asker).param("o", squad).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'UNIT_MEMBER_ADDED' and entity_id = :p").param("p", asker.toString())
+                .query(Long.class).single()).isEqualTo(1);
         assertThat(login("asker").get("/me").body().path("permissions").toString()).contains("CREATE");
         assertThat(jdbc.sql("select array_to_string(requested, ',') || '|' || array_to_string(recommended, ',') || '|' || array_to_string(granted, ',') from access_request where request_id = :r").param("r", id).query(String.class).single())
                 .as("three sets apart").isEqualTo("REQUESTER,FYI_RECEIVER|REQUESTER|REQUESTER,CHAIN_APPROVER");

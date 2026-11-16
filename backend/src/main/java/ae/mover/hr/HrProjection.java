@@ -207,6 +207,19 @@ public class HrProjection {
                               union all select o.id, o.parent_id from organization o join up on o.id = up.parent_id)
                             select 1 from up where up.id = m.organization_id)""")
                         .param("p", pid).param("now", Db.ts(now)).param("org", c.get("new_org")).update();
+                // a user of the old unit (added there, not acting) is a user of the new one (owner, 16 Nov 2026, as TNQL's
+                // reconciliation): the old entry ends so the old unit's grants given to all stop reaching them; an acting entry
+                // (added on purpose while posted elsewhere) stays
+                if (c.get("old_org") != null && jdbc.sql("""
+                        update unit_member set ended_at = :now, ended_by = :p, ended_reason = 'HR_TRANSFER'
+                        where person_id = :p and organization_id = :old and not acting and ended_at is null""")
+                        .param("p", pid).param("old", c.get("old_org")).param("now", Db.ts(now)).update() > 0) {
+                    jdbc.sql("""
+                            insert into unit_member(id, person_id, organization_id, acting, added_by, added_at)
+                            select :id, :p, :org, false, :p, :now
+                            where not exists (select 1 from unit_member where person_id = :p and organization_id = :org and ended_at is null)""")
+                            .param("id", UUID.randomUUID()).param("p", pid).param("org", c.get("new_org")).param("now", Db.ts(now)).update();
+                }
             }
             audit.system(gone ? "HR_PERSON_DEPARTED" : "HR_AFFILIATION_CHANGED", "PERSON", pid.toString(), null,
                     Map.of("transfer", !gone && c.get("new_org") != null && !c.get("new_org").equals(c.get("old_org"))));

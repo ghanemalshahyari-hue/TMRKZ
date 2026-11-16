@@ -82,7 +82,9 @@ class UnitMemberIT extends IntegrationTest {
         assertThat(byNo.body().path("inUnit").asBoolean()).isFalse();
         assertThat(byNo.body().path("acting").asBoolean()).as("posted in a sub-unit: added to A acting").isTrue();
         assertThat(lookup(m, orgA, "HRA1-" + sfx).body().path("personId").asText()).as("by User ID, any case").isEqualTo(hrA1.toString());
-        assertThat(lookup(m, orgA1, "E-hra1-" + sfx).body().path("inUnit").asBoolean()).as("already posted in A1").isTrue();
+        // posted in A1 is not being one of A1's users (owner, 16 Nov 2026): the card offers to add them, not acting
+        assertThat(lookup(m, orgA1, "E-hra1-" + sfx).body().path("inUnit").asBoolean()).as("posted in A1, not yet a user").isFalse();
+        assertThat(lookup(m, orgA1, "E-hra1-" + sfx).body().path("acting").asBoolean()).isFalse();
 
         // outside the directory, unknown: the same answer, so the search reveals nothing
         Res outside = lookup(m, orgA, "E-hrb-" + sfx);
