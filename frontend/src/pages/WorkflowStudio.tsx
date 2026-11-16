@@ -453,12 +453,23 @@ export function WorkflowStudio() {
                             <b>{r.type === 'parallel' || r.type === 'join' || r.type === 'start' ? NODE_TITLES[r.type] : r.name}</b>
                             {r.taken && <span className={'fs-taken ' + r.taken}>{WHEN_LABEL[r.taken]}</span>}
                             {r.chain && r.places.length === 0 && <div className="fs-route-place">لا شيء يصعد إليه من هذه الوحدة، فيكمل الطلب إلى الخطوة التالية.</div>}
-                            {r.places.map((p, i) => (
-                              <div key={i} className={'fs-route-place' + (p.holders === 0 || p.unresolved ? ' warn' : '')}>
-                                {r.chain && <b>{i + 1}. </b>}
-                                {roleName(p.role)}: {p.unresolved ? 'لم تُوجد جهة، فتبقى مفتوحة لأي صاحب دور' : p.anyOrg ? 'أي جهة ضمن النطاق' : p.orgs.join('، ')} · {p.holders ? `${p.holders} شخص` : 'لا أحد يملك هذا الدور هناك'}
-                              </div>
-                            ))}
+                            {r.places.map((p, i) =>
+                              p.skipped ? (
+                                // a unit of the climb with no hierarchy approver, own or inherited: skipped and recorded (ADR-062)
+                                <div key={i} className="fs-route-place skipped" data-skipped="true">
+                                  {r.chain && <b>{i + 1}. </b>}
+                                  {p.orgs.join('، ')} · <b>تم التجاوز</b> — لا يوجد معتمد
+                                </div>
+                              ) : (
+                                <div key={i} className={'fs-route-place' + (p.holders === 0 || p.unresolved ? ' warn' : '')}>
+                                  {r.chain && <b>{i + 1}. </b>}
+                                  {roleName(p.role)}: {p.unresolved ? 'لم تُوجد جهة، فتبقى مفتوحة لأي صاحب دور' : p.anyOrg ? 'أي جهة ضمن النطاق' : p.orgs.join('، ')} · {p.holders ? `${p.holders} شخص` : 'لا أحد يملك هذا الدور هناك'}
+                                </div>
+                              ),
+                            )}
+                            {r.chain && r.places.length > 0 && r.places.every((p) => p.skipped) && (
+                              <div className="fs-route-place">تم تجاوز جهات السلسلة كلها؛ ينتقل الطلب إلى الخطوة التالية.</div>
+                            )}
                             {r.type === 'approval' && (
                               <label className="fs-check">
                                 <input type="checkbox" checked={tryRejected.includes(r.node)} onChange={() => toggleReject(r.node)} /> ماذا لو رُفضت هنا؟

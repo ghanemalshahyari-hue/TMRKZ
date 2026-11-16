@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -88,7 +89,23 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         admin = login("admin");
     }
 
+    /** A test source left enabled would be asked live by later classes' «إضافة مستخدم» and sign-ins (ADR-065). */
+    @AfterEach
+    void disableSource() {
+        jdbc.sql("update hr_source set enabled = false").update();
+    }
+
     // ---- fixtures -------------------------------------------------------------------------------------------
+
+    /**
+     * HR people come in one by one (ADR-065): the source person is imported through «إضافة مستخدم» into the given unit, with no
+     * role, and is linked from then on, so the sync reads them.
+     */
+    private UUID link(String id, String unitId) {
+        Res r = admin.post("/access/unit-members", Map.of("organizationId", orgOf(unitId).toString(), "employeeNo", "N" + sfx + "-" + id));
+        assertThat(r.status()).as(r.toString()).isEqualTo(200);
+        return personOf(id);
+    }
 
     private void exec(String... sql) {
         jdbc.sql("select 1").query().singleRow();
@@ -225,14 +242,25 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         assertThat(status(r)).as(r.toString()).isEqualTo("SUCCEEDED");
         JsonNode counts = JSON.readTree(r.path("counts").asText());
         assertThat(counts.path("units").asInt()).isEqualTo(10);
-        assertThat(counts.path("people").asInt()).isEqualTo(20);
+        // HR people come in one by one (ADR-065): the whole unit tree, but nobody from the person view until imported (people
+        // linked by earlier tests' sources are asked for and not found; none is of this source)
+        assertThat(counts.path("people").asInt()).isZero();
         assertThat(counts.path("organizationsCreated").asInt()).isEqualTo(10);
-        assertThat(counts.path("peopleCreated").asInt()).isEqualTo(20);
+        assertThat(counts.path("peopleCreated").asInt()).isZero();
         // The tree is projected from source identifiers; unmapped columns (here: a phone number) are never read.
         assertThat(jdbc.sql("select parent_id from organization where id = :id").param("id", orgOf("5")).query(UUID.class).single())
                 .isEqualTo(orgOf("1"));
         assertThat(jdbc.sql("select count(*) from hr_person where external_id like :x").param("x", "P" + sfx + "%").query(Long.class).single())
-                .isEqualTo(20);
+                .isZero();
+        // one imported person is the one person the next run reads
+        link("7", "9");
+        JsonNode second = run("SCHEDULED", null);
+        assertThat(status(second)).as(second.toString()).isEqualTo("SUCCEEDED");
+        JsonNode c2 = JSON.readTree(second.path("counts").asText());
+        assertThat(c2.path("linkedPeople").asInt()).isEqualTo(counts.path("linkedPeople").asInt() + 1);
+        assertThat(c2.path("people").asInt()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from person where source = 'HR' and source_external_id like :x").param("x", "P" + sfx + "%")
+                .query(Long.class).single()).isEqualTo(1);
 
         // The adapter issues only the read-only transaction statement and SELECTs.
         HrSourceAdapter.Config cfg = new HrSourceAdapter.Config("hr-db.example.internal", 1521, "HRSVC", "service_name", reader,
@@ -290,10 +318,17 @@ class HrSyncAcceptanceIT extends IntegrationTest {
 
     @Test
     @DisplayName("PA-03: after a full sync, a failing, empty or sharply smaller source keeps the last valid copy")
-    void protections() {
+    void protections() throws Exception {
         standardSource();
         configure(fields());
         assertThat(status(run("SCHEDULED", null))).isEqualTo("SUCCEEDED");
+        // the twenty people are TMRKZ's users (imported one by one, ADR-065), so every run reads them
+        for (int i = 1; i <= 20; i++) {
+            link(String.valueOf(i), String.valueOf(2 + i % 9));
+        }
+        JsonNode all = run("SCHEDULED", null);
+        assertThat(status(all)).as(all.toString()).isEqualTo("SUCCEEDED");
+        assertThat(JSON.readTree(all.path("counts").asText()).path("people").asInt()).isEqualTo(20);
         UUID published = jdbc.sql("select id from hr_snapshot where status = 'PUBLISHED'").query(UUID.class).single();
 
         // Failure part-way through reading: a row the view cannot produce.
@@ -305,13 +340,13 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         assertThat(failed.path("error_code").asText()).startsWith("SOURCE_");
         view("people_v", "select * from " + schema + ".people_t");
 
-        // Empty source: always refused, even with a reason.
+        // Empty source (the person view returns nobody at all): always refused, even with a reason.
         exec("delete from " + schema + ".people_t");
         JsonNode empty = run("MANUAL", "تحديث مقصود بعد إعادة هيكلة الجهات");
         assertThat(status(empty)).isEqualTo("REJECTED");
         assertThat(empty.path("error_code").asText()).isEqualTo("EMPTY_SOURCE");
 
-        // Half the people gone: refused unless an authorised manual run explains it.
+        // Half the linked people gone (they would be marked departed): refused unless an authorised manual run explains it.
         for (int i = 1; i <= 10; i++) {
             personRow(String.valueOf(i), "موظف " + i, String.valueOf(2 + i % 9), "في الخدمة", "POS" + i);
         }
@@ -378,7 +413,8 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         configure(fields());
         assertThat(status(run("SCHEDULED", null))).isEqualTo("SUCCEEDED");
         UUID unit3 = orgOf("3");
-        UUID person4 = personOf("4");
+        // person 4 sits in unit 2 + 4 % 9 = 6 and is imported there, one of its users (ADR-065); a transfer moves that entry with them
+        UUID person4 = link("4", "6");
         UUID oldAffiliation = jdbc.sql("select organization_id from affiliation where person_id = :p and valid_to is null")
                 .param("p", person4).query(UUID.class).single();
 
@@ -391,9 +427,6 @@ class HrSyncAcceptanceIT extends IntegrationTest {
                 .status()).isEqualTo(200);
         UUID site = site("HRS", null, unit3);
         UUID grant = membership(person4, "REQUESTER", orgOf("1"), null);
-        // person 4 was added to their unit (one of its users, owner 16 Nov 2026); a transfer moves that entry with them
-        jdbc.sql("insert into unit_member(id, person_id, organization_id, acting, added_by, added_at) values (:id, :p, :o, false, :p, '2026-01-01T00:00:00Z')")
-                .param("id", UUID.randomUUID()).param("p", person4).param("o", oldAffiliation).update();
         // a unit identity symbol is local metadata as well (map brief §10)
         jdbc.sql("""
                 insert into org_unit_symbol(organization_id, standard, edition, sidc, description_ar, source, updated_by, updated_at)
@@ -446,6 +479,9 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         personRow("B", "موظف آخر", "3", "في الخدمة", "POS-OTHER");
         configure(fields());
         assertThat(status(run("SCHEDULED", null))).isEqualTo("SUCCEEDED");
+        // both are users of their units (imported one by one, ADR-065): a seat reaches only people added to the application
+        link("A", "2");
+        link("B", "3");
         UUID unit2 = orgOf("2");
         assertThat(admin.post("/position-seats", Map.of("organizationId", unit2.toString(), "positionId", "POS-APR",
                 "name", "صاحب الاعتماد", "roleCode", seatRole)).status()).isEqualTo(200);
@@ -527,6 +563,7 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         personRow("A", "صاحب الاعتماد في الإدارة أ", "2", "في الخدمة", "POS-A");
         configure(fields());
         assertThat(status(run("SCHEDULED", null))).isEqualTo("SUCCEEDED");
+        link("A", "2");
         UUID unit2 = orgOf("2");
         membership(personOf("A"), role, unit2, null);
         UUID site = site("S2", null, unit2);
@@ -608,11 +645,11 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         f.add(field("PERSON", "rank", "GRADE_NAME"));
         configure(f);
         assertThat(status(run("SCHEDULED", null))).isEqualTo("SUCCEEDED");
+        // person 4 sits in unit 2 + 4 % 9 = 6; an HR posting alone does not list them (owner, 16 Nov 2026): they are added first,
+        // which imports that one person from HR, rank included (ADR-065)
+        link("4", "6");
         assertThat(jdbc.sql("select rank_name from hr_person where external_id = :x").param("x", p("4")).query(String.class).single())
                 .isEqualTo("رائد");
-        // person 4 sits in unit 2 + 4 % 9 = 6; an HR posting alone does not list them (owner, 16 Nov 2026): they are added first
-        assertThat(admin.post("/access/unit-members", Map.of("organizationId", orgOf("6").toString(), "personId", personOf("4").toString())).status())
-                .isEqualTo(200);
         JsonNode matrix = admin.get("/access/workspace/units/" + orgOf("6") + "/matrix").body();
         JsonNode row = null;
         for (JsonNode r : matrix.path("people")) {

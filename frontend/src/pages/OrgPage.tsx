@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import type { Delegation, Member, OrgDetail, RoleDef } from '../api/types';
 import { PersonPicker } from '../components/access/pickers';
 import { OrgSymbol, SymbolAssignment, SymbolLegend } from '../components/UnitSymbol';
+import { flatSource } from '../components/tree/tree';
+import { UnitTree } from '../components/tree/UnitTree';
 import { Dialog, DialogHead, Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { addDays, dubaiISO, fullDate, todayDubai } from '../lib/dates';
@@ -109,6 +111,7 @@ export function OrgPage() {
   };
 
   const root = orgs.find((o) => o.depth === 0);
+  const tree = useMemo(() => flatSource(orgs), [orgs]);
   const name = detail?.org.name ?? root?.name ?? 'المؤسسة';
 
   return (
@@ -122,20 +125,20 @@ export function OrgPage() {
       <div className="org-layout">
         <aside className="card org-tree">
           <h3>شجرة الجهات</h3>
-          <div className="org-nodes">
-            {orgs.map((o) => (
-              <button
-                key={o.id}
-                className={'org-node ' + (o.depth > 0 ? 'child ' : '') + (current === o.id ? 'active' : '')}
-                style={o.depth > 1 ? { marginRight: (o.depth - 1) * 14 } : undefined}
-                onClick={() => setSelected(o.id)}
-              >
-                <OrgSymbol orgId={o.id} size={20} />
-                {o.name}
-                <small>{String(o.depth === 0 ? o.children.length : o.siteCount).padStart(2, '0')}</small>
-              </button>
-            ))}
-          </div>
+          {/* the one units tree of the application (owner, 16 Nov 2026), not a page-made list of nested cards */}
+          <UnitTree
+            source={tree}
+            label="شجرة الجهات"
+            searchLabel="البحث في شجرة الجهات"
+            search="ابحث عن جهة بالاسم…"
+            selected={current}
+            trail={tree.trail(current)}
+            openSingleRoot
+            onSelect={(o) => setSelected(o.id)}
+            icon={(o) => <OrgSymbol orgId={o.id} size={18} />}
+            meta={(o) => (o.siteCount ? o.siteCount + ' موقع' : null)}
+            testId="org-page-tree"
+          />
         </aside>
         <div className="stack">
           <section className="card org-summary">

@@ -77,9 +77,22 @@ public class OidcClient {
     public record Started(String redirectUrl, String browserBinding) {
     }
 
-    /** {@code platformRole}: the provider states the realm role of a platform account (never true on the directory path). */
+    /**
+     * {@code platformRole}: the provider states the realm role of a platform account (never true on the directory path).
+     * {@code profile}: what the directory states about the person's employment (ADR-068), never null.
+     */
     public record Identity(String issuer, String subject, String enterpriseKey, String displayName, String username,
-                           Instant authTime, String idToken, String purpose, String returnTo, String sessionId, boolean platformRole) {
+                           Instant authTime, String idToken, String purpose, String returnTo, String sessionId, boolean platformRole,
+                           DirectoryProfile profile) {
+
+        public Identity {
+            profile = profile == null ? DirectoryProfile.EMPTY : profile;
+        }
+
+        public Identity(String issuer, String subject, String enterpriseKey, String displayName, String username, Instant authTime,
+                        String idToken, String purpose, String returnTo, String sessionId, boolean platformRole) {
+            this(issuer, subject, enterpriseKey, displayName, username, authTime, idToken, purpose, returnTo, sessionId, platformRole, null);
+        }
 
         @Override
         public String toString() {
@@ -176,12 +189,27 @@ public class OidcClient {
                     : key == null ? null : String.valueOf(key).trim();
             Object roles = claims.getClaim(OidcProperties.ROLES_CLAIM);
             boolean platform = roles instanceof List<?> r ? r.contains(OidcProperties.PLATFORM_ROLE) : OidcProperties.PLATFORM_ROLE.equals(roles);
+            DirectoryProfile profile = new DirectoryProfile(single(claims, props.enterpriseKeyClaim()), single(claims, props.rankClaim()),
+                    single(claims, props.positionClaim()), single(claims, props.unitIdClaim()), single(claims, props.unitNameClaim()),
+                    single(claims, props.mainUnitIdClaim()), props.employmentClaims());
             return new Identity(claims.getIssuer(), claims.getSubject(), enterpriseKey == null || enterpriseKey.isEmpty() ? null : enterpriseKey,
                     name, username, at, idToken, (String) attempt.get("purpose"), (String) attempt.get("return_to"),
-                    (String) attempt.get("session_id"), platform);
+                    (String) attempt.get("session_id"), platform, profile);
         } catch (java.text.ParseException e) {
             throw failed("رمز الهوية يحمل بيانات غير صالحة.");
         }
+    }
+
+    /** One text value of a configured claim (null name: not read); a list counts only when it holds exactly one value. */
+    static String single(JWTClaimsSet claims, String name) {
+        if (name == null) {
+            return null;
+        }
+        Object v = claims.getClaim(name);
+        if (v instanceof List<?> l) {
+            v = l.size() == 1 ? l.get(0) : null;
+        }
+        return v instanceof String || v instanceof Number ? String.valueOf(v) : null;
     }
 
     /**

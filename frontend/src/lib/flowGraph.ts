@@ -67,7 +67,8 @@ export const STOP_KINDS: { value: FlowChain['stop']; label: string; hint: string
   { value: 'ORG', label: 'حتى جهة محددة', hint: 'يتوقف عند هذه الجهة إذا كانت في طريقه' },
 ];
 
-export const newChain = (): FlowChain => ({ from: 'PARENT', stop: 'MAIN_UNIT', skipEmpty: false });
+// owner decision of 16 Nov 2026 (ADR-062): a new climb passes, and records, the units that have no hierarchy approver
+export const newChain = (): FlowChain => ({ from: 'PARENT', stop: 'MAIN_UNIT', skipEmpty: true });
 
 /** The sentence a climbing approval shows on its card. */
 export function chainText(c: FlowChain): string {

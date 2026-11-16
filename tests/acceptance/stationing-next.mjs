@@ -182,6 +182,13 @@ try {
   }
 
   // ---- SITES ---------------------------------------------------------------------------------------------------------
+  // p04 holds «تهيئة المواقع والتمركز» everywhere, so «موقع جديد» has six steps (ADR-067): with no unit chosen at
+  // «التمركز الابتدائي», «التالي» goes straight to «مراجعة وحفظ»; the three-step review is used as it was
+  const toSiteReview = async (page) => {
+    await page.locator('[data-testid="setup-step-3"], [data-testid="site-summary"]').first().waitFor({ timeout: 10000 });
+    if (await page.getByTestId('setup-step-3').count()) await page.getByTestId('wizard-next').click();
+    await page.getByTestId('site-summary').waitFor({ timeout: 10000 });
+  };
   const p04 = await pageAs('p04.sites');
   await go(p04, '#siteSetup');
   await p04.getByTestId('setup-tree').waitFor({ timeout: 15000 });
@@ -209,8 +216,9 @@ try {
   await p04.getByTestId('finish-draw').click(); // free drawing: as many corners as needed, closed on request
   await p04.waitForTimeout(800);
   await p04.getByTestId('wizard-next').click();
+  await toSiteReview(p04);
   await p04.getByLabel('سبب تسجيل الموقع').fill('تهيئة أولى لموقع جديد');
-  await p04.getByTestId('save-site').click();
+  await p04.locator('[data-testid="save-site"], [data-testid="setup-save"]').click();
   // no code is typed (ADR-048): the server gives the next S-number, shown on the finish card
   const NEW1 = (await p04.getByTestId('made-code').innerText({ timeout: 15000 })).trim();
   ok(/^S-\d{4,}$/.test(NEW1), 'SITE-01b', 'رمز الموقع يُعطى تلقائياً', NEW1);
@@ -248,9 +256,10 @@ try {
   const vectors = partVectors(twoParts, moved2);
   ok(moved2.length === 2 && vectors.metres > 1 && vectors.spread < 1, 'SITE-12', 'يتحرك الجزءان معاً', JSON.stringify({ m: Math.round(vectors.metres), spread: vectors.spread }));
   await p04.getByTestId('wizard-next').click();
+  await toSiteReview(p04);
   ok((await p04.getByTestId('site-summary').innerText()).includes('2 أجزاء'), 'SITE-14', 'المراجعة قبل الحفظ تذكر الجزأين');
   await p04.getByLabel('سبب تسجيل الموقع').fill('تهيئة موقع من جزأين');
-  await p04.getByTestId('save-site').click();
+  await p04.locator('[data-testid="save-site"], [data-testid="setup-save"]').click();
   const NEW2 = (await p04.getByTestId('made-code').innerText({ timeout: 15000 })).trim();
   await p04.locator(`[data-site="${NEW2}"]`).waitFor({ timeout: 15000 });
   ok(sql(`select GeometryType(g.geom) from site_geometry_version g join site s on s.id = g.site_id where s.code = '${NEW2}'`) === 'MULTIPOLYGON', 'SITE-13', 'يُسجل موقعاً واحداً متعدد الأجزاء');
@@ -502,7 +511,7 @@ try {
   const p12 = await pageAs('p12.view');
   await go(p12, '#posture');
   await p12.getByTestId('posture-tree').waitFor({ timeout: 20000 });
-  await p12.locator(`[data-unit="${org('N-A11')}"]`).click();
+  await p12.getByTestId('posture-tree').locator(`[data-node="${org('N-A11')}"] .ut-name`).click();
   await p12.waitForTimeout(2500);
   ok((await p12.getByTestId('posture-primary').innerText()).includes('معتمدة') && (await p12.getByTestId('posture-alternative').innerText()).includes('معتمدة'), 'POSTURE-01', 'يرى منطقتي الانتشار بعد التفعيل');
   await shot(p12, '14-operational-posture.png');

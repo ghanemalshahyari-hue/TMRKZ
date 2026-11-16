@@ -40,7 +40,7 @@ function Item({ item, onDone }: { item: AccessInboxItem; onDone: () => void }) {
       {item.final && <p className="micro" data-testid="access-person"><b>الشخص الآن:</b> {item.personActive ? 'نشط في الموارد البشرية' : 'غير نشط'} · {item.movedTo ? 'نُقل' : 'في وحدته نفسها'}</p>}
       {item.final && (
         <p className="micro" data-testid="access-advice">
-          <b>توصية المراجع:</b> {item.recommended ? item.recommended.map((r) => r.name).join('، ') + ' — ' + item.reviewedBy : 'تم التجاوز تلقائياً: لا يوجد مراجع مؤهل لهذه الوحدة'}
+          <b>توصية المراجع:</b> {item.recommended ? item.recommended.map((r) => r.name).join('، ') + ' — ' + item.reviewedBy : item.reviewSkipped ?? 'تم التجاوز تلقائياً: لا يوجد مراجع مؤهل لهذه الوحدة'}
         </p>
       )}
       {item.final && item.recommendReject && <p className="error-text" data-testid="access-advice-reject">موصى بالرفض{item.reviewNote ? ': ' + item.reviewNote : ''}</p>}

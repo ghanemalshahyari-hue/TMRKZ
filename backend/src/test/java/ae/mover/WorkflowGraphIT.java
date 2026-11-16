@@ -410,7 +410,7 @@ class WorkflowGraphIT extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("Climbing: nobody holding the role in a unit skips it; nobody at all stays open to the role, never approved by nobody")
+    @DisplayName("Climbing: nobody holding the role in a unit skips it; nobody at all skips the whole climb and the flow goes on (ADR-062), never open to the role")
     void skipsEmptyUnits() {
         hierarchy();
         jdbc.sql("update membership set valid_to = now() where person_id = (select id from person where username = 'mSec-" + sfx + "')").update();
@@ -423,7 +423,183 @@ class WorkflowGraphIT extends IntegrationTest {
 
         String nobody = withClimb(climbing("chain", "FACILITIES_REVIEWER", "stop", "MAIN_UNIT"));
         UUID open = submittedBy("rTeam", team, nobody);
-        assertThat(jdbc.sql("select count(*) from task_assignment where request_id = :id and status = 'OPEN' and stage_key = 'chain' and target_org_id is null").param("id", open).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from task_assignment where request_id = :id and stage_key = 'chain'").param("id", open).query(Long.class).single())
+                .as("no «ROLE|*» task: the climb with nobody is skipped").isZero();
+        assertThat(openStages(open)).containsExactly("fin");
+        assertThat(jdbc.sql("select organization_id from request_route_skip where request_id = :id order by hierarchy_order").param("id", open).query(UUID.class).list())
+                .containsExactly(section);
+    }
+
+    // ---- ADR-062 (owner, 16 Nov 2026): hierarchy units with no hierarchy approver are skipped, recorded, and the flow goes on ---
+
+    /** The owner's health example: requester «قسم صحة أ1» → «مركز صحة 1» → «إدارة الصحة» → «إدارة الصحة الرئيسية» → main unit. */
+    private UUID hMain, hIdaraMain, hIdara, hMarkaz, hQism, hOps;
+
+    private void health() {
+        UUID hTop = hrUnit("HTOP", null, 1, false);
+        hMain = hrUnit("HMAIN", hTop, 4, true);
+        hIdaraMain = hrUnit("HIDARAMAIN", hMain, 5, false);
+        hIdara = hrUnit("HIDARA", hIdaraMain, 6, false);
+        hMarkaz = hrUnit("HMARKAZ", hIdara, 7, false);
+        hQism = hrUnit("HQISM", hMarkaz, 8, false);
+        hOps = hrUnit("HOPS", hMain, 5, false);
+        person("hReq", "REQUESTER", hQism);
+    }
+
+    /** «اعتماد مستويات الوحدة» (from the parent, below the main unit, skipping empty units) → unit operations at «عمليات الصحة» → final. */
+    private String healthFlow() {
+        Map<String, Object> levels = climbing("levels", "ORG_MANAGER", "stop", "MAIN_UNIT");
+        return requestType("NEW_RESERVATION", flow(
+                List.of(node("st", "start"), levels, approval("ops", false, place("FACILITIES_REVIEWER", "FIXED", "orgId", hOps.toString())),
+                        approval("fin", true, place("APPROVER", "ANY")), node("ok", "end_approved")),
+                List.of(line("st", "levels", null), line("levels", "ops", "approved"), line("ops", "fin", "approved"), line("fin", "ok", "approved"))), null);
+    }
+
+    private List<Map<String, Object>> skips(UUID id, int revision) {
+        return jdbc.sql("""
+                select organization_id, organization_name, organization_level, hierarchy_order, reason_code, reason_text, stage_key
+                  from request_route_skip where request_id = :id and revision = :v order by hierarchy_order""")
+                .param("id", id).param("v", revision).query().listOfRows();
+    }
+
+    private List<UUID> skipped(UUID id, int revision) {
+        return skips(id, revision).stream().map(m -> (UUID) m.get("organization_id")).toList();
+    }
+
+    private String openTargetOf(UUID id, String stage) {
+        return jdbc.sql("select coalesce(target_org_id::text, '*') from task_assignment where request_id = :id and stage_key = :s and status = 'OPEN'")
+                .param("id", id).param("s", stage).query(String.class).single();
+    }
+
+    @Test
+    @DisplayName("HSKIP-01/04: an empty level is skipped and recorded; a level with its own approver waits for it; the empty level above is skipped too")
+    @SuppressWarnings("unchecked")
+    void hskipOneEmptyLevel() {
+        health();
+        scoped("hIdaraOwn", "ORG_MANAGER", hIdara, unitTarget(hIdara, false)); // its own level only: it does not cover the centre
+        person("hOpsA", "FACILITIES_REVIEWER", hOps);
+        UUID id = submittedBy("hReq", hQism, healthFlow());
+        assertThat(skipped(id, 1)).as("the centre and the main administration have nobody").containsExactly(hMarkaz, hIdaraMain);
+        assertThat(openTargetOf(id, "levels")).as("HSKIP-04: the administration's own approver decides").isEqualTo(hIdara.toString());
+        Api own = login("hIdaraOwn");
+        assertThat(own.approve(own.taskFor(id), 1).status()).isEqualTo(200);
+        assertThat(openStages(id)).containsExactly("ops");
+        assertThat(openTargetOf(id, "ops")).isEqualTo(hOps.toString());
+    }
+
+    @Test
+    @DisplayName("HSKIP-02/03/06: every level below the main unit empty — three skips in order, the climb completes, unit operations opens next, no «ROLE|*»; the unit-operations holder is no hierarchy approver")
+    void hskipAllEmpty() {
+        health();
+        person("hOpsB", "FACILITIES_REVIEWER", hOps);
+        person("hOpsInCentre", "FACILITIES_REVIEWER", hMarkaz); // holds unit operations only, inside the climb
+        UUID id = submittedBy("hReq", hQism, healthFlow());
+        List<Map<String, Object>> s = skips(id, 1);
+        assertThat(s).extracting(m -> m.get("organization_id")).containsExactly(hMarkaz, hIdara, hIdaraMain);
+        assertThat(s).extracting(m -> ((Number) m.get("hierarchy_order")).intValue()).containsExactly(1, 2, 3);
+        assertThat(s).extracting(m -> m.get("organization_name")).containsExactly("وحدة HMARKAZ", "وحدة HIDARA", "وحدة HIDARAMAIN");
+        assertThat(s).extracting(m -> m.get("organization_level")).containsExactly(7, 6, 5);
+        assertThat(s).allSatisfy(m -> {
+            assertThat(m.get("reason_code")).isEqualTo("NO_HIERARCHY_APPROVER");
+            assertThat(m.get("reason_text")).isEqualTo("تم تجاوز هذه الجهة لعدم وجود معتمد للسلسلة الهرمية");
+            assertThat(m.get("stage_key")).isEqualTo("levels");
+        });
+        assertThat(jdbc.sql("select count(*) from task_assignment where request_id = :id and stage_key = 'levels'").param("id", id).query(Long.class).single())
+                .as("no hierarchy task at all, and no «ROLE|*»").isZero();
+        assertThat(openStages(id)).as("straight to unit operations").containsExactly("ops");
+        assertThat(openTargetOf(id, "ops")).isEqualTo(hOps.toString());
+        assertThat(login("hOpsInCentre").taskFor(id)).as("HSKIP-06: unit operations elsewhere is not the centre's hierarchy approver").isNull();
+        // one grouped audit event, written when the route was resolved
+        JsonNode audit;
+        try {
+            audit = JSON.readTree(jdbc.sql("select detail::text from audit_event where action = 'HIERARCHY_LEVEL_SKIPPED' and entity_id = :id").param("id", id.toString()).query(String.class).single());
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new AssertionError(e);
+        }
+        assertThat(audit.path("units")).hasSize(3);
+        assertThat(audit.path("stage").asText()).isEqualTo("levels");
+        // the request page: the climb is complete with its skipped units, then unit operations
+        JsonNode stages = login("hOpsB").get("/requests/" + id).body().path("stages");
+        JsonNode levels = null;
+        for (JsonNode st : stages) {
+            if ("levels".equals(st.path("key").asText())) {
+                levels = st;
+            }
+        }
+        assertThat(levels).isNotNull();
+        assertThat(levels.path("state").asText()).isEqualTo("COMPLETE");
+        assertThat(levels.path("skipped")).hasSize(3);
+        assertThat(levels.path("skipped").get(0).path("organizationName").asText()).isEqualTo("وحدة HMARKAZ");
+        assertThat(levels.path("skipped").get(0).path("reasonCode").asText()).isEqualTo("NO_HIERARCHY_APPROVER");
+        // opening the page again adds nothing
+        login("hOpsB").get("/requests/" + id);
+        assertThat(skipped(id, 1)).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("HSKIP-05: no own approver but an inherited one covering the level (ADR-058): not skipped, the inherited approver decides")
+    void hskipInherited() {
+        health();
+        person("hIdaraAll", "ORG_MANAGER", hIdara); // role scope: the administration with every unit under it
+        person("hOpsC", "FACILITIES_REVIEWER", hOps);
+        UUID id = submittedBy("hReq", hQism, healthFlow());
+        assertThat(skipped(id, 1)).as("only the main administration has nobody, own or inherited").containsExactly(hIdaraMain);
+        assertThat(openTargetOf(id, "levels")).isEqualTo(hMarkaz.toString());
+        Api inh = login("hIdaraAll");
+        assertThat(inh.approve(inh.taskFor(id), 1).status()).as("signs the centre's level").isEqualTo(200);
+        assertThat(openTargetOf(id, "levels")).isEqualTo(hIdara.toString());
+        assertThat(inh.approve(inh.taskFor(id), 1).status()).as("then its own").isEqualTo(200);
+        assertThat(openStages(id)).containsExactly("ops");
+    }
+
+    @Test
+    @DisplayName("HSKIP-07/08: unit operations with no holder is not skipped by this rule; a final approval with nobody never completes the request")
+    void hskipOtherStagesUnchanged() {
+        health();
+        UUID id = submittedBy("hReq", hQism, healthFlow());
+        assertThat(skipped(id, 1)).hasSize(3);
+        assertThat(openStages(id)).as("HSKIP-07: unit operations still opens, waiting for a holder").containsExactly("ops");
+        assertThat(openTargetOf(id, "ops")).isEqualTo(hOps.toString());
+        assertThat(status(id)).isEqualTo("SUBMITTED");
+
+        person("hOpsD", "FACILITIES_REVIEWER", hOps);
+        jdbc.sql("update membership set valid_to = now() where role_code = 'APPROVER'").update();
+        UUID second = submittedBy("hReq", hQism, healthFlow());
+        Api ops = login("hOpsD");
+        assertThat(ops.approve(ops.taskFor(second), 1).status()).isEqualTo(200);
+        assertThat(openStages(second)).as("HSKIP-08: the final approval stays open with nobody").containsExactly("fin");
+        assertThat(status(second)).isEqualTo("SUBMITTED");
+    }
+
+    @Test
+    @DisplayName("HSKIP-09/10: a returned and resubmitted request keeps the first revision's skips; later hierarchy changes never rewrite them")
+    void hskipRevisionsAndHistory() {
+        health();
+        person("hOpsE", "FACILITIES_REVIEWER", hOps);
+        UUID id = submittedBy("hReq", hQism, healthFlow());
+        assertThat(skipped(id, 1)).hasSize(3);
+        Api ops = login("hOpsE");
+        assertThat(ops.decide(ops.taskFor(id), "RETURN", "أكمل البيانات من فضلك", 1).status()).isEqualTo(200);
+        // the main administration gets an approver of its own before the resubmission
+        scoped("hIdaraMainOwn", "ORG_MANAGER", hIdaraMain, unitTarget(hIdaraMain, false));
+        Api req = login("hReq");
+        int version = req.get("/requests/" + id).body().path("version").asInt();
+        assertThat(req.post("/requests/" + id + "/submit", Map.of("expectedVersion", version, "resubmissionReason", "استُكملت البيانات"),
+                UUID.randomUUID().toString()).status()).isEqualTo(200);
+        assertThat(skipped(id, 1)).as("revision 1 keeps what happened then").containsExactly(hMarkaz, hIdara, hIdaraMain);
+        List<UUID> second = skipped(id, 2);
+        String levelsCarried = jdbc.sql("select coalesce(array_to_string(carried_stages, ','), '') from request_revision where request_id = :id and revision = 2")
+                .param("id", id).query(String.class).single();
+        if (!levelsCarried.contains("levels")) {
+            assertThat(second).as("revision 2's own route: the main administration now has an approver").containsExactly(hMarkaz, hIdara);
+        }
+        // HSKIP-10: the hierarchy changes after the route was resolved; the record keeps the names and levels of then
+        tx.executeWithoutResult(t -> {
+            jdbc.sql("select set_config('tmrkz.hr_projection', 'on', true)").query().singleRow(); // as the HR sync renames a unit
+            jdbc.sql("update organization set name = 'اسم جديد' where id = :o").param("o", hMarkaz).update();
+        });
+        assertThat(login("hOpsE").get("/requests/" + id).body().path("stages").toString()).as("the page shows the name of then").contains("وحدة HMARKAZ");
+        assertThat(skips(id, 1).get(0).get("organization_name")).isEqualTo("وحدة HMARKAZ");
     }
 
     @Test
@@ -925,8 +1101,20 @@ class WorkflowGraphIT extends IntegrationTest {
             assertThat(admin.put("/access-requests/offer", Map.of("REQUESTER", "MANAGER")).status()).as("somebody must be able to ask").isEqualTo(400);
             assertThat(admin.put("/access-requests/offer", Map.of("REQUESTER", "EVERYONE", "FYI_RECEIVER", "MANAGER")).status()).isEqualTo(200);
 
+            // «الصلاحيات المتاحة للطلب» (owner, 16 Nov 2026): the description and the scopes are the administrator's, not the page's
+            assertThat(admin.put("/access-requests/offer", Map.of("REQUESTER", Map.of("audience", "EVERYONE", "description", "يقدّم طلبات وحدته فقط",
+                    "scopeModes", List.of("UNIT", "UNIT_TREE"), "defaultScope", "SITES"), "FYI_RECEIVER", "MANAGER")).status()).as("a default outside its scopes").isEqualTo(400);
+            assertThat(admin.put("/access-requests/offer", Map.of("REQUESTER", Map.of("audience", "EVERYONE", "description", "يقدّم طلبات وحدته فقط",
+                    "scopeModes", List.of("UNIT", "UNIT_TREE"), "defaultScope", "UNIT_TREE"), "FYI_RECEIVER", "MANAGER")).status()).isEqualTo(200);
             JsonNode mine = me.get("/access-requests/mine").body();
             assertThat(mine.path("requestable").toString()).contains("REQUESTER").doesNotContain("FYI_RECEIVER").doesNotContain("CHAIN_APPROVER");
+            JsonNode offered = mine.path("requestable").get(0);
+            assertThat(offered.path("description").asText()).isEqualTo("يقدّم طلبات وحدته فقط");
+            assertThat(offered.path("scopeModes").toString()).isEqualTo("[\"UNIT\",\"UNIT_TREE\"]");
+            assertThat(offered.path("defaultScope").asText()).isEqualTo("UNIT_TREE");
+            Res outside = me.post("/access-requests", Map.of("roles", List.of("REQUESTER"), "reason", "أحتاجها لعملي في الوحدة", "scope", Map.of("mode", "UNITS", "ids", List.of(squad.toString()))));
+            assertThat(outside.status()).as("a scope the role does not allow").isEqualTo(400);
+            assertThat(String.valueOf(outside.body())).contains("هذا النطاق غير متاح");
             assertThat(me.post("/access-requests", Map.of("roles", List.of("FYI_RECEIVER"), "reason", "أحتاجها لعملي في الوحدة")).status()).as("kept for the manager").isEqualTo(400);
             assertThat(me.post("/access-requests", Map.of("roles", List.of("CHAIN_APPROVER"), "reason", "أحتاجها لعملي في الوحدة")).status()).as("no longer shown").isEqualTo(400);
             UUID id = UUID.fromString(me.post("/access-requests", Map.of("roles", List.of("REQUESTER"), "reason", "أحتاجها لعملي في الوحدة")).body().path("id").asText());
@@ -992,6 +1180,8 @@ class WorkflowGraphIT extends IntegrationTest {
         assertThat(mgr.post("/access-requests/" + id + "/decision", Map.of("taskId", second.path("taskId").asText(), "decision", "APPROVE", "roles", List.of(), "recommendReject", true, "note", "لا يحتاجها في عمله الحالي")).status()).isEqualTo(200);
         assertThat(me.get("/access-requests/mine").body().path("requests").get(0).path("statusLabel").asText()).startsWith("موصى بالرفض");
         assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", asker).query(Long.class).single()).as("advice grants nothing").isZero();
+        assertThat(jdbc.sql("select recommended_scope is not null and granted_scope is null from access_request where request_id = :r").param("r", id).query(Boolean.class).single())
+                .as("the advised scope is kept apart from the granted one (V43)").isTrue();
 
         Api fin = login("finScope");
         JsonNode last = inboxItem(fin.get("/access-requests/inbox").body(), id);
@@ -1024,6 +1214,10 @@ class WorkflowGraphIT extends IntegrationTest {
         JsonNode box = inboxItem(fin.get("/access-requests/inbox").body(), id);
         assertThat(box.path("final").asBoolean()).as("nobody reviews this unit, so it comes straight here").isTrue();
         assertThat(box.path("reviewedBy").isNull() || box.path("reviewedBy").isMissingNode()).isTrue();
+        // recorded, not inferred (owner, 16 Nov 2026): the step passed for want of an access manager, with the reason, audited once
+        assertThat(box.path("reviewSkipped").asText()).isEqualTo("لا يوجد مسؤول صلاحيات لهذه الوحدة — انتقل الطلب إلى الاعتماد النهائي");
+        assertThat(jdbc.sql("select count(*) from request_route_skip where request_id = :r and reason_code = 'NO_ACCESS_MANAGER'").param("r", id).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :r and action = 'ACCESS_REVIEW_SKIPPED'").param("r", id.toString()).query(Long.class).single()).isEqualTo(1);
         Res refused = fin.post("/access-requests/" + id + "/decision", Map.of("taskId", box.path("taskId").asText(), "decision", "REJECT", "note", "لا يحتاج هذه الصلاحية في عمله الحالي"));
         assertThat(refused.status()).as(String.valueOf(refused.body())).isEqualTo(200);
         assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", asker).query(Long.class).single()).isZero();
@@ -1038,6 +1232,9 @@ class WorkflowGraphIT extends IntegrationTest {
         Res stop = fin.post("/access-requests/" + second + "/decision", Map.of("taskId", moved.path("taskId").asText(), "decision", "APPROVE", "roles", List.of("REQUESTER")));
         assertThat(stop.status()).isEqualTo(400);
         assertThat(String.valueOf(stop.body())).contains("نُقل مقدم الطلب");
+        assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", asker).query(Long.class).single()).as("nothing granted").isZero();
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :r and action = 'ACCESS_REQUEST_UNIT_CHANGED' and reason = 'الوحدة تغيرت أثناء طلب الصلاحية'")
+                .param("r", second.toString()).query(Long.class).single()).as("the refusal is audited on its own").isEqualTo(1);
     }
 
     @Test

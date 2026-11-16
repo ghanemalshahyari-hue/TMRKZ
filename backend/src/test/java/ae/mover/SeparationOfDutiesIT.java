@@ -163,6 +163,9 @@ class SeparationOfDutiesIT extends IntegrationTest {
         jdbc.sql("insert into position_seat(id, organization_id, position_id, name, role_code) values (:id, :o, :pos, 'مقعد اعتماد', :r)")
                 .param("id", UUID.randomUUID()).param("o", root).param("pos", position).param("r", apr).update();
         membership(multi, apr, orgB, null);
+        // a position seat reaches a user added to the application only, never an HR posting alone (owner, 16 Nov 2026)
+        jdbc.sql("insert into unit_member(id, person_id, organization_id, added_by, added_at) values (gen_random_uuid(), :p, :o, :p, now())")
+                .param("p", multi).param("o", orgA).update();
         UUID id = login("multi").submitted(type, orgA, List.of(resA), day("2029-03-01"), day("2029-03-02"));
         String task = openTask(id);
         assertThat(login("multi").taskFor(id)).isNull();
@@ -307,5 +310,22 @@ class SeparationOfDutiesIT extends IntegrationTest {
         body.put("signature", Map.of("password", PASSWORD, "confirm", true));
         refusedForSeparation(login("req").post("/tasks/" + task + "/decision", body, UUID.randomUUID().toString()));
         assertThat(activeReservations(resA)).isZero();
+    }
+
+    @Test
+    @DisplayName("SEAT-01: a task assigned to a person whose grant ends leaves them and goes back to the responsibility's current holders (owner, 16 Nov 2026)")
+    void endedGrantReleasesAssignedTask() {
+        String type = finalBy(apr);
+        person("reqSeat", "REQUESTER", orgA);
+        UUID old = person("aprOld", apr, root);
+        person("aprNew", apr, root);
+        UUID id = login("reqSeat").submitted(type, orgA, List.of(resA), day("2029-08-01"), day("2029-08-02"));
+        String task = openTask(id);
+        jdbc.sql("update task_assignment set assigned_person_id = :p, awaiting_assignment = false where id = cast(:t as uuid)").param("p", old).param("t", task).update();
+        Res ended = login("admin").post("/memberships/" + membershipOf(old, apr) + "/end", Map.of("reason", "انتهى تكليفه بالاعتماد"));
+        assertThat(ended.status()).as(ended.toString()).isEqualTo(200);
+        UUID now = jdbc.sql("select assigned_person_id from task_assignment where id = cast(:t as uuid)").param("t", task).query(UUID.class).optional().orElse(null);
+        assertThat(now).as("the one who no longer holds it keeps nothing").isNotEqualTo(old);
+        assertThat(login("aprOld").taskFor(id)).as("and no longer sees it").isNull();
     }
 }

@@ -580,7 +580,7 @@ for (const [name, size] of Object.entries(SIZES)) {
     // hierarchy panel = the server's tree
     await page.getByRole('tab', { name: 'الوحدات التابعة' }).click();
     await page.waitForTimeout(500);
-    const rows = await page.locator('[data-testid=org-tree] [role=treeitem]').evaluateAll((els) => els.map((e) => ({ id: e.dataset.unit, name: e.querySelector('.tz-node-name span').textContent, cls: e.className })));
+    const rows = await page.locator('[data-testid=org-tree] [role=treeitem]').evaluateAll((els) => els.map((e) => ({ id: e.dataset.unit, name: e.querySelector('.ut-name span').textContent, cls: e.className })));
     const tree = (await api(page, '/organizations/tree')).body;
     const order = [];
     const walk = (ns) => ns.forEach((n) => (order.push(n.id), walk(n.children ?? [])));

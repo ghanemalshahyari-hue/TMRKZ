@@ -6,6 +6,7 @@ import { Icon } from '../ui';
 const MARK: Record<StripStatus, [string, string]> = {
   done: ['✓', 'مكتملة'],
   carried: ['↺', 'محمولة من قرار سابق'],
+  skipped: ['⤼', 'تم التجاوز — لا يوجد معتمد للسلسلة الهرمية'],
   current: ['●', 'المرحلة الحالية'],
   upcoming: ['', 'قادمة'],
   rejected: ['✕', 'رُفض الطلب'],
@@ -106,11 +107,12 @@ export function ApprovalRouteStrip({ request, checks, open, setOpen }: { request
 
 function StageItem({ s }: { s: RestationingStage }) {
   return (
-    <li className={s.mark ? 'done' : s.current ? 'current' : ''}>
+    <li className={s.mark === 'SKIPPED' ? 'skipped' : s.mark ? 'done' : s.current ? 'current' : ''} data-mark={s.mark ?? undefined}>
       <b>{s.label}</b>
       <StageUnit unit={s.unit} kind={s.kind} />
       <small>يستوفي: {s.satisfies.join('، ')}</small>
-      {s.mark && (
+      {s.mark === 'SKIPPED' && <small className="rs-skipped">تم التجاوز — {s.skipReason ?? 'لا يوجد معتمد للسلسلة الهرمية'}</small>}
+      {s.mark && s.mark !== 'SKIPPED' && (
         <small>
           {s.mark === 'CARRIED' ? 'محمول من قرار سابق' : 'اعتمدها'} {s.decidedBy?.name} · {fullDate(s.decidedAt ?? '')}
         </small>

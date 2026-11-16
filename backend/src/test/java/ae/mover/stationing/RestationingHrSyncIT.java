@@ -63,6 +63,12 @@ class RestationingHrSyncIT extends IntegrationTest {
     Api admin;
     double lat0, lng0;
 
+    /** A test source left enabled would be asked live by later classes' «إضافة مستخدم» and sign-ins (ADR-065). */
+    @org.junit.jupiter.api.AfterEach
+    void disableSource() {
+        jdbc.sql("update hr_source set enabled = false").update();
+    }
+
     @BeforeEach
     void source() {
         // one HR source per installation: earlier tests' source and snapshots are cleared, never their projections
@@ -109,7 +115,7 @@ class RestationingHrSyncIT extends IntegrationTest {
 
         // people, seats and the starting stationing on the synchronised units
         person("req", role("GREQ", "ORGANIZATION", "CREATE_RESTATIONING", "VIEW"), sec);
-        String seat = role("GSEAT", "ORGANIZATION", "APPROVE", "VIEW");
+        String seat = role("GSEAT", "ORGANIZATION", "APPROVE_HIERARCHY", "VIEW");
         person("apSec", seat, sec);
         person("apA", seat, deptA);
         person("apB", seat, deptB);

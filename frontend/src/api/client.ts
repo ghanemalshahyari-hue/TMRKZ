@@ -11,6 +11,8 @@ import type {
   TerrainDatasetView,
   RestationingChecks,
   RestationingContent,
+  RestationingLeg,
+  GeoPolygon,
   RestationingListItem,
   RestationingRequest,
   RestationingUnit,
@@ -238,16 +240,43 @@ export function isAbort(e: unknown): boolean {
 }
 
 type RoleName = { code: string; name: string };
+/**
+ * Who the person is, from the one employment context (ADR-068): Oracle while it is in force, the directory before.
+ * `unitConfigured` false: the source names a Unit ID TMRKZ does not hold; `statedUnitId`/`statedUnitName` are then as received.
+ */
+export type AccessIdentity = {
+  name: string;
+  employeeNo: string | null;
+  userId: string | null;
+  rank: string | null;
+  position: string | null;
+  unit: string | null;
+  mainUnit: string | null;
+  source: string;
+  sourceCode?: 'LDAP' | 'ORACLE';
+  unitConfigured?: boolean;
+  unitOrigin?: 'SOURCE' | 'EARLIER_HR' | 'ADDED' | 'NONE';
+  statedUnitId?: string | null;
+  statedUnitName?: string | null;
+  observedAt?: string | null;
+};
 export type AccessMine = {
   unit: string | null;
   available: boolean;
-  requestable: RoleName[];
+  /** what may be asked for, as the system administrator describes it (owner, 16 Nov 2026) */
+  requestable: OfferedRole[];
   scopeUnits?: { id: string; name: string; depth: number }[];
   scopeSites?: { id: string; name: string }[];
   held: string[];
+  /** who the person is, for the zero-access page (owner, 16 Nov 2026) */
+  identity?: AccessIdentity;
+  /** one line for the whole page: NONE | PENDING | RETURNED | PARTLY_APPROVED | APPROVED | REJECTED */
+  overall?: { code: string; text: string };
   requests: { statusLabel?: string; scope?: AccessScope | null; id: string; number: string; status: string; note: string | null; submittedAt: string; reason: string; unit: string; requested: RoleName[]; granted: RoleName[]; waiting: string | null }[];
 };
 export type AccessInboxItem = {
+  /** recorded when the review step was passed because the unit has no access manager (owner, 16 Nov 2026) */
+  reviewSkipped?: string | null;
   taskId: string;
   requestId: string;
   number: string;
@@ -279,14 +308,35 @@ export type HubAction = { action: string; allowed: boolean; reason: string | nul
 export type HubUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; state: string; site: { id: string; name: string; lat: number | null; lng: number | null; geometry: { type: string; coordinates: unknown } | null } | null; actions: HubAction[] };
 export type RequestHub = { actions: HubAction[]; units: HubUnit[]; unitsTotal: number };
 export type HubSite = { id: string; code: string; name: string; lat: number | null; lng: number | null; geometry: { type: string; coordinates: unknown } | null; linked: boolean };
+/** «موقع جديد» of the setup administrator (ADR-067): the site, its initial stationing and each unit's two areas, in one save. */
+export type SiteSetupBody = {
+  site: { code: string; name: string; kind: string; parentId?: string | null; responsibleOrgId: string | null; capacity?: number | null; location: { lat: number; lng: number }; notes?: string | null; reason?: string; symbol?: string | null };
+  boundary: { geometry: SiteGeometry; crs: string; expectedVersion: number; reason: string; method: string } | null;
+  units: { organizationId: string; primary: GeoPolygon | null; alternative: GeoPolygon | null }[];
+  reason: string;
+  reference?: string | null;
+  effectiveFrom?: string | null;
+};
+/** The same checks as the save, nothing written: each unit's legs in the shape of a request's checks. */
+export type SiteSetupCheck = {
+  ok: boolean;
+  problems: string[];
+  policyVersion: number | null;
+  deploymentRequirement: 'REQUIRED' | 'OPTIONAL' | null;
+  units: { organizationId: string; name: string; ok: boolean; problems: string[]; legs: RestationingLeg[] }[];
+};
+export type SiteSetupResult = { site: Site; units: { organizationId: string; name: string; stationingId: string; areas: { PRIMARY: string | null; ALTERNATIVE: string | null } }[]; policyVersion: number | null; effectiveFrom: string | null };
 export type OverviewItem = { id: string; number: string; type: string; state: string; stateLabel?: string; updatedAt?: string; requestingUnit?: { name: string }; person?: string; mine?: boolean; myTurn?: boolean; currentStage?: string; currentStageKind?: string; fyi?: boolean; fyiPending?: boolean; activatable?: boolean };
 export type StationingRouteVersion = { id: string; version: number; routing: { startAt: 'SELF' | 'PARENT'; levels: RoutingLevelValue[] }; stages: { unitOperations: boolean; finalByPermission: boolean; fyiBeforeActivation: boolean }; reason: string | null; publishedAt: string | null; publishedBy: string | null };
 export type StationingRouteRow = { purpose: string; published: StationingRouteVersion | null; draft: StationingRouteVersion | null };
-export type StationingRouteTry = { stages: { key: string; kind: string; label: string; unit: string | null; holders: number }[]; complete: boolean; problems: string[]; activators?: number; fyiHolders?: number };
+export type StationingRouteTry = { stages: { key: string; kind: string; label: string; unit: string | null; holders: number; inheritedFrom?: string | null; skipped?: boolean }[]; complete: boolean; problems: string[]; activators?: number; fyiHolders?: number };
 export type HomeCard = { key: string; label: string; value: number; href: string };
 export type PostureUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; state: string; site?: { id: string; name: string; geometry: { type: string; coordinates: unknown } | null } | null; kind?: string; plannedEnd?: string | null; primary?: unknown; alternative?: unknown; otherUnitsAtSite?: number; request?: { purpose: string; state: string } | null };
 export type SiteOccupants = { stationed: { orgId: string; orgName: string }[]; linked: { id: string; orgId: string; orgName: string; reason: string }[]; otherStationed: number };
-export type AccessOfferRow = { code: string; name: string; audience: string | null };
+export type AccessOfferRow = { code: string; name: string; audience: string | null; description?: string | null; scopeModes?: ScopeMode[] | null; defaultScope?: ScopeMode | null };
+export type ScopeMode = 'UNIT' | 'UNIT_TREE' | 'UNITS' | 'SITES';
+/** A role on the page to ask: its description and the scopes it may be asked with, set in «الصلاحيات المتاحة للطلب». */
+export type OfferedRole = { code: string; name: string; description?: string | null; scopeModes?: ScopeMode[] | null; defaultScope?: ScopeMode | null };
 
 export type UnitOpsRoute = { id: string; name: string; from: string; to: string; days: number[]; active: boolean; targets: { id: string; name: string }[] };
 /** A request's approval stamps (ADR-055): who approved each stamped stage, in which capacity and unit, when. */
@@ -347,7 +397,9 @@ export type DesktopFeedItem = { seq: number; kind: string; title: string; body: 
 export type DesktopFeed = { personId: string; latestSeq: number; items: DesktopFeedItem[] };
 /** The HR card shown by «إضافة مستخدم» before saving (ADR-049). */
 export type UnitMemberCard = {
-  personId: string;
+  /** null: found live in HR, not yet in TMRKZ; saving imports that one person (ADR-065, importOnSave) */
+  personId: string | null;
+  importOnSave?: boolean;
   employeeNo: string;
   displayName: string;
   userId: string | null;
@@ -419,7 +471,8 @@ export type AccountCard = {
   canEditProfile: boolean;
 };
 export type ProvidingDepartment = { code: string; name: string; providers: number };
-export type WorkspaceColumn = { code: string; name: string; mode: 'CHECK' | 'ASSIGN' | 'ADMIN' | 'AVAIL'; finalOnly: boolean; lock: string | null };
+/** {@code seat}: a responsibility of the unit (its holder decides a stage of others' requests), not a personal permission */
+export type WorkspaceColumn = { code: string; name: string; mode: 'CHECK' | 'ASSIGN' | 'ADMIN' | 'AVAIL'; finalOnly: boolean; lock: string | null; seat?: boolean };
 export type WorkspaceCell = {
   direct: { id: string; scopeText: string; validTo: string; all: boolean; units: number } | null;
   inherited: 'UNIT' | 'SEAT' | null;
@@ -531,7 +584,8 @@ export const api = {
   resubmitAccessRequest: (id: string, body: { roles: string[]; reason: string; scope?: AccessScope }) => post<{ id: string; number: string }>(`/access-requests/${id}/resubmit`, body),
   accessInbox: () => get<AccessInboxItem[]>('/access-requests/inbox'),
   accessOffer: () => get<AccessOfferRow[]>('/access-requests/offer'),
-  saveAccessOffer: (audiences: Record<string, string>) => put<AccessOfferRow[]>('/access-requests/offer', audiences),
+  saveAccessOffer: (offer: Record<string, { audience: string; description?: string | null; scopeModes?: ScopeMode[] | null; defaultScope?: ScopeMode | null }>) =>
+    put<AccessOfferRow[]>('/access-requests/offer', offer),
   decideAccessRequest: (id: string, body: { taskId: string; decision: string; roles: string[]; note?: string; scope?: AccessScope; recommendReject?: boolean }) =>
     post<{ status: string }>(`/access-requests/${id}/decision`, body),
   scopePreview: (organizationId: string, descendants: boolean, levels?: number[]) =>
@@ -543,7 +597,7 @@ export const api = {
     ),
   /** «إضافة مستخدم» (ADR-049): the HR card of one person, by employee number or User ID, inside the manager's reach. */
   unitMemberLookup: (organizationId: string, key: string) => get<UnitMemberCard>('/access/unit-members/lookup' + query({ organizationId, key })),
-  addUnitMember: (body: { organizationId: string; personId?: string | null; userId?: string | null; displayName?: string | null }) =>
+  addUnitMember: (body: { organizationId: string; personId?: string | null; employeeNo?: string | null; userId?: string | null; displayName?: string | null }) =>
     post<{ personId: string; created: boolean; already: boolean }>('/access/unit-members', body),
   endUnitMember: (personId: string, organizationId: string, reason: string) => post<void>(`/access/unit-members/${personId}/end`, { organizationId, reason }),
   replaceGrant: (id: string, grant: GrantBody, reason?: string) =>
@@ -617,6 +671,9 @@ export const api = {
   createSiteLink: (body: { siteId: string; organizationId: string; reason: string }) => post<unknown>('/site-links', body),
   endSiteLink: (id: string, reason: string) => post<unknown>(`/site-links/${id}/end`, { reason }),
   correctStationing: (body: { organizationId: string; siteId: string; reason: string }) => post<unknown>('/stationing/corrections', body),
+  /** «موقع جديد» of the setup administrator (ADR-067): one atomic, audited save; the key makes a resend harmless. */
+  siteSetup: (body: SiteSetupBody, idempotencyKey?: string) => post<SiteSetupResult>('/site-setup', body, idempotencyKey),
+  siteSetupCheck: (body: SiteSetupBody) => post<SiteSetupCheck>('/site-setup/check', body),
   stationingRoutes: () => get<{ routes: StationingRouteRow[]; policyInForce: boolean }>('/stationing/routes'),
   saveStationingRoute: (purpose: string, route: { routing: unknown; stages: unknown }) => put<StationingRouteVersion>(`/stationing/routes/${purpose}/draft`, route),
   publishStationingRoute: (purpose: string, reason: string) => post<StationingRouteVersion>(`/stationing/routes/${purpose}/publish`, { reason }),

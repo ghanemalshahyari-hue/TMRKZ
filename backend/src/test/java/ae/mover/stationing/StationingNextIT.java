@@ -178,7 +178,7 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(400);
         assertThat(login("activator").post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of(other.toString()))).status()).as("needs its own right").isEqualTo(403);
 
-        UUID reader = affiliated("reader", otherSec);
+        UUID reader = holding("reader", otherSec);  // a recipient holds some permission: none at all opens nothing (owner, 16 Nov 2026)
         Res sent = login("fyi").post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of(otherSec.toString()), "note", "للاطلاع"));
         assertThat(sent.status()).as(sent.toString()).isEqualTo(200);
         assertThat(jdbc.sql("select count(*) from notification where person_id = :p and title like 'للعلم:%'").param("p", reader).query(Long.class).single()).isEqualTo(1);
@@ -187,7 +187,7 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(readerApi.get("/restationing-requests/" + rs.body().path("id").asText()).status()).as("not any other").isEqualTo(404);
         assertThat(readerApi.post("/restationing-requests/" + id + "/decision", Map.of("decision", "APPROVE")).status()).isIn(400, 403);
         assertThat(readerApi.post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(403);
-        assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", reader).query(Long.class).single()).as("no lasting right").isZero();
+        assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", reader).query(Long.class).single()).as("no lasting right beyond its own").isEqualTo(1);
 
         UUID parentBefore = jdbc.sql("select parent_id from organization where id = :o").param("o", fresh).query(UUID.class).single();
         Res act = login("activator").post("/restationing-requests/" + id + "/activate", Map.of());
@@ -205,6 +205,41 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(allowed(after, "RESTATIONING")).isTrue();
         assertThat(allowed(after, "DEPLOYMENT_AREAS")).isTrue();
         assertThat(allowed(after, "INITIAL_STATIONING")).isFalse();
+    }
+
+    @Test
+    @DisplayName("ADR-062 in the stationing engine: levels with no approver, own or inherited, are skipped and recorded; the request goes on to unit operations, then final; never approved by nobody")
+    void hierarchyLevelsWithNobodyAreSkipped() {
+        // the department and the top have no approver now, neither of their own nor from above
+        for (String who : List.of("apDept", "apTop")) {
+            jdbc.sql("update membership set valid_to = now() where person_id = (select id from person where username = :u)").param("u", who + "-" + sfx).update();
+        }
+        String id = request("INITIAL_STATIONING", initial(List.of(fresh)), sec);
+        Res s = login("rq").post("/restationing-requests/" + id + "/submit", Map.of());
+        assertThat(s.status()).as(s.toString()).isEqualTo(200);
+        JsonNode route = s.body().path("route");
+        assertThat(keys(route)).containsExactly("H:" + sec, "H:" + dept, "H:" + top, "O:operations", "F:final");
+        List<String> marks = new java.util.ArrayList<>();
+        route.forEach(x -> marks.add(x.path("mark").asText("-")));
+        assertThat(marks).as("the section waits for its own approver; the two empty levels are passed").containsExactly("-", "SKIPPED", "SKIPPED", "-", "-");
+        assertThat(route.get(1).path("skipReasonCode").asText()).isEqualTo("NO_HIERARCHY_APPROVER");
+        assertThat(route.get(1).path("decidedBy").isNull()).as("nobody approved it").isTrue();
+        List<java.util.Map<String, Object>> skips = jdbc.sql("""
+                select organization_id, organization_name, hierarchy_order, reason_code, revision from restationing_route_skip
+                 where request_id = cast(:id as uuid) order by hierarchy_order""").param("id", id).query().listOfRows();
+        assertThat(skips).extracting(m -> m.get("organization_id")).containsExactly(dept, top);
+        assertThat(skips).allSatisfy(m -> {
+            assertThat(m.get("reason_code")).isEqualTo("NO_HIERARCHY_APPROVER");
+            assertThat(((Number) m.get("revision")).intValue()).isEqualTo(1);
+        });
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'HIERARCHY_LEVEL_SKIPPED'").param("id", id).query(Long.class).single()).isEqualTo(1);
+
+        assertThat(decide("ops", id, "APPROVE").status()).as("unit operations waits for the hierarchy").isEqualTo(403);
+        assertThat(decide("apSec", id, "APPROVE").status()).isEqualTo(200);
+        JsonNode atOps = login("ops").get("/restationing-requests/" + id).body();
+        assertThat(atOps.path("can").path("decideAs").asText()).as("straight to unit operations after the section").isEqualTo("اعتماد عمليات الوحدة");
+        assertThat(decide("ops", id, "APPROVE").status()).isEqualTo(200);
+        assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).as("the final approval is never skipped").isEqualTo("APPROVED_NOT_ACTIVATED");
     }
 
     @Test
@@ -296,7 +331,46 @@ class StationingNextIT extends RestationingTestBase {
     }
 
     @Test
-    @DisplayName("FYI: a person with no permission reads the one request; nothing else, nobody else in the branch; no mutation; it ends as designed; audited")
+    @DisplayName("Unit operations and final approval: the nearest scope covering the requesting unit decides; a wider holder has no turn (owner, 16 Nov 2026)")
+    void nearestScopeDecides() {
+        stationed(fresh, shared);
+        person("opsNear", role("NXOPSN", "ORGANIZATION", "VIEW", "DECIDE_UNIT_OPERATIONS"), sec);
+        person("finNear", role("NXFINN", "ORGANIZATION", "VIEW", "FINAL_APPROVE_STATIONING"), dept);
+        String id = request("DEPLOYMENT_AREAS", deployment(fresh, 0), sec);
+        Res s = login("rq").post("/restationing-requests/" + id + "/submit", Map.of());
+        assertThat(s.status()).as(s.toString()).isEqualTo(200);
+        decide("apSec", id, "APPROVE");
+        decide("apDept", id, "APPROVE");
+        decide("apTop", id, "APPROVE");
+        assertThat(login("ops").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).as("the holder over the top unit waits for nobody").isFalse();
+        assertThat(decide("ops", id, "APPROVE").status()).as("a wider scope is not the decider").isEqualTo(403);
+        assertThat(login("opsNear").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).isTrue();
+        assertThat(decide("opsNear", id, "APPROVE").status()).isEqualTo(200);
+        assertThat(decide("fin", id, "APPROVE").status()).as("the final holder over the top unit").isEqualTo(403);
+        assertThat(decide("finNear", id, "APPROVE").body().path("state").asText()).as("the nearest final holder").isEqualTo("APPROVED_NOT_ACTIVATED");
+    }
+
+    @Test
+    @DisplayName("OWN-01: the request belongs to the requesting unit: another requester of the unit edits and sends it; no requester decides it")
+    void requestBelongsToTheUnit() {
+        stationed(fresh, shared);
+        String id = request("DEPLOYMENT_AREAS", deployment(fresh, 0), sec);
+        person("rq2", role("NXREQ2", "ORGANIZATION", "VIEW", "CREATE_DEPLOYMENT_REQUEST", "APPROVE_HIERARCHY"), sec);
+        Api rq2 = login("rq2");
+        assertThat(rq2.get("/restationing-requests/" + id).body().path("can").path("submit").asBoolean()).as("another requester of the unit").isTrue();
+        Res edited = rq2.put("/restationing-requests/" + id + "/content", deployment(fresh, 0));
+        assertThat(edited.status()).as(edited.toString()).isEqualTo(200);
+        Res sent = rq2.post("/restationing-requests/" + id + "/submit", Map.of());
+        assertThat(sent.status()).as(sent.toString()).isEqualTo(200);
+        assertThat(login("rq").get("/restationing-requests/" + id).body().path("requester").path("name").asText()).as("who started it stays recorded").isEqualTo("شخص rq");
+        Res own = decide("rq2", id, "APPROVE");
+        assertThat(own.status()).as("whoever sent it never decides it").isEqualTo(403);
+        assertThat(own.body().path("code").asText()).isEqualTo("SEPARATION_OF_DUTIES");
+        assertThat(decide("apSec", id, "APPROVE").status()).isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("FYI: a recipient reads the one request; nothing else, nobody else in the branch; no mutation; it ends as designed; audited; a person with no permission at all is refused")
     void fyiReadsOneRequestOnly() {
         stationed(fresh, shared);
         String id = request("DEPLOYMENT_AREAS", deployment(fresh, 0), sec);
@@ -309,13 +383,21 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
         String unrelated = request("DEPLOYMENT_AREAS", deployment(fresh2, 0.01), sec);
 
-        UUID reader = affiliated("fyiReader", otherSec);
-        UUID parentMember = affiliated("fyiParent", other);
-        UUID siblingMember = affiliated("fyiSibling", dept);
+        // the recipients hold some unrelated permission: a person with none reaches only «طلب صلاحية» and support (owner, 16 Nov 2026)
+        UUID reader = holding("fyiReader", otherSec);
+        UUID parentMember = holding("fyiParent", other);
+        UUID siblingMember = holding("fyiSibling", dept);
+        affiliated("fyiBare", otherSec);
         Api fyi = login("fyi");
         Res sent = fyi.post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of(otherSec.toString()), "note", "للاطلاع"));
         assertThat(sent.status()).as(sent.toString()).isEqualTo(200);
         Api readerApi = login("fyiReader");
+        Res bare = login("fyiBare").get("/restationing-requests/" + id);
+        assertThat(bare.status()).as("no permission at all: not even a request sent «للعلم»").isEqualTo(403);
+        assertThat(bare.body().path("code").asText()).isEqualTo("NO_EFFECTIVE_ACCESS");
+        assertThat(login("fyiBare").get("/access-requests/mine").status()).as("the access-request page stays open").isEqualTo(200);
+        assertThat(login("fyiBare").get("/support/cases").status()).as("and support").isEqualTo(200);
+        assertThat(login("fyiBare").post("/assistant/ask", Map.of("question", "ما صلاحياتي؟")).status()).as("the assistant is closed").isEqualTo(403);
 
         // 1. the one request opens, read only; 2. another does not
         Res opened = readerApi.get("/restationing-requests/" + id);
@@ -339,8 +421,8 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(readerApi.post("/restationing-requests", Map.of("requestingUnitId", otherSec.toString(), "purpose", "DEPLOYMENT_AREAS", "content", deployment(otherSec, 0))).status()).isEqualTo(403);
 
         // no lasting right and no wider view
-        assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", reader).query(Long.class).single()).isZero();
-        assertThat(readerApi.get("/me").body().path("permissions")).isEmpty();
+        assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", reader).query(Long.class).single()).as("only its own").isEqualTo(1);
+        assertThat(readerApi.get("/me").body().path("permissions").toString()).isEqualTo("[\"VIEW_SUMMARY\"]");
         assertThat(readerApi.get("/sites/" + shared).status()).isIn(403, 404);
         assertThat(readerApi.get("/stationing/current").status() == 200 ? readerApi.get("/stationing/current").body().size() : 0).as("no register").isZero();
         assertThat(readerApi.get("/operational-posture").status()).isEqualTo(403);
@@ -367,7 +449,7 @@ class StationingNextIT extends RestationingTestBase {
         jdbc.sql("update affiliation set valid_to = now() where person_id = :p").param("p", reader).update();
         jdbc.sql("insert into affiliation(id, person_id, organization_id, valid_from) values (gen_random_uuid(), :p, :o, now())").param("p", reader).param("o", dept).update();
         assertThat(login("fyiReader").get("/restationing-requests/" + id).status()).as("moved in HR").isEqualTo(404);
-        UUID second = affiliated("fyiSecond", otherSec);
+        UUID second = holding("fyiSecond", otherSec);
         assertThat(login("fyiSecond").get("/restationing-requests/" + id).status()).as("whoever belongs to the unit now").isEqualTo(200);
         assertThat(second).isNotNull();
         jdbc.sql("update restationing_request set state = 'CANCELLED_BEFORE_ACTIVATION' where id = cast(:id as uuid)").param("id", id).update();
@@ -493,6 +575,16 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(one.toString()).doesNotContain("وحدة OTHER");
         assertThat(one.path("otherStationed").asLong()).isEqualTo(1);
         assertThat(jdbc.sql("select parent_id from organization where id = :o").param("o", other).query(UUID.class).single()).isEqualTo(parent);
+    }
+
+    /** Affiliated in HR with the unit and holding one unrelated permission (a summary view of that unit only). */
+    private UUID holding(String username, UUID unit) {
+        UUID p = person(username, role("NXVS" + username, "ORGANIZATION", "VIEW_SUMMARY"), unit);
+        if (jdbc.sql("select count(*) from affiliation where person_id = :p and valid_to is null").param("p", p).query(Long.class).single() == 0) {
+            jdbc.sql("insert into affiliation(id, person_id, organization_id, valid_from) values (gen_random_uuid(), :p, :o, now() - interval '1 day')")
+                    .param("p", p).param("o", unit).update();
+        }
+        return p;
     }
 
     private UUID affiliated(String username, UUID unit) {

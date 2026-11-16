@@ -3,7 +3,9 @@ import { api } from '../../api/client';
 import type { RestationingRequest, RestationingUnit } from '../../api/types';
 import { useApp, type View } from '../../lib/app';
 import { restriction } from '../../lib/navigation';
-import { pathOf, treeRows, type TreeUnit } from '../../lib/workspace';
+import { pathOf, type TreeUnit } from '../../lib/workspace';
+import { flatSource } from '../tree/tree';
+import { UnitTree } from '../tree/UnitTree';
 import { Icon } from '../ui';
 import { LinkedSitesPanel } from './LinkedSitesPanel';
 
@@ -51,16 +53,11 @@ export function OrgContextPanel({ request, tab, setTab, requestContent, unitId, 
 }) {
   const app = useApp();
   const { units, source } = useUnits(request);
-  const [toggled, setToggled] = useState<Set<string>>(new Set());
   const requesting = request?.requestingUnit.id ?? app.me.primaryOrg?.id ?? null;
-  const rows = useMemo(() => treeRows(units, { requesting, moving: request?.content.scope ?? [], toggled }), [units, requesting, request, toggled]);
+  // the one units tree of the application (owner, 16 Nov 2026): the requesting unit's branch open, as before
+  const tree = useMemo(() => flatSource(units), [units]);
+  const moving = useMemo(() => new Set(request?.content.scope ?? []), [request]);
   const path = pathOf(units, unitId ?? requesting);
-  const flip = (id: string) => setToggled((t) => {
-    const n = new Set(t);
-    if (n.has(id)) n.delete(id);
-    else n.add(id);
-    return n;
-  });
   const links: { view: View; label: string; icon: string }[] = [
     { view: 'permissions', label: 'الصلاحيات', icon: 'shield' },
     { view: 'audit', label: 'سجل التدقيق', icon: 'clock' },
@@ -92,27 +89,20 @@ export function OrgContextPanel({ request, tab, setTab, requestContent, unitId, 
               <h3>الهيكل التنظيمي</h3>
               <small className="tz-muted">{source}</small>
             </div>
-            {rows.length === 0 && <p className="tz-muted">لا وحدات ضمن نطاقك.</p>}
-            <ul role="tree">
-              {rows.map((r) => (
-                <li key={r.id} role="treeitem" aria-expanded={r.hasChildren ? r.open : undefined} aria-selected={r.id === unitId} style={{ paddingInlineStart: 6 + r.depth * 16 }}
-                  className={'tz-node' + (r.highlight ? ' ' + r.highlight : '') + (r.id === unitId ? ' chosen' : '')} data-unit={r.id}>
-                  {r.hasChildren ? (
-                    <button className="tz-node-toggle" aria-label={r.open ? 'طي' : 'توسيع'} onClick={() => flip(r.id)}>
-                      {r.open ? '▾' : '◂'}
-                    </button>
-                  ) : (
-                    <span className="tz-node-leaf" />
-                  )}
-                  <button className="tz-node-name" onClick={() => setUnitId(r.id)} title={r.code}>
-                    <Icon name={r.hasChildren ? 'folder' : 'units'} />
-                    <span>{r.name}</span>
-                    {r.highlight === 'requesting' && <em className="tz-tag">الطالبة</em>}
-                    {r.highlight === 'moving' && <em className="tz-tag moving">منتقلة</em>}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <UnitTree
+              source={tree}
+              label="الهيكل التنظيمي"
+              search={false}
+              selected={unitId}
+              reveal={requesting}
+              trail={tree.trail(requesting)}
+              openSingleRoot
+              onSelect={(u) => setUnitId(u.id)}
+              rowClass={(u) => (u.id === requesting ? 'requesting' : moving.has(u.id) ? 'moving' : undefined)}
+              icon={(u) => <Icon name={u.childCount ? 'folder' : 'units'} />}
+              tags={(u) => (u.id === requesting ? <em className="ut-tag">الطالبة</em> : moving.has(u.id) ? <em className="ut-tag moving">منتقلة</em> : null)}
+              empty="لا وحدات ضمن نطاقك."
+            />
           </section>
         )}
         {tab === 'sites' && (

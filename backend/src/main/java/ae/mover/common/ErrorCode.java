@@ -4,6 +4,8 @@ public enum ErrorCode {
     VALIDATION_FAILED(400),
     UNAUTHENTICATED(401),
     FORBIDDEN(403),
+    /** Signed in, no permission at all: only the access-request page and support are open (owner, 16 Nov 2026). */
+    NO_EFFECTIVE_ACCESS(403),
     SEPARATION_OF_DUTIES(403),
     RESOURCE_NOT_FOUND(404),
     STALE_REVISION(409),

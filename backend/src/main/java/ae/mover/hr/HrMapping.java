@@ -37,7 +37,8 @@ public final class HrMapping {
             new Canonical(Entity.UNIT, "code", false, "رمز الجهة"),
             new Canonical(Entity.UNIT, "name_en", false, "الاسم بالإنجليزية"),
             new Canonical(Entity.UNIT, "level", false, "مستوى الجهة"),
-            new Canonical(Entity.UNIT, "is_main", false, "وحدة رئيسية"),
+            // the main unit (owner, 16 Nov 2026): a unit whose MAIN_UNIT_ID is its own ID; never a flag, never a name
+            new Canonical(Entity.UNIT, "main_external_unit_id", false, "معرف الوحدة الرئيسية (MAIN_UNIT_ID) — الوحدة الرئيسية هي التي يشير فيها إلى نفسها"),
             new Canonical(Entity.PERSON, "external_person_id", true, "معرف الشخص في المصدر"),
             new Canonical(Entity.PERSON, "employee_number", true, "الرقم الوظيفي"),
             new Canonical(Entity.PERSON, "full_name", true, "الاسم الكامل"),
@@ -73,6 +74,31 @@ public final class HrMapping {
     public record Definition(List<Field> fields, Map<Entity, Rule> rules) {
     }
 
+    /**
+     * The main unit («الوحدة الرئيسية», owner 16 Nov 2026): the root of its branch, the unit every unit below it reports to.
+     * It is told by the data alone — its MAIN_UNIT_ID points to its own ID; a unit below it points up to it. Never by its
+     * name («قيادة», «مديرية», «إدارة» are functional labels) and never by a flag column (set to one default value on nearly
+     * every row in the source, it carries no meaning). MAIN_UNIT_ID is therefore not the direct parent: a main unit would
+     * be its own parent; the parent comes from the ID path (UNIT_PATH with path_parent). UTP_ID is a unit type, neither.
+     */
+    public static final String MAIN_FIELD = "main_external_unit_id";
+    static final String LEGACY_MAIN_FLAG = "is_main";
+    static final String MAIN_FLAG_REFUSED = "علم الوحدة الرئيسية لا يُعتمد عليه: الوحدة الرئيسية هي التي يشير فيها MAIN_UNIT_ID إلى معرفها نفسه"
+            + " — عيّن الحقل main_external_unit_id بدلاً منه";
+    static final String MAIN_IS_NOT_PARENT = "MAIN_UNIT_ID يدل على الوحدة الرئيسية وليس على الجهة الأم (الوحدة الرئيسية تشير فيه إلى نفسها)"
+            + " — خذ الجهة الأم من مسار المعرفات UNIT_PATH بالتحويل path_parent";
+
+    /** True when the unit row says it is a main unit: its main-unit reference is its own ID. */
+    public static boolean isMain(Map<String, String> unit) {
+        String id = unit.get("external_unit_id");
+        String main = unit.get(MAIN_FIELD);
+        return id != null && main != null && id.trim().equals(main.trim());
+    }
+
+    private static Field unitField(Definition def, String name) {
+        return def.fields().stream().filter(f -> f.entity() == Entity.UNIT && name.equals(f.field()) && f.enabled()).findFirst().orElse(null);
+    }
+
     public static Canonical canonical(Entity entity, String field) {
         return CANONICAL.stream().filter(c -> c.entity() == entity && c.field().equals(field)).findFirst().orElse(null);
     }
@@ -82,6 +108,10 @@ public final class HrMapping {
         List<String> problems = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (Field f : def.fields()) {
+            if (f.entity() == Entity.UNIT && LEGACY_MAIN_FLAG.equals(f.field())) {
+                problems.add(MAIN_FLAG_REFUSED);
+                continue;
+            }
             if (f.entity() == null || canonical(f.entity(), f.field()) == null) {
                 problems.add("حقل غير معروف في العقد: " + f.field());
                 continue;
@@ -107,6 +137,12 @@ public final class HrMapping {
                     problems.add("اسم عمود بديل غير صالح للحقل " + f.field());
                 }
             }
+        }
+        Field parent = unitField(def, "parent_external_unit_id");
+        Field main = unitField(def, MAIN_FIELD);
+        if (parent != null && main != null && parent.column() != null && parent.column().equalsIgnoreCase(main.column())
+                && !"path_parent".equals(parent.transform())) {
+            problems.add(MAIN_IS_NOT_PARENT);
         }
         for (Canonical c : CANONICAL) {
             if (c.required() && def.fields().stream().noneMatch(f -> f.entity() == c.entity() && f.field().equals(c.field()) && f.enabled())) {
@@ -217,6 +253,85 @@ public final class HrMapping {
             boolean match = actual != null && r.values().stream().anyMatch(v -> v.trim().equals(actual));
             out.put("active", String.valueOf("NOT_EQUALS".equals(r.operator()) ? actual != null && !match : match));
             return out;
+        }
+
+        /**
+         * A field's value as {@link #convert} reads it, as SQL for a WHERE clause (ADR-065: people are read by key, never all of
+         * them): the exact column spelling from the source metadata, quoted, with the transform applied where it changes the
+         * value. A plain column stays bare so the source can use its index. Null when the field is not mapped.
+         */
+        String expression(Entity e, String field) {
+            Field f = fields.get(e).stream().filter(x -> x.field().equals(field)).findFirst().orElse(null);
+            if (f == null || "path_parent".equals(f.transform())) {
+                return null;
+            }
+            List<String> cols = new ArrayList<>();
+            for (String col : columnsOf(f)) {
+                cols.add(quoted(exact.get(e + ":" + col.toUpperCase(Locale.ROOT))));
+            }
+            return switch (f.transform() == null ? "none" : f.transform()) {
+                case "trim" -> "TRIM(" + cols.get(0) + ")";
+                case "upper" -> "UPPER(TRIM(" + cols.get(0) + "))";
+                case "lower" -> "LOWER(TRIM(" + cols.get(0) + "))";
+                case "first_non_empty" -> "COALESCE(" + String.join(", ", cols.stream().map(c -> "NULLIF(TRIM(" + c + "), '')").toList()) + ")";
+                default -> cols.get(0);
+            };
+        }
+
+        /** {@code field IN (?, …)} over at most {@link Condition#MAX_LIST} values (Oracle's limit for one list); null when unmapped. */
+        public Condition in(Entity e, String field, java.util.Collection<String> values) {
+            String expr = expression(e, field);
+            if (expr == null || values.isEmpty() || values.size() > Condition.MAX_LIST) {
+                return null;
+            }
+            return new Condition(expr + " IN (" + String.join(", ", java.util.Collections.nCopies(values.size(), "?")) + ")",
+                    List.copyOf(values));
+        }
+
+        /** {@code LOWER(field) = ?} with the value lower-cased; null when the field is not mapped. */
+        public Condition equalsIgnoreCase(Entity e, String field, String value) {
+            String expr = expression(e, field);
+            return expr == null || value == null ? null : new Condition("LOWER(" + expr + ") = ?", List.of(value.toLowerCase(Locale.ROOT)));
+        }
+    }
+
+    private static String quoted(String column) {
+        if (column == null || !COLUMN_NAME.matcher(column).matches()) {
+            throw new ContractException(List.of("اسم عمود غير صالح في بيانات المصدر."));
+        }
+        return "\"" + column + "\"";
+    }
+
+    /**
+     * A WHERE clause over mapped columns (ADR-065): identifiers come from the source metadata through {@link Compiled} only, and
+     * every value is a bind parameter, never part of the text.
+     */
+    public static final class Condition {
+        public static final int MAX_LIST = 1000;
+        private final String sql;
+        private final List<String> binds;
+
+        private Condition(String sql, List<String> binds) {
+            this.sql = sql;
+            this.binds = binds;
+        }
+
+        public String sql() {
+            return sql;
+        }
+
+        public List<String> binds() {
+            return binds;
+        }
+
+        /** Either condition; null stands for none. */
+        public static Condition or(Condition a, Condition b) {
+            if (a == null || b == null) {
+                return a == null ? b : a;
+            }
+            List<String> all = new ArrayList<>(a.binds);
+            all.addAll(b.binds);
+            return new Condition("(" + a.sql + ") OR (" + b.sql + ")", List.copyOf(all));
         }
     }
 

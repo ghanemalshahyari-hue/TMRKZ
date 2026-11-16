@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api/client';
 import type { HierarchyLevel, OrgBranch } from '../../api/types';
+import type { TreeSource } from '../tree/tree';
+import { UnitTree } from '../tree/UnitTree';
 import { Dialog, DialogHead, Icon } from '../ui';
 import './unitsDialog.css';
 
@@ -47,12 +49,7 @@ export function UnitsDialog({ roleName, home, value, everything, finalApprover, 
 }) {
   const [rows, setRows] = useState<UnitChoice[]>(value);
   const [all, setAll] = useState(everything);
-  const [roots, setRoots] = useState<OrgBranch[] | null>(null);
   const [mainIds, setMainIds] = useState<Set<string>>(new Set());
-  const [kids, setKids] = useState<Record<string, OrgBranch[] | 'loading'>>({});
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  const [q, setQ] = useState('');
-  const [hits, setHits] = useState<OrgBranch[] | null>(null);
   const [levels, setLevels] = useState<HierarchyLevel[]>([]);
   const [covered, setCovered] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
@@ -62,32 +59,26 @@ export function UnitsDialog({ roleName, home, value, everything, finalApprover, 
     api.hierarchyLevels().then(setLevels).catch(() => setLevels([]));
   }, []);
 
-  useEffect(() => {
-    let live = true;
-    api
-      .grantRoots()
-      .then(async (mains) => {
-        if (!live) return;
-        setMainIds(new Set(mains.map((m) => m.id)));
-        setRoots(mains.length ? mains : await api.orgRoots()); // a hierarchy with no main units starts at its top
-      })
-      .catch((e: Error) => live && setError(e.message));
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (q.trim().length < 2) return setHits(null);
-    const ctl = new AbortController();
-    const t = window.setTimeout(() => {
-      api.orgSearch(q.trim(), ctl.signal).then(setHits).catch(() => undefined);
-    }, 250);
-    return () => {
-      window.clearTimeout(t);
-      ctl.abort();
-    };
-  }, [q]);
+  // the one units tree (owner, 16 Nov 2026): from the main units the granter may reach, and a search inside them only
+  const mainRef = useRef<Set<string>>(new Set());
+  const source = useMemo<TreeSource<OrgBranch>>(
+    () => ({
+      roots: async () => {
+        const mains = await api.grantRoots();
+        mainRef.current = new Set(mains.map((m) => m.id));
+        setMainIds(mainRef.current);
+        return mains.length ? mains : api.orgRoots(); // a hierarchy with no main units starts at its top
+      },
+      children: (id) => api.orgChildren(id),
+      search: (q, signal) =>
+        api.orgSearch(q, signal).then((r) =>
+          r
+            .filter((h) => !mainRef.current.size || mainRef.current.has(h.id) || h.path?.some((x) => mainRef.current.has(x.id)))
+            .map((h) => ({ item: h, path: (h.path ?? []).map((x) => x.name).join(' ‹ '), trail: (h.path ?? []).map((x) => x.id) })),
+        ),
+    }),
+    [],
+  );
 
   // what each row covers today, asked only when the row's reach changes
   useEffect(() => {
@@ -117,43 +108,6 @@ export function UnitsDialog({ roleName, home, value, everything, finalApprover, 
     onSave(all ? [] : rows, all);
   };
   const patch = (id: string, p: Partial<UnitChoice>) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...p } : r)));
-  const expand = (id: string) => {
-    setOpen((s) => {
-      const next = new Set(s);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    if (!kids[id]) {
-      setKids((k) => ({ ...k, [id]: 'loading' }));
-      api.orgChildren(id).then((r) => setKids((k) => ({ ...k, [id]: r }))).catch((e: Error) => setError(e.message));
-    }
-  };
-
-  const node = (o: OrgBranch): React.ReactNode => {
-    const children = kids[o.id];
-    return (
-      <li key={o.id}>
-        <div className={'ud-node' + (chosen.has(o.id) ? ' on' : '')}>
-          {o.childCount > 0 ? (
-            <button type="button" className="ud-arrow" aria-label={(open.has(o.id) ? 'طي ' : 'فتح ') + o.name} aria-expanded={open.has(o.id)} onClick={() => expand(o.id)}>
-              {open.has(o.id) ? '▾' : '◂'}
-            </button>
-          ) : (
-            <span className="ud-arrow" />
-          )}
-          <label title={isMain(o.id) ? 'الوحدة الرئيسية ليست مستوى في السلسلة الهرمية — اختر مستوى تحتها' : undefined}>
-            <input type="checkbox" checked={chosen.has(o.id)} disabled={isMain(o.id) && !chosen.has(o.id)} onChange={() => toggleRow(o)} /> {o.name}
-          </label>
-        </div>
-        {open.has(o.id) && children === 'loading' && <div className="ud-note">جارٍ التحميل…</div>}
-        {open.has(o.id) && Array.isArray(children) && <ul>{children.map(node)}</ul>}
-      </li>
-    );
-  };
-
-  // as the tree: the main units and below only
-  const shown = (hits ?? []).filter((h) => !mainIds.size || mainIds.has(h.id) || h.path?.some((p) => mainIds.has(p.id)));
   const incomplete = rows.some((r) => r.mode === 'LEVELS' && !r.levels.length);
   return (
     <Dialog open onClose={close} className="large-dialog">
@@ -176,22 +130,17 @@ export function UnitsDialog({ roleName, home, value, everything, finalApprover, 
           <div className="ud-grid">
             <section className="ud-tree" aria-label="الهيكل">
               {chain && <h4 className="ud-tree-head">الهيكل التنظيمي <small className="muted">ضع علامة لإضافة الوحدة</small></h4>}
-              <input type="search" aria-label="ابحث عن وحدة" placeholder="ابحث عن وحدة بالاسم…" value={q} onChange={(e) => setQ(e.target.value)} />
-              {hits ? (
-                <ul>
-                  {shown.map((h) => (
-                    <li key={h.id}>
-                      <label className="ud-hit" title={isMain(h.id) ? 'الوحدة الرئيسية ليست مستوى في السلسلة الهرمية — اختر مستوى تحتها' : undefined}>
-                        <input type="checkbox" checked={chosen.has(h.id)} disabled={isMain(h.id) && !chosen.has(h.id)} onChange={() => toggleRow(h)} /> {h.name}
-                        {h.path?.length ? <small className="muted"> {h.path.map((p) => p.name).join(' ‹ ')}</small> : null}
-                      </label>
-                    </li>
-                  ))}
-                  {shown.length === 0 && <li className="ud-note">لا توجد وحدة بهذا الاسم.</li>}
-                </ul>
-              ) : (
-                <ul data-testid="units-tree">{roots?.map(node)}</ul>
-              )}
+              <UnitTree
+                source={source}
+                label="الهيكل التنظيمي"
+                searchLabel="ابحث عن وحدة"
+                search="ابحث عن وحدة بالاسم…"
+                testId="units-tree"
+                checked={chosen}
+                onCheck={toggleRow}
+                disabled={(o) => (isMain(o.id) ? 'الوحدة الرئيسية ليست مستوى في السلسلة الهرمية — اختر مستوى تحتها' : null)}
+                empty="لا توجد وحدة ضمن ما يمكنك منحه."
+              />
             </section>
             <section className="ud-chosen">
               <h4>الوحدات المحددة <span className="pill">{rows.length.toLocaleString('en-US')}</span></h4>

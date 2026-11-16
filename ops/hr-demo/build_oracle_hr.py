@@ -108,15 +108,8 @@ def generate():
     by_id = {u['ID']: u for u in units}
 
     def main_of(unit):
-        # MAIN_UNIT_ID is the PARENT; the person's main unit is the nearest
-        # ancestor-or-self flagged MAIN_UNIT_FLAG (UAT BUG-33)
-        cur, seen = unit, set()
-        while cur is not None and cur['ID'] not in seen:
-            if cur.get('MAIN_UNIT_FLAG'):
-                return cur
-            seen.add(cur['ID'])
-            cur = by_id.get(cur['MAIN_UNIT_ID'])
-        return unit
+        # MAIN_UNIT_ID is the unit's main unit, itself on a main unit (owner, 16 Nov 2026); none above every main unit
+        return by_id.get(unit['MAIN_UNIT_ID']) or unit
 
     live_units = units
     dead_units = []
@@ -205,7 +198,7 @@ def generate():
             'GRD_ID': (OFFICER_GRADES if officer else OTHER_GRADES).index(next(x for x in (OFFICER_GRADES if officer else OTHER_GRADES) if x[0] == grade)) + (100 if officer else 200),
             'GRADE_NAME': grade, 'FULL_GRADE_NAME': full_grade, 'MAIN_GRADE_TYPE': 1,
             'POSITION_ID': pos_seq[0], 'EMP_POSITION_DESC': position, 'JOB_ID': job_id, 'JOB_NAME': job,
-            'ORG_UNIT_ID': unit['ID'], 'ORG_UNIT_NAME': unit['NAME'], 'ORG_UNIT_FULL_PATH': unit['UNIT_PATH'],
+            'ORG_UNIT_ID': unit['ID'], 'ORG_UNIT_NAME': unit['NAME'], 'ORG_UNIT_FULL_PATH': unit['FULL_PATH'],
             'MAIN_ORG_UNT_ID': main['ID'], 'MAIN_ORG_UNIT_NAME': main['NAME'],
             'ANNEXATION_UNIT_ID': annex['ID'] if annex else None, 'ANNEXATION_UNIT_NAME': annex['NAME'] if annex else None,
             'ANNEXATION_DATE': (TODAY - dt.timedelta(days=rnd.randint(5, 400))) if annex else None,
@@ -415,10 +408,15 @@ def verify(env):
     print('  with annexation          :', q('SELECT COUNT(*) FROM HR_PRS_EMPLOYEES_ALL WHERE ANNEXATION_UNIT_ID IS NOT NULL')[0][0])
     print('  units total              :', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI')[0][0], '| active:', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI WHERE STATUS = 1')[0][0])
     print('  units per level          :', q('SELECT UNT_LEVEL, COUNT(*) FROM HR_ENV_UNITS_AI GROUP BY UNT_LEVEL ORDER BY 1'))
-    print('  orphan parents           :', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI u WHERE MAIN_UNIT_ID IS NOT NULL AND NOT EXISTS (SELECT 1 FROM HR_ENV_UNITS_AI p WHERE p.ID = u.MAIN_UNIT_ID)')[0][0],
-          '| roots:', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI WHERE MAIN_UNIT_ID IS NULL')[0][0])
-    print('  level != parent+1        :', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI u JOIN HR_ENV_UNITS_AI p ON p.ID = u.MAIN_UNIT_ID WHERE u.UNT_LEVEL <> p.UNT_LEVEL + 1')[0][0])
-    print('  cycles (CONNECT BY)      :', 'none' if q("SELECT COUNT(*) FROM HR_ENV_UNITS_AI START WITH MAIN_UNIT_ID IS NULL CONNECT BY NOCYCLE PRIOR ID = MAIN_UNIT_ID")[0][0] == q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI')[0][0] else 'UNREACHABLE NODES — check')
+    # the parent is the second-to-last segment of the ID path; a main unit is MAIN_UNIT_ID = ID (owner, 16 Nov 2026)
+    tree = ("WITH t AS (SELECT ID, UNT_LEVEL, MAIN_UNIT_ID, CASE WHEN REGEXP_COUNT(UNIT_PATH, '[0-9]+') > 1 THEN "
+            "TO_NUMBER(REGEXP_SUBSTR(UNIT_PATH, '[0-9]+', 1, REGEXP_COUNT(UNIT_PATH, '[0-9]+') - 1)) END AS PARENT_ID FROM HR_ENV_UNITS_AI) ")
+    print('  main units (MAIN_UNIT_ID = ID):', q('SELECT UNT_LEVEL, COUNT(*) FROM HR_ENV_UNITS_AI WHERE MAIN_UNIT_ID = ID GROUP BY UNT_LEVEL ORDER BY 1'),
+          '| pointing to a unit that is not main:', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI u WHERE MAIN_UNIT_ID IS NOT NULL AND NOT EXISTS (SELECT 1 FROM HR_ENV_UNITS_AI p WHERE p.ID = u.MAIN_UNIT_ID AND p.MAIN_UNIT_ID = p.ID)')[0][0])
+    print('  orphan parents           :', q(tree + 'SELECT COUNT(*) FROM t u WHERE PARENT_ID IS NOT NULL AND NOT EXISTS (SELECT 1 FROM t p WHERE p.ID = u.PARENT_ID)')[0][0],
+          '| roots:', q(tree + 'SELECT COUNT(*) FROM t WHERE PARENT_ID IS NULL')[0][0])
+    print('  level != parent+1        :', q(tree + 'SELECT COUNT(*) FROM t u JOIN t p ON p.ID = u.PARENT_ID WHERE u.UNT_LEVEL <> p.UNT_LEVEL + 1')[0][0])
+    print('  cycles (CONNECT BY)      :', 'none' if q(tree + "SELECT COUNT(*) FROM t START WITH PARENT_ID IS NULL CONNECT BY NOCYCLE PRIOR ID = PARENT_ID")[0][0] == q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI')[0][0] else 'UNREACHABLE NODES — check')
     print('  people in unknown unit   :', q('SELECT COUNT(*) FROM HR_PRS_EMPLOYEES_ALL e WHERE NOT EXISTS (SELECT 1 FROM HR_ENV_UNITS_AI u WHERE u.ID = e.ORG_UNIT_ID)')[0][0])
     print('  directors resolvable     :', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI u JOIN HR_PRS_EMPLOYEES_ALL e ON e.POSITION_ID = u.DIRECTOR_POS_ID')[0][0], 'of', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI WHERE DIRECTOR_POS_ID IS NOT NULL')[0][0])
     try:

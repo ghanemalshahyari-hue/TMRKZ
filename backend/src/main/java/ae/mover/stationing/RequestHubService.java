@@ -349,7 +349,7 @@ public class RequestHubService {
             card(out, "ACCESS_FINAL", "بانتظار اعتمادي للصلاحيات", items.stream().filter(i -> Boolean.TRUE.equals(i.get("accessFinal"))).count(), "#accessInbox");
         }
         long turn = items.stream().filter(i -> !"ACCESS".equals(i.get("type")) && Boolean.TRUE.equals(i.get("myTurn"))).count();
-        if (turn > 0 || ctx.has(Permission.APPROVE)) {
+        if (turn > 0 || ctx.has(Permission.APPROVE) || ctx.has(Permission.APPROVE_HIERARCHY)) {
             card(out, "MY_TURN", "بانتظار اعتمادي", turn, "#allRequests");
         }
         if (ctx.has(Permission.DECIDE_UNIT_OPERATIONS)) {

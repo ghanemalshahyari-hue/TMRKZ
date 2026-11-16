@@ -243,7 +243,7 @@
 
 /* informational unit symbols: identity beside the name, never a state colour */
 .unit-symbol{display:inline-flex;align-items:center;gap:6px;flex:none;color:#6f8b84;vertical-align:middle}
-.unit-symbol small{font-size:10px;color:var(--muted)}
+.unit-symbol small{font-size:10px;color:var(--muted);white-space:nowrap}
 .unit-symbol-img{display:block;max-height:44px;width:auto}
 .unit-symbol-img.placeholder{width:18px;height:14px}
 .unit-symbol.generic svg{display:block}

@@ -100,6 +100,7 @@ public class AuditService {
             Map.entry("MEMBERSHIP_CREATED", "إضافة عضوية"),
             Map.entry("IDENTITY_LINKED", "ربط حساب دخول بسجل شخص"),
             Map.entry("IDENTITY_LINK_REFUSED", "رفض ربط حساب دخول"),
+            Map.entry("HR_PERSON_IMPORTED", "استيراد شخص واحد من الموارد البشرية"),
             Map.entry("BOOTSTRAP_ADMIN_CREATED", "إنشاء مدير التهيئة الأولى المؤقت"),
             Map.entry("BOOTSTRAP_ADMIN_REPLACED", "انتقال مدير التهيئة الأولى إلى سجله"),
             Map.entry("PLATFORM_ACCOUNT_CREATED", "إنشاء حساب منصة دائم"),

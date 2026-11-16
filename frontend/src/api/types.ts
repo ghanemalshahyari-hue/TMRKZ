@@ -24,6 +24,7 @@ export type Permission =
   | 'REQUEST_SITE_REGISTRATION'
   | 'DECIDE_UNIT_OPERATIONS'
   | 'FINAL_APPROVE_STATIONING'
+  | 'APPROVE_HIERARCHY'
   | 'MANAGE_FYI_DISTRIBUTION'
   | 'VIEW_OPERATIONAL_POSTURE'
   | 'ACTIVATE_STATIONING'
@@ -442,7 +443,7 @@ export type SimulationResult = {
   errors: { path: string; message: string }[];
   path: { key: string; name: string; runs: boolean }[];
   impact: { inFlightOnOlderVersions: number; message: string };
-  route: { node: string; type: FlowNodeType; name: string; taken: FlowWhen | null; chain?: boolean; places: { role: string; orgs: string[]; anyOrg: boolean; unresolved: boolean; holders: number }[] }[];
+  route: { node: string; type: FlowNodeType; name: string; taken: FlowWhen | null; chain?: boolean; places: { role: string; orgs: string[]; anyOrg: boolean; unresolved: boolean; holders: number; skipped?: boolean }[] }[];
   outcome: 'APPROVED' | 'NO_FINAL_APPROVER' | 'REJECTED' | null;
   coverage: { node: string; name: string; role: string; total: number; unresolved: number; sample: string[] }[];
 };
@@ -483,7 +484,11 @@ export type StageView = {
   slaDays: number;
   state: 'PENDING' | 'ACTIVE' | 'COMPLETE' | 'SKIPPED' | 'CARRIED';
   tasks: { id: string; roleName: string; orgName: string | null; state: TaskState; decidedBy: string | null; decidedAt: string | null }[];
+  /** Hierarchy units this climbing step passed for having no hierarchy approver (ADR-062): a unit skipped, not the step. */
+  skipped?: SkippedUnit[];
 };
+/** One hierarchy unit skipped in a climbing step, as recorded when the route was resolved (its name and level then). */
+export type SkippedUnit = { organizationId?: string; organizationName?: string; level?: number; order: number; reasonCode: 'NO_HIERARCHY_APPROVER'; reason: string };
 export type Attachment = {
   id: string;
   fieldId: string;
@@ -908,7 +913,7 @@ export type HrTestResult = { ok: boolean; databaseVersion?: string; unitColumns?
 export type IdentityIssue = {
   id: string;
   displayName: string | null;
-  reason: 'NO_KEY' | 'NO_MATCH' | 'AMBIGUOUS' | 'INACTIVE' | 'STALE_SOURCE' | 'ALREADY_LINKED';
+  reason: 'NO_KEY' | 'NO_MATCH' | 'AMBIGUOUS' | 'INACTIVE' | 'STALE_SOURCE' | 'ALREADY_LINKED' | 'SOURCE_UNAVAILABLE' | 'DIRECTORY_CONFLICT';
   attempts: number;
   lastSeenAt: string;
   claimedKey?: string;
@@ -1091,7 +1096,9 @@ export type RestationingStage = {
   unit: Ref | null;
   satisfies: string[];
   final: boolean;
-  mark: 'APPROVED' | 'CARRIED' | null;
+  /** SKIPPED: a hierarchy level with no approver, own or inherited, passed and recorded (ADR-062) — never an approval. */
+  mark: 'APPROVED' | 'CARRIED' | 'SKIPPED' | null;
+  skipReason?: string;
   current: boolean;
   decidedBy: Ref | null;
   decidedAt: string | null;

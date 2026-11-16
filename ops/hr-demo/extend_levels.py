@@ -2,7 +2,7 @@
 """Deeper demo levels (owner, 16 Nov 2026) for TMRKZ's demo Oracle HR (ADR-057).
 
 Adds, below the existing levels after level 5, 4–5 new units (each under a random existing unit of levels 5–9; one that lands on
-level 6 is a main unit, as every level-6 unit of the demo is), and grows each into a branch of 3–6 units per level down to level 12
+level 6 is a main unit — MAIN_UNIT_ID = ID — as every level-6 unit of the demo is), and grows each into a branch of 3–6 units per level down to level 12
 or 13 (chosen at random per branch). Each level of each new branch gets 3 synthetic people, except 1–2 levels per branch left with
 none on purpose. Oracle only: nobody is added to TMRKZ — a person becomes a user there only by «إضافة مستخدم» or an approved
 access request (ADR-061); the next HR sync brings the units and the HR records.
@@ -21,6 +21,7 @@ import oracledb
 
 from build_oracle_hr import (FAMILY, FAMILY_LATIN, FIRST, FIRST_F, JOBS, LATIN, OFFICER_GRADES, OTHER_GRADES, POSITIONS, TODAY,
                              _TR, connect, load_env)
+from main_unit_rule import SEP, id_path_parent, meaningless_flag
 
 UNIT_BASE = 990000
 PERSON_BASE = 990000
@@ -34,7 +35,7 @@ def remove(cur):
     cur.execute("SELECT MAX(UNT_LEVEL) FROM HR_UNITS_T WHERE CODE LIKE 'DX%'")
     top = cur.fetchone()[0] or 0
     units = 0
-    for level in range(top, 0, -1):          # children before parents (FK_UNIT_PARENT)
+    for level in range(top, 0, -1):          # deeper first: a unit's MAIN_UNIT_ID may name a DX main unit (FK_UNIT_PARENT)
         cur.execute("DELETE FROM HR_UNITS_T WHERE CODE LIKE 'DX%' AND UNT_LEVEL = :l", l=level)
         units += cur.rowcount
     return units, people
@@ -67,7 +68,19 @@ def main():
     cur.execute("SELECT ID, NAME, MAIN_UNIT_ID, UNT_LEVEL, UNIT_PATH, MAIN_UNIT_FLAG, CODE FROM HR_UNITS_T WHERE STATUS = 1")
     existing = {r[0]: {'ID': r[0], 'NAME': r[1], 'MAIN_UNIT_ID': r[2], 'UNT_LEVEL': r[3], 'UNIT_PATH': r[4], 'MAIN_UNIT_FLAG': r[5],
                        'DX': (r[6] or '').startswith('DX')} for r in cur.fetchall()}
+    if not all((u['UNIT_PATH'] or '').startswith(SEP) for u in existing.values()):
+        sys.exit('[extend] the demo still has the earlier shape; run main_unit_rule.py first (owner, 16 Nov 2026)')
     by_id = dict(existing)
+    # the parent from the ID path; a main unit is MAIN_UNIT_ID = ID, never the flag (owner, 16 Nov 2026)
+    parent_of = {i: id_path_parent(u['UNIT_PATH']) for i, u in existing.items()}
+    mains = {i for i, u in existing.items() if u['MAIN_UNIT_ID'] == i}
+    name_path = {}
+
+    def full_path(u):
+        if u['ID'] not in name_path:
+            up = by_id.get(parent_of.get(u['ID']))
+            name_path[u['ID']] = (full_path(up) + ' - ' if up else '') + u['NAME']
+        return name_path[u['ID']]
     anchors = [u for u in existing.values() if 5 <= u['UNT_LEVEL'] <= 9]
 
     units, people, report = [], [], []
@@ -77,23 +90,22 @@ def main():
         next_unit[0] += 1
         uid = next_unit[0]
         level = parent['UNT_LEVEL'] + 1
+        # level 6 is a main unit (MAIN_UNIT_ID = ID); below it, the unit points up to its main unit
+        main_id = uid if level == 6 else (parent['ID'] if parent['ID'] in mains else parent['MAIN_UNIT_ID'])
         u = {'ID': uid, 'CODE': 'DX%04d' % (uid - UNIT_BASE), 'NAME': name, 'NAME_E': 'Extra unit %d' % uid, 'SHORT_NAME': name[:40],
-             'MAIN_UNIT_ID': parent['ID'], 'UNT_LEVEL': level, 'UNIT_PATH': parent['UNIT_PATH'] + ' - ' + name, 'STATUS': 1,
-             'MAIN_UNIT_FLAG': 1 if level == 6 else 0, 'HAS_SON': 0, 'DIRECTOR_POS_ID': None, 'UNT_ID': 'OU-%d' % uid}
+             'MAIN_UNIT_ID': main_id, 'UNT_LEVEL': level, 'UNIT_PATH': parent['UNIT_PATH'] + SEP + str(uid), 'STATUS': 1,
+             'MAIN_UNIT_FLAG': meaningless_flag(uid), 'HAS_SON': 0, 'DIRECTOR_POS_ID': None, 'UNT_ID': 'OU-%d' % uid}
         if parent['ID'] > UNIT_BASE:
             parent['HAS_SON'] = 1       # existing units are left as they are
         units.append(u)
         by_id[uid] = u
+        parent_of[uid] = parent['ID']
+        if main_id == uid:
+            mains.add(uid)
         return u
 
     def main_of(u):
-        cur_u, seen = u, set()
-        while cur_u is not None and cur_u['ID'] not in seen:
-            if cur_u.get('MAIN_UNIT_FLAG'):
-                return cur_u
-            seen.add(cur_u['ID'])
-            cur_u = by_id.get(cur_u['MAIN_UNIT_ID'])
-        return u
+        return by_id.get(u['MAIN_UNIT_ID']) or u
 
     def add_person(unit):
         n = last_person - PERSON_BASE + len(people) + 1
@@ -120,7 +132,7 @@ def main():
             'GRD_ID': table.index(next(x for x in table if x[0] == grade)) + (100 if officer else 200),
             'GRADE_NAME': grade, 'FULL_GRADE_NAME': grade, 'MAIN_GRADE_TYPE': 1,
             'POSITION_ID': POS_BASE + n, 'EMP_POSITION_DESC': rnd.choice(POSITIONS), 'JOB_ID': 7001 + job_index, 'JOB_NAME': JOBS[job_index],
-            'ORG_UNIT_ID': unit['ID'], 'ORG_UNIT_NAME': unit['NAME'], 'ORG_UNIT_FULL_PATH': unit['UNIT_PATH'],
+            'ORG_UNIT_ID': unit['ID'], 'ORG_UNIT_NAME': unit['NAME'], 'ORG_UNIT_FULL_PATH': full_path(unit),
             'MAIN_ORG_UNT_ID': main['ID'], 'MAIN_ORG_UNIT_NAME': main['NAME'],
             'ANNEXATION_UNIT_ID': None, 'ANNEXATION_UNIT_NAME': None, 'ANNEXATION_DATE': None,
             'MAIN_ANNEXATION_UNIT_ID': None, 'MAIN_ANNEXATION_UNIT_NAME': None,
@@ -135,7 +147,7 @@ def main():
     def subtree_of(main_id):
         kids = {}
         for u in existing.values():
-            kids.setdefault(u['MAIN_UNIT_ID'], []).append(u)
+            kids.setdefault(parent_of[u['ID']], []).append(u)
         out, todo = [], [main_id]
         while todo:
             uid = todo.pop()
@@ -146,7 +158,7 @@ def main():
     if a.each_main:
         # every main unit's own branch: 4–5 new units under its existing (not earlier-added) units of levels 6–9
         plan = []
-        for main in sorted((u for u in existing.values() if u['MAIN_UNIT_FLAG'] and not u['DX']), key=lambda u: u['NAME']):
+        for main in sorted((u for u in existing.values() if u['ID'] in mains and not u['DX']), key=lambda u: u['NAME']):
             inside = [u for u in subtree_of(main['ID']) if 6 <= u['UNT_LEVEL'] <= 9 and not u['DX']]
             plan += [(f'{main["NAME"]} · وحدة {k}', rnd.choice(inside)) for k in range(1, rnd.randint(4, 5) + 1)]
     else:

@@ -1,5 +1,5 @@
 {
-  "note": "أدوار الاعتماد وطلبات الصلاحية كما في برنامج التنقل (ADR-042، ADR-044)",
+  "note": "أدوار الاعتماد وطلبات الصلاحية كما في برنامج التنقل (ADR-042، ADR-044). منذ 16 نوفمبر 2026 (ADR-063، قرار المالك) هي نفسها أدوار مسار التمركز: معتمد السلسلة الهرمية يوقّع مستويات السلسلة فقط (APPROVE_HIERARCHY)، معتمد عمليات الوحدة مرحلة العمليات (DECIDE_UNIT_OPERATIONS)، المعتمد النهائي الاعتماد النهائي (FINAL_APPROVE_STATIONING).",
   "roles": [
     {
       "code": "CHAIN_APPROVER",
@@ -7,7 +7,8 @@
       "scope": "ORGANIZATION",
       "permissions": [
         "VIEW",
-        "REVIEW"
+        "REVIEW",
+        "APPROVE_HIERARCHY"
       ],
       "summaryOnly": false,
       "grantableRoles": []
@@ -18,7 +19,8 @@
       "scope": "ORGANIZATION",
       "permissions": [
         "VIEW",
-        "REVIEW"
+        "REVIEW",
+        "DECIDE_UNIT_OPERATIONS"
       ],
       "summaryOnly": false,
       "grantableRoles": []
@@ -31,7 +33,8 @@
         "VIEW",
         "REVIEW",
         "APPROVE",
-        "EXPORT"
+        "EXPORT",
+        "FINAL_APPROVE_STATIONING"
       ],
       "summaryOnly": false,
       "grantableRoles": []
@@ -59,7 +62,11 @@
         "REQUESTER",
         "CHAIN_APPROVER",
         "UNIT_OPERATIONS_APPROVER",
-        "FYI_RECEIVER"
+        "FYI_RECEIVER",
+        "STATIONING_REQUESTER",
+        "DEPLOYMENT_REQUESTER",
+        "SITE_REGISTRATION_REQUESTER",
+        "POSTURE_VIEWER"
       ]
     },
     {

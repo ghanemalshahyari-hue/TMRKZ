@@ -226,11 +226,15 @@ public class StationingRoutes {
                 m.put("unit", s.unit() == null ? null : path.stream().filter(u -> u.id().equals(s.unit())).map(OrgUnit::name).findFirst().orElse(null));
                 if (s.unit() != null) {
                     // the stage unit's own seat, or when it has none the nearest approver above covering it (ADR-058)
-                    var st = stations.byPermission(Permission.APPROVE, s.unit());
+                    var st = stations.byPermission(Permission.APPROVE_HIERARCHY, s.unit());
                     m.put("holders", (long) st.people().size());
                     m.put("inheritedFrom", st.via() == ae.mover.access.Stations.Via.INHERITED ? st.fromName() : null);
+                    // ADR-062: a hierarchy level with nobody, own or inherited, is skipped and recorded; the request goes on
+                    m.put("skipped", s.kind() == RouteDerivation.Kind.HIERARCHY && st.empty());
                 } else {
-                    m.put("holders", holders(s.kind() == RouteDerivation.Kind.UNIT_OPERATIONS ? "DECIDE_UNIT_OPERATIONS" : "FINAL_APPROVE_STATIONING", ids));
+                    // the nearest scope covering the requesting unit decides (owner, 16 Nov 2026): only those are counted
+                    m.put("holders", (long) stations.nearestPeople(s.kind() == RouteDerivation.Kind.UNIT_OPERATIONS
+                            ? Permission.DECIDE_UNIT_OPERATIONS : Permission.FINAL_APPROVE_STATIONING, in.orgId()).size());
                 }
                 stages.add(m);
             }

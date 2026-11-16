@@ -20,6 +20,8 @@ class UnitMemberIT extends IntegrationTest {
 
     @BeforeEach
     void fixtures() {
+        // these cases run without HR: nobody outside TMRKZ is looked up live (ADR-065 is covered by HrLinkedPeopleIT)
+        jdbc.sql("update hr_source set enabled = false").update();
         root = org("ROOT", null);
         orgA = org("A", root);
         orgA1 = org("A1", orgA);

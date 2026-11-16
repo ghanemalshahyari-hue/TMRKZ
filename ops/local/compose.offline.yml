@@ -1,0 +1,15 @@
+# Offline / isolated run (owner, 16 Nov 2026): this folder is the offline installation. Used by ops/local/offline.sh with
+# docker-compose.yml and compose.local-directory.yml; nothing is built or pulled (--no-build --pull never).
+# The application's network has no route out of the machine; only web (and the optional https proxy) also joins «edge»,
+# which exists only to publish the application's port on this host.
+networks:
+  internal:
+    internal: true
+  edge:
+    driver: bridge
+
+services:
+  web:
+    networks: [internal, edge]
+  proxy:
+    networks: [internal, edge]

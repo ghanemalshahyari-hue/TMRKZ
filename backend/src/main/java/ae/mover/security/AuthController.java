@@ -110,7 +110,7 @@ public class AuthController {
         Instant now = clock.instant();
         OidcClient.Identity id = new OidcClient.Identity(directory.issuer(), user.uuid(),
                 "EMPLOYEE_NUMBER".equals(oidcProps.linkKey()) ? user.employeeNumber() : user.username(),
-                user.displayName(), user.username(), now, null, "LOGIN", "/", null, false);
+                user.displayName(), user.username(), now, null, "LOGIN", "/", null, false, user.profile());
         UUID person = identities.resolve(id);
         throttle.succeeded(username);
         AuthService.LoginResult r = auth.issueSession(person, directory.issuer(), null, now, ip, request.getHeader("User-Agent"));

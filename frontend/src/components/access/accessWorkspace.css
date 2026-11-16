@@ -255,3 +255,8 @@ body:has(.aw-divider.dragging) { user-select: none; cursor: col-resize; }
 .aw-help-pop .aw-help-warn { color: var(--orange); font-weight: 700; }
 .aw-help-pop .button { justify-self: start; }
 
+
+/* «مسؤوليات/مقاعد الوحدة» against «صلاحيات الشخص» (owner, 16 Nov 2026): a seat chip carries a small square mark */
+.aw-chip.seat { font-weight: 700; }
+.aw-seat-mark { display: inline-block; width: 7px; height: 7px; border-radius: 2px; background: currentColor; margin-inline-end: 4px; vertical-align: middle; opacity: 0.75; }
+.aw-why-head { margin: 10px 0 2px; font-size: 13px; }

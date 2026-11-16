@@ -15,9 +15,10 @@ export function normalLogin(raw: string): string | null {
 }
 
 /**
- * «إضافة مستخدم», as in TNQL's access workspace (owner, 11 Nov 2026; ADR-049): search the HR mirror by military number or User
- * ID and read the HR card, or add a User ID without HR. Saving places the person in the unit with no permission; the matrix then
- * shows their empty row, highlighted, for the cells to be ticked. The server decides who may be found and added.
+ * «إضافة مستخدم», as in TNQL's access workspace (owner, 11 Nov 2026; ADR-049): search by military number or User ID and read the
+ * HR card, or add a User ID without HR. Saving places the person in the unit with no permission; the matrix then shows their
+ * empty row, highlighted, for the cells to be ticked. The server decides who may be found and added. A person not yet in TMRKZ
+ * is found live in HR (card without personId) and saving imports that one person (ADR-065, as MOVER).
  */
 export function AddUserDialog({ unit, onClose, onAdded }: { unit: { id: string; name: string }; onClose: () => void; onAdded: (personId: string, key: string, already: boolean) => void }) {
   const [way, setWay] = useState<Way>('HR');
@@ -46,7 +47,13 @@ export function AddUserDialog({ unit, onClose, onAdded }: { unit: { id: string; 
     setBusy(true);
     setError(null);
     api
-      .addUnitMember(way === 'HR' ? { organizationId: unit.id, personId: card!.personId } : { organizationId: unit.id, userId: login, displayName: name.trim() || null })
+      .addUnitMember(
+        way === 'HR'
+          ? card!.personId
+            ? { organizationId: unit.id, personId: card!.personId }
+            : { organizationId: unit.id, employeeNo: card!.employeeNo }
+          : { organizationId: unit.id, userId: login, displayName: name.trim() || null },
+      )
       .then((r) => onAdded(r.personId, way === 'HR' ? card!.employeeNo : login!, r.already))
       .catch((e: Error) => setError(e.message))
       .finally(() => setBusy(false));
@@ -95,6 +102,11 @@ export function AddUserDialog({ unit, onClose, onAdded }: { unit: { id: string; 
                   {card.hrStatus && <div><dt>حالة الموظف</dt><dd>{card.hrStatus}</dd></div>}
                   {card.userId && <div><dt>رقم المستخدم</dt><dd className="latin">{card.userId}</dd></div>}
                 </dl>
+                {!card.personId && (
+                  <p className="au-note" data-testid="add-user-import">
+                    غير موجود في تمركز بعد: عند الحفظ يُستورد سجله وحده من الموارد البشرية، بلا أي صلاحية.
+                  </p>
+                )}
                 {card.inUnit ? (
                   <p className="au-note">هذا الموظف من مستخدمي «{unit.name}» بالفعل؛ الحفظ يعرض صفه في المصفوفة.</p>
                 ) : card.acting ? (

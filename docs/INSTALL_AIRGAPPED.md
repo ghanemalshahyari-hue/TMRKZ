@@ -1,5 +1,28 @@
 # MOVER — Installation in an isolated network
 
+## 0. This folder is the offline installation (owner, 16 Nov 2026)
+
+The TMRKZ folder itself is carried to the isolated machine; nothing else is needed. It holds the runtime images saved with
+`docker save` in `images/` (with `SHA256SUMS` and each image id), the newest verified backup in `backups/tmrkz-mover-*/`
+(business, identity and authorisation databases, files, and `oracle-hr-demo-data.tgz` for the demo HR source), the installed
+offline map in `map-data/runtime/current` (official `tmrkz-map-2026.11.2`, the only map kept), and the settings `.env`,
+`ops/local/.generated/` and `ops/hr-demo/.generated/` (git-ignored; secrets — carry them only on the approved medium).
+
+On the isolated machine (Docker Desktop or Docker Engine with compose, Git Bash or any POSIX shell):
+
+```sh
+sh ops/local/offline.sh          # loads missing images (checksums first), restores the backup on a machine without data, starts everything
+sh ops/local/offline.sh check    # proves the application network has no route to the internet
+sh ops/local/offline.sh stop     # stops everything; data kept in the Docker volumes
+```
+
+Nothing is built or pulled (`--no-build --pull never`), and the application's compose network is `internal` (no route out;
+only the web container also joins `edge` to publish its port on this host) — `ops/local/compose.offline.yml`. Before a
+transfer, refresh `images/` and the backup from the running installation (`docker save`; `ops/backup.sh` then
+`ops/verify-backup.sh`, then archive the demo Oracle volume beside it) so the folder carries the latest state.
+
+The procedure below (a separate bundle directory) remains for building a release bundle on a connected build host.
+
 ## 1. Build the offline bundle (connected build host)
 
 ```sh

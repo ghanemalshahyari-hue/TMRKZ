@@ -450,6 +450,14 @@ export class SiteEditor {
 
   private readonly onDrawClick = (e: MapMouseEvent) => {
     if (!this.drawing) return;
+    // a double click finishes the drawing (owner, 16 Nov 2026): its second click — and any click within a few pixels of the
+    // last corner — adds no corner, else the near-duplicate corner made a zero-length side and the shape could not close
+    if (((e.originalEvent as MouseEvent | undefined)?.detail ?? 1) >= 2) return;
+    const last = this.drawing.vertices.at(-1);
+    if (last) {
+      const q = this.map.project([last.lng, last.lat]);
+      if (Math.hypot(q.x - e.point.x, q.y - e.point.y) <= 4) return;
+    }
     const first = this.drawing.vertices[0];
     let onFirst = false;
     if (first && this.drawing.vertices.length >= 3) {

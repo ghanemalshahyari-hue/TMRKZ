@@ -81,11 +81,56 @@ public class Stations {
      * unit (or that names it); a grant over everything never sits a seat there.
      */
     public Station byPermission(Permission p, UUID unit) {
+        return resolve(heldBy(p), unit, true, true);
+    }
+
+    private List<RawGrant> heldBy(Permission p) {
         List<RawGrant> held = new ArrayList<>();
         for (String code : jdbc.sql("select code from role_def where :p = any(permissions)").param("p", p.name()).query(String.class).list()) {
             grants.ofRole(code, clock.instant()).stream().filter(g -> g.permissions().contains(p)).forEach(held::add);
         }
-        return resolve(held, unit, true, true);
+        return held;
+    }
+
+    /**
+     * The grants that decide a stage with no unit of its own — «اعتماد عمليات الوحدة», «الاعتماد النهائي» — for a requesting unit
+     * (owner, 16 Nov 2026: «nearest scope wins»). Of every grant holding the permission and covering the unit, only those named
+     * nearest it: the unit itself, then the nearest unit above; at the same unit a list of levels before the whole branch; a
+     * grant over everything last. People who may not decide this request (its requester, someone who decided another stage)
+     * are left out first, so the next nearest decides instead of nobody. Empty when nobody covers the unit.
+     */
+    public Set<UUID> nearestGrants(Permission p, UUID unit, Set<UUID> excludedPeople) {
+        Set<UUID> out = new LinkedHashSet<>();
+        nearest(p, unit, excludedPeople).forEach(g -> out.add(g.grantId()));
+        return out;
+    }
+
+    /** The people who would decide such a stage for the unit (the route simulator's count). */
+    public Set<UUID> nearestPeople(Permission p, UUID unit) {
+        Set<UUID> out = new LinkedHashSet<>();
+        nearest(p, unit, Set.of()).forEach(g -> out.add(g.personId()));
+        return out;
+    }
+
+    private List<RawGrant> nearest(Permission p, UUID unit, Set<UUID> excludedPeople) {
+        List<UUID> path = new ArrayList<>(hierarchy.path(unit).stream().map(OrgUnit::id).toList());
+        if (path.isEmpty()) {
+            path.add(unit);
+        }
+        int[] best = null;
+        List<RawGrant> out = new ArrayList<>();
+        for (RawGrant g : heldBy(p)) {
+            int[] n = excludedPeople.contains(g.personId()) ? null : g.nearness(path);
+            if (n == null || (best != null && RawGrant.compare(n, best) > 0)) {
+                continue;
+            }
+            if (best == null || RawGrant.compare(n, best) < 0) {
+                out.clear();
+                best = n;
+            }
+            out.add(g);
+        }
+        return out;
     }
 
     Station resolve(List<RawGrant> held, UUID unit, boolean homeAlso, boolean noAll) {

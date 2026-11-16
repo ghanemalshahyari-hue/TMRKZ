@@ -230,7 +230,10 @@ class AuthorizationIT extends IntegrationTest {
         assertThat(rev.get("/requests/" + id).status()).isEqualTo(200);
         UUID membership = jdbc.sql("select id from membership where person_id = :p").param("p", p).query(UUID.class).single();
         assertThat(login("admin").post("/memberships/" + membership + "/end", Map.of("reason", "نقل إلى جهة أخرى")).status()).isEqualTo(200);
-        assertThat(rev.get("/requests/" + id).status()).isEqualTo(404);
+        // holding nothing now, the same session reaches only «طلب صلاحية» and support (owner, 16 Nov 2026)
+        Res gone = rev.get("/requests/" + id);
+        assertThat(gone.status()).isEqualTo(403);
+        assertThat(gone.body().path("code").asText()).isEqualTo("NO_EFFECTIVE_ACCESS");
         sync.run(false);
         assertThat(jdbc.sql("select count(*) from authz_tuple where person_id = :p").param("p", p).query(Integer.class).single()).isZero();
         AccessContext fgaOnly = access.load(new Actor(p, null, null, null), Instant.now()).withConfirmer(authorization);

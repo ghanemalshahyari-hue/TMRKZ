@@ -51,6 +51,7 @@ export const PERMISSIONS: Permission[] = [
   'FINAL_APPROVE_STATIONING',
   'MANAGE_FYI_DISTRIBUTION',
   'VIEW_OPERATIONAL_POSTURE',
+  'APPROVE_HIERARCHY',
 ];
 export const PERMISSION_NAMES: Record<Permission, string> = {
   VIEW: 'عرض',
@@ -76,6 +77,7 @@ export const PERMISSION_NAMES: Record<Permission, string> = {
   REQUEST_SITE_REGISTRATION: 'طلب اعتماد موقع',
   DECIDE_UNIT_OPERATIONS: 'اعتماد عمليات الوحدة',
   FINAL_APPROVE_STATIONING: 'الاعتماد النهائي للتمركز',
+  APPROVE_HIERARCHY: 'اعتماد مستوى في السلسلة الهرمية',
   MANAGE_FYI_DISTRIBUTION: 'تحديد وحدات العلم',
   VIEW_OPERATIONAL_POSTURE: 'متابعة الموقف العملياتي',
   ACTIVATE_STATIONING: 'تفعيل التمركز',

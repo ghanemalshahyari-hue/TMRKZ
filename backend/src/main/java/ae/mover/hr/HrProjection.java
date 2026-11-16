@@ -22,7 +22,8 @@ import ae.mover.security.Actor;
  * Applies a validated snapshot to the local projection inside the publish transaction: organisations and people keep
  * their TMRKZ identity (matched by source identifier, never by name), HR fields are overwritten only here, local
  * additions live elsewhere and are untouched. Affiliation changes end grants that no longer fit, disable departed
- * people everywhere at once, and hand open tasks to {@link TaskRealignment}.
+ * people everywhere at once, and hand open tasks to {@link TaskRealignment}. Since ADR-065 the whole unit tree is applied
+ * but only the people the snapshot asked HR for (its scope): the linked people of a sync, or one imported person.
  */
 @Component
 public class HrProjection {
@@ -31,6 +32,12 @@ public class HrProjection {
     // a grouped semi-join, not a count per person: with 200,000 people the per-row count could fall into a full scan per row
     private static final String UNIQUE_NUMBER = "hr_person h where h.snapshot_id = :s"
             + " and h.employee_number in (select employee_number from hr_person where snapshot_id = :s group by employee_number having count(*) = 1)";
+    /**
+     * The people this projection may touch (ADR-065): the source identifiers the snapshot asked HR for — the linked people of a
+     * sync, or the one person of an import ({@code :one}). Someone the sync no longer reads is never updated or marked departed.
+     */
+    private static final String SCOPE = "(select sc.external_id from hr_snapshot_scope sc where sc.snapshot_id = :s"
+            + " and (cast(:one as text) is null or sc.external_id = cast(:one as text)))";
 
     private final JdbcClient jdbc;
     private final Clock clock;
@@ -71,8 +78,33 @@ public class HrProjection {
         Instant now = clock.instant();
         jdbc.sql("select set_config('tmrkz.hr_projection', 'on', true)").query().singleRow();
         Map<String, Object> s = Map.of("s", snapshot, "now", Db.ts(now), "cycles", String.join(",", cycleUnits));
+        int[] orgs = organizations(s);
+        Result people = people(snapshot, null, now);
+        return new Result(orgs[0], orgs[1], orgs[2], people.peopleCreated(), people.peopleAdopted(), people.peopleUpdated(),
+                people.peopleDisabled(), people.transfers(), people.grantsEnded(), people.tasksRealigned());
+    }
 
+    /**
+     * One person imported from HR (ADR-065, «إضافة مستخدم» or a first sign-in): the same rules as the sync, for that source
+     * identifier only, over the snapshot row the import just stored. Must run inside the caller's transaction.
+     */
+    public Result applyPerson(UUID snapshot, String externalId) {
+        jdbc.sql("select set_config('tmrkz.hr_projection', 'on', true)").query().singleRow();
+        return people(snapshot, java.util.Objects.requireNonNull(externalId), clock.instant());
+    }
+
+    private int[] organizations(Map<String, Object> s) {
         // ---- organisations -------------------------------------------------------------------------------------
+        // A unit TMRKZ already holds under the same Unit ID (resolved from the directory before Oracle was in force, ADR-068 §25)
+        // becomes Oracle's: the Unit ID is the join, so a second node is never made for it.
+        int orgAdopted = jdbc.sql("""
+                update organization o set source = 'HR', version = o.version + 1
+                from hr_unit u where u.snapshot_id = :s and o.source = 'LOCAL' and o.source_external_id = u.external_id
+                  and not exists (select 1 from organization x where x.source = 'HR' and x.source_external_id = u.external_id)""")
+                .params(s).update();
+        if (orgAdopted > 0) {
+            audit.system("HR_UNITS_ADOPTED", "HR_SNAPSHOT", String.valueOf(s.get("s")), null, Map.of("count", orgAdopted));
+        }
         int orgCreated = jdbc.sql("""
                 insert into organization(id, code, name, parent_id, status, valid_from, source, source_external_id)
                 select gen_random_uuid(), 'HR-' || u.external_id, u.name, null, case when u.active then 'ACTIVE' else 'RETIRED' end,
@@ -104,6 +136,14 @@ public class HrProjection {
                 .params(s).update();
         jdbc.sql("update organization o set parent_id = t.parent from (" + target + ") t where o.id = t.id and o.parent_id is distinct from t.parent")
                 .params(s).update();
+        return new int[] {orgCreated, orgUpdated + orgAdopted, orgRetired};
+    }
+
+    private Result people(UUID snapshot, String one, Instant now) {
+        Map<String, Object> s = new HashMap<>();
+        s.put("s", snapshot);
+        s.put("now", Db.ts(now));
+        s.put("one", one);
 
         // ---- who changes: computed before people and affiliations move -------------------------------------------
         List<Map<String, Object>> changes = jdbc.sql("""
@@ -113,11 +153,11 @@ public class HrProjection {
                 left join affiliation a on a.person_id = p.id and a.valid_to is null
                 left join hr_person h on h.snapshot_id = :s and h.external_id = p.source_external_id
                 left join organization o on o.source = 'HR' and o.source_external_id = h.unit_external_id
-                where p.source = 'HR'
+                where p.source = 'HR' and p.source_external_id in %s
                   and ((p.status = 'ACTIVE' and (h.external_id is null or not h.active))
                        or (a.id is not null and h.active
-                           and (o.id is distinct from a.organization_id or h.position_id is distinct from a.position_id)))""")
-                .params(s).query().listOfRows();
+                           and (o.id is distinct from a.organization_id or h.position_id is distinct from a.position_id)))"""
+                .formatted(SCOPE)).params(s).query().listOfRows();
         Map<UUID, AccessContext> before = new HashMap<>();
         for (Map<String, Object> c : changes) {
             UUID pid = (UUID) c.get("person_id");
@@ -128,36 +168,39 @@ public class HrProjection {
         int adopted = jdbc.sql("""
                 update person p set source = 'HR', source_external_id = h.external_id
                 from %s
+                  and h.external_id in %s
                   and p.source = 'LOCAL' and p.source_external_id is null and p.employee_no = h.employee_number
                   and not exists (select 1 from person x where x.source = 'HR' and x.source_external_id = h.external_id)"""
-                .formatted(UNIQUE_NUMBER)).params(s).update();
+                .formatted(UNIQUE_NUMBER, SCOPE)).params(s).update();
         int created = jdbc.sql("""
                 insert into person(id, employee_no, display_name, status, source, source_external_id)
                 select gen_random_uuid(), h.employee_number, h.full_name, case when h.active then 'ACTIVE' else 'DISABLED' end,
                        'HR', h.external_id
                 from %s
+                  and h.external_id in %s
                   and not exists (select 1 from person x where x.source = 'HR' and x.source_external_id = h.external_id)
                   and not exists (select 1 from person x where x.employee_no = h.employee_number)"""
-                .formatted(UNIQUE_NUMBER)).params(s).update();
+                .formatted(UNIQUE_NUMBER, SCOPE)).params(s).update();
         int updated = jdbc.sql("""
                 update person p set display_name = h.full_name, status = case when h.active then 'ACTIVE' else 'DISABLED' end,
                        employee_no = case when exists (select 1 from person x where x.employee_no = h.employee_number and x.id <> p.id)
                                           then p.employee_no else h.employee_number end
                 from %s
+                  and h.external_id in %s
                   and p.source = 'HR' and p.source_external_id = h.external_id
                   and (p.display_name <> h.full_name or p.employee_no <> h.employee_number
                        or p.status <> case when h.active then 'ACTIVE' else 'DISABLED' end)"""
-                .formatted(UNIQUE_NUMBER)).params(s).update();
+                .formatted(UNIQUE_NUMBER, SCOPE)).params(s).update();
         // away per HR (leave, absence): left out of who a step goes to, still appointed (ADR-059)
         jdbc.sql("""
                 update person p set hr_unavailable = nullif(btrim(h.leave_status), '')
-                from hr_person h where h.snapshot_id = :s and p.source = 'HR' and p.source_external_id = h.external_id
-                  and p.hr_unavailable is distinct from nullif(btrim(h.leave_status), '')""").params(s).update();
+                from hr_person h where h.snapshot_id = :s and h.external_id in %s and p.source = 'HR' and p.source_external_id = h.external_id
+                  and p.hr_unavailable is distinct from nullif(btrim(h.leave_status), '')""".formatted(SCOPE)).params(s).update();
         int disabled = jdbc.sql("""
                 update person p set status = 'DISABLED'
-                where p.source = 'HR' and p.status = 'ACTIVE'
-                  and not exists (select 1 from hr_person h where h.snapshot_id = :s and h.external_id = p.source_external_id)""")
-                .params(s).update();
+                where p.source = 'HR' and p.status = 'ACTIVE' and p.source_external_id in %s
+                  and not exists (select 1 from hr_person h where h.snapshot_id = :s and h.external_id = p.source_external_id)"""
+                .formatted(SCOPE)).params(s).update();
 
         // ---- affiliations ------------------------------------------------------------------------------------------
         jdbc.sql("""
@@ -167,18 +210,19 @@ public class HrProjection {
                 from (select p.id as person_id, h.active, o.id as org, h.position_id from person p
                       left join hr_person h on h.snapshot_id = :s and h.external_id = p.source_external_id
                       left join organization o on o.source = 'HR' and o.source_external_id = h.unit_external_id
-                      where p.source = 'HR') t
+                      where p.source = 'HR' and p.source_external_id in %s) t
                 where a.person_id = t.person_id and a.valid_to is null
-                  and (not coalesce(t.active, false) or t.org is distinct from a.organization_id or t.position_id is distinct from a.position_id)""")
-                .params(s).update();
+                  and (not coalesce(t.active, false) or t.org is distinct from a.organization_id or t.position_id is distinct from a.position_id)"""
+                .formatted(SCOPE)).params(s).update();
         jdbc.sql("""
                 insert into affiliation(id, person_id, organization_id, position_id, position_title, valid_from)
                 select gen_random_uuid(), p.id, o.id, h.position_id, h.position_title, :now
                 from person p
                 join hr_person h on h.snapshot_id = :s and h.external_id = p.source_external_id and h.active
                 join organization o on o.source = 'HR' and o.source_external_id = h.unit_external_id
-                where p.source = 'HR' and not exists (select 1 from affiliation a where a.person_id = p.id and a.valid_to is null)""")
-                .params(s).update();
+                where p.source = 'HR' and p.source_external_id in %s
+                  and not exists (select 1 from affiliation a where a.person_id = p.id and a.valid_to is null)"""
+                .formatted(SCOPE)).params(s).update();
 
         // ---- consequences ------------------------------------------------------------------------------------------
         int grantsEnded = 0;
@@ -225,6 +269,6 @@ public class HrProjection {
                     Map.of("transfer", !gone && c.get("new_org") != null && !c.get("new_org").equals(c.get("old_org"))));
         }
         int realigned = before.isEmpty() ? 0 : realignment.realign(before, "HR_SYNC", now);
-        return new Result(orgCreated, orgUpdated, orgRetired, created, adopted, updated, disabled, transfers, grantsEnded, realigned);
+        return new Result(0, 0, 0, created, adopted, updated, disabled, transfers, grantsEnded, realigned);
     }
 }

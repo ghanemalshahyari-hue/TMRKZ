@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, isAbort } from '../../api/client';
 import type { OrgBranch, Ref, SiteNode } from '../../api/types';
 import { Icon } from '../ui';
+import type { TreeSource } from '../tree/tree';
+import { UnitTree } from '../tree/UnitTree';
 import { OrgSymbol, SymbolLegend } from '../UnitSymbol';
 import { RowActionsButton } from './SiteActionMenu';
 
@@ -40,6 +42,7 @@ function PathLine({ path }: { path?: Ref[] }) {
 /**
  * Organisation tree loaded one level at a time (no members, no people), with search across every branch the actor
  * may see. Selecting an organisation filters the map by responsibility and use; it never infers sites from names.
+ * Drawn by the one units tree of the application (owner, 16 Nov 2026).
  */
 export function OrgTree({
   selectedId,
@@ -56,119 +59,34 @@ export function OrgTree({
   revision: number;
   subOption?: boolean;
 }) {
-  const [roots, setRoots] = useState<OrgBranch[] | null>(null);
-  const [kids, setKids] = useState<Loaded<OrgBranch>>({});
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState('');
-  const search = useSearch<OrgBranch>(q, (v, s) => api.orgSearch(v, s));
-
-  useEffect(() => {
-    setKids({});
-    api
-      .orgRoots()
-      .then((r) => (setRoots(r), setError(null)))
-      .catch((e: Error) => setError(e.message));
-  }, [revision]);
-
-  const load = (id: string) => {
-    if (kids[id]) return Promise.resolve();
-    setKids((k) => ({ ...k, [id]: 'loading' }));
-    return api
-      .orgChildren(id)
-      .then((r) => setKids((k) => ({ ...k, [id]: r })))
-      .catch((e: Error) => (setKids((k) => ({ ...k, [id]: undefined })), setError(e.message)));
-  };
-  const toggle = (id: string) => {
-    const next = new Set(open);
-    if (next.has(id)) next.delete(id);
-    else {
-      next.add(id);
-      void load(id);
-    }
-    setOpen(next);
-  };
-  /** Search result: open its path so the tree shows where it is, then select it. */
-  const reveal = async (o: OrgBranch) => {
-    const next = new Set(open);
-    for (const p of o.path ?? []) {
-      next.add(p.id);
-      await load(p.id);
-    }
-    setOpen(next);
-    setQ('');
-    onSelect({ id: o.id, name: o.name });
-  };
-
-  const row = (o: OrgBranch, depth: number) => {
-    const isOpen = open.has(o.id);
-    const children = kids[o.id];
-    return (
-      <li key={o.id} role="treeitem" aria-expanded={o.childCount ? isOpen : undefined} aria-selected={selectedId === o.id}>
-        <div className={'tree-row ' + (selectedId === o.id ? 'active' : '')} style={{ paddingInlineStart: 6 + depth * 14 }}>
-          {o.childCount > 0 ? (
-            <button className="tree-toggle" onClick={() => toggle(o.id)} aria-label={(isOpen ? 'طي ' : 'فتح ') + o.name}>
-              {isOpen ? '▾' : '◂'}
-            </button>
-          ) : (
-            <span className="tree-toggle" aria-hidden="true">·</span>
-          )}
-          <button className="tree-label" onClick={() => onSelect(selectedId === o.id ? null : { id: o.id, name: o.name })}>
-            <b className="with-symbol">
-              <OrgSymbol orgId={o.id} size={18} />
-              {o.name}
-            </b>
-            <small>
-              {o.siteCount ? o.siteCount + ' موقع مسؤولة عنه' : 'لا مواقع مسؤولة عنها مباشرة'}
-              {o.childCount ? ' · ' + o.childCount + ' فرع' : ''}
-            </small>
-          </button>
-        </div>
-        {isOpen && (
-          <ul role="group">
-            {children === 'loading' && <li className="tree-note">جارٍ تحميل الفروع…</li>}
-            {Array.isArray(children) && children.map((c) => row(c, depth + 1))}
-          </ul>
-        )}
-      </li>
-    );
-  };
-
+  const source = useMemo<TreeSource<OrgBranch>>(
+    () => ({
+      roots: () => api.orgRoots(),
+      children: (id) => api.orgChildren(id),
+      search: (q, signal) =>
+        api.orgSearch(q, signal).then((r) => r.map((o) => ({ item: o, path: (o.path ?? []).map((x) => x.name).join(' ‹ '), trail: (o.path ?? []).map((x) => x.id) }))),
+    }),
+    [],
+  );
   return (
     <div className="browse-pane">
-      <div className="search-box">
-        <Icon name="search" />
-        <input placeholder="ابحث عن جهة في كل الفروع المسموحة…" aria-label="البحث في الجهات" value={q} onChange={(e) => setQ(e.target.value)} />
-      </div>
+      <UnitTree
+        source={source}
+        label="شجرة الجهات"
+        searchLabel="البحث في الجهات"
+        search="ابحث عن جهة في كل الفروع المسموحة…"
+        revision={revision}
+        selected={selectedId}
+        onSelect={(o) => onSelect(selectedId === o.id ? null : { id: o.id, name: o.name })}
+        icon={(o) => <OrgSymbol orgId={o.id} size={18} />}
+        meta={(o) => (o.siteCount ? o.siteCount + ' موقع' : null)}
+      />
       {selectedId && subOption && (
         <label className="check-label tree-option">
           <input type="checkbox" checked={includeSub} onChange={(e) => onIncludeSub(e.target.checked)} />
           تشمل الفروع التابعة
         </label>
       )}
-      {error && <div className="note red micro">{error}</div>}
-      {search.hits ? (
-        <ul className="tree" role="listbox" aria-label="نتائج البحث في الجهات">
-          {search.hits.length === 0 && <li className="tree-note">لا نتائج ضمن نطاقك.</li>}
-          {search.hits.map((o) => (
-            <li key={o.id} role="option" aria-selected={selectedId === o.id}>
-              <button className="tree-hit" onClick={() => reveal(o)}>
-                <b className="with-symbol">
-                  <OrgSymbol orgId={o.id} size={18} />
-                  {o.name}
-                </b>
-                <PathLine path={o.path} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <ul className="tree" role="tree" aria-label="شجرة الجهات">
-          {roots === null && !error && <li className="tree-note">جارٍ التحميل…</li>}
-          {roots?.map((o) => row(o, 0))}
-        </ul>
-      )}
-      {search.error && <div className="note red micro">{search.error}</div>}
       <SymbolLegend />
     </div>
   );

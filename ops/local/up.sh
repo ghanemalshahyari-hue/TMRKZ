@@ -6,7 +6,7 @@
 # Once .env names the enterprise directory (LDAP_URL set and not the stand-in, ADR-052), the stand-in is left out: the
 # directory settings, the organisation's CA in TMRKZ_TRUSTSTORE_DIR (default ops/keycloak/truststores) and .env apply as in
 # production. The federation inside Keycloak is then pointed at it with ops/keycloak/set-directory.sh.
-# Usage: sh ops/local/up.sh
+# Usage: sh ops/local/up.sh          (offline, from this folder's saved images: sh ops/local/offline.sh)
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
@@ -15,11 +15,23 @@ URL="$(sed -n 's/^TMRKZ_PUBLIC_URL=//p' .env | tail -n 1)"; URL="${URL:-http://l
 # readiness is checked on this host's plain port: an https name may resolve only in the organisation's DNS (ADR-051)
 PORT="$(sed -n 's/^MOVER_HTTP_PORT=//p' .env | tail -n 1)"; LOCAL="http://127.0.0.1:${PORT:-8088}"
 DIRECTORY="$(sed -n 's/^LDAP_URL=//p' .env | tail -n 1 | tr -d '\r')"
+# offline (ops/local/offline.sh, owner 16 Nov 2026): nothing is built or pulled and the application network has no route out;
+# on a machine without the data TMRKZ_RESTORE names the backup restored (databases and files) before the start
+UP="--build"; OFF=""
+if [ "${TMRKZ_OFFLINE:-}" = 1 ]; then UP="--no-build --pull never"; OFF="-f ops/local/compose.offline.yml"; fi
+# a new version built on this connected machine while the application stays on its isolated network
+if [ "${TMRKZ_OFFLINE:-}" = 1 ] && [ "${TMRKZ_BUILD:-}" = 1 ]; then UP="--build"; fi
+restore() {
+  [ -n "${TMRKZ_RESTORE:-}" ] || return 0
+  COMPOSE_PATH_SEPARATOR=":" COMPOSE_FILE="$1${OFF:+:ops/local/compose.offline.yml}" RESTORE_DATA_ONLY=1 \
+    sh ops/restore.sh "$TMRKZ_RESTORE" tmrkz-mover "${PORT:-8088}"
+}
 case "$DIRECTORY" in
   ""|ldap://openldap*) ;;
   *)
     echo "[up] enterprise directory from .env: $DIRECTORY (no stand-in)"
-    docker compose -p tmrkz-mover -f docker-compose.yml up -d --build "$@"
+    restore docker-compose.yml
+    docker compose -p tmrkz-mover -f docker-compose.yml $OFF up -d $UP "$@"
     STANDIN=no ;;
 esac
 if [ "${STANDIN:-yes}" = yes ]; then
@@ -45,7 +57,8 @@ export LDAP_URL="ldap://openldap:389" LDAP_START_TLS="true" LDAP_BIND_DN="cn=adm
 export LDAP_BIND_CREDENTIAL="$LOCAL_LDAP_ADMIN_PASSWORD" LDAP_USERS_DN="ou=people,dc=tmrkz,dc=local"
 export TMRKZ_TRUSTSTORE_DIR="./$G/truststore"
 
-docker compose -p tmrkz-mover -f docker-compose.yml -f ops/local/compose.local-directory.yml up -d --build "$@"
+restore docker-compose.yml:ops/local/compose.local-directory.yml
+docker compose -p tmrkz-mover -f docker-compose.yml -f ops/local/compose.local-directory.yml $OFF up -d $UP "$@"
 fi
 i=0
 until [ "$(curl -s -o /dev/null -w '%{http_code}' "$LOCAL/auth/realms/tmrkz/.well-known/openid-configuration")" = 200 ] \

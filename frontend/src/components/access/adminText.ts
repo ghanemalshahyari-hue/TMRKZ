@@ -57,6 +57,7 @@ const ACCOUNT_ACTIONS: Record<string, string> = {
   PERSON_PROFILE_CHANGED: 'تعديل البيانات',
   PERSON_RETIRED: 'حذف الحساب',
   LOCAL_USER_CREATED: 'إنشاء حساب محلي',
+  HR_PERSON_IMPORTED: 'استيراد من الموارد البشرية',
 };
 
 export function accountAction(code: string): string {

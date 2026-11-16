@@ -38,6 +38,40 @@ public record RawGrant(
         Instant validTo,
         List<GrantTarget> targets) {
 
+    /**
+     * How near the grant is named to a unit, from the unit's path upward (the unit first): {distance, kind}. Distance is the
+     * place on the path of the nearest named unit that covers it (0 the unit itself; the path's length for a grant over
+     * everything); kind breaks a tie at the same unit — 0 named at the unit itself, 1 a list of levels, 2 the whole branch,
+     * 3 everything. Null when the grant does not cover the unit. «Nearest scope wins» (owner, 16 Nov 2026) compares these.
+     */
+    public int[] nearness(List<UUID> path) {
+        Spec s = spec();
+        if (s.all()) {
+            return new int[] {path.size(), 3};
+        }
+        if (!s.orgConstraint() || path.isEmpty()) {
+            return null;
+        }
+        List<GrantTarget> units = "CUSTOM".equals(scopeMode)
+                ? targets.stream().filter(t -> GrantTarget.ORGANIZATION.equals(t.kind())).toList() : s.orgs();
+        int[] best = null;
+        for (GrantTarget t : units) {
+            int i = path.indexOf(t.id());
+            if (i < 0 || !(t.limited() ? t.reached().contains(path.get(0)) : i == 0 || t.includeDescendants())) {
+                continue;
+            }
+            int[] n = {i, i == 0 ? 0 : t.limited() ? 1 : 2};
+            if (best == null || compare(n, best) < 0) {
+                best = n;
+            }
+        }
+        return best;
+    }
+
+    public static int compare(int[] a, int[] b) {
+        return a[0] != b[0] ? Integer.compare(a[0], b[0]) : Integer.compare(a[1], b[1]);
+    }
+
     /** The grant's scope resolved to explicit targets; legacy role scopes become the equivalent targets. */
     public Spec spec() {
         if ("CUSTOM".equals(scopeMode)) {

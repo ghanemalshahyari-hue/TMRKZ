@@ -76,6 +76,18 @@ services:
       LDAP_EMPLOYEE_NUMBER_ATTRIBUTE: ${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:-employeeNumber}
       LDAP_USER_OBJECT_CLASS: ${LDAP_USER_OBJECT_CLASS:-inetOrgPerson}
       TMRKZ_LDAP_CA_DIR: /etc/tmrkz/ldap-ca
+      # ADR-068: which directory attributes / ID-token claims carry unit ID, unit name, main unit ID, rank and position.
+      # Empty: not read (the default). Keycloak's mappers: ops/keycloak/set-employment-attributes.sh.
+      LDAP_ATTR_UNIT_ID: ${LDAP_ATTR_UNIT_ID:-}
+      LDAP_ATTR_UNIT_NAME: ${LDAP_ATTR_UNIT_NAME:-}
+      LDAP_ATTR_MAIN_UNIT_ID: ${LDAP_ATTR_MAIN_UNIT_ID:-}
+      LDAP_ATTR_RANK: ${LDAP_ATTR_RANK:-}
+      LDAP_ATTR_POSITION: ${LDAP_ATTR_POSITION:-}
+      TMRKZ_OIDC_CLAIM_UNIT_ID: ${TMRKZ_OIDC_CLAIM_UNIT_ID:-}
+      TMRKZ_OIDC_CLAIM_UNIT_NAME: ${TMRKZ_OIDC_CLAIM_UNIT_NAME:-}
+      TMRKZ_OIDC_CLAIM_MAIN_UNIT_ID: ${TMRKZ_OIDC_CLAIM_MAIN_UNIT_ID:-}
+      TMRKZ_OIDC_CLAIM_RANK: ${TMRKZ_OIDC_CLAIM_RANK:-}
+      TMRKZ_OIDC_CLAIM_POSITION: ${TMRKZ_OIDC_CLAIM_POSITION:-}
       # Authorisation decisions are confirmed by TMRKZ's own OpenFGA (ADR-018); without it sensitive actions are refused.
       TMRKZ_OPENFGA_API_URL: http://openfga:8080
       TMRKZ_OPENFGA_API_TOKEN: ${TMRKZ_OPENFGA_API_TOKEN:?set TMRKZ_OPENFGA_API_TOKEN in .env; run ops/init-env.sh}

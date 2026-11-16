@@ -125,13 +125,23 @@ export function StationingRoutePanel({ purpose, others, onChanged }: { purpose: 
           <button className="button compact" data-testid="route-try" disabled={busy || !org.id || !hasLast} onClick={tryIt}>تشغيل التجربة</button>
           {tried && (
             <div data-testid="route-tried">
-              <div className={'fs-outcome ' + (tried.complete && tried.stages.every((s) => s.holders > 0) ? 'ok' : 'no')}>
-                النتيجة: {!tried.complete ? 'لا يُقبل إرسال الطلب من هذه الوحدة' : tried.stages.every((s) => s.holders > 0) ? 'يصل الطلب إلى كل المراحل' : 'يتوقف الطلب عند مرحلة لا يحملها أحد'}
+              <div className={'fs-outcome ' + (tried.complete && tried.stages.every((s) => s.holders > 0 || s.skipped) ? 'ok' : 'no')}>
+                النتيجة: {!tried.complete ? 'لا يُقبل إرسال الطلب من هذه الوحدة' : tried.stages.every((s) => s.holders > 0 || s.skipped) ? 'يصل الطلب إلى كل المراحل' + (tried.stages.some((s) => s.skipped) ? '، وتُتجاوز المستويات التي لا معتمد لها' : '') : 'يتوقف الطلب عند مرحلة لا يحملها أحد'}
               </div>
               {tried.problems.map((p) => <p key={p} className="micro error-text">{p}</p>)}
               <ol className="fs-route">
                 {tried.stages.map((s) => (
-                  <li key={s.key}><b>{s.label}</b>{s.unit ? ' — ' + s.unit : ''}<div className={'micro ' + (s.holders ? 'muted' : 'error-text')}>{s.holders ? s.holders + ' شخص يحمل هذه المرحلة' : 'لا أحد يحمل هذه المرحلة'}</div></li>
+                  <li key={s.key} data-skipped={s.skipped || undefined}>
+                    <b>{s.label}</b>{s.unit ? ' — ' + s.unit : ''}
+                    {s.skipped ? (
+                      <div className="micro fs-skipped">تم التجاوز — لا يوجد معتمد</div>
+                    ) : (
+                      <div className={'micro ' + (s.holders ? 'muted' : 'error-text')}>
+                        {s.holders ? s.holders + ' شخص يحمل هذه المرحلة' : 'لا أحد يحمل هذه المرحلة'}
+                        {s.inheritedFrom ? ' · اعتماد بواسطة معتمد أعلى: ' + s.inheritedFrom : ''}
+                      </div>
+                    )}
+                  </li>
                 ))}
               </ol>
               <p className="micro muted">التفعيل: {tried.activators ?? 0} شخص.{tried.fyiHolders != null ? ' وحدات العلم: ' + tried.fyiHolders + ' شخص.' : ''} يُحسب من منح الوحدة وما فوقها، والقرار نفسه يفحص النطاق كاملاً.</p>

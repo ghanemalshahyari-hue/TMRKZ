@@ -24,12 +24,22 @@ public record OidcProperties(
         int reauthMaxAgeSeconds,
         int loginMaxAgeSeconds,
         int httpTimeoutMs,
-        List<String> platformAccounts) {
+        List<String> platformAccounts,
+        String unitIdClaim,
+        String unitNameClaim,
+        String mainUnitIdClaim,
+        String rankClaim,
+        String positionClaim) {
 
     /** The realm role a platform account holds in the provider, and the ID token claim that carries realm roles. */
     public static final String PLATFORM_ROLE = "tmrkz-platform";
     public static final String ROLES_CLAIM = "tmrkz_roles";
+    private static final java.util.regex.Pattern CLAIM = java.util.regex.Pattern.compile("^[A-Za-z][A-Za-z0-9_.-]{0,63}$");
 
+    /**
+     * The employment claims (ADR-068) are the NAMES of the ID-token claims that carry the unit ID, unit name, main unit ID, rank
+     * and position (TMRKZ_OIDC_CLAIM_*). Empty means not read; a name that is not a plain claim name stops the application.
+     */
     public OidcProperties {
         if (!"EMPLOYEE_NUMBER".equals(linkKey)) linkKey = "DOMAIN_ACCOUNT";
         if (enterpriseKeyClaim == null || enterpriseKeyClaim.isBlank()) enterpriseKeyClaim = "employee_number";
@@ -38,6 +48,33 @@ public record OidcProperties(
         if (httpTimeoutMs <= 0) httpTimeoutMs = 10000;
         platformAccounts = platformAccounts == null ? List.of() : platformAccounts.stream()
                 .filter(Objects::nonNull).map(s -> s.trim().toLowerCase(Locale.ROOT)).filter(s -> !s.isEmpty()).distinct().toList();
+        unitIdClaim = claim("TMRKZ_OIDC_CLAIM_UNIT_ID", unitIdClaim);
+        unitNameClaim = claim("TMRKZ_OIDC_CLAIM_UNIT_NAME", unitNameClaim);
+        mainUnitIdClaim = claim("TMRKZ_OIDC_CLAIM_MAIN_UNIT_ID", mainUnitIdClaim);
+        rankClaim = claim("TMRKZ_OIDC_CLAIM_RANK", rankClaim);
+        positionClaim = claim("TMRKZ_OIDC_CLAIM_POSITION", positionClaim);
+    }
+
+    private static String claim(String setting, String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        String n = name.trim();
+        if (!CLAIM.matcher(n).matches()) {
+            throw new IllegalArgumentException(setting + " is not a claim name");
+        }
+        return n;
+    }
+
+    /** Whether any employment claim is read on this path. */
+    public boolean employmentClaims() {
+        return unitIdClaim != null || unitNameClaim != null || mainUnitIdClaim != null || rankClaim != null || positionClaim != null;
+    }
+
+    /** Never the client secret. */
+    @Override
+    public String toString() {
+        return "OidcProperties[" + issuer + ", " + clientId + ", linkKey=" + linkKey + "]";
     }
 
     /** A login named by the installation as a lasting platform account (TMRKZ_PLATFORM_ACCOUNTS). */

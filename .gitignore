@@ -54,3 +54,6 @@ ops/tls/private/
 .env.before-https-*
 # demo HR source secrets (ops/hr-demo/up.sh)
 ops/hr-demo/.generated/
+
+# offline images (docker save) carried with the folder, never in git
+/images/

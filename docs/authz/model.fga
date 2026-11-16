@@ -72,6 +72,8 @@ type system
     define manage_fyi_distribution_any: [grant#holder]
     define view_operational_posture: [grant#holder]
     define view_operational_posture_any: [grant#holder]
+    define approve_hierarchy: [grant#holder]
+    define approve_hierarchy_any: [grant#holder]
 
 type organization
   relations
@@ -202,6 +204,10 @@ type organization
     define view_operational_posture_tree: [grant#holder]
     define view_operational_posture_inh: view_operational_posture_tree or view_operational_posture_inh from parent
     define view_operational_posture: view_operational_posture_here or view_operational_posture_inh or view_operational_posture from system
+    define approve_hierarchy_here: [grant#holder]
+    define approve_hierarchy_tree: [grant#holder]
+    define approve_hierarchy_inh: approve_hierarchy_tree or approve_hierarchy_inh from parent
+    define approve_hierarchy: approve_hierarchy_here or approve_hierarchy_inh or approve_hierarchy from system
 
 type site
   relations
@@ -425,6 +431,13 @@ type site
     define view_operational_posture_direct: view_operational_posture_here or view_operational_posture_inh
     define view_operational_posture_req: view_operational_posture_direct or view_operational_posture from responsible
     define view_operational_posture: view_operational_posture_req or view_operational_posture_contains or view_operational_posture from system
+    define approve_hierarchy_here: [grant#holder]
+    define approve_hierarchy_tree: [grant#holder]
+    define approve_hierarchy_contains: [grant#holder]
+    define approve_hierarchy_inh: approve_hierarchy_tree or approve_hierarchy_inh from parent
+    define approve_hierarchy_direct: approve_hierarchy_here or approve_hierarchy_inh
+    define approve_hierarchy_req: approve_hierarchy_direct or approve_hierarchy from responsible
+    define approve_hierarchy: approve_hierarchy_req or approve_hierarchy_contains or approve_hierarchy from system
 
 type resource
   relations
@@ -491,6 +504,8 @@ type resource
     define manage_fyi_distribution: manage_fyi_distribution_here or manage_fyi_distribution from system
     define view_operational_posture_here: [grant#holder]
     define view_operational_posture: view_operational_posture_here or view_operational_posture from system
+    define approve_hierarchy_here: [grant#holder]
+    define approve_hierarchy: approve_hierarchy_here or approve_hierarchy from system
 
 type request
   relations
@@ -562,6 +577,8 @@ type request
     define manage_fyi_distribution_task: manage_fyi_distribution from related_org or manage_fyi_distribution_direct from site or manage_fyi_distribution from resource or manage_fyi_distribution from system
     define view_operational_posture: view_operational_posture from related_org or view_operational_posture_req from site or view_operational_posture from resource or view_operational_posture from system
     define view_operational_posture_task: view_operational_posture from related_org or view_operational_posture_direct from site or view_operational_posture from resource or view_operational_posture from system
+    define approve_hierarchy: approve_hierarchy from related_org or approve_hierarchy_req from site or approve_hierarchy from resource or approve_hierarchy from system
+    define approve_hierarchy_task: approve_hierarchy from related_org or approve_hierarchy_direct from site or approve_hierarchy from resource or approve_hierarchy from system
     define view_full: creator or view
     define view_any: view_full or view_summary
     define info_view: info_member from info_org

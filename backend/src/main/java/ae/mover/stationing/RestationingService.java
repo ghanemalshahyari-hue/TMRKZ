@@ -126,7 +126,22 @@ public class RestationingService {
         boolean marked() {
             return mark != null;
         }
+
+        /** Decided by a person (approved, or carried from an earlier decision) — a skipped hierarchy stage is not (ADR-062). */
+        boolean decided() {
+            return mark != null && !SKIPPED.equals(mark);
+        }
+
+        StageRow withMark(String m) {
+            return new StageRow(id, routeNo, position, key, kind, unit, permission, label, satisfies, dependsOn, finalStage, independentOf, m,
+                    decidedBy, viaDelegation, decidedAt);
+        }
     }
+
+    /** A hierarchy stage whose level has no approver, own or inherited (ADR-058), is passed and recorded (owner, 16 Nov 2026, ADR-062). */
+    static final String SKIPPED = "SKIPPED";
+    static final String NO_HIERARCHY_APPROVER = "NO_HIERARCHY_APPROVER";
+    static final String NO_HIERARCHY_APPROVER_TEXT = "تم تجاوز هذه الجهة لعدم وجود معتمد للسلسلة الهرمية";
 
     private final JdbcClient jdbc;
     private final Json json;
@@ -312,7 +327,7 @@ public class RestationingService {
             if (first || wasPaused) {
                 routeNo = r.routeNo() + 1;
                 // O-10b: after a hierarchy change every stage is decided again; the earlier route stays as route_no - 1
-                old.stream().filter(StageRow::marked).forEach(o -> invalidated.add(decisionOf(o)));
+                old.stream().filter(StageRow::decided).forEach(o -> invalidated.add(decisionOf(o)));
                 for (int i = 0; i < fresh.size(); i++) {
                     next.add(row(fresh.get(i), routeNo, i, null, null, null, null));
                 }
@@ -321,6 +336,21 @@ public class RestationingService {
                 reconcile(old, fresh, changed, routeNo, next, invalidated, carried);
                 jdbc.sql("delete from restationing_stage where request_id = :id and route_no = :r").param("id", id).param("r", routeNo).update();
             }
+            // ADR-062: every hierarchy stage is looked at again for this submission; nobody there, own or inherited → skipped
+            List<StageRow> resolved = new ArrayList<>();
+            List<StageRow> skippedNow = new ArrayList<>();
+            for (StageRow st : next) {
+                StageRow x = st;
+                if ("HIERARCHY".equals(st.kind()) && (st.mark() == null || SKIPPED.equals(st.mark()))) {
+                    boolean nobody = stations.byPermission(Permission.valueOf(st.permission()), st.unit()).empty();
+                    x = st.withMark(nobody ? SKIPPED : null);
+                    if (nobody) {
+                        skippedNow.add(x);
+                    }
+                }
+                resolved.add(x);
+            }
+            next = resolved;
             for (StageRow st : next) {
                 insertStage(id, st);
             }
@@ -343,6 +373,7 @@ public class RestationingService {
                     .param("c", json.write(r.content().stored())).param("changed", String.join(",", RestationingContent.names(changed)))
                     .param("reason", first ? null : reason).param("inv", json.write(invalidated)).param("carried", String.join(",", carried))
                     .param("route", routeNo).param("pv", pv.version()).param("checks", json.write(view)).update();
+            recordSkipped(id, r.number(), n, routeNo, pv.version(), r.unit(), skippedNow, now);
             Map<String, Object> detail = new LinkedHashMap<>();
             detail.put("policyVersion", pv.version());
             detail.put("purpose", r.purpose());
@@ -372,7 +403,7 @@ public class RestationingService {
         int reopen = -1;
         for (int i = 0; i < fresh.size(); i++) {
             StageRow p = prev.get(fresh.get(i).key());
-            if (hits(fresh.get(i), changed) || p == null || !p.marked()) {
+            if (hits(fresh.get(i), changed) || p == null || !p.decided()) {
                 reopen = i;
                 break;
             }
@@ -380,7 +411,7 @@ public class RestationingService {
         for (int i = 0; i < fresh.size(); i++) {
             RouteStage s = fresh.get(i);
             StageRow p = prev.get(s.key());
-            if (p == null || !p.marked()) {
+            if (p == null || !p.decided()) {
                 next.add(row(s, routeNo, i, null, null, null, null));
             } else if (hits(s, changed)) {
                 invalidated.add(decisionOf(p));
@@ -474,13 +505,13 @@ public class RestationingService {
      */
     private Grant requireDecider(AccessContext ctx, Req r, StageRow stage, List<StageRow> route) {
         Set<UUID> actor = humans(ctx.personId());
-        Set<UUID> requester = humans(r.requester());
+        Set<UUID> requester = requesters(r);
         if (intersects(actor, requester)) {
             throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES, "مقدم الطلب لا يقرر مراحل طلبه.", Map.of());
         }
         Set<UUID> others = new HashSet<>();
         // the approver who signed a lower station because it had nobody of its own still signs his own (ADR-058, as in TNQL)
-        route.stream().filter(x -> x.marked() && !x.key().equals(stage.key()) && !inheritedBy(x, stage))
+        route.stream().filter(x -> x.decided() && !x.key().equals(stage.key()) && !inheritedBy(x, stage))
                 .forEach(x -> others.addAll(humans(x.decidedBy())));
         if (intersects(actor, others)) {
             throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES,
@@ -491,8 +522,10 @@ public class RestationingService {
         Map<UUID, UUID> delegators = delegators(ctx);
         Permission p = Permission.valueOf(stage.permission());
         ae.mover.access.Stations.Station station = stage.unit() == null ? null : stations.byPermission(p, stage.unit());
+        // unit operations and the final approval: the nearest scope covering the requesting unit decides (owner, 16 Nov 2026)
+        Set<UUID> nearest = NEAREST_SCOPE.contains(stage.kind()) ? stations.nearestGrants(p, r.unit(), excluded) : null;
         Optional<Grant> g = ctx.grants().stream()
-                .filter(x -> x.has(p) && seat(x, stage, r, station, ctx.personId()))
+                .filter(x -> x.has(p) && seat(x, stage, r, station, ctx.personId()) && (nearest == null || nearest.contains(x.grantId())))
                 .filter(x -> x.delegationId() == null || !excluded.contains(delegators.get(x.delegationId())))
                 .findFirst();
         UUID target = stage.unit() != null ? stage.unit() : r.unit();
@@ -501,6 +534,9 @@ public class RestationingService {
         }
         return g.get();
     }
+
+    /** Stages with no unit of their own decided by the nearest scope covering the requesting unit (owner, 16 Nov 2026). */
+    private static final Set<String> NEAREST_SCOPE = Set.of("UNIT_OPERATIONS", "FINAL");
 
     /**
      * A hierarchy or cross-branch stage is the stage unit's own approver seat — or, when the unit has no approver of its own,
@@ -858,7 +894,7 @@ public class RestationingService {
             List<UUID> recipients = new ArrayList<>();
             if (!units.isEmpty()) {
                 recipients = jdbc.sql("""
-                        select distinct a.person_id from affiliation a where a.valid_to is null and a.organization_id = any(string_to_array(:u, ',')::uuid[])""")
+                        select distinct a.person_id from (select person_id, organization_id from affiliation where valid_to is null union select person_id, organization_id from unit_member where ended_at is null) a where a.organization_id = any(string_to_array(:u, ',')::uuid[])""")
                         .param("u", Db.ids(units)).query(UUID.class).list();
                 for (UUID person : recipients) {
                     jdbc.sql("""
@@ -899,7 +935,7 @@ public class RestationingService {
             if (n == 0) {
                 throw ApiException.notFound();
             }
-            List<String> recipients = jdbc.sql("select distinct a.person_id::text from affiliation a where a.valid_to is null and a.organization_id = :o")
+            List<String> recipients = jdbc.sql("select distinct a.person_id::text from (select person_id, organization_id from affiliation where valid_to is null union select person_id, organization_id from unit_member where ended_at is null) a where a.organization_id = :o")
                     .param("o", unit).query(String.class).list();
             Map<String, Object> detail = new LinkedHashMap<>();
             detail.put("unit", unit.toString());
@@ -917,14 +953,15 @@ public class RestationingService {
         return ctx.remember("restationing-fyi:" + request, () -> jdbc.sql("""
                 select count(*) from restationing_fyi f join restationing_request q on q.id = f.request_id
                  where f.request_id = :r and f.ended_at is null and q.state not in ('CANCELLED_BEFORE_ACTIVATION', 'LAPSED_NOT_ACTIVATED')
-                   and f.organization_id in (select a.organization_id from affiliation a where a.person_id = :p and a.valid_to is null)""")
+                   and f.organization_id in (select a.organization_id from affiliation a where a.person_id = :p and a.valid_to is null
+                       union select um.organization_id from unit_member um where um.person_id = :p and um.ended_at is null)""")
                 .param("r", request).param("p", ctx.personId()).query(Long.class).single() > 0);
     }
 
     /** D1/D10: neither the requester nor the final approver activates, and the activator's right covers every unit. */
     private void requireActivator(AccessContext ctx, Req r, Permission p, String missing) {
         Set<UUID> actor = humans(ctx.personId());
-        Set<UUID> requester = humans(r.requester());
+        Set<UUID> requester = requesters(r);
         Set<UUID> finalApprover = r.finalApprover() == null ? Set.of() : humans(r.finalApprover());
         if (intersects(actor, requester)) {
             throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES, "مقدم الطلب لا يفعّل طلبه.", Map.of());
@@ -1460,7 +1497,8 @@ public class RestationingService {
             m.put("activation", a);
         }
         Map<String, Object> can = new LinkedHashMap<>();
-        boolean owner = r.requester().equals(ctx.personId());
+        // the request belongs to the requesting unit: whoever may make this request for it edits and sends it (owner, 16 Nov 2026)
+        boolean owner = ctx.canFor(createPermission(r.purpose()), r.unit());
         can.put("edit", owner && EDITABLE.contains(r.state()));
         can.put("submit", owner && EDITABLE.contains(r.state()));
         can.put("decide", current != null && mayDecide(ctx, r, current, route));
@@ -1514,7 +1552,7 @@ public class RestationingService {
 
     private boolean mayActivate(AccessContext ctx, Req r) {
         Set<UUID> actor = humans(ctx.personId());
-        if (intersects(actor, humans(r.requester())) || r.finalApprover() != null && intersects(actor, humans(r.finalApprover()))) {
+        if (intersects(actor, requesters(r)) || r.finalApprover() != null && intersects(actor, humans(r.finalApprover()))) {
             return false;
         }
         Permission p = r.extension() ? Permission.ACTIVATE_TEMPORARY_EXTENSION : Permission.ACTIVATE_STATIONING;
@@ -1531,6 +1569,10 @@ public class RestationingService {
         s.put("satisfies", x.satisfies().stream().map(m -> m.get("label")).toList());
         s.put("final", x.finalStage());
         s.put("mark", x.mark());
+        if (SKIPPED.equals(x.mark())) {
+            s.put("skipReasonCode", NO_HIERARCHY_APPROVER);
+            s.put("skipReason", "لا يوجد معتمد للسلسلة الهرمية");
+        }
         s.put("current", current != null && current.key().equals(x.key()));
         s.put("decidedBy", x.decidedBy() == null ? null : person(x.decidedBy()));
         s.put("decidedAt", x.decidedAt() == null ? null : x.decidedAt().toString());
@@ -1559,7 +1601,7 @@ public class RestationingService {
             }
         }
         for (StageRow s : stages(r.id(), r.routeNo())) {
-            if (s.unit() != null && ctx.grants().stream().anyMatch(g -> g.has(Permission.APPROVE) && !g.isAll() && s.unit().equals(g.orgId()))) {
+            if (s.unit() != null && ctx.grants().stream().anyMatch(g -> g.has(Permission.valueOf(s.permission())) && !g.isAll() && s.unit().equals(g.orgId()))) {
                 return true;
             }
         }
@@ -1572,15 +1614,17 @@ public class RestationingService {
         }
     }
 
+    /**
+     * The request belongs to the requesting unit, not to the person who started it (owner, 16 Nov 2026): anyone who holds this
+     * request's right for that unit edits and sends it — the one who started it is kept for the history; one who no longer holds
+     * the right no longer edits it.
+     */
     private void requireOwnerEditable(AccessContext ctx, Req r) {
-        if (!r.requester().equals(ctx.personId())) {
-            throw ApiException.forbidden("يعدّل الطلبَ ويرسله مقدمُه فقط.");
+        if (!ctx.canFor(createPermission(r.purpose()), r.unit())) {
+            throw ApiException.forbidden("يحتاج صلاحية هذا الطلب للوحدة الطالبة.");
         }
         if (!EDITABLE.contains(r.state())) {
             throw ApiException.validation("لا يُعدّل الطلب في حالته الحالية؛ الحركة اللاحقة تحتاج طلباً جديداً.");
-        }
-        if (!ctx.canFor(createPermission(r.purpose()), r.unit())) {
-            throw ApiException.forbidden("يحتاج صلاحية هذا الطلب للوحدة الطالبة.");
         }
     }
 
@@ -1657,10 +1701,50 @@ public class RestationingService {
             case EXCEPTION -> Permission.APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION.name();
             case UNIT_OPERATIONS -> Permission.DECIDE_UNIT_OPERATIONS.name();
             case FINAL -> Permission.FINAL_APPROVE_STATIONING.name();
-            default -> Permission.APPROVE.name();
+            // a level of the climb, or a unit added from another branch: its hierarchy approver (ADR-063), never APPROVE alone
+            default -> Permission.APPROVE_HIERARCHY.name();
         };
         return new StageRow(null, routeNo, position, s.key(), s.kind().name(), s.unit(), perm, s.label(), sat, s.dependsOn(),
                 s.finalStage(), s.independentOf(), mark, by, via, at);
+    }
+
+    /**
+     * The hierarchy stages this submission skipped, kept per revision with the unit's name and level as they are now (ADR-062):
+     * the history never depends on today's hierarchy, and one grouped audit event says what was passed and why.
+     */
+    private void recordSkipped(UUID id, String number, int revision, int routeNo, int policyVersion, UUID requestUnit,
+                               List<StageRow> skipped, Instant now) {
+        if (skipped.isEmpty()) {
+            return;
+        }
+        List<OrgUnit> path = hierarchy.path(requestUnit);
+        List<Map<String, Object>> units = new ArrayList<>();
+        for (StageRow st : skipped) {
+            OrgUnit u = path.stream().filter(x -> x.id().equals(st.unit())).findFirst().orElse(null);
+            int order = u == null ? st.position() + 1 : path.indexOf(u);
+            String name = u != null ? u.name() : jdbc.sql("select name from organization where id = :o").param("o", st.unit()).query(String.class).single();
+            jdbc.sql("""
+                    insert into restationing_route_skip(request_id, revision, route_no, stage_key, organization_id, organization_name,
+                                                        organization_level, hierarchy_order, reason_code, reason_text, policy_version, created_at)
+                    values (:r, :n, :route, :k, :o, :name, :lvl, :ord, :code, :text, :pv, :now) on conflict do nothing""")
+                    .param("r", id).param("n", revision).param("route", routeNo).param("k", st.key()).param("o", st.unit())
+                    .param("name", name).param("lvl", u == null ? null : u.level()).param("ord", order).param("code", NO_HIERARCHY_APPROVER)
+                    .param("text", NO_HIERARCHY_APPROVER_TEXT).param("pv", policyVersion).param("now", Db.ts(now)).update();
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("organizationId", st.unit().toString());
+            m.put("organizationName", name);
+            m.put("level", u == null ? null : u.level());
+            m.put("order", order);
+            m.put("reasonCode", NO_HIERARCHY_APPROVER);
+            units.add(m);
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("revision", revision);
+        detail.put("route", routeNo);
+        detail.put("policyVersion", policyVersion);
+        detail.put("units", units);
+        audit.record(null, ae.mover.audit.AuditService.Capacity.NONE, "HIERARCHY_LEVEL_SKIPPED", "RESTATIONING_REQUEST", id.toString(),
+                number, detail, NO_HIERARCHY_APPROVER_TEXT, revision);
     }
 
     private static Map<String, Object> decisionOf(StageRow o) {
@@ -1765,6 +1849,18 @@ public class RestationingService {
         }).toList());
         m.put("needsDistanceException", res.needsDistanceException());
         return m;
+    }
+
+    /**
+     * Everyone on the requesting side of a request: the person who started it and everyone who submitted a revision of it. The
+     * request belongs to the requesting unit (owner, 16 Nov 2026), so any of its requesters may have edited and sent it; none of
+     * them decides or activates it.
+     */
+    Set<UUID> requesters(Req r) {
+        Set<UUID> out = new HashSet<>(humans(r.requester()));
+        jdbc.sql("select distinct submitted_by from restationing_revision where request_id = :id and submitted_by is not null")
+                .param("id", r.id()).query(UUID.class).list().forEach(p -> out.addAll(humans(p)));
+        return out;
     }
 
     Set<UUID> humans(UUID person) {

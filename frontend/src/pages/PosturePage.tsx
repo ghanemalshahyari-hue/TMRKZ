@@ -4,6 +4,8 @@ import type { GeoPolygon, RestationingRequest, SiteGeometry } from '../api/types
 import type { Map as MlMap } from 'maplibre-gl';
 import { PITCH_3D, installedTerrain3d, type MapView } from '../components/map/maplibre';
 import type { BasemapMode, Terrain3dSource } from '../components/map/maplibre/offlineStyle';
+import { flatSource } from '../components/tree/tree';
+import { UnitTree } from '../components/tree/UnitTree';
 import { Icon } from '../components/ui';
 import { MapFrame, MapLegend } from '../components/workspace/MapFrame';
 import { OperationalWorkspace } from '../components/workspace/OperationalWorkspace';
@@ -51,21 +53,29 @@ export function PosturePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.revision]);
   const unit = units?.find((u) => u.id === selected) ?? null;
+  const tree = useMemo(() => flatSource(units ?? []), [units]);
   const req = useMemo(() => (unit ? asMapRequest(unit) : null), [unit]);
   useEffect(() => setFit((k) => k + 1), [selected]);
   const rail = (
     <div className="tz-rail">
       <section className="tz-drawer open tz-site-list" aria-label="وحداتي">
         <div className="tz-drawer-head"><span className="tz-drawer-toggle"><Icon name="units" /><span>وحدتي والوحدات التابعة</span><span className="tz-chip">{units?.length ?? '…'}</span></span></div>
-        <div className="rs-list" data-testid="posture-tree">
-          {units?.length === 0 && <div className="tz-muted tz-pad">لا وحدات ضمن صلاحيتك.</div>}
-          {units?.map((u) => (
-            <button key={u.id} data-unit={u.id} className={'rs-item' + (u.id === selected ? ' active' : '')} aria-current={u.id === selected} style={{ paddingInlineStart: 10 + u.depth * 14 }} onClick={() => setSelected(u.id)}>
-              <span className="rs-item-head"><b>{u.name}</b></span>
-              <small>{u.site?.name ?? 'بلا تمركز معتمد'}</small>
-            </button>
-          ))}
-        </div>
+        {/* the one units tree of the application (owner, 16 Nov 2026); a short list opens whole, a long one down to the chosen unit */}
+        {units && (
+          <UnitTree
+            source={tree}
+            label="وحدتي والوحدات التابعة"
+            searchLabel="بحث في الوحدات"
+            testId="posture-tree"
+            selected={selected}
+            trail={tree.trail(selected)}
+            initialOpen={units.length <= 80 ? units.map((u) => u.id) : []}
+            openSingleRoot
+            onSelect={(u) => setSelected(u.id)}
+            meta={(u) => u.site?.name ?? 'بلا تمركز معتمد'}
+            empty="لا وحدات ضمن صلاحيتك."
+          />
+        )}
       </section>
     </div>
   );

@@ -1,0 +1,51 @@
+/* The one units tree (owner, 16 Nov 2026), the look of the access workspace's «الوحدات»: compact rows, never nested cards.
+   Theme variables only, so both themes follow. */
+.ut { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
+.ut-search { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; background: var(--paper); }
+.ut-search .icon { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.ut-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; padding: 8px 0; outline: none; }
+.ut-error { color: var(--red); font-size: 12px; }
+.ut-note { padding: 6px 8px; color: var(--muted); font-size: 12px; list-style: none; }
+
+.ut-nodes, .ut-nodes ul, .ut-hits { list-style: none; margin: 0; padding: 0; }
+.ut-nodes { max-height: var(--ut-max-height, 640px); overflow: auto; }
+.ut-row { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 2px 6px; border-radius: 8px; border: 1px solid transparent; }
+.ut-row:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.ut-row.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.ut-row.off .ut-name, .ut-row.off .ut-check { color: var(--muted); }
+.ut-row.off .ut-check { cursor: not-allowed; }
+.ut-twist { width: 20px; height: 20px; flex: none; display: inline-grid; place-items: center; border: 1px solid var(--line); border-radius: 6px;
+  background: transparent; color: var(--ink); font: 700 13px/1 Arial, sans-serif; cursor: pointer; padding: 0; }
+.ut-twist.ut-leaf { border-color: transparent; color: var(--muted); cursor: default; }
+.ut-name { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; text-align: start; border: 0; background: transparent; color: var(--ink);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; padding: 2px 0; }
+.ut-name > span, .ut-check > .ut-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ut-name:focus-visible, .ut-check input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
+.ut-check { flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ut-check input { flex: none; margin: 0; }
+.ut-check .ut-name { flex: 1; display: block; padding: 0; cursor: inherit; }
+.ut-meta { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; color: var(--muted); white-space: nowrap; max-width: 45%; overflow: hidden; text-overflow: ellipsis; }
+.ut-meta .icon { width: 11px; height: 11px; }
+.ut-tag { flex: none; font-style: normal; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
+.ut-tag.moving { background: color-mix(in srgb, var(--orange) 15%, transparent); color: var(--orange); }
+
+.ut-hits { display: grid; gap: 4px; max-height: var(--ut-max-height, 640px); overflow: auto; }
+.ut-hit { width: 100%; display: flex; align-items: center; gap: 8px; text-align: start; border: 1px solid var(--line); border-radius: 8px; background: var(--paper);
+  color: var(--ink); font: inherit; padding: 6px 8px; cursor: pointer; }
+.ut-hit:hover { border-color: var(--accent); }
+.ut-hit > span { display: grid; min-width: 0; }
+.ut-hit b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ut-hit small { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a unit a page marks (e.g. the requesting unit of a request) */
+.ut li.requesting > .ut-row { border-color: color-mix(in srgb, var(--accent) 60%, transparent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ut li.moving > .ut-row { border-color: color-mix(in srgb, var(--orange) 45%, transparent); }
+/* the old tree classes (.tree-row, .tree-label, .tree-hit), kept on the rows for existing checks, must not restyle them */
+.ut .ut-row.tree-row { align-items: center; gap: 6px; }
+.ut .ut-row.tree-row.active.on { background: color-mix(in srgb, var(--accent) 9%, transparent); border-color: var(--accent); }
+.ut .ut-name.tree-label { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 6px; padding: 2px 0; text-align: start; }
+.ut .ut-check .ut-name.tree-label { display: block; }
+.ut .ut-hit.tree-hit { flex-direction: row; align-items: center; justify-content: flex-start; border: 1px solid var(--line); padding: 6px 8px; }
+.ut .unit-symbol { flex: none; }
+.ut .unit-symbol-img { max-height: 18px; }
+

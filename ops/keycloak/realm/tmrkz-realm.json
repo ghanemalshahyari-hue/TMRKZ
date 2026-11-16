@@ -90,6 +90,71 @@
             "access.token.claim": "false",
             "userinfo.token.claim": "false"
           }
+        },
+        {
+          "name": "unit id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tmrkz_unit_id",
+            "claim.name": "tmrkz_unit_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "unit name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tmrkz_unit_name",
+            "claim.name": "tmrkz_unit_name",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "main unit id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tmrkz_main_unit_id",
+            "claim.name": "tmrkz_main_unit_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "rank",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tmrkz_rank",
+            "claim.name": "tmrkz_rank",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "position",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "tmrkz_position",
+            "claim.name": "tmrkz_position",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
         }
       ]
     }

@@ -135,7 +135,8 @@ public class AccessWorkspaceService {
      */
     static final String USERS = """
             (select person_id, organization_id from unit_member where ended_at is null
-             union select person_id, organization_id from membership where valid_to is null or valid_to > now())""";
+             union select person_id, organization_id from membership where valid_to is null or valid_to > now()
+             union select person_id, organization_id from duty_permit where ended_at is null and valid_to > now())""";
 
     /** The platform and first-setup accounts are listed only for a manager over everything, as TNQL hides them from a scoped one. */
     private static String platformFilter(DirectoryScope.Reach r, String person) {
@@ -395,7 +396,8 @@ public class AccessWorkspaceService {
         String people = """
                 from person p left join unit_member um on um.person_id = p.id and um.organization_id = :o and um.ended_at is null
                 where (um.id is not null
-                    or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and (m.valid_to is null or m.valid_to > now())))
+                    or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and (m.valid_to is null or m.valid_to > now()))
+                    or exists (select 1 from duty_permit dp where dp.person_id = p.id and dp.organization_id = :o and dp.ended_at is null and dp.valid_to > now()))
                   and (cast(:q as text) is null or p.display_name ilike :q or p.employee_no ilike :q or coalesce(p.username, '') ilike :q)
                   and (cast(:role as text) is null
                     or exists (select 1 from membership m where m.person_id = p.id and m.organization_id = :o and m.role_code = :role
@@ -421,6 +423,8 @@ public class AccessWorkspaceService {
             c.put("mode", r.mode());
             c.put("finalOnly", GrantAdminService.FINAL_ROLES.contains(r.code()));
             c.put("lock", roleLock(ctx, org, r));
+            // a unit responsibility («مقعد»): its holder decides a stage of other people's requests for the unit (owner, 16 Nov 2026)
+            c.put("seat", r.permissions().stream().anyMatch(ae.mover.access.Permission.STAGE_DECISIONS::contains));
             columns.add(c);
         }
         Set<String> unitRoles = new java.util.HashSet<>(jdbc.sql("select role_code from unit_grant where organization_id = :o and valid_to is null")

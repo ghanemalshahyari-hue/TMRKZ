@@ -2,6 +2,7 @@ package ae.mover.hr;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -168,6 +169,47 @@ public class HrSourceAdapter {
                 throw translate(e);
             }
             return total;
+        }
+
+        /**
+         * The selected columns of the view's rows that meet {@code where} (null: any row), at most {@code maxRows} (0: all). Every
+         * value is a bind parameter; the clause is built from source metadata only ({@link HrMapping.Condition}). People are read
+         * this way, by key, since ADR-065: the linked people in batches, or one person looked up live.
+         */
+        public List<Map<String, Object>> select(String view, List<String> columns, HrMapping.Condition where, int maxRows) {
+            requireView(view);
+            for (String col : columns) {
+                if (!HrMapping.COLUMN_NAME.matcher(col).matches()) {
+                    throw new SourceException(Failure.CONTRACT, "اسم عمود غير صالح في بيانات المصدر.", null);
+                }
+            }
+            String sql = "SELECT " + columns.stream().map(c -> "\"" + c + "\"").collect(Collectors.joining(", ")) + " FROM " + view
+                    + (where == null ? "" : " WHERE " + where.sql());
+            statements.add(sql);
+            List<Map<String, Object>> out = new ArrayList<>();
+            try (PreparedStatement st = connection.prepareStatement(sql)) {
+                st.setQueryTimeout(Math.max(1, cfg.callTimeoutMs() / 1000));
+                if (maxRows > 0) {
+                    st.setMaxRows(maxRows);
+                }
+                st.setFetchSize(maxRows > 0 ? Math.min(maxRows, 1000) : 1000);
+                List<String> binds = where == null ? List.of() : where.binds();
+                for (int i = 0; i < binds.size(); i++) {
+                    st.setString(i + 1, binds.get(i));
+                }
+                try (ResultSet rs = st.executeQuery()) {
+                    while (rs.next()) {
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        for (int i = 0; i < columns.size(); i++) {
+                            row.put(columns.get(i), rs.getObject(i + 1));
+                        }
+                        out.add(row);
+                    }
+                }
+            } catch (SQLException e) {
+                throw translate(e);
+            }
+            return out;
         }
 
         @Override

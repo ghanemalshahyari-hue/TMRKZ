@@ -151,6 +151,10 @@ configuration changes never require data migration of in-flight requests.
   `MOVER_SECURE_COOKIE=true`). The realm is created from these values on the first start only; after the address changes,
   `sh ops/keycloak/set-public-url.sh <project>` gives the client `tmrkz-web` the new sign-in and sign-out addresses, and `ops/keycloak/set-directory.sh` points the directory federation at the directory now in `.env` (ADR-052)
   (`ops/tls/enable.sh` runs it).
+- Employment attributes before Oracle is in force (ADR-068): name the directory attributes that carry unit ID, unit
+  name, main unit ID, rank and position in `.env` (`LDAP_ATTR_*`; empty = not read), then
+  `sh ops/keycloak/set-employment-attributes.sh <project>` (shows the changes) and `CONFIRM=yes sh …` (applies; re-runnable)
+  for the identity provider's directory mappers, set the printed `TMRKZ_OIDC_CLAIM_*` names in `.env`, and restart the backend.
 - The administration console is not served through the web entry point. Reach it from the host only, for example
   `docker compose exec keycloak /opt/keycloak/bin/kcadm.sh …`, or a temporary SSH tunnel to `keycloak:8080/auth/admin/`.
   The bootstrap account `tmrkz-bootstrap` uses `TMRKZ_KEYCLOAK_ADMIN_PASSWORD`: replace it with a named administrator

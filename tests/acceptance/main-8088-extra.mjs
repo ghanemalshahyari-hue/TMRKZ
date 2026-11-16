@@ -91,6 +91,13 @@ try {
   ok(sql(`select count(*) from stationing_route_version`) === '0', 'PATH-05', 'لم يُحفظ ولم يُفعَّل مسار أثناء القبول');
 
   // ---- a Point site through the page ------------------------------------------------------------------------------------
+  // p04 holds «تهيئة المواقع والتمركز» everywhere, so «موقع جديد» has six steps (ADR-067): with no unit chosen at
+  // «التمركز الابتدائي», «التالي» goes straight to «مراجعة وحفظ»; the three-step review is used as it was
+  const toSiteReview = async (page) => {
+    await page.locator('[data-testid="setup-step-3"], [data-testid="site-summary"]').first().waitFor({ timeout: 10000 });
+    if (await page.getByTestId('setup-step-3').count()) await page.getByTestId('wizard-next').click();
+    await page.getByTestId('site-summary').waitFor({ timeout: 10000 });
+  };
   const sites = await as('p04.sites');
   await go(sites, '#siteSetup');
   await sites.getByTestId('setup-tree').waitFor({ timeout: 15000 });
@@ -105,8 +112,9 @@ try {
   await sites.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.25);
   await sites.waitForTimeout(800);
   await sites.getByTestId('wizard-next').click();
+  await toSiteReview(sites);
   await sites.getByLabel('سبب تسجيل الموقع').fill('تسجيل موقع نقطة في اختبار القبول');
-  await sites.getByTestId('save-site').click();
+  await sites.locator('[data-testid="save-site"], [data-testid="setup-save"]').click();
   // no code is typed (ADR-048): the server gives it, the finish card shows it
   const code = (await sites.getByTestId('made-code').innerText({ timeout: 15000 })).trim();
   await sites.locator(`[data-site="${code}"]`).waitFor({ timeout: 15000 });
@@ -131,8 +139,9 @@ try {
   await sites.getByTestId('finish-draw').click(); // free drawing, closed on request
   await sites.waitForTimeout(800);
   await sites.getByTestId('wizard-next').click();
+  await toSiteReview(sites);
   await sites.getByLabel('سبب تسجيل الموقع').fill('موقع يتداخل مع موقع مسجل');
-  await sites.getByTestId('save-site').click();
+  await sites.locator('[data-testid="save-site"], [data-testid="setup-save"]').click();
   await sites.waitForTimeout(1800);
   ok(sql(`select count(*) from site where name = '${refusedName}'`) === '0', 'SITE-ATOMIC', 'الحدود المرفوضة لا تترك موقعاً بلا حدود');
   ok((await sites.getByTestId('add-site-form').count()) === 1, 'SITE-ATOMIC-2', 'يبقى النموذج مفتوحاً ليعدّل المستخدم الحدود');

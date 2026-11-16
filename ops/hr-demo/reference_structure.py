@@ -221,11 +221,15 @@ def build_units():
 
     def add(name, parent, level, branch=0):
         uid = _id_for(branch, level, name)
-        path = (parent['UNIT_PATH'] + ' - ' if parent else '') + name
+        # as the real source (owner, 16 Nov 2026): UNIT_PATH is the ID path, the parent its second-to-last segment;
+        # MAIN_UNIT_ID is the unit's main unit (set below), never the parent; the flag carries no meaning
         u = {'ID': uid, 'CODE': 'U%05d' % (uid - FIRST_ID), 'NAME': name, 'NAME_E': 'Unit %d' % uid,
-             'SHORT_NAME': name[:40], 'MAIN_UNIT_ID': parent['ID'] if parent else None, 'UNT_LEVEL': level,
-             'UNIT_PATH': path, 'STATUS': 1, 'MAIN_UNIT_FLAG': 0, 'HAS_SON': 0,
-             'DIRECTOR_POS_ID': None, 'UNT_ID': 'OU-%d' % uid}
+             'SHORT_NAME': name[:40], 'MAIN_UNIT_ID': None, 'UNT_LEVEL': level,
+             'UNIT_PATH': (parent['UNIT_PATH'] if parent else '') + '\\' + str(uid), 'STATUS': 1,
+             'MAIN_UNIT_FLAG': 0 if uid % 97 == 0 else 1, 'HAS_SON': 0, 'DIRECTOR_POS_ID': None, 'UNT_ID': 'OU-%d' % uid,
+             # not columns: the parent, and the name path people carry in ORG_UNIT_FULL_PATH
+             'PARENT_ID': parent['ID'] if parent else None,
+             'FULL_PATH': (parent['FULL_PATH'] + ' - ' if parent else '') + name}
         if parent:
             parent['HAS_SON'] = 1
         units.append(u)
@@ -243,8 +247,12 @@ def build_units():
         l4 = add(f'Level 4-{n}-1-1', l3, 4, n)
         l5 = add(f'Level 5-{n}-1-1-1', l4, 5, n)
         l6 = add(main_name, l5, 6, n)
-        l6['MAIN_UNIT_FLAG'] = 1        # the agreed main unit is L6, not L1/L2 (UAT BUG-33)
+        l6['MAIN_UNIT_ID'] = l6['ID']   # the agreed main unit is L6, not L1/L2 (UAT BUG-33): MAIN_UNIT_ID = ID
         add_children(l6, children, 7, n)
+    by_id = {u['ID']: u for u in units}
+    for u in units:                     # parents come first: below a main unit, point up to it; above every one, none
+        if u['MAIN_UNIT_ID'] is None and u['PARENT_ID'] is not None:
+            u['MAIN_UNIT_ID'] = by_id[u['PARENT_ID']]['MAIN_UNIT_ID']
     return units
 
 
@@ -252,4 +260,4 @@ if __name__ == '__main__':
     us = build_units()
     print(len(us), 'units')
     for u in us:
-        print(' ' * (u['UNT_LEVEL'] - 1) * 2 + f"L{u['UNT_LEVEL']} {u['NAME']}  (id {u['ID']}, parent {u['MAIN_UNIT_ID']})")
+        print(' ' * (u['UNT_LEVEL'] - 1) * 2 + f"L{u['UNT_LEVEL']} {u['NAME']}  (id {u['ID']}, parent {u['PARENT_ID']}, main unit {u['MAIN_UNIT_ID']})")

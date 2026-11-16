@@ -25,6 +25,8 @@ import { bulk, cellKey, changes, counts, lockOf, ticked, toggle, type Pending } 
 import { loadWidths, resize, saveWidths, widthAt, DEFAULT_WIDTHS, type Panel, type PanelWidths } from './panelWidths';
 import { FyiMains, UnitOpsRoutes } from './UnitRouting';
 import { UnitsDialog, type UnitChoice } from './UnitsDialog';
+import type { TreeSource } from '../tree/tree';
+import { UnitTree as TreeView } from '../tree/UnitTree';
 import './accessWorkspace.css';
 import './unitsDialog.css';
 
@@ -336,140 +338,49 @@ function TaskSearch({ total, onUnit, onPerson }: { total: number | undefined; on
 // ---- 02 tree ---------------------------------------------------------------------------------------------------------
 
 function UnitTree({ selected, trail, onSelect, revision }: { selected: string | null; trail?: string[]; onSelect: (u: Unit) => void; revision: number }) {
-  const [roots, setRoots] = useState<WorkspaceNode[] | null>(null);
-  const [kids, setKids] = useState<Record<string, WorkspaceNode[]>>({});
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  const [text, setText] = useState('');
-  const [hits, setHits] = useState<WorkspaceHit[] | null>(null);
-  const openRef = useRef(open);
-  openRef.current = open;
-  const kidsRef = useRef(kids);
-  kidsRef.current = kids;
-  const first = useRef(true);
-  const listRef = useRef<HTMLUListElement | null>(null);
-  const shown = useRef<string | null>(null);
-  useEffect(() => {
-    let live = true;
-    api
-      .workspaceTree()
-      .then(async (r) => {
-        if (!live) return;
-        setRoots(r);
-        const ids = new Set(openRef.current);
-        // a single top unit opens by itself, as in the movement programme
-        if (first.current && r.length === 1 && r[0].childCount) ids.add(r[0].id);
-        first.current = false;
-        // a refresh (a save, a new member…) keeps the tree as the person left it: every open branch is read again, so its
-        // counts are current; before 16 Nov 2026 the branches were dropped and stayed marked open with nothing under them
-        const loaded = await Promise.all([...ids].map((id) => api.workspaceTree(id).then((c) => [id, c] as const).catch(() => null)));
-        if (!live) return;
-        const next: Record<string, WorkspaceNode[]> = {};
-        for (const x of loaded) if (x) next[x[0]] = x[1];
-        setKids(next);
-        setOpen(new Set(Object.keys(next)));
-      })
-      .catch(() => live && setRoots([]));
-    return () => {
-      live = false;
-    };
-  }, [revision]);
-  // a unit chosen from a search, a person or the file opens its branch down to it, as MOVER's revealUnit
-  const trailKey = trail?.join() ?? '';
-  useEffect(() => {
-    if (!selected || !trail?.length) return;
-    let live = true;
-    (async () => {
-      const add: Record<string, WorkspaceNode[]> = {};
-      for (const id of trail) {
-        if (kidsRef.current[id]) continue;
-        const c = await api.workspaceTree(id).catch(() => null);
-        if (!live) return;
-        if (c) add[id] = c;
-      }
-      setKids((k) => ({ ...k, ...add }));
-      setOpen((o) => new Set([...o, ...trail.filter((id) => add[id] || kidsRef.current[id])]));
-    })();
-    return () => {
-      live = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, trailKey]);
-  // …and brings it into view once it is drawn
-  useEffect(() => {
-    if (!selected || shown.current === selected) return;
-    const el = listRef.current?.querySelector<HTMLElement>(`[data-node="${selected}"]`);
-    if (!el) return;
-    shown.current = selected;
-    el.scrollIntoView({ block: 'nearest' });
-  }, [selected, kids, open, roots]);
-  useEffect(() => {
-    if (!text.trim()) return setHits(null);
-    const t = window.setTimeout(() => api.workspaceSearch(text.trim(), 'UNITS').then(setHits).catch(() => setHits([])), 250);
-    return () => window.clearTimeout(t);
-  }, [text]);
-  const expand = (id: string, force = false) => {
-    setOpen((o) => {
-      const next = new Set(o);
-      if (next.has(id) && !force) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    if (!kids[id]) api.workspaceTree(id).then((c) => setKids((k) => ({ ...k, [id]: c }))).catch(() => undefined);
-  };
-  const node = (u: WorkspaceNode, depth: number): React.ReactNode => (
-    <li key={u.id}>
-      <div className={'aw-node' + (selected === u.id ? ' on' : '')} data-node={u.id} style={{ paddingInlineStart: 6 + depth * 14 }}>
-        {u.childCount ? (
-          <button className="aw-twist" aria-label={(open.has(u.id) ? 'طي ' : 'فتح ') + u.name} aria-expanded={open.has(u.id)} onClick={() => expand(u.id)}>
-            {open.has(u.id) ? '−' : '+'}
-          </button>
-        ) : (
-          <span className="aw-twist aw-leaf">·</span>
-        )}
-        <button className="aw-node-name" onClick={() => onSelect({ id: u.id, name: u.name })} aria-current={selected === u.id}>
-          {u.name}
-        </button>
-        <span className="aw-counts latin" title={u.childCount + ' وحدة فرعية · ' + u.peopleCount + ' مستخدم'}>
-          {u.childCount > 0 && (
-            <>
-              {n(u.childCount)} <Icon name="tree" /> ·{' '}
-            </>
-          )}
-          {n(u.peopleCount)} <Icon name="user" />
-        </span>
-      </div>
-      {open.has(u.id) && kids[u.id] && <ul>{kids[u.id].map((c) => node(c, depth + 1))}</ul>}
-    </li>
+  // the one units tree of the application (owner, 16 Nov 2026), on the workspace's own reach-bound tree and search
+  const [collapse, setCollapse] = useState(0);
+  const source = useMemo<TreeSource<WorkspaceNode>>(
+    () => ({
+      roots: () => api.workspaceTree(),
+      children: (id) => api.workspaceTree(id),
+      search: (q) =>
+        api.workspaceSearch(q, 'UNITS').then((hits) =>
+          hits.map((h) => ({ item: { id: h.id, name: h.name ?? '', code: h.code ?? null, main: false, childCount: 0, peopleCount: 0 }, path: h.path })),
+        ),
+    }),
+    [],
   );
   return (
     <section className="aw-card aw-tree" aria-label="الوحدات">
       <header className="aw-head">
         <span className="aw-num">02</span>
         <h2>الوحدات</h2>
-        <button className="icon-button aw-collapse" aria-label="طي الكل" title="طي الكل" onClick={() => setOpen(new Set())}>—</button>
+        <button className="icon-button aw-collapse" aria-label="طي الكل" title="طي الكل" onClick={() => setCollapse((k) => k + 1)}>—</button>
       </header>
-      <label className="aw-search-in">
-        <Icon name="search" />
-        <input type="search" aria-label="بحث بالداخل" placeholder="بحث بالداخل — تُعرض النتيجة بمسار..." value={text} onChange={(e) => setText(e.target.value)} />
-      </label>
-      {hits ? (
-        <ul className="aw-hits aw-inline">
-          {hits.length === 0 && <li className="aw-muted">لا نتائج.</li>}
-          {hits.map((h) => (
-            <li key={h.id}>
-              <button onClick={() => (onSelect({ id: h.id, name: h.name ?? '' }), setText(''))}>
-                <b>{h.name}</b>
-                <small>{h.path}</small>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <ul className="aw-nodes" role="tree" aria-label="شجرة الوحدات" ref={listRef}>
-          {roots === null && <li className="aw-muted">جارٍ التحميل…</li>}
-          {roots?.map((r) => node(r, 0))}
-        </ul>
-      )}
+      <TreeView
+        source={source}
+        label="شجرة الوحدات"
+        searchLabel="بحث بالداخل"
+        search="بحث بالداخل — تُعرض النتيجة بمسار..."
+        minSearch={1}
+        revision={revision}
+        selected={selected}
+        trail={trail}
+        openSingleRoot
+        collapseKey={collapse}
+        onSelect={(u) => onSelect({ id: u.id, name: u.name })}
+        meta={(u) => (
+          <span className="latin" title={u.childCount + ' وحدة فرعية · ' + u.peopleCount + ' مستخدم'}>
+            {u.childCount > 0 && (
+              <>
+                {n(u.childCount)} <Icon name="tree" /> ·{' '}
+              </>
+            )}
+            {n(u.peopleCount)} <Icon name="user" />
+          </span>
+        )}
+      />
     </section>
   );
 }
@@ -517,7 +428,9 @@ function Cards({ matrix, filtered, onView, onAccount }: { matrix: WorkspaceMatri
             </div>
             <div className="aw-chips">
               {[...direct, ...other].map(({ c, cell }) => (
-                <span key={c.code} className={'aw-chip' + (cell.direct ? ' direct' : cell.temporary ? ' temp' : ' inherit')} title={cell.direct ? 'منح مباشر' : cell.temporary ? 'مؤقتة' : 'موروثة من الوحدة'}>
+                <span key={c.code} className={'aw-chip' + (cell.direct ? ' direct' : cell.temporary ? ' temp' : ' inherit') + (c.seat ? ' seat' : '')}
+                  title={(c.seat ? 'مسؤولية/مقعد الوحدة — ' : 'صلاحية شخصية — ') + (cell.direct ? 'منح مباشر' : cell.temporary ? 'مؤقتة' : 'موروثة من الوحدة')}>
+                  {c.seat && <i className="aw-seat-mark" aria-hidden="true" />}
                   {c.name}
                 </span>
               ))}
@@ -544,22 +457,36 @@ function Cards({ matrix, filtered, onView, onAccount }: { matrix: WorkspaceMatri
 
 function PersonView({ person, columns, unit, onClose }: { person: WorkspacePerson; columns: WorkspaceColumn[]; unit: Unit; onClose: () => void }) {
   const rows = effectiveRoles(person, columns);
+  // two different things (owner, 16 Nov 2026): what the person may do, and the unit's responsibilities they occupy now
+  const seats = rows.filter(({ c }) => c.seat);
+  const own = rows.filter(({ c }) => !c.seat);
+  const item = ({ c, cell }: (typeof rows)[number]) => (
+    <li key={c.code}>
+      <b>{c.name}</b>
+      {cell.direct && <span>مباشرة: {cell.direct.scopeText}{cell.direct.validTo ? ' — حتى ' + fullDate(cell.direct.validTo) : ''}</span>}
+      {cell.inherited === 'UNIT' && <span className="aw-ok">موروثة من عضوية الوحدة</span>}
+      {cell.inherited === 'SEAT' && <span className="aw-ok">من منصبه في الموارد البشرية</span>}
+      {cell.temporary && !cell.direct && <span className="aw-warn">مؤقتة: تفويض ساري في هذه الوحدة</span>}
+    </li>
+  );
   return (
     <Dialog open onClose={onClose} className="small-dialog">
       <DialogHead eyebrow={unit.name} title={person.displayName} small={person.employeeNo + ' · ' + n(rows.length) + ' صلاحية فعالة'} onClose={onClose} />
       <div className="dialog-body">
         {rows.length === 0 && <p className="aw-muted">لا صلاحية فعالة في هذه الوحدة.</p>}
-        <ul className="aw-why">
-          {rows.map(({ c, cell }) => (
-            <li key={c.code}>
-              <b>{c.name}</b>
-              {cell.direct && <span>مباشرة: {cell.direct.scopeText}{cell.direct.validTo ? ' — حتى ' + fullDate(cell.direct.validTo) : ''}</span>}
-              {cell.inherited === 'UNIT' && <span className="aw-ok">موروثة من عضوية الوحدة</span>}
-              {cell.inherited === 'SEAT' && <span className="aw-ok">من منصبه في الموارد البشرية</span>}
-              {cell.temporary && !cell.direct && <span className="aw-warn">مؤقتة: تفويض ساري في هذه الوحدة</span>}
-            </li>
-          ))}
-        </ul>
+        {seats.length > 0 && (
+          <section data-testid="aw-seats">
+            <h4 className="aw-why-head">مسؤوليات/مقاعد الوحدة</h4>
+            <p className="aw-muted small">مسؤولية تبقى للوحدة إذا تغيّر شاغلها؛ المهام المفتوحة تنتقل إلى من يشغلها بعده.</p>
+            <ul className="aw-why">{seats.map(item)}</ul>
+          </section>
+        )}
+        {own.length > 0 && (
+          <section data-testid="aw-personal">
+            <h4 className="aw-why-head">صلاحيات الشخص</h4>
+            <ul className="aw-why">{own.map(item)}</ul>
+          </section>
+        )}
         {person.lock && <p className="aw-muted"><Icon name="lock" /> {person.lock}</p>}
       </div>
     </Dialog>

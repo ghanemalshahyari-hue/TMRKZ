@@ -102,6 +102,12 @@ class EnterpriseSignInIT extends IntegrationTest {
         r.add("tmrkz.oidc.post-logout-redirect-uri", () -> "http://tmrkz.test/");
         r.add("tmrkz.oidc.link-key", () -> "DOMAIN_ACCOUNT");
         r.add("tmrkz.oidc.platform-accounts", () -> "platform.admin.it, Platform.Dev.IT");
+        // ADR-068: the claims the identity provider maps from the directory (names as in ops/keycloak/set-employment-attributes.sh)
+        r.add("tmrkz.oidc.unit-id-claim", () -> "tmrkz_unit_id");
+        r.add("tmrkz.oidc.unit-name-claim", () -> "tmrkz_unit_name");
+        r.add("tmrkz.oidc.main-unit-id-claim", () -> "tmrkz_main_unit_id");
+        r.add("tmrkz.oidc.rank-claim", () -> "tmrkz_rank");
+        r.add("tmrkz.oidc.position-claim", () -> "tmrkz_position");
     }
 
     // ---- fixtures -------------------------------------------------------------------------------------------
@@ -123,7 +129,9 @@ class EnterpriseSignInIT extends IntegrationTest {
         UUID mapping = UUID.randomUUID();
         UUID run = UUID.randomUUID();
         snapshot = UUID.randomUUID();
-        jdbc.sql("insert into hr_source(id, name, last_success_at) values (:id, 'مصدر اختبار', now())").param("id", source).update();
+        // Oracle in force (ADR-068: an enabled source with a published snapshot): the HR linking rules below apply. No settings are
+        // saved, so HR is never asked live here.
+        jdbc.sql("insert into hr_source(id, name, last_success_at, enabled) values (:id, 'مصدر اختبار', now(), true)").param("id", source).update();
         jdbc.sql("insert into hr_mapping_version(id, source_id, version, status, fields, active_rules) values (:id, :s, 1, 'PUBLISHED', '[]', '{}')")
                 .param("id", mapping).param("s", source).update();
         jdbc.sql("insert into hr_sync_run(id, source_id, mapping_version_id, trigger, status, started_at) values (:id, :s, :m, 'SCHEDULED', 'SUCCEEDED', now())")
@@ -131,6 +139,26 @@ class EnterpriseSignInIT extends IntegrationTest {
         jdbc.sql("insert into hr_snapshot(id, run_id, mapping_version_id, status, published_at) values (:id, :r, :m, 'PUBLISHED', now())")
                 .param("id", snapshot).param("r", run).param("m", mapping).update();
         org = org("ORG", null);
+    }
+
+    /** A source left enabled would put later classes under Oracle (ADR-068). */
+    @org.junit.jupiter.api.AfterEach
+    void sourceOff() {
+        jdbc.sql("update hr_source set enabled = false").update();
+    }
+
+    /** Like the provider, with extra ID-token claims (the employment claims of ADR-068). */
+    private String callbackWithClaims(Authorization a, String subject, String account, Map<String, Object> extra) throws Exception {
+        JWTClaimsSet.Builder c = new JWTClaimsSet.Builder().issuer(issuer()).subject(subject).audience(CLIENT)
+                .issueTime(new Date()).expirationTime(Date.from(Instant.now().plusSeconds(300)))
+                .claim("nonce", a.nonce()).claim("auth_time", Instant.now().getEpochSecond())
+                .claim("preferred_username", account).claim("name", "موظف " + account).claim("azp", CLIENT);
+        extra.forEach(c::claim);
+        SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(KEY.getKeyID()).type(JOSEObjectType.JWT).build(), c.build());
+        jwt.sign(new RSASSASigner(KEY));
+        String code = UUID.randomUUID().toString();
+        CODES.put(code, new Grant(a.challenge(), jwt.serialize()));
+        return "/api/v1/auth/oidc/callback?code=" + code + "&state=" + a.state();
     }
 
     /** An HR person (projected and in the published snapshot) with the given domain account. */
@@ -554,6 +582,46 @@ class EnterpriseSignInIT extends IntegrationTest {
         assertThat(location(b.get(callbackWithAuthTime(reauthOf(b), sub, "at" + sfx, Instant.now().getEpochSecond())))).isEqualTo("/#review");
         assertThat(b.post("/api/v1/tasks/" + task + "/decision", decision).statusCode()).isEqualTo(200);
         assertThat(activeReservations(res)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("AUTH-01, SOURCE-01 (provider path): before Oracle, the provider's claims make a zero-access person placed by Unit ID; a platform-looking or conflicting identity gets no record")
+    void firstSignInFromClaimsBeforeOracle() throws Exception {
+        jdbc.sql("update hr_source set enabled = false").update(); // Oracle not in force: the directory decides
+        UUID unit = org("CLM", null);
+        jdbc.sql("update organization set source_external_id = :x where id = :id").param("x", "CU-" + sfx).param("id", unit).update();
+        String account = "claims" + sfx;
+        Map<String, Object> claims = Map.of("employee_number", "CN-" + sfx, "tmrkz_unit_id", "CU-" + sfx, "tmrkz_unit_name", "نص الوحدة",
+                "tmrkz_rank", "رائد", "tmrkz_position", "ركن عمليات");
+        Browser b = new Browser();
+        assertThat(location(b.get(callbackWithClaims(authorizationOf(b.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(), account, claims))))
+                .isEqualTo("/");
+        com.fasterxml.jackson.databind.JsonNode me = JSON.readTree(b.get("/api/v1/me").body());
+        assertThat(me.path("permissions").size()).as("nothing until granted").isZero();
+        UUID person = UUID.fromString(me.path("id").asText());
+        assertThat(jdbc.sql("select employee_no from person where id = :p").param("p", person).query(String.class).single()).isEqualTo("CN-" + sfx);
+        assertThat(jdbc.sql("select method from identity_link where person_id = :p").param("p", person).query(String.class).single()).isEqualTo("DIRECTORY");
+        assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", person).query(Long.class).single()).isZero();
+        com.fasterxml.jackson.databind.JsonNode who = JSON.readTree(b.get("/api/v1/access-requests/mine").body()).path("identity");
+        assertThat(who.path("sourceCode").asText()).isEqualTo("LDAP");
+        assertThat(who.path("unit").asText()).isEqualTo("جهة CLM");
+        assertThat(who.path("rank").asText()).isEqualTo("رائد");
+        assertThat(who.path("position").asText()).isEqualTo("ركن عمليات");
+        assertThat(b.get("/api/v1/sites").statusCode()).isEqualTo(403);
+
+        // an identity stating the platform role that the installation does not name never gets a record
+        Browser unnamed = new Browser();
+        assertThat(location(unnamed.get(callbackWithRoles(authorizationOf(unnamed.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(),
+                "platformish" + sfx, List.of("tmrkz-platform"))))).startsWith("/#auth-error=IDENTITY_NOT_LINKED");
+        assertThat(jdbc.sql("select count(*) from person where username = :u").param("u", "platformish" + sfx).query(Long.class).single()).isZero();
+        // a login another TMRKZ record already holds never gets a second record: an access manager decides
+        String taken = "taken" + sfx;
+        jdbc.sql("insert into person(id, employee_no, display_name, username, source) values (gen_random_uuid(), :e, :l, :l, 'LOCAL')")
+                .param("e", "T-" + taken).param("l", taken).update();
+        Browser dup = new Browser();
+        assertThat(location(dup.get(callbackWithRoles(authorizationOf(dup.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(), taken, null))))
+                .isEqualTo("/#auth-error=IDENTITY_NOT_LINKED&reason=DIRECTORY_CONFLICT");
+        assertThat(jdbc.sql("select count(*) from person where lower(username) = :u").param("u", taken).query(Long.class).single()).isEqualTo(1);
     }
 
     // ---- helpers ----------------------------------------------------------------------------------------------

@@ -124,7 +124,7 @@ public class PlaceResolver {
             case "LEVELS" -> u -> u.level() != null && levels.contains(u.level());
             case "ORG" -> u -> u.id().toString().equals(orgId);
             case "COUNT" -> u -> false;
-            default -> u -> u.main() || u.parentId() == null; // MAIN_UNIT: a branch with no flagged unit stops at its top
+            default -> u -> u.main() || u.parentId() == null; // MAIN_UNIT (MAIN_UNIT_ID = ID in HR): a branch with none stops at its top
         };
         // as in the movement programme, a main unit only groups its units and is never a station: the climb ends below it
         boolean belowMain = "MAIN_UNIT".equals(stop);

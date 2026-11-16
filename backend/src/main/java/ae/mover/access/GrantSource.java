@@ -85,7 +85,8 @@ public class GrantSource {
                 where (cast(:pid as uuid) is null or d.delegate_id = :pid) and d.revoked_at is null and d.valid_to > :at
                   and (m.valid_to is null or m.valid_to > :at)""" + started.formatted("d") + (startedOnly ? " and m.valid_from <= :at" : "") + "\n" + """
                 union all
-                -- responsibility seats: the role follows whoever currently holds the HR position in the organisation
+                -- responsibility seats: the role follows whoever currently holds the HR position in the organisation — among the
+                -- people added to the application only; HR alone gives nobody anything (owner, 16 Nov 2026, as MOVER)
                 select null::uuid, a.person_id, null::uuid, null::uuid, null,
                        r.code, r.name, r.permissions, r.scope, r.summary_only,
                        o.id, o.name, s.id, s.name,
@@ -96,10 +97,12 @@ public class GrantSource {
                 join organization o on o.id = ps.organization_id and o.status = 'ACTIVE'
                 left join site s on s.id = ps.site_scope_id
                 join person p on p.id = a.person_id and p.status = 'ACTIVE' and not p.access_disabled
-                where (cast(:pid as uuid) is null or a.person_id = :pid) and (a.valid_to is null or a.valid_to > :at)"""
+                where (cast(:pid as uuid) is null or a.person_id = :pid) and (a.valid_to is null or a.valid_to > :at)
+                  and exists (select 1 from unit_member um where um.person_id = a.person_id and um.ended_at is null)"""
                 + started.formatted("a") + "\n" + """
                 union all
-                -- unit grants («موروثة من الوحدة», V36): every member of the unit holds the role there, at the role's own reach
+                -- unit grants («موروثة من الوحدة», V36): every user added to the unit holds the role there, at the role's own reach;
+                -- an HR posting alone is not membership (owner, 16 Nov 2026: a first sign-in holds nothing, as MOVER)
                 select null::uuid, mem.person_id, null::uuid, null::uuid, null,
                        r.code, r.name, r.permissions, r.scope, r.summary_only,
                        o.id, o.name, null::uuid, null,
@@ -107,8 +110,7 @@ public class GrantSource {
                 from unit_grant ug
                 join role_def r on r.code = ug.role_code
                 join organization o on o.id = ug.organization_id and o.status = 'ACTIVE'
-                join (select person_id, organization_id from affiliation where valid_to is null or valid_to > :at
-                      union select person_id, organization_id from unit_member where ended_at is null) mem
+                join (select person_id, organization_id from unit_member where ended_at is null) mem
                   on mem.organization_id = ug.organization_id
                 join person p on p.id = mem.person_id and p.status = 'ACTIVE' and not p.access_disabled
                 where (cast(:pid as uuid) is null or mem.person_id = :pid) and (ug.valid_to is null or ug.valid_to > :at)"""

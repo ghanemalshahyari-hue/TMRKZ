@@ -1,7 +1,9 @@
 import { PURPOSE_TITLE, isPurpose, type Purpose } from '../lib/requestPurpose';
+import { flatSource } from '../components/tree/tree';
+import { UnitTree } from '../components/tree/UnitTree';
 import { ApprovalStamps } from '../components/workspace/ApprovalStamps';
 import type { RestationingUnit } from '../api/types';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { api } from '../api/client';
 import type { RestationingChecks, RestationingListItem, RestationingRequest } from '../api/types';
 import { Icon } from '../components/ui';
@@ -209,8 +211,9 @@ function FyiDistribution({ r, busy, act }: { r: RestationingRequest; busy: boole
   const [options, setOptions] = useState<RestationingUnit[] | null>(null);
   const [chosen, setChosen] = useState<string[]>([]);
   const [note, setNote] = useState('');
-  const [q, setQ] = useState('');
-  const shown = (options ?? []).filter((o) => !q.trim() || o.name.includes(q.trim())).slice(0, 200);
+  // the one units tree of the application (owner, 16 Nov 2026)
+  const tree = useMemo(() => flatSource(options ?? []), [options]);
+  const ticked = useMemo(() => new Set(chosen), [chosen]);
   return (
     <section className="tz-card" data-testid="fyi-distribution">
       <h4>توزيع للعلم</h4>
@@ -219,13 +222,10 @@ function FyiDistribution({ r, busy, act }: { r: RestationingRequest; busy: boole
       ) : (
         <>
           <p className="micro tz-muted">ليس تصويتاً: يطّلع أفراد هذه الوحدات على هذا الطلب وحده، ولا تُمنح لهم أي صلاحية دائمة.</p>
-          <label className="field"><span>بحث عن وحدة</span><input aria-label="بحث عن وحدة علم" value={q} onChange={(e) => setQ(e.target.value)} /></label>
-          <div className="rs-list" style={{ maxHeight: 180, overflow: 'auto' }}>
-            {shown.map((o) => (
-              <label key={o.id} className="rs-check" style={{ paddingInlineStart: o.depth * 12 }}>
-                <input type="checkbox" data-fyi-unit={o.id} checked={chosen.includes(o.id)} onChange={() => setChosen(chosen.includes(o.id) ? chosen.filter((x) => x !== o.id) : [...chosen, o.id])} /> {o.name}
-              </label>
-            ))}
+          <div style={{ ['--ut-max-height' as string]: '220px' }}>
+            <UnitTree source={tree} label="وحدات العلم" searchLabel="بحث عن وحدة علم" search="بحث عن وحدة…" checked={ticked} checkData="fyi-unit"
+              onCheck={(o) => setChosen(chosen.includes(o.id) ? chosen.filter((x) => x !== o.id) : [...chosen, o.id])}
+              initialOpen={(options ?? []).length <= 80 ? (options ?? []).map((o) => o.id) : []} openSingleRoot />
           </div>
           <label className="field"><span>ملاحظة (اختياري)</span><input aria-label="ملاحظة العلم" value={note} onChange={(e) => setNote(e.target.value)} /></label>
           <button className="button primary" data-testid="fyi-send" disabled={busy} onClick={() => act(() => api.distributeFyi(r.id, chosen, note), chosen.length ? 'أُرسل للعلم' : 'سُجل: لا وحدات للعلم')}>{chosen.length ? 'إرسال للعلم' : 'تأكيد: بلا وحدات'}</button>

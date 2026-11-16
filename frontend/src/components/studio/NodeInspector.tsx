@@ -59,8 +59,13 @@ function ChainEditor({ chain, levels, onChange }: { chain: FlowChain; levels: Hi
       </label>
       {chain.onlyLevels && <LevelChecks label="المستويات التي توافق" levels={levels} chosen={chain.onlyLevels} onChange={(v) => onChange({ ...chain, onlyLevels: v })} />}
       <label className="fs-check">
-        <input type="checkbox" checked={!!chain.skipEmpty} onChange={(e) => onChange({ ...chain, skipEmpty: e.target.checked })} /> تخطَّ الجهة التي لا يوجد فيها معتمد (بدونه يُرفض الإرسال حتى يُعيَّن)
+        <input type="checkbox" data-testid="chain-skip-empty" checked={!!chain.skipEmpty} onChange={(e) => onChange({ ...chain, skipEmpty: e.target.checked })} /> تجاوز الجهات التي لا يوجد بها معتمد
       </label>
+      <small className="muted micro">
+        {chain.skipEmpty
+          ? 'إذا لم يوجد معتمد في جهة ضمن السلسلة، يتجاوزها النظام ويسجل السبب ثم يكمل إلى الجهة التالية. إذا انتهت السلسلة، ينتقل إلى المرحلة التالية في المسار.'
+          : 'بدونه يُرفض إرسال الطلب ما دامت في السلسلة جهة بلا معتمد، حتى يُعيَّن لها معتمد.'}
+      </small>
     </div>
   );
 }

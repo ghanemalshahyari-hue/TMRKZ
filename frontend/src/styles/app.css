@@ -125,3 +125,30 @@
 .inline-search input { min-width: 180px; }
 tr.clickable { cursor: pointer; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+/* Hierarchy units skipped in a climbing step (ADR-062): secondary, amber, a skip mark — never the approved green */
+.tl-skips { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.tl-skip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; padding: 4px 8px; border-radius: 7px; font-size: 11px;
+  border: 1px dashed color-mix(in srgb, var(--orange) 45%, var(--line)); background: color-mix(in srgb, var(--orange) 7%, transparent); color: var(--muted); }
+.tl-skip-mark { color: var(--orange); font-weight: 700; }
+.tl-skip-name { color: var(--ink); }
+.tl-skip-state { color: var(--orange); font-weight: 700; }
+.tl-skip-reason { flex-basis: 100%; color: var(--muted); }
+.timeline-item.passed > i { background: color-mix(in srgb, var(--orange) 14%, transparent); color: var(--orange); }
+.tl-skip-note { font-size: 11px; padding: 8px 10px; border-radius: 9px; border: 1px solid color-mix(in srgb, var(--orange) 35%, var(--line));
+  background: color-mix(in srgb, var(--orange) 6%, transparent); }
+.tl-skip-note summary { cursor: pointer; color: var(--orange); font-weight: 700; }
+.tl-skip-note ul { margin: 6px 0 0; padding-inline-start: 18px; color: var(--muted); }
+
+/* the zero-access page: who signed in (owner, 16 Nov 2026) */
+.access-identity { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px 14px; margin: 0; }
+.access-identity div { display: grid; gap: 1px; }
+.access-identity dt { font-size: 11.5px; }
+.access-identity dd { margin: 0; font-weight: 600; }
+
+/* «الصلاحيات المتاحة للطلب»: one role per block (owner, 16 Nov 2026) */
+.offer-row { display: grid; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--tz-line, #e4e0d6); }
+.offer-row:last-child { border-bottom: 0; }
+.offer-scopes { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 6px 8px; border-radius: 8px; }
+.offer-scopes legend { font-size: 12px; }
+.offer-scopes .field { flex-basis: 100%; }

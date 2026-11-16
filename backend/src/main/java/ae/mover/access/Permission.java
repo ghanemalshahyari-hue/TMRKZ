@@ -20,6 +20,9 @@ package ae.mover.access;
  * open their own request; DECIDE_UNIT_OPERATIONS and FINAL_APPROVE_STATIONING decide their configured stage;
  * MANAGE_FYI_DISTRIBUTION chooses the units informed after final approval; VIEW_OPERATIONAL_POSTURE is read-only and opens
  * nothing else.
+ *
+ * <p>APPROVE_HIERARCHY (owner decision of 16 Nov 2026, ADR-063): signs a level of the hierarchy climb of a stationing request —
+ * held by «معتمد السلسلة الهرمية» only, so a final approver (APPROVE over everything) is never a hierarchy station.
  */
 public enum Permission {
     VIEW, VIEW_SUMMARY, CREATE, EDIT, REVIEW, APPROVE, EXPORT, EXECUTE,
@@ -28,5 +31,16 @@ public enum Permission {
     CREATE_RESTATIONING, ACTIVATE_STATIONING, APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION,
     DECIDE_PRE_ACTIVATION_CANCELLATION, ACTIVATE_TEMPORARY_EXTENSION, DECIDE_EARLY_RETURN, DECIDE_BEFORE_START_CANCELLATION,
     CREATE_INITIAL_STATIONING, CREATE_DEPLOYMENT_REQUEST, REQUEST_SITE_REGISTRATION,
-    DECIDE_UNIT_OPERATIONS, FINAL_APPROVE_STATIONING, MANAGE_FYI_DISTRIBUTION, VIEW_OPERATIONAL_POSTURE
+    DECIDE_UNIT_OPERATIONS, FINAL_APPROVE_STATIONING, MANAGE_FYI_DISTRIBUTION, VIEW_OPERATIONAL_POSTURE,
+    APPROVE_HIERARCHY;
+
+    /**
+     * Permissions that decide a stage of somebody else's request (approve, recommend, decide, distribute for information,
+     * activate). A role holding any of them is a responsibility of the unit — a seat its current holder occupies — rather than a
+     * personal permission (LDAP first login specification §19–22, owner 16 Nov 2026): «مسؤوليات/مقاعد الوحدة» against
+     * «صلاحيات الشخص» in «إدارة الصلاحيات والوحدات». Derived from the role's permissions, never from its name.
+     */
+    public static final java.util.Set<Permission> STAGE_DECISIONS = java.util.EnumSet.of(APPROVE, REVIEW, APPROVE_HIERARCHY,
+            DECIDE_UNIT_OPERATIONS, FINAL_APPROVE_STATIONING, MANAGE_FYI_DISTRIBUTION, ACTIVATE_STATIONING, ACTIVATE_TEMPORARY_EXTENSION,
+            APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION, DECIDE_PRE_ACTIVATION_CANCELLATION, DECIDE_EARLY_RETURN, DECIDE_BEFORE_START_CANCELLATION);
 }

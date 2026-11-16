@@ -46,9 +46,12 @@ import ae.mover.hr.HrMapping.Entity;
  *   <li>a PostgreSQL advisory lock admits one run across all application instances; a run that finds it taken is
  *       recorded as SKIPPED (deferred), never started in parallel;</li>
  *   <li>the published mapping is checked against the view metadata — a mismatch is REJECTED without guessing;</li>
- *   <li>rows stream into a STAGING snapshot inside one read-only source transaction;</li>
+ *   <li>rows stream into a STAGING snapshot inside one read-only source transaction: the whole unit view, but of the person
+ *       view only TMRKZ's linked people ({@code hr_linked_person}), by their source identifiers in bound batches — HR people
+ *       come in one by one, through {@link HrPeopleService} (owner, 16 Nov 2026, as MOVER; ADR-065);</li>
  *   <li>keys, duplicates, parents, cycles and counts are checked; an empty source is always refused and a drop larger than
- *       max(drop%, minimum) is refused unless an authorised manual run gives a reason;</li>
+ *       max(drop%, minimum) — of units, or of active linked people the run would mark departed — is refused unless an
+ *       authorised manual run gives a reason;</li>
  *   <li>the snapshot is published and projected in one transaction, so readers see one complete version.</li>
  * </ol>
  * Failures are recorded in their own transactions (they survive the rollback) without source rows, and the last
@@ -181,6 +184,7 @@ public class HrSyncService {
         tx.executeWithoutResult(s -> {
             jdbc.sql("delete from hr_unit where snapshot_id in (select id from hr_snapshot where status = 'STAGING')").update();
             jdbc.sql("delete from hr_person where snapshot_id in (select id from hr_snapshot where status = 'STAGING')").update();
+            jdbc.sql("delete from hr_snapshot_scope where snapshot_id in (select id from hr_snapshot where status = 'STAGING')").update();
             jdbc.sql("update hr_snapshot set status = 'DISCARDED' where status = 'STAGING'").update();
             jdbc.sql("""
                     update hr_sync_run set status = 'FAILED', finished_at = :now, error_code = 'INTERRUPTED',
@@ -226,20 +230,39 @@ public class HrSyncService {
             HrSourceAdapter.Config cfg = config(src);
             int[] dup = new int[2];
             int[] skipped = new int[2];
+            // the people TMRKZ asks HR for: its linked people only, never the whole view (owner, 16 Nov 2026, as MOVER; ADR-065)
+            List<String> linked = jdbc.sql("select external_id from hr_linked_person order by external_id").query(String.class).list();
+            Set<String> asked = new HashSet<>(linked);
+            counts.put("linkedPeople", linked.size());
+            if (!linked.isEmpty()) {
+                batch.batchUpdate("insert into hr_snapshot_scope(snapshot_id, external_id) values (?, ?) on conflict do nothing",
+                        linked.stream().map(x -> new Object[] {snapshot, x}).toList());
+            }
             try (HrSourceAdapter.Session session = adapter.open(cfg)) {
                 Map<Entity, List<String>> discovered = new EnumMap<>(Entity.class);
                 discovered.put(Entity.UNIT, session.columns(cfg.unitView()));
                 discovered.put(Entity.PERSON, session.columns(cfg.personView()));
                 HrMapping.Compiled compiled = HrMapping.compile(def, discovered);
                 counts.put("sourceVersion", session.databaseVersion());
+                // the whole unit tree, as before: every unit stays visible for stationing (owner's choice, ADR-065)
                 session.stream(cfg.unitView(), compiled.columns(Entity.UNIT), props.fetchSize(), props.insertBatch(), rows -> {
                     checkDeadline(deadline);
                     insertUnits(runId, snapshot, compiled, rows, dup, skipped);
                 });
-                session.stream(cfg.personView(), compiled.columns(Entity.PERSON), props.fetchSize(), props.insertBatch(), rows -> {
+                int read = 0;
+                for (int i = 0; i < linked.size(); i += HrMapping.Condition.MAX_LIST) {
                     checkDeadline(deadline);
-                    insertPeople(runId, snapshot, compiled, rows, dup, skipped);
-                });
+                    List<String> part = linked.subList(i, Math.min(linked.size(), i + HrMapping.Condition.MAX_LIST));
+                    List<Map<String, Object>> rows = session.select(cfg.personView(), compiled.columns(Entity.PERSON),
+                            compiled.in(Entity.PERSON, "external_person_id", part), 0);
+                    read += rows.size();
+                    insertPeople(runId, snapshot, compiled, rows, asked, dup, skipped);
+                }
+                // none of the linked people came back: an empty person view is refused as always; a view that still has
+                // people means they left, which the departure check below weighs
+                if (!linked.isEmpty() && read == 0) {
+                    counts.put("personViewEmpty", session.select(cfg.personView(), compiled.columns(Entity.PERSON).subList(0, 1), null, 1).isEmpty());
+                }
                 counts.put("statements", session.statements().size());
             }
             counts.put("duplicateUnitKeys", dup[0]);
@@ -331,11 +354,6 @@ public class HrSyncService {
 
     // ---- staging ----------------------------------------------------------------------------------------------
 
-    /** A flag as sources write it: 1, Y or true. */
-    static boolean truthy(String v) {
-        return v != null && java.util.Set.of("1", "Y", "YES", "TRUE").contains(v.trim().toUpperCase());
-    }
-
     private void insertUnits(UUID runId, UUID snapshot, HrMapping.Compiled c, List<Map<String, Object>> rows, int[] dup, int[] skipped) {
         List<Object[]> args = new ArrayList<>();
         for (Map<String, Object> row : rows) {
@@ -346,11 +364,14 @@ public class HrSyncService {
                 continue;
             }
             args.add(new Object[]{snapshot, v.get("external_unit_id"), v.get("code"), v.get("name"), v.get("name_en"),
-                    v.get("parent_external_unit_id"), v.get("status"), Boolean.parseBoolean(v.get("active")), integer(v.get("level")), truthy(v.get("is_main"))});
+                    v.get("parent_external_unit_id"), v.get("status"), Boolean.parseBoolean(v.get("active")), integer(v.get("level")),
+                    // a main unit is the one whose MAIN_UNIT_ID is its own ID (owner, 16 Nov 2026), never a flag
+                    HrMapping.isMain(v), v.get(HrMapping.MAIN_FIELD)});
         }
         int[] done = batch.batchUpdate("""
-                insert into hr_unit(snapshot_id, external_id, code, name, name_en, parent_external_id, status_raw, active, level, is_main)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing""", args);
+                insert into hr_unit(snapshot_id, external_id, code, name, name_en, parent_external_id, status_raw, active, level, is_main,
+                                    main_external_id)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) on conflict do nothing""", args);
         for (int i = 0; i < done.length; i++) {
             if (done[i] == 0) {
                 dup[0]++;
@@ -359,10 +380,14 @@ public class HrSyncService {
         }
     }
 
-    private void insertPeople(UUID runId, UUID snapshot, HrMapping.Compiled c, List<Map<String, Object>> rows, int[] dup, int[] skipped) {
+    private void insertPeople(UUID runId, UUID snapshot, HrMapping.Compiled c, List<Map<String, Object>> rows, Set<String> asked,
+                              int[] dup, int[] skipped) {
         List<Object[]> args = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             Map<String, String> v = c.convert(Entity.PERSON, row);
+            if (v.get("external_person_id") != null && !asked.contains(v.get("external_person_id"))) {
+                continue; // only a person TMRKZ asked for is ever stored (ADR-065)
+            }
             if (v.get("external_person_id") == null || v.get("full_name") == null || v.get("employee_number") == null) {
                 skipped[1]++;
                 issue(runId, "MISSING_KEY", "PERSON", v.get("external_person_id"), "سجل شخص دون معرف أو اسم أو رقم وظيفي؛ لم يُستورد.");
@@ -445,6 +470,17 @@ public class HrSyncService {
                 .param("s", snapshot).query(String.class).list();
         ambiguous.forEach(a -> issue(runId, "DUPLICATE_NUMBER", "PERSON", a,
                 "الرقم الوظيفي مشترك بين أكثر من سجل؛ لن يُربط آلياً ويحتاج معالجة مخولة."));
+        // an active linked person the person view no longer returns is departed (as before ADR-065, when they vanished from the
+        // full copy); one already disabled is not reported again every hour
+        List<String> missing = jdbc.sql("""
+                select sc.external_id from hr_snapshot_scope sc
+                join person p on p.source = 'HR' and p.source_external_id = sc.external_id and p.status = 'ACTIVE'
+                where sc.snapshot_id = :s
+                  and not exists (select 1 from hr_person h where h.snapshot_id = :s and h.external_id = sc.external_id)""")
+                .param("s", snapshot).query(String.class).list();
+        missing.forEach(m -> issue(runId, "NOT_IN_SOURCE", "PERSON", m,
+                "شخص من مستخدمي تمركز لم يعد في عرض الموارد البشرية؛ يُعامل مغادراً."));
+        counts.put("linkedNotInSource", missing.size());
         counts.put("orphanUnits", orphans.size());
         counts.put("cycleUnits", cycles.size());
         counts.put("peopleWithUnknownUnit", unknown);
@@ -457,21 +493,33 @@ public class HrSyncService {
     }
 
     private void protect(UUID snapshot, Map<String, Object> src, Map<String, Object> counts, String trigger, String overrideReason) {
-        if ((int) counts.get("units") == 0 || (int) counts.get("people") == 0) {
+        // an empty unit view, or a person view with nobody at all while TMRKZ has linked people, is never published
+        if ((int) counts.get("units") == 0 || Boolean.TRUE.equals(counts.get("personViewEmpty"))) {
             throw new Rejection("EMPTY_SOURCE", "أعاد المصدر نتيجة فارغة؛ لا تُنشر أبداً وبقيت آخر نسخة صالحة.");
         }
         Map<String, Object> prev = jdbc.sql("select * from hr_snapshot where status = 'PUBLISHED'").query().listOfRows()
                 .stream().findFirst().orElse(null);
         if (prev == null) {
-            return;
+            return; // the first snapshot has nothing to be compared with, as before ADR-065
         }
         int pct = ((Number) src.get("drop_percent")).intValue();
         int min = ((Number) src.get("drop_minimum")).intValue();
         List<String> drops = new ArrayList<>();
         check(drops, "الجهات", prev.get("unit_count"), counts.get("units"), pct, min);
-        check(drops, "الأشخاص", prev.get("person_count"), counts.get("people"), pct, min);
         check(drops, "الجهات النشطة", prev.get("active_unit_count"), counts.get("activeUnits"), pct, min);
-        check(drops, "الأشخاص النشطون", prev.get("active_person_count"), counts.get("activePeople"), pct, min);
+        // people (ADR-065): the snapshot holds the linked people only, so its count is no longer compared with the previous one
+        // (which held every HR person before ADR-065); what the check protects — many people disabled at once by a broken
+        // source — is weighed directly: the active linked people this snapshot would mark departed
+        Map<String, Object> leaving = jdbc.sql("""
+                select count(*) as active, count(*) filter (where h.external_id is null or not h.active) as leaving
+                from person p
+                join hr_snapshot_scope sc on sc.snapshot_id = :s and sc.external_id = p.source_external_id
+                left join hr_person h on h.snapshot_id = :s and h.external_id = p.source_external_id
+                where p.source = 'HR' and p.status = 'ACTIVE'""").param("s", snapshot).query().singleRow();
+        int active = ((Number) leaving.get("active")).intValue();
+        int gone = ((Number) leaving.get("leaving")).intValue();
+        counts.put("linkedLeaving", gone);
+        check(drops, "مستخدمو تمركز النشطون من الموارد البشرية", active, active - gone, pct, min);
         if (drops.isEmpty()) {
             return;
         }
@@ -507,6 +555,7 @@ public class HrSyncService {
         tx.executeWithoutResult(s -> {
             jdbc.sql("delete from hr_unit where snapshot_id = :s").param("s", snapshot).update();
             jdbc.sql("delete from hr_person where snapshot_id = :s").param("s", snapshot).update();
+            jdbc.sql("delete from hr_snapshot_scope where snapshot_id = :s").param("s", snapshot).update();
             jdbc.sql("update hr_snapshot set status = 'DISCARDED' where id = :s and status = 'STAGING'").param("s", snapshot).update();
         });
     }
@@ -521,6 +570,7 @@ public class HrSyncService {
             tx.executeWithoutResult(s -> {
                 jdbc.sql("delete from hr_unit where snapshot_id = :s").param("s", id).update();
                 jdbc.sql("delete from hr_person where snapshot_id = :s").param("s", id).update();
+                jdbc.sql("delete from hr_snapshot_scope where snapshot_id = :s").param("s", id).update();
             });
         }
     }

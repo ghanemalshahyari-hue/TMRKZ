@@ -87,7 +87,17 @@ public class RequestViews {
     public record TaskView(String id, String roleName, String orgName, String state, String decidedBy, String decidedAt) {
     }
 
-    public record StageView(String key, String name, String mode, int slaDays, String state, List<TaskView> tasks) {
+    /**
+     * skipped: the hierarchy units this step passed for having no hierarchy approver (ADR-062), as recorded for this revision —
+     * a «hierarchy unit skipped», never the same as the whole step skipped (state SKIPPED).
+     */
+    public record StageView(String key, String name, String mode, int slaDays, String state, List<TaskView> tasks,
+                            @JsonInclude(JsonInclude.Include.NON_EMPTY) List<SkippedUnit> skipped) {
+    }
+
+    /** One hierarchy unit skipped in a climbing step, as recorded when the route was resolved (name and level then). */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record SkippedUnit(String organizationId, String organizationName, Integer level, int order, String reasonCode, String reason) {
     }
 
     public record HistoryItem(String event, String actor, String at, String note) {
@@ -313,13 +323,36 @@ public class RequestViews {
 
     // ---- detail -------------------------------------------------------------------------------------
 
+    /** A task of this request going to a unit, open now or decided by this person, that this person's grants let them hold. */
+    private String[] stationTask(AccessContext ctx, UUID requestId, RequestScope scope) {
+        if (ctx.personId() == null) {
+            return null;
+        }
+        return jdbc.sql("""
+                select t.role_code, t.target_org_id::text, t.final from task_assignment t
+                 where t.request_id = :id and t.target_org_id is not null
+                   and (t.status = 'OPEN' or exists (select 1 from decision d where d.task_id = t.id and d.actor_person_id = :me))""")
+                .param("id", requestId).param("me", ctx.personId())
+                .query((rs, n) -> new String[] {rs.getString(1), rs.getString(2), String.valueOf(rs.getBoolean(3))}).list().stream()
+                .filter(t -> ctx.taskGrant(t[0], UUID.fromString(t[1]), scope, Boolean.parseBoolean(t[2])).isPresent())
+                .findFirst().orElse(null);
+    }
+
     public RequestDetail detail(AccessContext ctx, UUID id) {
         RequestScope scope = access.requestScope(id);
         ViewLevel level = ctx.viewLevel(scope);
         if (level == ViewLevel.NONE) {
-            throw ApiException.notFound();
+            // the approver of a station sees the request they are asked to decide there, or decided (ADR-062, as TNQL's): a
+            // grant on «هذا المستوى فقط» above the requesting unit does not cover the request itself, only its station
+            String[] station = stationTask(ctx, id, scope);
+            if (station == null) {
+                throw ApiException.notFound();
+            }
+            ctx.confirmTask(station[0], UUID.fromString(station[1]), scope, ae.mover.access.Permission.REVIEW);
+            level = ViewLevel.FULL;
+        } else {
+            ctx.confirmView(scope, level);
         }
-        ctx.confirmView(scope, level);
         boolean full = level == ViewLevel.FULL;
         if (scope.fyi().containsKey(ctx.personId())) {
             jdbc.sql("update request_fyi set first_read_at = now() where request_id = :r and person_id = :p and first_read_at is null")
@@ -357,8 +390,10 @@ public class RequestViews {
         List<StageView> stages = def == null ? List.of() : stages(id, revision, status, def, r.get("process_instance_id") != null
                 || !"DRAFT".equals(status));
         if (!full) {
+            // a summary view names no unit, for skipped ones neither (no new visibility from this record)
             stages = stages.stream().map(s -> new StageView(s.key(), s.name(), s.mode(), s.slaDays(), s.state(),
-                    s.tasks().stream().map(t -> new TaskView(t.id(), t.roleName(), null, t.state(), null, null)).toList())).toList();
+                    s.tasks().stream().map(t -> new TaskView(t.id(), t.roleName(), null, t.state(), null, null)).toList(),
+                    s.skipped() == null ? null : s.skipped().stream().map(k -> new SkippedUnit(null, null, k.level(), k.order(), k.reasonCode(), k.reason())).toList())).toList();
         }
         List<MyTask> myTasks = new ArrayList<>();
         if ("SUBMITTED".equals(status)) {
@@ -443,12 +478,28 @@ public class RequestViews {
         Map<String, String> roleNames = new HashMap<>();
         jdbc.sql("select code, name from role_def").query((rs, n) -> roleNames.put(rs.getString("code"), rs.getString("name"))).list();
         boolean decided = List.of("APPROVED", "CLOSED").contains(status);
+        // the hierarchy units each step skipped for this revision, as recorded when the route was resolved (ADR-062)
+        Map<String, List<SkippedUnit>> skips = new LinkedHashMap<>();
+        if (started) {
+            jdbc.sql("""
+                    select stage_key, organization_id, organization_name, organization_level, hierarchy_order, reason_code
+                      from request_route_skip where request_id = :id and revision = :rev order by stage_key, hierarchy_order""")
+                    .param("id", requestId).param("rev", revision).query((rs, n) -> {
+                        skips.computeIfAbsent(rs.getString("stage_key"), k -> new ArrayList<>()).add(new SkippedUnit(
+                                rs.getString("organization_id"), rs.getString("organization_name"), (Integer) rs.getObject("organization_level"),
+                                rs.getInt("hierarchy_order"), rs.getString("reason_code"), "لا يوجد معتمد للسلسلة الهرمية"));
+                        return null;
+                    }).list();
+        }
         List<StageView> out = new ArrayList<>();
         for (WorkflowDefinition.Stage s : def.stages()) {
             List<TaskView> t = tasks.get(s.key());
             String state;
+            List<SkippedUnit> skipped = skips.get(s.key());
             if (carried.contains(s.key())) {
                 state = "CARRIED";
+            } else if (t == null && skipped != null) {
+                state = "COMPLETE"; // every unit of the climb skipped: the step ended without anyone approving, and the flow went on
             } else if (t == null) {
                 state = decided ? "SKIPPED" : "PENDING";
             } else if (open.containsKey(s.key())) {
@@ -456,11 +507,13 @@ public class RequestViews {
             } else {
                 state = t.stream().anyMatch(x -> "APPROVED".equals(x.state()) || "REJECTED".equals(x.state())) ? "COMPLETE" : "PENDING";
             }
-            if (t == null) {
+            if (t == null && skipped != null) {
+                t = List.of();
+            } else if (t == null) {
                 t = s.assignees().stream().map(a -> new TaskView(null, roleNames.getOrDefault(a.role(), a.role()), null,
                         "CARRIED".equals(state) ? "APPROVED" : "PENDING", null, null)).toList();
             }
-            out.add(new StageView(s.key(), s.name(), s.mode(), s.slaDays(), state, t));
+            out.add(new StageView(s.key(), s.name(), s.mode(), s.slaDays(), state, t, skipped));
         }
         return out;
     }

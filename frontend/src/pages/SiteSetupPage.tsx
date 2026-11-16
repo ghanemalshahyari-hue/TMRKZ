@@ -1,24 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent } from 'maplibre-gl';
 import { Marker } from 'maplibre-gl';
-import { api, type SiteOccupants } from '../api/client';
-import type { RestationingRequest, SiteDetail, SiteGeometry } from '../api/types';
-import { PITCH_3D, SiteEditor, addOverlayLayer, frame, installedTerrain3d, type MapView, type SiteLive } from '../components/map/maplibre';
+import { api, newIdempotencyKey, type SiteOccupants, type SiteSetupBody, type SiteSetupCheck } from '../api/client';
+import type { GeoPolygon, OrgBranch, RestationingLeg, RestationingRequest, SiteDetail, SiteGeometry, StationingPolicyValues } from '../api/types';
+import { PITCH_3D, SITE_LOOK, SiteEditor, addOverlayLayer, frame, installedTerrain3d, type MapView, type SiteLive } from '../components/map/maplibre';
 import type { BasemapMode, Terrain3dSource } from '../components/map/maplibre/offlineStyle';
 import { OrgTree } from '../components/map/BrowseTrees';
+import { AREA_LOOK, AreaControls } from '../components/stationing/AreaControls';
 import { PointsTable } from '../components/stationing/PointsTable';
 import { SiteSymbolPicker, SymbolArt } from '../components/stationing/SiteSymbolPicker';
+import type { TreeSource } from '../components/tree/tree';
+import { UnitTree } from '../components/tree/UnitTree';
 import { Icon } from '../components/ui';
+import { DeploymentCheckCard } from '../components/workspace/DeploymentCheckCard';
 import { MapFrame, MapLegend } from '../components/workspace/MapFrame';
 import { OperationalWorkspace } from '../components/workspace/OperationalWorkspace';
 import { RequestMap } from '../components/workspace/RequestMap';
+import { useAreaInsight } from '../components/workspace/TerrainPanel';
 import { useRegisteredSites } from '../components/workspace/useRegisteredSites';
 import { useApp } from '../lib/app';
 import { formatIn, type FormatKey } from '../lib/coordFormats';
+import { initialArea, resolveAreaDefault, type AreaDefault } from '../lib/deploymentDefault';
 import { formatArea } from '../lib/footprint';
+import { distanceM } from '../lib/geo';
+import { legText } from '../lib/requestMap';
 import { anchorOf, partsOf, siteArea } from '../lib/siteGeometry';
+import { isSetupAdmin, lastStep, nextStep, policyLeg, prevStep, setupBody, setupProblem, stepsFor, toggleUnit, unitBlock, unitLines, withArea, type SetupStep, type UnitPlan } from '../lib/siteSetupFlow';
 import { symbolEntry } from '../lib/siteSymbols';
-import { MAIN_KINDS, cornersOf, outlineOf, rowsOf, shapeText, stepProblem, type PointRow, type Step } from '../lib/siteWizard';
+import { MAIN_KINDS, cornersOf, outlineOf, rowsOf, shapeText, stepProblem, type PointRow } from '../lib/siteWizard';
+import { previewLeg } from '../lib/terrainAnalysis';
 
 const EMPTY_MAP = {
   id: 'setup', number: '', state: 'DRAFT', requestingUnit: { id: '', name: '' }, requester: { id: '', name: '' }, units: [], currentSites: [],
@@ -32,7 +42,9 @@ const BLANK: Form = { name: '', code: '', kind: 'موقع', parentId: '', notes:
 // «موقع جديد» as in MOVER's «المواقع» drawer (owner, 10 Nov 2026: «do the same as we did there»; MOVER owner 1 Nov 2026: simple
 // enough for a child): one question per card, three steps — the data, the shape, review and save. «معسكر» by default, as there.
 const NEW_SITE: Form = { ...BLANK, kind: 'معسكر', ownerId: '' };
-const STEPS = ['البيانات', 'الرسم', 'الحفظ'];
+/** What the map editor holds: the site, or one unit's deployment area (steps 4 and 5 of the setup administrator). */
+type EditTarget = 'site' | { unit: string; role: 'primary' | 'alternative' };
+const EMPTY_FC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 /**
  * «تهيئة المواقع والتمركز»: the controlled setup of an empty installation, not a daily request (ADR-045). Each step asks a written
@@ -68,15 +80,15 @@ export function SiteSetupPage() {
   const [edit, setEdit] = useState<Form>(BLANK);
   const [editingShape, setEditingShape] = useState(false);
   const [vertexMode, setVertexMode] = useState(false);
-  // the «موقع جديد» wizard
-  const [step, setStep] = useState<Step>(1);
+  // the «موقع جديد» wizard: three steps, or six for the setup administrator (ADR-067)
+  const [step, setStep] = useState<SetupStep>(1);
   const [inside, setInside] = useState(false);
   const [otherKind, setOtherKind] = useState(false);
   const [parentQ, setParentQ] = useState('');
   const [owner, setOwner] = useState<{ id: string; name: string } | null>(null);
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [wizErr, setWizErr] = useState('');
-  const [made, setMade] = useState<{ id: string; name: string; code: string } | null>(null);
+  const [made, setMade] = useState<{ id: string; name: string; code: string; units?: number } | null>(null);
   // «جدول الإحداثيات»: shown on «اكتب الإحداثيات»; it follows the map and the map follows it
   const [typing, setTyping] = useState(false);
   const [rows, setRows] = useState<PointRow[]>([]);
@@ -90,6 +102,24 @@ export function SiteSetupPage() {
   const [symEdit, setSymEdit] = useState<string | null | undefined>(undefined);
   const [symReason, setSymReason] = useState('');
   const [fromCoords, setFromCoords] = useState(false);
+  // «تهيئة المواقع والتمركز» (ADR-067): who holds facilities and corrections everywhere also stations units there and places
+  // their areas, in the same wizard and one save; the server checks the right again (SiteSetupService.admin)
+  const admin = isSetupAdmin(app.me.grants);
+  const steps = stepsFor(admin);
+  const last = lastStep(admin);
+  const [plan, setPlan] = useState<UnitPlan[]>([]);
+  const [active, setActive] = useState<string | null>(null);
+  const [placingArea, setPlacingArea] = useState(false);
+  const [areaVertices, setAreaVertices] = useState(4);
+  const [policy, setPolicy] = useState<{ version: number; reference: string | null; values: StationingPolicyValues } | null | undefined>(undefined);
+  const [review, setReview] = useState<{ key: string; check: SiteSetupCheck | null; error: string } | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const listeners = useRef(new Set<(l: SiteLive) => void>());
+  const targetRef = useRef<EditTarget>('site');
+  const loadedKey = useRef('site');
+  const placingAreaRef = useRef(false);
+  placingAreaRef.current = placingArea;
+  const idemKey = useRef('');
   const mapRef = useRef<MlMap | null>(null);
   const editor = useRef<SiteEditor | null>(null);
   const marker = useRef<Marker | null>(null);
@@ -115,11 +145,20 @@ export function SiteSetupPage() {
     m.addSource('setup-earlier', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     addOverlayLayer(m, { id: 'setup-earlier-fill', type: 'fill', source: 'setup-earlier', paint: { 'fill-color': '#2f9e6e', 'fill-opacity': 0.25 } }, 'top');
     addOverlayLayer(m, { id: 'setup-earlier-line', type: 'line', source: 'setup-earlier', paint: { 'line-color': '#2f9e6e', 'line-width': 2, 'line-dasharray': [2, 1.6] } }, 'top');
+    // the setup's plan under the shape being edited: the new site while an area is edited, and the areas already placed
+    m.addSource('setup-plan', { type: 'geojson', data: EMPTY_FC });
+    addOverlayLayer(m, { id: 'setup-plan-fill', type: 'fill', source: 'setup-plan', paint: { 'fill-color': ['match', ['get', 'role'], 'PRIMARY', '#e8963a', 'ALTERNATIVE', '#7b4fc0', '#2bb36a'], 'fill-opacity': 0.16 } }, 'top');
+    addOverlayLayer(m, { id: 'setup-plan-line', type: 'line', source: 'setup-plan', paint: { 'line-color': ['match', ['get', 'role'], 'PRIMARY', '#d9822b', 'ALTERNATIVE', '#7b4fc0', '#1f9d55'], 'line-width': 1.8, 'line-dasharray': [2, 1.4] } }, 'top');
     editor.current = new SiteEditor(m, {
       onChange: (l: SiteLive, final: boolean) => {
+        listeners.current.forEach((f) => f(l));
         setDrawing(l.mode === 'draw');
         setDrawInfo(l.draw ? { count: l.draw.count, canFinish: l.draw.canFinish } : null);
-        if (final) setGeometry(l.geometry ?? null);
+        if (!final) return;
+        // the site, or the deployment area of the unit being edited: each change goes to what the editor holds
+        const t = targetRef.current;
+        if (t === 'site') setGeometry(l.geometry ?? null);
+        else setPlan((p) => withArea(p, t.unit, t.role, l.geometry && l.geometry.type === 'Polygon' ? (l.geometry as unknown as GeoPolygon) : null));
       },
       maxAreaM2: () => null,
     });
@@ -130,12 +169,20 @@ export function SiteSetupPage() {
         take({ lat: e.lngLat.lat, lng: e.lngLat.lng });
         return;
       }
+      // «تحديد المنطقة على الخريطة»: the policy's initial footprint around the click, then dragged and edited
+      if (placingAreaRef.current) {
+        setPlacingArea(false);
+        const d = areaDefaultRef.current.value;
+        if (d && targetRef.current !== 'site') editor.current?.load(initialArea({ lat: e.lngLat.lat, lng: e.lngLat.lng }, d), false);
+        return;
+      }
       if (!placingRef.current) return;
       setPlacing(false);
       setPoint({ lat: e.lngLat.lat, lng: e.lngLat.lng });
       marker.current?.remove();
       marker.current = new Marker({ color: '#d9822b' }).setLngLat(e.lngLat).addTo(m);
     });
+    setMapReady(true);
   };
   const reload = () => {
     if (selected) api.siteOccupants(selected).then(setOcc).catch(() => setOcc(null));
@@ -178,16 +225,17 @@ export function SiteSetupPage() {
   }, [sites]);
   const site = sites.find((s) => s.siteId === selected) ?? null;
   const orgs = useMemo(() => app.orgs.filter((o) => !q.trim() || o.name.includes(q.trim())).slice(0, 200), [app.orgs, q]);
-  const startAdd = () => {
+  // «＋ إضافة موقع», or a site inside a chosen camp (owner, 16 Nov 2026): the wizard opens with «يقع داخل» that camp and the map on it
+  const startAdd = (parent?: { siteId: string; name: string }) => {
     setAdding(true);
     setSelected(null);
-    setForm(NEW_SITE);
+    setForm(parent ? { ...NEW_SITE, kind: 'موقع', parentId: parent.siteId } : NEW_SITE);
     setShape('POLYGON');
     setGeometry(null);
     setPoint(null);
     setPlacing(false);
     setStep(1);
-    setInside(false);
+    setInside(!!parent);
     setOtherKind(false);
     setParentQ('');
     setOwner(null);
@@ -205,30 +253,171 @@ export function SiteSetupPage() {
     parts.current = null;
     showEarlier(null);
     marker.current?.remove();
+    editSite();
     editor.current?.load(null, false);
+    setPlan([]);
+    setActive(null);
+    setPlacingArea(false);
+    setReview(null);
+    // one key per new site: a save sent twice (a double click, a retry after a lost answer) registers it once
+    idemKey.current = newIdempotencyKey();
   };
   const stopAdd = () => {
     if (drawing) editor.current?.cancelDrawing();
     setAdding(false);
     setPlacing(false);
+    setPlacingArea(false);
     setPickRow(null);
     pickRef.current = null;
     setMade(null);
+    editSite();
     editor.current?.load(null, false);
     marker.current?.remove();
     showEarlier(null);
   };
+  /** The editor back on the site (its own look, no leg), before anything is loaded into it. */
+  const editSite = () => {
+    targetRef.current = 'site';
+    loadedKey.current = 'site';
+    editor.current?.setLook(SITE_LOOK);
+    editor.current?.setOrigin(null);
+    editor.current?.setDistanceLabel(null);
+  };
   /** «التالي» / «السابق»: forward only once the step is complete; the reason stays in the card where the person is looking. */
-  const goStep = (to: Step) => {
-    const problem = to > step ? stepProblem({ name: form.name, kind: form.kind, inside, parentId: form.parentId, shape, point, geometry, drawing }, to) : '';
+  const goStep = (to: SetupStep) => {
+    const forward = to > step;
+    const siteProblem = forward && step <= 2 ? stepProblem({ name: form.name, kind: form.kind, inside, parentId: form.parentId, shape, point, geometry, drawing }, Math.min(to, 3) as 1 | 2 | 3) : '';
+    const waiting = forward && admin && to >= 4 && plan.length > 0 && policy === undefined ? 'جارٍ قراءة سياسة التمركز السارية… أعد المحاولة بعد لحظة.' : '';
+    const problem = siteProblem || waiting || (forward && admin ? setupProblem({ units: plan, requirement: policy?.values.deploymentRequirement ?? null, policyInForce: !!policy, drawing }, step, to) : '');
     setWizErr(problem);
     if (problem) return;
     if (drawing) editor.current?.cancelDrawing();
     setPlacing(false);
+    setPlacingArea(false);
     setPickRow(null);
     pickRef.current = null;
+    // the areas are placed unit by unit: each area step opens on the first unit still without that area
+    if (to === 4 || to === 5) {
+      const role = to === 4 ? 'primary' : 'alternative';
+      setActive((plan.find((u) => !u[role]) ?? plan[0])?.id ?? null);
+    }
     setStep(to);
   };
+  // ---- the setup administrator's steps 3–6 (ADR-067) ------------------------------------------------------------------------
+  // the policy in force: whether areas are required, the ranges, the initial footprint of a click — never a value of the page
+  useEffect(() => {
+    if (!admin || !adding || policy !== undefined) return;
+    api
+      .stationingPolicy()
+      .then((p) => setPolicy(p.inForce ? { version: p.inForce.version, reference: p.inForce.reference, values: p.inForce.values } : null))
+      .catch(() => setPolicy(null));
+  }, [admin, adding, policy]);
+  const areaDefault = resolveAreaDefault((policy?.values as { deploymentAreaDefault?: AreaDefault | null } | undefined)?.deploymentAreaDefault ?? null);
+  const areaDefaultRef = useRef(areaDefault);
+  areaDefaultRef.current = areaDefault;
+  const requirement = policy?.values.deploymentRequirement ?? null;
+  // what the editor holds: the site, or at steps 4 and 5 the area of the unit chosen there
+  const areaRole: 'primary' | 'alternative' | null = adding && admin && !made ? (step === 4 ? 'primary' : step === 5 ? 'alternative' : null) : null;
+  const activeUnit = plan.find((u) => u.id === active) ?? plan[0] ?? null;
+  const editTarget: EditTarget = areaRole && activeUnit ? { unit: activeUnit.id, role: areaRole } : 'site';
+  const targetKey = editTarget === 'site' ? 'site' : editTarget.unit + ':' + editTarget.role;
+  const siteAnchor = shape === 'POINT' ? point : geometry ? anchorOf(partsOf(geometry)) : null;
+  // a leg is measured centre to centre: the primary from the new site, the alternative from the unit's primary (O-04)
+  const areaOrigin = editTarget === 'site' ? null : editTarget.role === 'primary' ? siteAnchor : activeUnit?.primary ? anchorOf(partsOf(activeUnit.primary as unknown as SiteGeometry)) : null;
+  const editedArea = editTarget === 'site' ? null : ((activeUnit?.[editTarget.role] ?? null) as unknown as SiteGeometry | null);
+  const insight = useAreaInsight(editedArea, null, policy?.version ?? null);
+  const areaDistance = editedArea && areaOrigin ? distanceM(areaOrigin, anchorOf(partsOf(editedArea))) : null;
+  const previewOf = (role: 'primary' | 'alternative'): RestationingLeg | undefined =>
+    previewLeg(role, areaDistance, insight?.assess ?? null, policy?.values ?? null) ?? policyLeg(role, areaDistance, policy?.values);
+  const leg = editTarget === 'site' ? undefined : previewOf(editTarget.role);
+  /** The map around a leg: the area itself, or before it exists everything up to the policy's maximum around where it is measured from. */
+  const frameArea = (role: 'primary' | 'alternative', area: SiteGeometry | null, from: { lat: number; lng: number } | null) => {
+    const m = mapRef.current;
+    if (!m || !from) return;
+    const o = area ? anchorOf(partsOf(area)) : from;
+    const r = area ? 900 : policy ? policy.values[role].maxM * 1.05 : null;
+    if (r == null) return void m.easeTo({ center: [o.lng, o.lat], duration: 400 });
+    const dLat = r / 110_900;
+    const dLng = r / (111_320 * Math.cos((o.lat * Math.PI) / 180));
+    frame(m, [{ lat: o.lat - dLat, lng: o.lng - dLng }, { lat: o.lat + dLat, lng: o.lng + dLng }], view, { duration: 400, padding: { top: 40, right: 40, bottom: 150, left: 70 }, maxZoom: 22 });
+  };
+  // the editor follows the target: the previous shape is closed first (its last change goes where it belongs), then the next loaded
+  useEffect(() => {
+    const ed = editor.current;
+    if (!ed || !mapReady || loadedKey.current === targetKey) return;
+    loadedKey.current = targetKey;
+    ed.cancelDrawing();
+    targetRef.current = editTarget;
+    setPlacingArea(false);
+    setVertexMode(false);
+    ed.setMode('move');
+    if (editTarget === 'site') {
+      ed.setLook(SITE_LOOK);
+      ed.setOrigin(null);
+      ed.setDistanceLabel(null);
+      ed.load(adding && !made && shape === 'POLYGON' ? geometry : null, false);
+      return;
+    }
+    const g = (plan.find((u) => u.id === editTarget.unit)?.[editTarget.role] ?? null) as unknown as SiteGeometry | null;
+    ed.setLook(AREA_LOOK[editTarget.role]);
+    ed.setOrigin(areaOrigin ? { at: areaOrigin, label: null } : null);
+    ed.load(g, false);
+    frameArea(editTarget.role, g, areaOrigin);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey, mapReady]);
+  // the leg's start and its chip on the map follow the edited area: distance · allowed range · verdict (the server decides)
+  const legKey = JSON.stringify(leg ? [leg.status, leg.effectiveMinM, leg.effectiveMaxM, leg.exceptionMaxM] : null);
+  useEffect(() => {
+    const ed = editor.current;
+    if (!ed || editTarget === 'site') return;
+    ed.setOrigin(areaOrigin ? { at: areaOrigin, label: null } : null);
+    ed.setDistanceLabel((d: number) => legText(d, leg));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetKey, areaOrigin?.lat, areaOrigin?.lng, legKey]);
+  // the plan under the edited shape: the new site while an area is edited, and every area placed but the one in the editor
+  useEffect(() => {
+    const src = mapRef.current?.getSource('setup-plan') as GeoJSONSource | undefined;
+    if (!src) return;
+    const features: GeoJSON.Feature[] = [];
+    if (adding && admin && !made && step >= 3) {
+      if (editTarget !== 'site' && shape === 'POLYGON' && geometry) features.push({ type: 'Feature', geometry: geometry as unknown as GeoJSON.Geometry, properties: { role: 'SITE' } });
+      for (const u of plan)
+        for (const role of ['primary', 'alternative'] as const) {
+          const g = u[role];
+          if (!g || (editTarget !== 'site' && editTarget.unit === u.id && editTarget.role === role)) continue;
+          features.push({ type: 'Feature', geometry: g as unknown as GeoJSON.Geometry, properties: { role: role.toUpperCase(), unit: u.name } });
+        }
+    }
+    src.setData({ type: 'FeatureCollection', features });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adding, admin, made, step, targetKey, plan, geometry, shape, mapReady]);
+  // «مراجعة وحفظ»: the server's own checks of exactly what will be sent, nothing written
+  const bodyOf = (reason: string): SiteSetupBody | null => {
+    const at = shape === 'POINT' ? point : geometry ? anchorOf(partsOf(geometry)) : null;
+    if (!at) return null;
+    const site = { code: '', name: form.name.trim(), kind: form.kind.trim(), parentId: (inside && form.parentId) || null, responsibleOrgId: owner?.id ?? null, capacity: null, location: at, notes: form.notes || null, reason, symbol };
+    const boundary = shape === 'POLYGON' && geometry ? { geometry, crs: 'EPSG:4326', expectedVersion: 0, reason, method: fromCoords ? 'COORDINATES' : 'DRAWN' } : null;
+    return setupBody(site, boundary, plan, reason);
+  };
+  /** What a check was made of: the body without its reasons (the reason is typed after the check, on the same card). */
+  const keyOf = (b: SiteSetupBody | null) => (b ? JSON.stringify({ ...b, reason: '', site: { ...b.site, reason: '' }, boundary: b.boundary && { ...b.boundary, reason: '' } }) : '');
+  // the review stands only for what it checked: a shape moved since then is checked again before it is trusted
+  const reviewFresh = !!review && review.key === keyOf(bodyOf(''));
+  const runCheck = () => {
+    // the reason is asked on this same card and the save waits for it; the review is about the place, the units and the areas
+    const body = bodyOf(form.reason.trim().length >= 5 ? form.reason : 'مراجعة قبل الحفظ');
+    if (!body) return;
+    const key = keyOf(body);
+    setReview({ key, check: null, error: '' });
+    api.siteSetupCheck(body).then(
+      (check) => setReview((r) => (r?.key === key ? { key, check, error: '' } : r)),
+      (e: Error) => setReview((r) => (r?.key === key ? { key, check: null, error: e.message } : r)),
+    );
+  };
+  useEffect(() => {
+    if (admin && adding && !made && step === 6) runCheck();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [admin, adding, made, step]);
   const choosePoint = (p: { lat: number; lng: number }, fly = true) => {
     setPoint(p);
     marker.current?.remove();
@@ -387,7 +576,21 @@ export function SiteSetupPage() {
     }
   };
   const save = () => {
-    let saved: { id: string; name: string; code: string } | null = null;
+    let saved: { id: string; name: string; code: string; units?: number } | null = null;
+    if (admin) {
+      // the setup administrator: the site, its initial stationing and the areas, in one audited save (ADR-067)
+      return act(async () => {
+        const body = bodyOf(form.reason);
+        if (!body) throw new Error('حدد الموقع على الخريطة أولاً.');
+        const r = await api.siteSetup(body, idemKey.current);
+        saved = { id: r.site.id, name: r.site.name, code: r.site.code, units: r.units.length };
+      }, plan.length ? 'سُجل الموقع وتمركزه ومناطق الانتشار' : 'سُجل الموقع', () => {
+        setMade(saved);
+        editor.current?.load(null, false);
+        marker.current?.remove();
+        showEarlier(null);
+      });
+    }
     return act(async () => {
       const at = shape === 'POINT' ? point : geometry ? anchorOf(partsOf(geometry)) : null;
       if (!at) throw new Error('حدد الموقع على الخريطة أولاً.');
@@ -443,6 +646,9 @@ export function SiteSetupPage() {
                 <span className="rs-item-head"><b>{s.name}</b><small className="tz-code">{s.code}</small></span>
                 <small>موقع رئيسي · {s.boundary ? 'حدود مسجلة' : 'علامة'}</small>
               </button>
+              {canSites && s.siteId === selected && (
+                <button className="tz-add-inside-row" data-testid="add-inside-row" onClick={() => startAdd({ siteId: s.siteId, name: s.name })}>＋ موقع داخل «{s.name}»</button>
+              )}
               {tree(s.siteId, 1)}
             </div>
           ))}
@@ -455,7 +661,7 @@ export function SiteSetupPage() {
       <section className="tz-drawer open tz-site-work" aria-label="تهيئة الموقع">
         <div className="tz-drawer-head">
           <span className="tz-drawer-toggle"><Icon name="boundary" /><span>تهيئة الموقع</span></span>
-          {canSites && <button className="button primary compact tz-new" data-testid="add-site" aria-pressed={adding && !made} disabled={adding && !made} onClick={startAdd}>＋ إضافة موقع</button>}
+          {canSites && <button className="button primary compact tz-new" data-testid="add-site" aria-pressed={adding && !made} disabled={adding && !made} onClick={() => startAdd()}>＋ إضافة موقع</button>}
         </div>
         {/* «موقع جديد» right under its button, the whole height of the panel (owner, 10 Nov 2026) */}
         <div className="sw-fill" data-testid="setup-context">
@@ -607,6 +813,132 @@ export function SiteSetupPage() {
       <button type="button" className="sw-go" data-testid="save-site" disabled={busy || drawing || form.reason.trim().length < 5} onClick={save}>{busy ? 'جارٍ الحفظ…' : 'حفظ الموقع'}</button>
     </div>
   );
+  // ---- the setup administrator: «التمركز الابتدائي», «منطقة الانتشار الرئيسية», «منطقة الانتشار البديلة», «مراجعة وحفظ» ----------
+  const chosen = useMemo(() => new Set(plan.map((u) => u.id)), [plan]);
+  // the one units tree of the application (ADR-063), loaded one level at a time with a search across every branch
+  const unitSource = useMemo<TreeSource<OrgBranch>>(
+    () => ({
+      roots: () => api.orgRoots(),
+      children: (id) => api.orgChildren(id),
+      search: (q, signal) => api.orgSearch(q, signal).then((r) => r.map((o) => ({ item: o, path: (o.path ?? []).map((x) => x.name).join(' ‹ '), trail: (o.path ?? []).map((x) => x.id) }))),
+    }),
+    [],
+  );
+  const requirementHint = requirement === 'REQUIRED'
+    ? 'تشترط سياسة التمركز السارية منطقتي الانتشار لكل وحدة تُثبَّت هنا.'
+    : requirement === 'OPTIONAL' ? 'منطقتا الانتشار اختياريتان في سياسة التمركز السارية: الاثنتان معاً، أو لا شيء.' : policy === null ? 'لا توجد سياسة تمركز نافذة: لا تُثبَّت وحدة قبل نشرها.' : '';
+  const setupStep3 = (
+    <div className="sw-body" data-testid="setup-step-3">
+      {card(1, 'أي الوحدات تتمركز في هذا الموقع؟', (
+        <>
+          <div className="sw-sub sw-tree" data-testid="setup-units">
+            <UnitTree source={unitSource} label="وحدات التمركز الابتدائي" search="ابحث عن وحدة في كل الفروع…" searchLabel="بحث عن وحدة للتمركز" revision={app.revision}
+              checked={chosen} checkData="setup-unit" onCheck={(o) => setPlan((p) => toggleUnit(p, o))} disabled={(o) => (chosen.has(o.id) ? null : unitBlock(o.id, registered.current) || null)} />
+          </div>
+          <p className="sw-hint">اختياري. تُختار الوحدات التي لا تمركز لها فقط، كل وحدة بنفسها: لا ينتقل معها من يتبعها، ولا يتغير الهيكل التنظيمي.</p>
+        </>
+      ))}
+      {card(2, plan.length ? `المختارة (${plan.length})` : 'المختارة', plan.length ? (
+        <ul className="sw-list" data-testid="setup-chosen">
+          {plan.map((u) => <li key={u.id} className="sw-row"><b>{u.name}</b><button type="button" className="sw-link" onClick={() => setPlan((p) => toggleUnit(p, u))}>إزالة</button></li>)}
+        </ul>
+      ) : <p className="sw-hint">لم تُختر وحدة: يُسجَّل الموقع وحده.</p>)}
+      {requirementHint && <p className="sw-hint" data-testid="setup-requirement">{requirementHint}</p>}
+    </div>
+  );
+  const areaStep = (role: 'primary' | 'alternative') => (
+    <div className="sw-body" data-testid={role === 'primary' ? 'setup-step-4' : 'setup-step-5'}>
+      {card(1, 'لأي وحدة؟', (
+        <div className="sw-choices" role="tablist" aria-label="الوحدات">
+          {plan.map((u) => (
+            <button key={u.id} type="button" role="tab" aria-selected={u.id === activeUnit?.id} className={'sw-choice' + (u.id === activeUnit?.id ? ' on' : '')} data-unit={u.id} onClick={() => setActive(u.id)}>
+              {u[role] ? '✓ ' : ''}{u.name}
+            </button>
+          ))}
+        </div>
+      ))}
+      {activeUnit && card(2, (role === 'primary' ? 'منطقة الانتشار الرئيسية' : 'منطقة الانتشار البديلة') + ' — ' + activeUnit.name, role === 'alternative' && !activeUnit.primary ? (
+        <p className="sw-hint">لهذه الوحدة لا منطقة رئيسية بعد؛ منها تُقاس البديلة. ضعها في الخطوة السابقة، أو اتركهما معاً إن كانت السياسة لا تشترطهما.</p>
+      ) : (
+        <AreaControls
+          tabs={false}
+          editor={editor}
+          listeners={listeners}
+          area={role}
+          onArea={() => undefined}
+          hasPrimary={!!activeUnit.primary}
+          placing={placingArea}
+          areaDefault={areaDefault}
+          policyVersion={policy ? { version: policy.version, reference: policy.reference } : null}
+          onPlace={() => {
+            editor.current?.cancelDrawing();
+            const on = !placingArea;
+            setPlacingArea(on);
+            if (on) frameArea(role, null, areaOrigin);
+          }}
+          onDraw={() => {
+            setPlacingArea(false);
+            editor.current?.load(null, false);
+            frameArea(role, null, areaOrigin);
+            editor.current?.startDrawing(null, areaVertices);
+          }}
+          target={areaVertices}
+          setTarget={(n) => {
+            setAreaVertices(n);
+            editor.current?.setTarget(n);
+          }}
+          origin={areaOrigin}
+          leg={leg}
+          checked={reviewFresh ? review?.check?.units.find((u) => u.organizationId === activeUnit.id)?.legs.find((l) => l.leg === role) : undefined}
+          siteWord="الموقع الجديد"
+        >
+          {leg?.status === 'NEEDS_EXCEPTION' && <p className="sw-err">تحتاج استثناء مسافة، والاستثناء لا يُمنح في التهيئة: ضعها ضمن النطاق.</p>}
+        </AreaControls>
+      ))}
+      {requirementHint && <p className="sw-hint">{requirementHint}</p>}
+    </div>
+  );
+  const unitProblems = new Set((review?.check?.units ?? []).flatMap((u) => u.problems.map((p) => `«${u.name}»: ${p}`)));
+  const setupStep6 = (
+    <div className="sw-body" data-testid="setup-step-6">
+      {card(1, 'الموقع', <dl className="sw-sum" data-testid="site-summary">{summary.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>)}
+      {card(2, 'التمركز الابتدائي ومناطق الانتشار', plan.length ? (
+        <dl className="sw-sum" data-testid="units-summary">{unitLines(plan).map(([k, v], i) => <div key={plan[i].id}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      ) : <p className="sw-hint">لا وحدات: يُسجَّل الموقع وحده.</p>)}
+      {card(3, 'فحص الخادم', (
+        <div className="sw-sub" data-testid="setup-review">
+          {review != null && !reviewFresh && <p className="sw-hint" data-testid="review-stale">تغيّر شيء منذ الفحص: أعد الفحص قبل الحفظ.</p>}
+          {review == null || (review.check == null && !review.error) ? <p className="sw-hint">جارٍ الفحص…</p> : review.error ? <p className="sw-err">{review.error}</p> : (
+            <>
+              <p className={review.check!.ok ? 'sw-done' : 'sw-err'}>{review.check!.ok ? '✓ الفحوص مستوفاة — يمكن الحفظ' : 'فحوص غير مستوفاة'}</p>
+              {review.check!.problems.filter((p) => !unitProblems.has(p)).length > 0 && (
+                <ul className="rs-problems">{review.check!.problems.filter((p) => !unitProblems.has(p)).map((p) => <li key={p}>{p}</li>)}</ul>
+              )}
+              {review.check!.units.map((u) => (
+                <div key={u.organizationId} data-unit-check={u.organizationId}>
+                  <p className="sw-hint"><b>{u.name}</b></p>
+                  <DeploymentCheckCard compact request={EMPTY_MAP} checks={{ ok: u.ok, problems: u.problems, policyVersion: review.check!.policyVersion, legs: u.legs }} />
+                </div>
+              ))}
+            </>
+          )}
+          <button type="button" className="sw-link" onClick={runCheck}>إعادة الفحص</button>
+        </div>
+      ))}
+      {card(4, 'لماذا تسجّل هذا الموقع وتمركزه؟', (
+        <>
+          <textarea className="sw-input" rows={3} aria-label="سبب تسجيل الموقع" placeholder="السبب يُحفظ في سجل التدقيق باسمك" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+          <p className="sw-hint">يُحفظ كل شيء مرة واحدة: الموقع، وتمركز الوحدات، ومناطق انتشارها. وإن رُفض شيء لم يُحفظ شيء.</p>
+        </>
+      ))}
+      <button type="button" className="sw-go" data-testid="setup-save" disabled={busy || drawing || form.reason.trim().length < 5} onClick={save}>
+        {busy ? 'جارٍ الحفظ…' : plan.length ? 'حفظ الموقع والتمركز' : 'حفظ الموقع'}
+      </button>
+    </div>
+  );
+  const stepBody = !admin
+    ? (step === 1 ? step1 : step === 2 ? step2 : step3)
+    : step === 1 ? step1 : step === 2 ? step2 : step === 3 ? setupStep3 : step === 4 ? areaStep('primary') : step === 5 ? areaStep('alternative') : setupStep6;
   const addPanel = (
     <section className="sw-wizard" data-testid="add-site-form" data-step={made ? 'done' : step}>
       <div className="sw-top">
@@ -616,26 +948,28 @@ export function SiteSetupPage() {
       {made ? (
         <div className="sw-body" data-testid="site-made">
           <p className="sw-done">✓ سُجل «{made.name}» برمز <bdi data-testid="made-code">{made.code}</bdi></p>
+          {!!made.units && <p className="sw-done" data-testid="made-units">✓ وتمركزت فيه {made.units === 1 ? 'وحدة واحدة' : made.units + ' وحدات'} بمناطق انتشارها، في حفظ واحد مُدقَّق.</p>}
           <p className="sw-hint">ظهر في قائمة المواقع وعلى الخريطة. من بطاقته تُثبَّت الوحدات المتمركزة فيه وتُربط به الوحدات.</p>
           <button type="button" className="sw-go" onClick={() => { const id = made.id; stopAdd(); setSelected(id); }}>فتح بطاقة الموقع</button>
           <div className="sw-nav2">
-            <button type="button" className="sw-link" onClick={startAdd}>إضافة موقع آخر</button>
+            <button type="button" className="sw-link" onClick={() => startAdd()}>إضافة موقع آخر</button>
             <button type="button" className="sw-link" onClick={stopAdd}>إغلاق</button>
           </div>
         </div>
       ) : (
         <>
-          <ol className="sw-steps" aria-label={`الخطوة ${step} من 3`}>
-            {STEPS.map((t, i) => (
-              <li key={t} className={'sw-step' + (i + 1 === step ? ' on' : i + 1 < step ? ' done' : '')} aria-current={i + 1 === step ? 'step' : undefined}><b>{i + 1 < step ? '✓' : i + 1}</b><span>{t}</span></li>
+          {/* six steps keep the strip on one line: the current step is named, the others show their number (named on hover) */}
+          <ol className={'sw-steps' + (steps.length > 3 ? ' many' : '')} aria-label={`الخطوة ${step} من ${steps.length}`}>
+            {steps.map((t, i) => (
+              <li key={t} className={'sw-step' + (i + 1 === step ? ' on' : i + 1 < step ? ' done' : '')} aria-current={i + 1 === step ? 'step' : undefined} title={t}><b>{i + 1 < step ? '✓' : i + 1}</b><span>{t}</span></li>
             ))}
           </ol>
           {wizErr && <p className="sw-err" role="alert">{wizErr}</p>}
-          {step === 1 ? step1 : step === 2 ? step2 : step3}
+          {stepBody}
           <div className="sw-nav">
-            {step < 3 && <button type="button" className="sw-go" data-testid="wizard-next" onClick={() => goStep((step + 1) as Step)}>التالي ←</button>}
+            {step < last && <button type="button" className="sw-go" data-testid="wizard-next" onClick={() => goStep(nextStep(step, admin, plan.length))}>التالي ←</button>}
             <div className="sw-nav2">
-              {step > 1 ? <button type="button" className="sw-link" data-testid="wizard-back" onClick={() => goStep((step - 1) as Step)}>→ السابق</button> : <span />}
+              {step > 1 ? <button type="button" className="sw-link" data-testid="wizard-back" onClick={() => goStep(prevStep(step, admin, plan.length))}>→ السابق</button> : <span />}
               <button type="button" className="sw-link sw-cancel" onClick={stopAdd}>إلغاء</button>
             </div>
           </div>
@@ -648,6 +982,11 @@ export function SiteSetupPage() {
       <section className="tz-card rs-summary">
         <h2 className="tz-site-title">{site.name}</h2>
         <p className="tz-muted micro">{site.code} · موقع واحد على الخريطة، مهما تعددت الوحدات التي تستخدمه.</p>
+        {canSites && (
+          <button className="button compact tz-add-inside" data-testid="add-inside" onClick={() => startAdd({ siteId: site.siteId, name: site.name })}>
+            ＋ إضافة موقع داخل «{site.name}»
+          </button>
+        )}
       </section>
       {canSites && detail?.canManage && (
         <section className={'tz-card sw-fcard' + (folded.has('edit-site') ? ' folded' : '')} data-testid="edit-site">
@@ -738,8 +1077,8 @@ export function SiteSetupPage() {
       rail={workPanel()}
       context={listPanel()}
       centre={
-        <MapFrame title={<span className="tz-mapstep"><Icon name="map" /><b>تهيئة المواقع والتمركز</b></span>} mode={mode} setMode={setMode} view={view} setView={setView} has3d={!!terrain3d} placing={placing || drawing} legend={legend}>
-          {terrain3d !== undefined && <RequestMap view={view} terrain3d={terrain3d} request={EMPTY_MAP} checks={null} mode={mode} fitMaxZoom={13} hideSite fit={false} onMap={onMap} referenceInteractive={!adding && !editingShape} fitSites pick={adding || editingShape ? null : { selectedId: selected, onPick: (id) => setSelected(id) }} focus={selected ? { siteId: selected, key: selected.length } : null} />}
+        <MapFrame title={<span className="tz-mapstep"><Icon name="map" /><b>تهيئة المواقع والتمركز</b></span>} mode={mode} setMode={setMode} view={view} setView={setView} has3d={!!terrain3d} placing={placing || drawing || placingArea} legend={legend}>
+          {terrain3d !== undefined && <RequestMap view={view} terrain3d={terrain3d} request={EMPTY_MAP} checks={null} mode={mode} fitMaxZoom={13} hideSite fit={false} onMap={onMap} referenceInteractive={!adding && !editingShape} fitSites pick={adding || editingShape ? null : { selectedId: selected, onPick: (id) => setSelected(id) }} focus={selected ? { siteId: selected, key: selected.length } : adding && form.parentId ? { siteId: form.parentId, key: form.parentId.length + 1 } : null} />}
         </MapFrame>
       }
     />

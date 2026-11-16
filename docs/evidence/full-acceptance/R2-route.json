@@ -1,0 +1,12 @@
+{
+ "request": {
+  "id": "04df13c1-0965-4a0f-8743-2cf61e84d3ed",
+  "number": "RS-2026-0002"
+ },
+ "routeAtSubmit": "HIERARCHY:وحدة إضافية 1 · م9-4:SKIPPED:- → HIERARCHY:وحدة إضافية 1 · م8-4:SKIPPED:- → HIERARCHY:وحدة إضافية 1:SKIPPED:- → UNIT_OPERATIONS:-:OPEN:- → FINAL:-:OPEN:-",
+ "skips": "وحدة إضافية 1 · م9-4 (L9) | وحدة إضافية 1 · م8-4 (L8) | وحدة إضافية 1 (L7)",
+ "final": {
+  "state": "ACTIVATED_PERMANENT",
+  "route": "HIERARCHY:وحدة إضافية 1 · م9-4:SKIPPED:- → HIERARCHY:وحدة إضافية 1 · م8-4:SKIPPED:- → HIERARCHY:وحدة إضافية 1:SKIPPED:- → UNIT_OPERATIONS:-:APPROVED:full26.u03 → FINAL:-:APPROVED:full26.u05"
+ }
+}

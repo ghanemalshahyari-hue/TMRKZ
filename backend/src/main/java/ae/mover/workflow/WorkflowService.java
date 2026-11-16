@@ -75,7 +75,8 @@ public class WorkflowService {
     }
 
     /** One place of a step in a simulation: where it would go for the unit tried, and how many people hold the role there. */
-    public record SimulatedPlace(String role, List<String> orgs, boolean anyOrg, boolean unresolved, int holders) {
+    /** skipped: a unit of a climb with no hierarchy approver, own or inherited, that the step passes and records (ADR-062). */
+    public record SimulatedPlace(String role, List<String> orgs, boolean anyOrg, boolean unresolved, int holders, boolean skipped) {
     }
 
     /** A step the simulated request passes: its {@code taken} line, and for approval and notify steps, its places. */
@@ -152,11 +153,12 @@ public class WorkflowService {
     /** Every unit a climbing approval passes for this requesting unit, with who holds the role there; the page marks what it skips. */
     private List<SimulatedPlace> chainPlaces(String role, JsonNode chain, UUID org) {
         List<SimulatedPlace> out = new ArrayList<>();
+        boolean skip = chain.path("skipEmpty").asBoolean(false);
         for (var u : places.chain(chain, org)) {
             var st = places.station(role, u.id());
             // a level with no approver of its own is signed by the nearest approver above whose grant covers it (ADR-058)
             String name = st.via() == ae.mover.access.Stations.Via.INHERITED ? u.name() + " — يعتمدها معتمد «" + st.fromName() + "»" : u.name();
-            out.add(new SimulatedPlace(role, List.of(name), false, false, st.people().size()));
+            out.add(new SimulatedPlace(role, List.of(name), false, false, st.people().size(), skip && st.empty()));
         }
         return out;
     }
@@ -170,13 +172,13 @@ public class WorkflowService {
                         : !m.required() ? List.of("لا يوجد هذا الدور في هذه الوحدة الرئيسية، فتُتخطى الخطوة")
                         : m.people().isEmpty() ? List.of("لا يوجد معتمد يشمل نطاقه هذه الوحدة، فيُرفض الإرسال")
                         : m.anchor() == null ? List.of() : jdbc.sql("select name from organization where id = :id").param("id", m.anchor()).query(String.class).list();
-                out.add(new SimulatedPlace(a.role(), at, m.everywhere(), false, m.people().size()));
+                out.add(new SimulatedPlace(a.role(), at, m.everywhere(), false, m.people().size(), false));
                 continue;
             }
             var p = org == null ? new PlaceResolver.Place(List.of(), true, false) : places.resolve(a, org, List.of());
             List<String> names = p.orgs().isEmpty() ? List.of() : jdbc.sql("select name from organization where id = any(string_to_array(:ids, ',')::uuid[]) order by name")
                     .param("ids", Db.ids(p.orgs())).query(String.class).list();
-            out.add(new SimulatedPlace(a.role(), names, p.anyOrg(), p.unresolved(), places.peopleAt(a.role(), p).size()));
+            out.add(new SimulatedPlace(a.role(), names, p.anyOrg(), p.unresolved(), places.peopleAt(a.role(), p).size(), false));
         }
         return out;
     }

@@ -35,10 +35,12 @@ public class WorkflowRuntime {
     private final java.time.Clock clock;
 
     private final ae.mover.access.SeparationOfDuties separation;
+    private final ae.mover.audit.AuditService audit;
 
     public WorkflowRuntime(JdbcClient jdbc, Json json, WorkflowService workflows, PlaceResolver places, java.time.Clock clock,
-                           ae.mover.access.SeparationOfDuties separation) {
+                           ae.mover.access.SeparationOfDuties separation, ae.mover.audit.AuditService audit) {
         this.separation = separation;
+        this.audit = audit;
         this.jdbc = jdbc;
         this.json = json;
         this.workflows = workflows;
@@ -105,7 +107,107 @@ public class WorkflowRuntime {
             return false;
         }
         Stage stage = workflows.definition(ctx.workflowVersionId()).stage(stageKey).orElseThrow();
-        return RuleLanguage.evaluate(stage.condition(), ctx.values(), ctx.facts()) && !slots(ctx, stage).isEmpty();
+        if (!RuleLanguage.evaluate(stage.condition(), ctx.values(), ctx.facts())) {
+            return false;
+        }
+        recordSkippedUnits(ctx, stage);
+        recordNoAccessManager(ctx, stage);
+        return !slots(ctx, stage).isEmpty();
+    }
+
+    public static final String NO_ACCESS_MANAGER = "NO_ACCESS_MANAGER";
+    public static final String NO_ACCESS_MANAGER_TEXT = "لا يوجد مسؤول صلاحيات لهذه الوحدة — انتقل الطلب إلى الاعتماد النهائي";
+
+    /**
+     * A permission request whose unit has no access manager to recommend (or only the applicant) goes straight to the final
+     * approval (ADR-044); since 16 Nov 2026 (owner, LDAP first login) that is recorded for the revision and audited, so the
+     * final approver and the history read it rather than infer it. Idempotent for the same request, revision and step.
+     */
+    void recordNoAccessManager(RevisionContext ctx, Stage stage) {
+        if (stage.finalStage() || ctx.requestId() == null) {
+            return;
+        }
+        for (Assignee a : stage.assignees()) {
+            if (!"BY_SCOPE".equals(a.orgFrom()) || !"UNIT_ACCESS_MANAGER".equals(a.role())) {
+                continue;
+            }
+            PlaceResolver.ScopeMatch scope = places.scope(a.role(), ctx.ownerOrgId());
+            if (scope.required() && !separation.requester(ctx.requestId()).containsAll(scope.people())) {
+                continue;
+            }
+            String name = jdbc.sql("select name from organization where id = :o").param("o", ctx.ownerOrgId()).query(String.class).optional().orElse("");
+            int added = jdbc.sql("""
+                    insert into request_route_skip(request_id, revision, stage_key, organization_id, organization_name, organization_level,
+                                                   hierarchy_order, reason_code, reason_text, workflow_version_id, created_at)
+                    values (:r, :v, :s, :o, :n, null, 0, :code, :text, :wf, :at)
+                    on conflict (request_id, revision, stage_key, organization_id) do nothing""")
+                    .param("r", ctx.requestId()).param("v", ctx.revision()).param("s", stage.key()).param("o", ctx.ownerOrgId())
+                    .param("n", name).param("code", NO_ACCESS_MANAGER).param("text", NO_ACCESS_MANAGER_TEXT)
+                    .param("wf", ctx.workflowVersionId()).param("at", java.sql.Timestamp.from(clock.instant())).update();
+            if (added > 0) {
+                java.util.Map<String, Object> detail = new java.util.LinkedHashMap<>();
+                detail.put("revision", ctx.revision());
+                detail.put("stage", stage.key());
+                detail.put("organizationId", ctx.ownerOrgId().toString());
+                audit.record(null, ae.mover.audit.AuditService.Capacity.NONE, "ACCESS_REVIEW_SKIPPED", "REQUEST", ctx.requestId().toString(),
+                        null, detail, NO_ACCESS_MANAGER_TEXT, ctx.revision());
+            }
+            return;
+        }
+    }
+
+    public static final String NO_HIERARCHY_APPROVER = "NO_HIERARCHY_APPROVER";
+    public static final String NO_HIERARCHY_APPROVER_TEXT = "تم تجاوز هذه الجهة لعدم وجود معتمد للسلسلة الهرمية";
+
+    /**
+     * The owner's decision of 16 Nov 2026 (ADR-062): in a climb that passes units with nobody (chain.skipEmpty), every unit with
+     * no hierarchy approver — neither its own nor an inherited one covering it (ADR-058) — is recorded as skipped for this
+     * request revision, with its name and level as they are now, when the process reaches the step. Idempotent for the same
+     * request, revision and step; one grouped audit event when something new is recorded. A step whose units are all skipped
+     * has no slot and the flow goes on to the next step; it never opens to every holder of the role.
+     */
+    void recordSkippedUnits(RevisionContext ctx, Stage stage) {
+        JsonNode chain = chainOf(ctx, stage);
+        if (chain == null || !chain.path("skipEmpty").asBoolean(false)) {
+            return;
+        }
+        String role = stage.assignees().get(0).role();
+        List<java.util.Map<String, Object>> recorded = new ArrayList<>();
+        int order = 0;
+        for (ae.mover.stationing.OrgUnit u : places.chain(chain, ctx.ownerOrgId())) {
+            order++;
+            if (!places.station(role, u.id()).empty()) {
+                continue;
+            }
+            int added = jdbc.sql("""
+                    insert into request_route_skip(request_id, revision, stage_key, organization_id, organization_name, organization_level,
+                                                   hierarchy_order, reason_code, reason_text, workflow_version_id, created_at)
+                    values (:r, :v, :s, :o, :n, :l, :ord, :code, :text, :wf, :at)
+                    on conflict (request_id, revision, stage_key, organization_id) do nothing""")
+                    .param("r", ctx.requestId()).param("v", ctx.revision()).param("s", stage.key()).param("o", u.id())
+                    .param("n", u.name()).param("l", u.level()).param("ord", order).param("code", NO_HIERARCHY_APPROVER)
+                    .param("text", NO_HIERARCHY_APPROVER_TEXT).param("wf", ctx.workflowVersionId())
+                    .param("at", java.sql.Timestamp.from(clock.instant())).update();
+            if (added > 0) {
+                java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("organizationId", u.id().toString());
+                m.put("organizationName", u.name());
+                m.put("level", u.level());
+                m.put("order", order);
+                m.put("reasonCode", NO_HIERARCHY_APPROVER);
+                recorded.add(m);
+            }
+        }
+        if (!recorded.isEmpty()) {
+            java.util.Map<String, Object> detail = new java.util.LinkedHashMap<>();
+            detail.put("revision", ctx.revision());
+            detail.put("stage", stage.key());
+            detail.put("stageName", stage.name());
+            detail.put("workflowVersionId", String.valueOf(ctx.workflowVersionId()));
+            detail.put("units", recorded);
+            audit.record(null, ae.mover.audit.AuditService.Capacity.NONE, "HIERARCHY_LEVEL_SKIPPED", "REQUEST", ctx.requestId().toString(),
+                    null, detail, NO_HIERARCHY_APPROVER_TEXT, ctx.revision());
+        }
     }
 
     public List<String> slots(DelegateExecution execution, String stageKey) {
@@ -121,10 +223,8 @@ public class WorkflowRuntime {
             String role = stage.assignees().get(0).role();
             List<UUID> orgs = places.chainOrgs(role, chain, ctx.ownerOrgId(), separation.requester(ctx.requestId()));
             orgs.forEach(o -> out.add(role + "|" + o));
-            // units to climb, and every one skipped for having nobody: open to the role, never approved by nobody
-            if (orgs.isEmpty() && places.chain(chain, ctx.ownerOrgId()).stream().anyMatch(u -> places.station(role, u.id()).empty())) {
-                out.add(role + "|*");
-            }
+            // owner, 16 Nov 2026 (ADR-062): units with no hierarchy approver are skipped and recorded (recordSkippedUnits); when
+            // every unit is skipped the step has no slot and the flow goes on — never «ROLE|*», which opened it to any holder
             return new ArrayList<>(out);
         }
         for (Assignee a : stage.assignees()) {

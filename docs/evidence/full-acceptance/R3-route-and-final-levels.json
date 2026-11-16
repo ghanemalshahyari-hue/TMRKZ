@@ -1,0 +1,272 @@
+{
+ "simulate": {
+  "m10-3-before": {
+   "fyiHolders": 1,
+   "activators": 1,
+   "stages": [
+    {
+     "key": "H:91f7e3f1-4b67-4df1-9fb5-01b9bb4b69a3",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L9",
+     "unit": "وحدة إضافية 1 · م9-1",
+     "holders": 1,
+     "inheritedFrom": "وحدة إضافية 1 · م8-3",
+     "skipped": false
+    },
+    {
+     "key": "H:a4a7d040-7291-46ad-ba55-a2cb9223faed",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L8",
+     "unit": "وحدة إضافية 1 · م8-3",
+     "holders": 1,
+     "inheritedFrom": null,
+     "skipped": false
+    },
+    {
+     "key": "H:e053e7e2-936f-4ce7-8d54-f786d5b9bc6a",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L7",
+     "unit": "وحدة إضافية 1",
+     "holders": 0,
+     "inheritedFrom": null,
+     "skipped": true
+    },
+    {
+     "key": "O:operations",
+     "kind": "UNIT_OPERATIONS",
+     "label": "اعتماد عمليات الوحدة",
+     "unit": null,
+     "holders": 1
+    },
+    {
+     "key": "F:final",
+     "kind": "FINAL",
+     "label": "الاعتماد النهائي",
+     "unit": null,
+     "holders": 0
+    }
+   ],
+   "complete": true,
+   "problems": []
+  },
+  "m10-3-final-L3": {
+   "fyiHolders": 1,
+   "activators": 1,
+   "stages": [
+    {
+     "key": "H:91f7e3f1-4b67-4df1-9fb5-01b9bb4b69a3",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L9",
+     "unit": "وحدة إضافية 1 · م9-1",
+     "holders": 1,
+     "inheritedFrom": "وحدة إضافية 1 · م8-3",
+     "skipped": false
+    },
+    {
+     "key": "H:a4a7d040-7291-46ad-ba55-a2cb9223faed",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L8",
+     "unit": "وحدة إضافية 1 · م8-3",
+     "holders": 1,
+     "inheritedFrom": null,
+     "skipped": false
+    },
+    {
+     "key": "H:e053e7e2-936f-4ce7-8d54-f786d5b9bc6a",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L7",
+     "unit": "وحدة إضافية 1",
+     "holders": 0,
+     "inheritedFrom": null,
+     "skipped": true
+    },
+    {
+     "key": "O:operations",
+     "kind": "UNIT_OPERATIONS",
+     "label": "اعتماد عمليات الوحدة",
+     "unit": null,
+     "holders": 1
+    },
+    {
+     "key": "F:final",
+     "kind": "FINAL",
+     "label": "الاعتماد النهائي",
+     "unit": null,
+     "holders": 0
+    }
+   ],
+   "complete": true,
+   "problems": []
+  },
+  "m10-3-final-L4-equal": {
+   "fyiHolders": 1,
+   "activators": 1,
+   "stages": [
+    {
+     "key": "H:91f7e3f1-4b67-4df1-9fb5-01b9bb4b69a3",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L9",
+     "unit": "وحدة إضافية 1 · م9-1",
+     "holders": 1,
+     "inheritedFrom": "وحدة إضافية 1 · م8-3",
+     "skipped": false
+    },
+    {
+     "key": "H:a4a7d040-7291-46ad-ba55-a2cb9223faed",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L8",
+     "unit": "وحدة إضافية 1 · م8-3",
+     "holders": 1,
+     "inheritedFrom": null,
+     "skipped": false
+    },
+    {
+     "key": "H:e053e7e2-936f-4ce7-8d54-f786d5b9bc6a",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L7",
+     "unit": "وحدة إضافية 1",
+     "holders": 0,
+     "inheritedFrom": null,
+     "skipped": true
+    },
+    {
+     "key": "O:operations",
+     "kind": "UNIT_OPERATIONS",
+     "label": "اعتماد عمليات الوحدة",
+     "unit": null,
+     "holders": 1
+    },
+    {
+     "key": "F:final",
+     "kind": "FINAL",
+     "label": "الاعتماد النهائي",
+     "unit": null,
+     "holders": 2
+    }
+   ],
+   "complete": true,
+   "problems": []
+  },
+  "m10-3-final-L4-levels": {
+   "fyiHolders": 1,
+   "activators": 1,
+   "stages": [
+    {
+     "key": "H:91f7e3f1-4b67-4df1-9fb5-01b9bb4b69a3",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L9",
+     "unit": "وحدة إضافية 1 · م9-1",
+     "holders": 1,
+     "inheritedFrom": "وحدة إضافية 1 · م8-3",
+     "skipped": false
+    },
+    {
+     "key": "H:a4a7d040-7291-46ad-ba55-a2cb9223faed",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L8",
+     "unit": "وحدة إضافية 1 · م8-3",
+     "holders": 1,
+     "inheritedFrom": null,
+     "skipped": false
+    },
+    {
+     "key": "H:e053e7e2-936f-4ce7-8d54-f786d5b9bc6a",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L7",
+     "unit": "وحدة إضافية 1",
+     "holders": 0,
+     "inheritedFrom": null,
+     "skipped": true
+    },
+    {
+     "key": "O:operations",
+     "kind": "UNIT_OPERATIONS",
+     "label": "اعتماد عمليات الوحدة",
+     "unit": null,
+     "holders": 1
+    },
+    {
+     "key": "F:final",
+     "kind": "FINAL",
+     "label": "الاعتماد النهائي",
+     "unit": null,
+     "holders": 1
+    }
+   ],
+   "complete": true,
+   "problems": []
+  },
+  "m10-1-final-L4-nearest-unit": {
+   "fyiHolders": 1,
+   "activators": 1,
+   "stages": [
+    {
+     "key": "H:847864c2-b73e-4614-be13-62f73327ea9f",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L9",
+     "unit": "وحدة إضافية 1 · م9-3",
+     "holders": 1,
+     "inheritedFrom": null,
+     "skipped": false
+    },
+    {
+     "key": "H:582e4058-e632-46ec-a668-6dc048085eb4",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L8",
+     "unit": "وحدة إضافية 1 · م8-5",
+     "holders": 0,
+     "inheritedFrom": null,
+     "skipped": true
+    },
+    {
+     "key": "H:e053e7e2-936f-4ce7-8d54-f786d5b9bc6a",
+     "kind": "HIERARCHY",
+     "label": "اعتماد المستوى L7",
+     "unit": "وحدة إضافية 1",
+     "holders": 0,
+     "inheritedFrom": null,
+     "skipped": true
+    },
+    {
+     "key": "O:operations",
+     "kind": "UNIT_OPERATIONS",
+     "label": "اعتماد عمليات الوحدة",
+     "unit": null,
+     "holders": 1
+    },
+    {
+     "key": "F:final",
+     "kind": "FINAL",
+     "label": "الاعتماد النهائي",
+     "unit": null,
+     "holders": 1
+    }
+   ],
+   "complete": true,
+   "problems": []
+  }
+ },
+ "request": {
+  "id": "9b930307-bf57-4a6d-8f9b-bbaa8a744e06",
+  "number": "RS-2026-0003"
+ },
+ "routeAtSubmit": "HIERARCHY:وحدة إضافية 1 · م9-1:OPEN:- → HIERARCHY:وحدة إضافية 1 · م8-3:OPEN:- → HIERARCHY:وحدة إضافية 1:SKIPPED:- → UNIT_OPERATIONS:-:OPEN:- → FINAL:-:OPEN:-",
+ "inheritedPage": "مسار الاعتماد إخفاء التفاصيل ✓ مقدم الطلب الجهة: وحدة إضافية 1 · م10-3 مستخدم قبول 01 ● اعتماد المستوى L9 الجهة: وحدة إضافية 1 · م9-1 المرحلة الحالية اعتماد المستوى L8 الجهة: وحدة إضافية 1 · م8-3 ⤼ اعتماد المستوى L7 الجهة: وحدة إضافية 1 تم التجاوز — لا يوجد معتمد للسلسلة الهرمية اعتماد عمليات الوحدة الاعتماد النهائي التفعيل إجراء مستقل اعتماد المستوى L9 الجهة: وحدة إضافية 1 · م9-1 يستوفي: اعتماد هرمي المرحلة الحالية اعتماد المستوى L8 الجهة: وحدة إضافية 1 · م8-3 يستوفي: اعتماد هرمي اعتماد المستوى",
+ "afterHierarchy": "HIERARCHY:وحدة إضافية 1 · م9-1:APPROVED:full26.u02 → HIERARCHY:وحدة إضافية 1 · م8-3:APPROVED:full26.u02 → HIERARCHY:وحدة إضافية 1:SKIPPED:- → UNIT_OPERATIONS:-:OPEN:- → FINAL:-:OPEN:-",
+ "l3Page": "الطلب الوحدات التابعة المواقع المرتبطة ACCEPTANCE ONLY — تمركز أولي لـ م10-3 في معسكر القبول الكامل 01 (اختبار المعتمد الموروث) الوحدات وحدة إضافية 1 · م10-3 الموقع الحالي — الموقع المطلوب معسكر القبول الكامل 01 النفاذ عند التفعيل المستقل نسخة السياسة 1 مقدم الطلب مستخدم قبول 01 الأختام طباعة سجل الاعتماد Level 2-4 وحدة إضافية 1 اعتماد عمليات الوحدة مستخدم قبول 03 معتمد عمليات الوحدة RS-2026-0003 ١٦‏/١١‏/٢٠٢٦ ١٣:٤٤ ختم عمليات الوحدة الختم إثبات مرئي للاعتماد المسجل في سجل الإجراءات، وليس توقيعاً إلكترونياً. الفحوص نسخة السياسة 1 كل الفحوص مستوفاة منطقة الانتشار الرئيسية غير موضوعة المسافة من مركز موقع التمركز — نطاق السياسة 5–8 كم الحد الأقصى الفعلي 8 كم منطقة الانتشار البديلة غير موضوعة المسافة من مركز منطقة الانتشار الرئيسية — نطاق السياسة 3–5 كم الحد الأقصى الفعلي 5 كم دورة حياة الطلب طلب إلغاء قبل التفعيل تفاصيل الموقع تفاصيل الوحدة RS-2026-0003 طلب تمركز أولي — وحدة إضافية 1 · م10-3 قيد الاعتماد الحدود والمناطق الشوارع طبيعة الأرض © OpenStreetMap contributors (ODbL) · Protomaps — أسماء الطرق من OpenStreetMap وليست أسماء رسمية أسماء الطرق من OpenStreetMap وليست أسماء رسمية مفتاح الخريطة موقع مسجّل (للمرجع فقط) الموقع الحالي موقع إعادة التمركز أرض مشغولة (وحدات أخرى) منطقة الانتشار الرئيسية منطقة الانتشار البديلة مسافة الانتشار من مركز إلى مركز (مع النطاق المسموح) الانتقال إلى موقع إعادة التمركز (المسافة للعلم — لا قيد) مسار الاعتماد إخفاء التفاصيل ✓ مقدم الطلب الجهة: وحدة إضافية 1 · م10-3 مستخدم قبول 01 ✓ اعتماد المستوى L9 الجهة: وحدة إضافية 1 · م9-1 قرره مستخدم قبول 02 16 نوفمبر 2026 ✓ اعتماد المستوى L8 الجهة: وحدة إضافية 1 · م8-3 قرره مستخدم قبول 02 16 نوفمبر 2026 ⤼ اعتماد المستوى L7 الجهة: وحدة إضافية 1 تم التجاوز — لا يوجد معتمد للسلسلة الهرمية ✓ اعتماد عمليات الوحدة قرره مستخدم قبول 03 16 نوفمبر 2026 ● الاعتماد النهائي المرحلة الحالية التفعيل إجراء مستقل اعتماد المستوى L9 الجهة: وحدة إضافية 1 · م9-1 يستوفي: اعتماد هرمي اعتمدها مستخدم قبول 02 · 16 نوفمبر 2026 اعتماد المستوى L8 الجهة: وحدة إضافية 1 · م8-3 يستوفي: اعتماد هرمي اعتمدها مستخدم قبول 02 · 16 نوفمبر 2026 اعتماد المستوى L7 الجهة: وحدة إضافية 1 يستوفي: اعتماد هرمي تم التجاوز — لا يوجد معتمد للسلسلة الهرمية اعتماد عمليات الوحدة يقررها صاحب «اعتماد عمليات الوحدة» يستوفي: اعتماد عمليات الوحدة اعتمدها مستخدم قبول 03 · 16 نوفمبر 2026 الاعتماد النهائي يقررها صاحب «الاعتماد النهائي» يستوفي: الاعتماد النهائي المرحلة الحالية الإرسالات (1) ربط الوحدات بالمواقع التمركز الحالي وارتباطات المواقع إعادة التمركز عبر الخريطة الطلبات، وطلب جديد الحدود والمناطق الموقع ومنطقتا الانتشار على الخريطة مسار الاعتماد المراحل والسجل الكامل الطلبات 2 ＋ طلب جديد الكل قيد الاعتماد مسودات مفعّلة RS-2026-0003 طلب تمركز أولي قيد الاعتماد وحدة إضافية 1 · م10-3 · دائم · 1 وحدة المرحلة الحالية: الاعتماد النهائي مستخدم قبول 01 (أنت) · 16 نوفمبر 2026 RS-2026-0001 طلب تمركز أولي مفعّل — دائم وحدة إضافية 1 · م10-1 · دائم · 1 وحدة مستخدم قبول 01 (أنت) · 16 نوفمبر 2026",
+ "l4equal": {
+  "holders": 2,
+  "A": true,
+  "B": true
+ },
+ "l4levels": {
+  "holders": 1,
+  "A": false,
+  "B": true,
+  "m10_1_holders": 1
+ },
+ "final": {
+  "state": "APPROVED_NOT_ACTIVATED",
+  "route": "HIERARCHY:وحدة إضافية 1 · م9-1:APPROVED:full26.u02 → HIERARCHY:وحدة إضافية 1 · م8-3:APPROVED:full26.u02 → HIERARCHY:وحدة إضافية 1:SKIPPED:- → UNIT_OPERATIONS:-:APPROVED:full26.u03 → FINAL:-:APPROVED:full26.u05"
+ }
+}

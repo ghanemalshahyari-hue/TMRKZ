@@ -29,7 +29,8 @@ export function OrgSymbol({ orgId, size = 22, withText = false }: { orgId: strin
   if (s.state === 'loading') return <span className="unit-symbol" style={{ width: size, height: size }} aria-hidden="true" />;
   if (s.state === 'none')
     return (
-      <span className="unit-symbol generic" style={{ width: size, height: size }} title="لم يحدد رمز الوحدة">
+      // with its words the mark grows to fit them (owner, 16 Nov 2026: the words wrapped one per line in a box as wide as the mark)
+      <span className="unit-symbol generic" style={withText ? { minHeight: size } : { width: size, height: size }} title="لم يحدد رمز الوحدة">
         <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
           <rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" strokeDasharray="3 2" />
           <path d="M8 12h8" stroke="currentColor" strokeWidth="1.6" />

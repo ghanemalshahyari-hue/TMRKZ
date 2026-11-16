@@ -10,7 +10,7 @@ import { centre } from './requestMap';
  * - the distance between the current site and the proposed re-stationing site is information, never a rule.
  */
 
-export type StripStatus = 'done' | 'carried' | 'current' | 'upcoming' | 'rejected' | 'returned';
+export type StripStatus = 'done' | 'carried' | 'skipped' | 'current' | 'upcoming' | 'rejected' | 'returned';
 export type StripNode = {
   key: string;
   label: string;
@@ -48,7 +48,7 @@ export function routeStrip(r: RestationingRequest, checks: RestationingChecks | 
   if (!expected) {
     let rejectedPlaced = false;
     for (const s of r.route) {
-      let status: StripStatus = s.mark === 'APPROVED' ? 'done' : s.mark === 'CARRIED' ? 'carried' : s.current ? 'current' : 'upcoming';
+      let status: StripStatus = s.mark === 'APPROVED' ? 'done' : s.mark === 'CARRIED' ? 'carried' : s.mark === 'SKIPPED' ? 'skipped' : s.current ? 'current' : 'upcoming';
       if (r.state === 'REJECTED' && !s.mark && !rejectedPlaced) {
         status = 'rejected';
         rejectedPlaced = true;
@@ -60,7 +60,7 @@ export function routeStrip(r: RestationingRequest, checks: RestationingChecks | 
         person: s.decidedBy?.name ?? null,
         at: s.decidedAt,
         status,
-        note: s.kind === 'EXCEPTION' ? 'استثناء مسافة الانتشار' : s.kind === 'CROSS_BRANCH' ? 'جهة من فرع آخر' : s.mark === 'CARRIED' ? 'محمول من قرار سابق' : null,
+        note: s.mark === 'SKIPPED' ? 'تم التجاوز — ' + (s.skipReason ?? 'لا يوجد معتمد للسلسلة الهرمية') : s.kind === 'EXCEPTION' ? 'استثناء مسافة الانتشار' : s.kind === 'CROSS_BRANCH' ? 'جهة من فرع آخر' : s.mark === 'CARRIED' ? 'محمول من قرار سابق' : null,
         final: s.final,
       });
     }

@@ -53,7 +53,7 @@ abstract class RestationingTestBase extends IntegrationTest {
         sSec = siteWithBoundary("SSEC", lat0, lng0, sec);
         sOther = siteWithBoundary("SOTH", lat0, lng0 + 0.02, other);
         person("req", role("RSREQ", "ORGANIZATION", "CREATE_RESTATIONING", "VIEW"), sec);
-        String seat = role("RSSEAT", "ORGANIZATION", "APPROVE", "VIEW");
+        String seat = role("RSSEAT", "ORGANIZATION", "APPROVE_HIERARCHY", "VIEW");
         person("apSec", seat, sec);
         person("apDept", seat, dept);
         person("apTop", seat, top);

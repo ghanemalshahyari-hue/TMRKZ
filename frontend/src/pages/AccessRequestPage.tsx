@@ -1,5 +1,9 @@
-import { useEffect, useState } from 'react';
-import { api, type AccessMine, type AccessScope, type OverviewItem } from '../api/client';
+import { useEffect, useMemo, useState } from 'react';
+import { api, type AccessMine, type AccessScope, type OverviewItem, type ScopeMode } from '../api/client';
+import { SCOPE_MODES, scopesFor } from '../lib/accessScopes';
+import { identityCard, UNIT_NOT_CONFIGURED } from '../lib/identityCard';
+import { flatSource, withParents } from '../components/tree/tree';
+import { UnitTree } from '../components/tree/UnitTree';
 import { MyPermits } from '../components/access/AccessAdmin';
 import { Heading } from '../components/ui';
 import { useApp } from '../lib/app';
@@ -33,23 +37,46 @@ export const ROLE_MEANING: Record<string, string> = {
 const STATUS: Record<string, string> = { SUBMITTED: 'قيد المراجعة', APPROVED: 'فُعّلت', REJECTED: 'رُفض', RETURNED: 'أُعيد' };
 
 /** The scope choices (ADR-045). The whole system is never offered here: it is not a default, and it cannot be asked for. */
-export function ScopeChoice({ scope, setScope, units, sites }: { scope: AccessScope; setScope: (s: AccessScope) => void; units: { id: string; name: string; depth?: number }[]; sites: { id: string; name: string }[] }) {
+export function ScopeChoice({ scope, setScope, units, sites, allowed }: { scope: AccessScope; setScope: (s: AccessScope) => void; units: { id: string; name: string; depth?: number }[]; sites: { id: string; name: string }[]; allowed?: ScopeMode[] }) {
   const toggle = (id: string) => setScope({ ...scope, ids: scope.ids.includes(id) ? scope.ids.filter((x) => x !== id) : [...scope.ids, id] });
+  // the one units tree of the application (owner, 16 Nov 2026)
+  const tree = useMemo(() => flatSource(withParents(units)), [units]);
+  const ticked = useMemo(() => new Set(scope.ids), [scope.ids]);
   return (
     <fieldset className="access-scope" data-testid="access-scope">
       <legend>النطاق</legend>
-      {([['UNIT', 'وحدتي فقط'], ['UNIT_TREE', 'وحدتي والوحدات التابعة'], ['UNITS', 'وحدات محددة'], ['SITES', 'مواقع محددة']] as const).map(([m, label]) => (
+      {SCOPE_MODES.filter(([m]) => !allowed || allowed.includes(m)).map(([m, label]) => (
         <label key={m} className="check-label" style={{ marginInlineEnd: 12 }}>
           <input type="radio" name="scope" data-scope={m} checked={scope.mode === m} disabled={m === 'SITES' && !sites.length} onChange={() => setScope({ mode: m, ids: [] })} /> {label}
         </label>
       ))}
-      {scope.mode === 'UNITS' && units.map((u) => (
-        <label key={u.id} className="check-label" style={{ display: 'block', paddingInlineStart: (u.depth ?? 0) * 12 }}><input type="checkbox" checked={scope.ids.includes(u.id)} onChange={() => toggle(u.id)} /> {u.name}</label>
-      ))}
+      {scope.mode === 'UNITS' && (
+        <UnitTree source={tree} label="الوحدات المطلوبة" searchLabel="بحث في الوحدات" checked={ticked} onCheck={(u) => toggle(u.id)}
+          initialOpen={units.length <= 80 ? units.map((u) => u.id) : []} openSingleRoot />
+      )}
       {scope.mode === 'SITES' && sites.map((u) => (
         <label key={u.id} className="check-label" style={{ display: 'block' }}><input type="checkbox" checked={scope.ids.includes(u.id)} onChange={() => toggle(u.id)} /> {u.name}</label>
       ))}
     </fieldset>
+  );
+}
+
+/**
+ * Who signed in and where their asking stands (owner, 16 Nov 2026: LDAP first login, zero access), from the one employment
+ * context (ADR-068): Oracle while it is in force, the directory before. A unit TMRKZ does not hold is shown as received.
+ */
+function IdentityCard({ who, overall }: { who: NonNullable<AccessMine['identity']>; overall?: AccessMine['overall'] }) {
+  const { rows, notice } = identityCard(who);
+  return (
+    <div className="card padding" data-testid="access-identity" data-source={who.sourceCode} style={{ marginBottom: 12 }}>
+      {overall && <p data-testid="access-overall" data-code={overall.code} style={{ margin: '0 0 8px', fontWeight: 700 }}>{overall.text}</p>}
+      {notice && <p className="error-text" data-testid="access-unit-not-configured" style={{ margin: '0 0 8px' }}>{notice}</p>}
+      <dl className="access-identity">
+        {rows.map(([k, v]) => (
+          <div key={k}><dt className="muted">{k}</dt><dd>{v}</dd></div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
@@ -67,7 +94,8 @@ export function AccessRequestPage() {
   const none = app.me.permissions.length === 0;
   const [fyi, setFyi] = useState<OverviewItem[]>([]);
   const load = () => {
-    api.requestOverview('FYI').then(setFyi).catch(() => setFyi([]));
+    // a person with no permission sees no request «للعلم» (owner, 16 Nov 2026); the server refuses it too
+    if (!none) api.requestOverview('FYI').then(setFyi).catch(() => setFyi([]));
     return api.accessMine().then(setMine).catch((e: Error) => app.toast(e.message));
   };
   useEffect(() => {
@@ -83,6 +111,11 @@ export function AccessRequestPage() {
   const open = mine?.requests.some((r) => r.status === 'SUBMITTED');
   const returned = mine?.requests.find((r) => r.status === 'RETURNED') ?? null;
   const offered = mine?.requestable.filter((r) => !mine.held.includes(r.code)) ?? [];
+  // the scopes the chosen roles allow (set by the system administrator); a choice they no longer allow moves to their default
+  const allowedScopes = useMemo(() => scopesFor(offered.filter((r) => roles.includes(r.code))), [offered, roles]);
+  useEffect(() => {
+    if (allowedScopes.start && !allowedScopes.modes.includes(scope.mode as ScopeMode)) setScope({ mode: allowedScopes.start, ids: [] });
+  }, [allowedScopes, scope.mode]);
   const send = async () => {
     setBusy(true);
     try {
@@ -100,12 +133,13 @@ export function AccessRequestPage() {
   };
   return (
     <section data-testid="access-request">
-      <Heading title="طلب صلاحية" description={none ? 'دخلت البرنامج، ولا توجد لك صلاحيات بعد. اطلب ما يلزم عملك، وتُفعَّل بعد الموافقة.' : 'اطلب صلاحية إضافية يحتاجها عملك.'} />
+      <Heading title="طلب صلاحية" description={none ? 'تم التحقق من هويتك، ولا توجد لك صلاحيات بعد. اطلب ما يلزم عملك، وتُفعَّل بعد الموافقة.' : 'اطلب صلاحية إضافية يحتاجها عملك.'} />
+      {mine?.identity && <IdentityCard who={mine.identity} overall={mine.overall} />}
       <MyPermits />
       {mine && !mine.available && <div className="empty" data-testid="access-unavailable">لم يُفعَّل بعد مسار طلب الصلاحيات؛ راجع مدير النظام.</div>}
       {mine?.available && (
         <div className="card padding">
-          <p><b>وحدتك:</b> {mine.unit ?? 'لا توجد لك وحدة في سجل الموارد البشرية؛ راجع مدير النظام.'}</p>
+          <p><b>وحدتك:</b> {mine.unit ?? (mine.identity?.unitConfigured === false ? UNIT_NOT_CONFIGURED + '؛ لا يُقدَّم طلب الصلاحية حتى تُهيأ.' : 'لا توجد لك وحدة في سجل الموارد البشرية؛ راجع مدير النظام.')}</p>
           {open ? (
             <p className="muted" data-testid="access-open">لديك طلب قيد المراجعة. يمكنك تقديم طلب جديد بعد القرار فيه.</p>
           ) : offered.length === 0 ? (
@@ -113,18 +147,18 @@ export function AccessRequestPage() {
           ) : (
             <>
               {returned && <p className="error-text" data-testid="access-returned">أُعيد طلبك {returned.number} للتعديل{returned.note ? ': ' + returned.note : ''}. عدّله وأرسله مرة أخرى.</p>}
-              <h3 style={{ marginTop: 12 }}>الصلاحيات المطلوبة</h3>
+              <h3 style={{ marginTop: 12 }}>الصلاحيات المتاحة للطلب</h3>
               {offered.map((r) => (
                 <label key={r.code} className="check-label" style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '6px 0' }}>
                   <input type="checkbox" data-role={r.code} checked={roles.includes(r.code)} onChange={(e) => setRoles(e.target.checked ? [...roles, r.code] : roles.filter((x) => x !== r.code))} />
-                  <span><b>{r.name}</b><br /><small className="muted">{ROLE_MEANING[r.code]}</small></span>
+                  <span><b>{r.name}</b><br /><small className="muted">{r.description || ROLE_MEANING[r.code]}</small></span>
                 </label>
               ))}
               <label className="field" style={{ marginTop: 10 }}>
                 <span>لماذا تحتاجها؟</span>
                 <textarea aria-label="سبب الطلب" value={reason} onChange={(e) => setReason(e.target.value)} />
               </label>
-              <ScopeChoice scope={scope} setScope={setScope} units={mine.scopeUnits ?? []} sites={mine.scopeSites ?? []} />
+              <ScopeChoice scope={scope} setScope={setScope} units={mine.scopeUnits ?? []} sites={mine.scopeSites ?? []} allowed={allowedScopes.modes} />
               <button className="button primary" disabled={busy || !roles.length || reason.trim().length < 5 || !mine.unit || (['UNITS', 'SITES'].includes(scope.mode) && !scope.ids.length)} onClick={send}>{returned ? 'إعادة إرسال الطلب' : 'إرسال طلب الصلاحية'}</button>
             </>
           )}

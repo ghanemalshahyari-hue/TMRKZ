@@ -22,13 +22,15 @@ import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
 import ae.mover.common.Db;
 import ae.mover.common.ErrorCode;
+import ae.mover.hr.HrPeopleService;
 import ae.mover.security.OidcProperties;
 
 /**
  * «إضافة مستخدم» to a unit, as in TNQL's access workspace (owner, 11 Nov 2026; ADR-049). The access manager of a unit finds
- * a person in the HR mirror by employee number or User ID, sees the HR card and adds them to the unit's matrix; or, without
- * HR, adds a User ID that the directory will authenticate. Either way the person enters the unit with no role: the row is
- * empty and permissions are ticked afterwards through the existing grant rules. Nothing here grants a right.
+ * a person by employee number or User ID, sees the HR card and adds them to the unit's matrix; or, without HR, adds a User ID
+ * that the directory will authenticate. Either way the person enters the unit with no role: the row is empty and permissions
+ * are ticked afterwards through the existing grant rules. Nothing here grants a right. Since ADR-065 (owner, 16 Nov 2026, as
+ * MOVER) a person not yet in TMRKZ is looked up live in HR and, on saving, that one person is imported ({@link HrPeopleService}).
  *
  * <p>Bounds: the HR search only finds people already inside the manager's directory (a person outside it, unknown or inactive
  * gets the same answer, so the search cannot be used to discover who exists); a User ID already held by an account outside
@@ -48,10 +50,12 @@ public class UnitMemberService {
     private final DirectoryScope directory;
     private final OidcProperties oidc;
     private final ae.mover.access.AccessRights rights;
+    private final HrPeopleService hrPeople;
 
     public UnitMemberService(JdbcClient jdbc, Clock clock, AuditService audit, DirectoryScope directory, OidcProperties oidc,
-                             ae.mover.access.AccessRights rights) {
+                             ae.mover.access.AccessRights rights, HrPeopleService hrPeople) {
         this.rights = rights;
+        this.hrPeople = hrPeople;
         this.jdbc = jdbc;
         this.clock = clock;
         this.audit = audit;
@@ -87,7 +91,9 @@ public class UnitMemberService {
 
     /**
      * The HR card of one person found by exact employee number or User ID (domain account), for the unit being managed. Only a
-     * member of the manager's directory is returned; anyone else is the same «not found».
+     * member of the manager's directory is returned; anyone else is the same «not found». A person not yet in TMRKZ is looked up
+     * live in HR (ADR-065, as MOVER): read-only, nothing is saved, shown only when their HR unit is inside the manager's reach;
+     * the card then has no {@code personId} and {@code importOnSave}, and saving imports that one person.
      */
     public Map<String, Object> lookup(AccessContext ctx, UUID orgId, String key) {
         requireUnit(ctx, orgId);
@@ -105,10 +111,57 @@ public class UnitMemberService {
                   and (lower(p.employee_no) = lower(:k) or (cast(:l as text) is not null and (lower(p.username) = :l or lower(h.domain_account) = :l)))
                 limit 2""")
                 .param("k", k).param("l", login).query(UUID.class).list();
+        if (found.isEmpty()) {
+            return liveCard(ctx, orgId, k, login);
+        }
         if (found.size() != 1 || !directory.members(ctx, found).contains(found.get(0))) {
             throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, NOT_FOUND);
         }
         return card(found.get(0), orgId);
+    }
+
+    /** The one active HR record with this key, live, inside the manager's reach; otherwise the same «not found». Writes nothing. */
+    private HrPeopleService.HrRecord liveRecord(AccessContext ctx, String number, String login) {
+        if (!hrPeople.configured()) {
+            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, NOT_FOUND);
+        }
+        List<HrPeopleService.HrRecord> active = hrPeople.find(number, login).stream().filter(HrPeopleService.HrRecord::active).toList();
+        if (active.size() != 1) {
+            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, NOT_FOUND);
+        }
+        HrPeopleService.HrRecord r = active.get(0);
+        // the manager's directory, as for anyone in TMRKZ: people posted in a unit of their reach (a global manager: anyone)
+        DirectoryScope.Reach reach = directory.reach(ctx);
+        UUID hrUnit = hrUnit(r);
+        if (!reach.global() && (hrUnit == null || !reach.orgs().contains(hrUnit))) {
+            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, NOT_FOUND);
+        }
+        return r;
+    }
+
+    private UUID hrUnit(HrPeopleService.HrRecord r) {
+        return r.unitExternalId() == null ? null : jdbc.sql("select id from organization where source = 'HR' and source_external_id = :x")
+                .param("x", r.unitExternalId()).query(UUID.class).optional().orElse(null);
+    }
+
+    private Map<String, Object> liveCard(AccessContext ctx, UUID orgId, String key, String login) {
+        HrPeopleService.HrRecord r = liveRecord(ctx, key, login);
+        UUID hrUnit = hrUnit(r);
+        String unitName = hrUnit == null ? null : jdbc.sql("select name from organization where id = :o").param("o", hrUnit)
+                .query(String.class).single();
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("personId", null);
+        m.put("employeeNo", r.employeeNumber());
+        m.put("displayName", r.fullName());
+        m.put("userId", r.domainAccount());
+        m.put("positionTitle", r.positionTitle());
+        m.put("jobTitle", r.jobTitle());
+        m.put("hrStatus", r.statusText());
+        m.put("unitName", unitName);
+        m.put("inUnit", false);
+        m.put("acting", unitName != null && !orgId.equals(hrUnit));
+        m.put("importOnSave", true);
+        return m;
     }
 
     private Map<String, Object> card(UUID person, UUID orgId) {
@@ -142,7 +195,8 @@ public class UnitMemberService {
         return m;
     }
 
-    public record AddInput(UUID organizationId, String personId, String userId, String displayName) {
+    /** {@code employeeNo}: an HR person not yet in TMRKZ, from a card with {@code importOnSave} (ADR-065). */
+    public record AddInput(UUID organizationId, String personId, String userId, String displayName, String employeeNo) {
     }
 
     /**
@@ -162,6 +216,7 @@ public class UnitMemberService {
         Instant now = clock.instant();
         UUID person;
         boolean created = false;
+        boolean fromHr = in.personId() != null && !in.personId().isBlank() || in.employeeNo() != null && !in.employeeNo().isBlank();
         if (in.personId() != null && !in.personId().isBlank()) {
             person = UUID.fromString(in.personId());
             boolean hrActive = jdbc.sql("select count(*) from person where id = :p and source = 'HR' and status = 'ACTIVE'")
@@ -169,6 +224,13 @@ public class UnitMemberService {
             if (!hrActive || !directory.members(ctx, Set.of(person)).contains(person)) {
                 throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, NOT_FOUND);
             }
+        } else if (fromHr) {
+            // ADR-065: that one person, re-read live now, is imported with no permission (or refreshed, if already in TMRKZ)
+            HrPeopleService.HrRecord r = liveRecord(ctx, in.employeeNo().trim(), null);
+            UUID known = hrPeople.existing(r.externalId());
+            boolean current = known != null && jdbc.sql("select count(*) from person where id = :p and status = 'ACTIVE'")
+                    .param("p", known).query(Integer.class).single() > 0 && directory.members(ctx, Set.of(known)).contains(known);
+            person = current ? known : hrPeople.importOne(r, ctx.actor(), "UNIT_MEMBER", orgId);
         } else {
             String login = normalLogin(in.userId());
             if (login == null) {
@@ -182,6 +244,10 @@ public class UnitMemberService {
                     left join hr_person h on h.external_id = p.source_external_id
                     where p.source = 'HR' and (lower(p.username) = :l or lower(h.domain_account) = :l)""")
                     .param("l", login).query(Integer.class).single();
+            // HR people are no longer all in TMRKZ (ADR-065): HR itself is asked, so an HR employee is never added as a local User ID
+            if (inHr == 0 && hrPeople.configured() && !hrPeople.find(null, login).isEmpty()) {
+                inHr = 1;
+            }
             if (inHr > 0) {
                 throw ApiException.validation("لهذا المستخدم سجل في الموارد البشرية؛ ابحث عنه بالرقم العسكري أو رقم المستخدم.");
             }
@@ -232,7 +298,7 @@ public class UnitMemberService {
             return Map.of("personId", person.toString(), "created", false, "already", true);
         }
         audit.recordAs(ctx.actor(), "UNIT_MEMBER_ADDED", "PERSON", person.toString(), null,
-                Map.of("organizationId", orgId.toString(), "acting", acting, "withoutHr", in.personId() == null || in.personId().isBlank()), null);
+                Map.of("organizationId", orgId.toString(), "acting", acting, "withoutHr", !fromHr), null);
         return Map.of("personId", person.toString(), "created", created, "already", false);
     }
 

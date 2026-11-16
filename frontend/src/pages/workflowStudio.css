@@ -119,3 +119,5 @@
 .type-topic small { color: var(--muted); }
 .type-after label { display: flex; gap: 8px; align-items: center; }
 
+/* a unit of the climb with no hierarchy approver, own or inherited: skipped and recorded (ADR-062) */
+.fs-route-place.skipped { color: var(--orange); border-inline-start: 2px dashed color-mix(in srgb, var(--orange) 60%, transparent); padding-inline-start: 6px; }

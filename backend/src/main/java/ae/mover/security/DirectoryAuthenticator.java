@@ -74,8 +74,16 @@ public class DirectoryAuthenticator {
         }
     }
 
-    /** The directory entry of a verified person. {@code uuid} is the stable identifier used for the identity link. */
-    public record DirectoryUser(String dn, String uuid, String username, String employeeNumber, String displayName) {
+    /**
+     * The directory entry of a verified person. {@code uuid} is the stable identifier used for the identity link; {@code profile}
+     * what the entry states about the person's employment, from the attributes the installation names (ADR-068).
+     */
+    public record DirectoryUser(String dn, String uuid, String username, String employeeNumber, String displayName,
+                                DirectoryProfile profile) {
+
+        public DirectoryUser(String dn, String uuid, String username, String employeeNumber, String displayName) {
+            this(dn, uuid, username, employeeNumber, displayName, new DirectoryProfile(employeeNumber, null, null, null, null, null, false));
+        }
     }
 
     public boolean configured() {
@@ -117,8 +125,10 @@ public class DirectoryAuthenticator {
             controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
             controls.setCountLimit(2);
             controls.setTimeLimit(props.readTimeoutMs());
-            controls.setReturningAttributes(new String[]{props.uuidAttribute(), props.usernameAttribute(),
-                    props.employeeNumberAttribute(), "displayName", "cn"});
+            java.util.List<String> returning = new java.util.ArrayList<>(java.util.List.of(props.uuidAttribute(), props.usernameAttribute(),
+                    props.employeeNumberAttribute(), "displayName", "cn"));
+            returning.addAll(props.employmentAttributes());
+            controls.setReturningAttributes(returning.stream().distinct().toArray(String[]::new));
             String filter = "(&(objectClass=" + props.userObjectClass() + ")(" + attribute + "={0}))";
             // Active Directory's objectGUID is binary: it is kept as hex text and searched with its bytes.
             Object arg = binaryUuid() && attribute.equalsIgnoreCase(props.uuidAttribute()) ? HexFormat.of().parseHex(value) : value;
@@ -147,9 +157,12 @@ public class DirectoryAuthenticator {
             if (uuid == null) {
                 throw new DirectoryException(Failure.UNAVAILABLE, "directory entry has no stable identifier", null);
             }
-            user = new DirectoryUser(first.getNameInNamespace(), uuid, lower(text(a.get(props.usernameAttribute()))),
-                    text(a.get(props.employeeNumberAttribute())),
-                    text(a.get("displayName")) != null ? text(a.get("displayName")) : text(a.get("cn")));
+            String employeeNumber = text(a.get(props.employeeNumberAttribute()));
+            DirectoryProfile profile = new DirectoryProfile(employeeNumber, optional(a, props.rankAttribute()),
+                    optional(a, props.positionAttribute()), optional(a, props.unitIdAttribute()), optional(a, props.unitNameAttribute()),
+                    optional(a, props.mainUnitIdAttribute()), !props.employmentAttributes().isEmpty());
+            user = new DirectoryUser(first.getNameInNamespace(), uuid, lower(text(a.get(props.usernameAttribute()))), employeeNumber,
+                    text(a.get("displayName")) != null ? text(a.get("displayName")) : text(a.get("cn")), profile);
         } catch (NamingException e) {
             throw translate(e);
         } finally {
@@ -271,6 +284,15 @@ public class DirectoryAuthenticator {
         }
         String s = String.valueOf(v).trim();
         return s.isEmpty() ? null : s;
+    }
+
+    /** An employment attribute the installation names (null: not read). A binary value is never one of them. */
+    private static String optional(Attributes a, String attribute) throws NamingException {
+        if (attribute == null) {
+            return null;
+        }
+        Attribute v = a.get(attribute);
+        return v == null || v.size() == 0 || v.get() instanceof byte[] ? null : text(v);
     }
 
     private static String lower(String s) {

@@ -82,8 +82,12 @@ public class GrantAdminService {
     private final Json json;
     private final AccessRights rightsOf;
 
+    private final org.springframework.beans.factory.ObjectProvider<ae.mover.hr.TaskRealignment> realignment;
+
     public GrantAdminService(JdbcClient jdbc, Clock clock, AccessService access, AuditService audit, GrantSource source,
-                             DirectoryScope directory, PersonKeys keys, Json json, AccessRights rightsOf) {
+                             DirectoryScope directory, PersonKeys keys, Json json, AccessRights rightsOf,
+                             org.springframework.beans.factory.ObjectProvider<ae.mover.hr.TaskRealignment> realignment) {
+        this.realignment = realignment;
         this.rightsOf = rightsOf;
         this.keys = keys;
         this.json = json;
@@ -469,6 +473,10 @@ public class GrantAdminService {
         if (currentEnd != null && !currentEnd.isAfter(end)) {
             throw ApiException.validation("العضوية منتهية بالفعل.");
         }
+        // the holder's rights as they were, so a task assigned to them can move once the grant has ended (SEAT, owner 16 Nov 2026)
+        UUID holder = (UUID) m.get("person_id");
+        Instant now = clock.instant();
+        AccessContext held = end.isAfter(now) ? null : access.load(new ae.mover.security.Actor(holder, null, null, null), now);
         jdbc.sql("update membership set valid_to = :e, ended_reason = :r where id = :id")
                 .param("e", Db.ts(end)).param("r", reason).param("id", id).update();
         int pooled = jdbc.sql("""
@@ -496,7 +504,9 @@ public class GrantAdminService {
             audit.recordAs(ctx.actor(), "TASKS_REALIGNED", "PERSON", m.get("person_id").toString(), null,
                     Map.of("openTasks", pooled, "rule", "المهام مسندة إلى الدور وتبقى لدى شاغليه الحاليين"), reason);
         }
-        return Map.of("id", id.toString(), "validTo", end.toString(), "realignedTasks", pooled);
+        // a task assigned to this person that they may no longer decide goes back to whoever holds the responsibility now
+        int moved = held == null ? 0 : realignment.getObject().realign(Map.of(holder, held), "GRANT_ENDED", now);
+        return Map.of("id", id.toString(), "validTo", end.toString(), "realignedTasks", pooled, "movedTasks", moved);
     }
 
     // ---- list ---------------------------------------------------------------------------------------------------

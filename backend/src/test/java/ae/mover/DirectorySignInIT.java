@@ -86,6 +86,12 @@ class DirectorySignInIT extends IntegrationTest {
         r.add("tmrkz.ldap.bind-credential", () -> "service-secret");
         r.add("tmrkz.ldap.users-dn", () -> BASE);
         r.add("tmrkz.ldap.ca-dir", CA_DIR::toString);
+        // ADR-068: this directory's names for the employment attributes (standard inetOrgPerson attributes, fictional values)
+        r.add("tmrkz.ldap.unit-id-attribute", () -> "departmentNumber");
+        r.add("tmrkz.ldap.unit-name-attribute", () -> "ou");
+        r.add("tmrkz.ldap.main-unit-id-attribute", () -> "businessCategory");
+        r.add("tmrkz.ldap.rank-attribute", () -> "employeeType");
+        r.add("tmrkz.ldap.position-attribute", () -> "title");
     }
 
     UUID org;
@@ -121,6 +127,30 @@ class DirectorySignInIT extends IntegrationTest {
     private void directoryUser(String name, String ou) throws Exception {
         LDAP.add("dn: uid=" + uid(name) + "," + ou, "objectClass: inetOrgPerson", "uid: " + uid(name), "cn: Test " + name,
                 "sn: " + name, "employeeNumber: E-" + uid(name), "userPassword: " + PASSWORD_OK);
+    }
+
+    /** A fictional employee whose entry states their unit (Unit ID and name), main unit, rank and position (ADR-068). */
+    private void employee(String name, String unitId, String unitName, String mainUnitId) throws Exception {
+        LDAP.add(new com.unboundid.ldap.sdk.Entry("uid=" + uid(name) + "," + PEOPLE,
+                new com.unboundid.ldap.sdk.Attribute("objectClass", "inetOrgPerson"), new com.unboundid.ldap.sdk.Attribute("uid", uid(name)),
+                new com.unboundid.ldap.sdk.Attribute("cn", "Test " + name), new com.unboundid.ldap.sdk.Attribute("sn", name),
+                new com.unboundid.ldap.sdk.Attribute("displayName", "موظف " + name),
+                new com.unboundid.ldap.sdk.Attribute("employeeNumber", "E-" + uid(name)),
+                new com.unboundid.ldap.sdk.Attribute("userPassword", PASSWORD_OK),
+                new com.unboundid.ldap.sdk.Attribute("departmentNumber", unitId), new com.unboundid.ldap.sdk.Attribute("ou", unitName),
+                new com.unboundid.ldap.sdk.Attribute("businessCategory", mainUnitId),
+                new com.unboundid.ldap.sdk.Attribute("employeeType", "نقيب"), new com.unboundid.ldap.sdk.Attribute("title", "ضابط عمليات")));
+    }
+
+    /** A unit TMRKZ already holds, carrying its Unit ID (the join with the directory and, later, Oracle). */
+    private UUID unitWithId(String code, UUID parent, String unitId) {
+        UUID id = org(code, parent);
+        jdbc.sql("update organization set source_external_id = :x where id = :id").param("x", unitId).param("id", id).update();
+        return id;
+    }
+
+    private long count(String sql, Object param) {
+        return jdbc.sql(sql).param("p", param).query(Long.class).single();
     }
 
     /** HR person (in the published snapshot) whose domain account is the directory login. */
@@ -254,19 +284,32 @@ class DirectorySignInIT extends IntegrationTest {
         jdbc.sql("update membership set valid_to = now() where role_code = 'SYSTEM_ADMIN' and (valid_to is null or valid_to > now())").update();
         directoryUser("first", PEOPLE);
         jdbc.sql("delete from hr_person").update(); // the HR mirror does not contain the person yet
-        assertThat(signIn(uid("first"), PASSWORD_OK).status()).isEqualTo(403);
+        // Before Oracle is in force (ADR-068) a login nobody registered signs in holding nothing, like anyone the directory knows.
+        Signed before = signIn(uid("first"), PASSWORD_OK);
+        assertThat(before.status()).as(String.valueOf(before.body())).isEqualTo(200);
+        JsonNode plain = JSON.readTree(call(before.cookie(), "GET", "/me", null).body());
+        assertThat(plain.path("permissions").size()).isZero();
+        UUID directoryPerson = UUID.fromString(plain.path("id").asText());
         jdbc.sql("insert into bootstrap_admin(login, expires_at) values (:l, now() + interval '24 hours')").param("l", uid("first")).update();
         Signed boot = signIn(uid("first"), PASSWORD_OK);
         assertThat(boot.status()).as(String.valueOf(boot.body())).isEqualTo(200);
         JsonNode me = JSON.readTree(call(boot.cookie(), "GET", "/me", null).body());
         assertThat(me.path("permissions").toString()).contains("CONFIGURE", "MANAGE_ACCESS").doesNotContain("\"VIEW\"");
         UUID bootPerson = UUID.fromString(me.path("id").asText());
+        assertThat(bootPerson).isNotEqualTo(directoryPerson);
         assertThat(jdbc.sql("select valid_to - valid_from from membership where person_id = :p").param("p", bootPerson).query(String.class).single())
                 .isEqualTo("3 days");
-        // The request is single use and is refused while an administrator exists.
+        // the identity moved to the temporary administrator; the record the first sign-in made holds nothing and links nobody
+        assertThat(count("select count(*) from identity_link where person_id = :p", directoryPerson)).isZero();
+        assertThat(count("select count(*) from membership where person_id = :p", directoryPerson)).isZero();
+        // The request is single use and is refused while an administrator exists: that login holds nothing.
         jdbc.sql("insert into bootstrap_admin(login, expires_at) values (:l, now() + interval '24 hours')").param("l", uid("second")).update();
         directoryUser("second", PEOPLE);
-        assertThat(signIn(uid("second"), PASSWORD_OK).status()).isEqualTo(403);
+        Signed second = signIn(uid("second"), PASSWORD_OK);
+        assertThat(second.status()).isEqualTo(200);
+        assertThat(JSON.readTree(call(second.cookie(), "GET", "/me", null).body()).path("permissions").size()).isZero();
+        assertThat(jdbc.sql("select used_at is null from bootstrap_admin where login = :l").param("l", uid("second")).query(Boolean.class).single())
+                .isTrue();
 
         // The HR mirror now has the person: the next sign-in moves to the HR record and ends the temporary grant.
         UUID hr = hrPerson("first");
@@ -275,5 +318,134 @@ class DirectorySignInIT extends IntegrationTest {
         assertThat(jdbc.sql("select status from person where id = :p").param("p", bootPerson).query(String.class).single()).isEqualTo("DISABLED");
         assertThat(jdbc.sql("select count(*) from audit_event where action = 'BOOTSTRAP_ADMIN_REPLACED' and entity_id = :p").param("p", hr.toString())
                 .query(Long.class).single()).isEqualTo(1);
+    }
+
+    // ---- LDAP first login before Oracle (ADR-068; LDAP specification §1-8, §41) -------------------------------------
+
+    @Test
+    @DisplayName("AUTH-01, SOURCE-01: before Oracle, a directory user nobody added signs in as a zero-access person placed by the directory's Unit ID")
+    void firstSignInBeforeOracle() throws Exception {
+        UUID main = unitWithId("MAIN", null, "M-" + sfx);
+        unitWithId("UNIT", main, "U-" + sfx);
+        employee("new1", "U-" + sfx, "اسم الوحدة كما في الدليل", "M-" + sfx);
+        assertThat(count("select count(*) from person where lower(username) = :p", uid("new1"))).as("nobody added them").isZero();
+
+        Signed s = signIn(uid("new1"), PASSWORD_OK);
+        assertThat(s.status()).as(String.valueOf(s.body())).isEqualTo(200);
+        JsonNode me = JSON.readTree(call(s.cookie(), "GET", "/me", null).body());
+        UUID person = UUID.fromString(me.path("id").asText());
+        assertThat(me.path("permissions").size()).as("authentication is not authorization").isZero();
+        assertThat(me.path("grants").size()).isZero();
+        Map<String, Object> p = jdbc.sql("select source, employee_no, username, display_name, password_hash from person where id = :p")
+                .param("p", person).query().singleRow();
+        assertThat(p).containsEntry("source", "LOCAL").containsEntry("employee_no", "E-" + uid("new1"))
+                .containsEntry("username", uid("new1")).containsEntry("display_name", "موظف new1");
+        assertThat(p.get("password_hash")).as("no local usable password").isNull();
+        assertThat(jdbc.sql("select method from identity_link where person_id = :p").param("p", person).query(String.class).single())
+                .isEqualTo("DIRECTORY");
+        assertThat(count("select count(*) from membership where person_id = :p", person)).as("no grant").isZero();
+        assertThat(count("select count(*) from unit_member where person_id = :p", person)).as("no unit entry").isZero();
+        assertThat(count("select count(*) from affiliation where person_id = :p", person)).isZero();
+        assertThat(count("select count(*) from audit_event where action = 'IDENTITY_PROVISIONED_FROM_DIRECTORY' and entity_id = :p",
+                person.toString())).isEqualTo(1);
+        // what the directory stated is kept — never a password
+        Map<String, Object> d = jdbc.sql("select * from person_directory_profile where person_id = :p").param("p", person).query().singleRow();
+        assertThat(d).containsEntry("unit_external_id", "U-" + sfx).containsEntry("unit_name", "اسم الوحدة كما في الدليل")
+                .containsEntry("main_unit_external_id", "M-" + sfx).containsEntry("rank", "نقيب").containsEntry("position", "ضابط عمليات");
+        assertThat(d.toString()).doesNotContain(PASSWORD_OK);
+
+        // the identity card: the unit joined by its Unit ID (TMRKZ's unit, not the directory's text), its main unit, source LDAP
+        JsonNode mine = JSON.readTree(call(s.cookie(), "GET", "/access-requests/mine", null).body());
+        JsonNode who = mine.path("identity");
+        assertThat(who.path("sourceCode").asText()).isEqualTo("LDAP");
+        assertThat(who.path("unit").asText()).isEqualTo("جهة UNIT");
+        assertThat(who.path("mainUnit").asText()).isEqualTo("جهة MAIN");
+        assertThat(who.path("unitConfigured").asBoolean()).isTrue();
+        assertThat(who.path("rank").asText()).isEqualTo("نقيب");
+        assertThat(who.path("position").asText()).isEqualTo("ضابط عمليات");
+        assertThat(who.path("employeeNo").asText()).isEqualTo("E-" + uid("new1"));
+        assertThat(who.path("name").asText()).isEqualTo("موظف new1");
+        assertThat(mine.path("unit").asText()).isEqualTo("جهة UNIT");
+        assertThat(mine.path("overall").path("text").asText()).isEqualTo("لم تقدم طلب صلاحية");
+
+        // the next sign-in is the same person: no second record, no second audit
+        Signed again = signIn(uid("new1"), PASSWORD_OK);
+        assertThat(JSON.readTree(call(again.cookie(), "GET", "/me", null).body()).path("id").asText()).isEqualTo(person.toString());
+        assertThat(count("select count(*) from person where lower(username) = :p", uid("new1"))).isEqualTo(1);
+        assertThat(count("select count(*) from audit_event where action = 'IDENTITY_PROVISIONED_FROM_DIRECTORY' and entity_id = :p",
+                person.toString())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("AUTH-02: a Unit ID TMRKZ does not hold signs the person in with nothing; no unit is created; the request waits for the unit")
+    void unknownUnit() throws Exception {
+        String unknown = "U-NONE-" + sfx;
+        employee("new2", unknown, "وحدة غير مهيأة " + sfx, "M-NONE-" + sfx);
+        long units = jdbc.sql("select count(*) from organization").query(Long.class).single();
+        Signed s = signIn(uid("new2"), PASSWORD_OK);
+        assertThat(s.status()).as(String.valueOf(s.body())).isEqualTo(200);
+        assertThat(jdbc.sql("select count(*) from organization").query(Long.class).single()).as("the directory never creates a unit").isEqualTo(units);
+        assertThat(count("select count(*) from organization where source_external_id = :p", unknown)).isZero();
+        assertThat(count("select count(*) from organization where name = :p", "وحدة غير مهيأة " + sfx)).isZero();
+        assertThat(JSON.readTree(call(s.cookie(), "GET", "/me", null).body()).path("permissions").size()).isZero();
+
+        JsonNode mine = JSON.readTree(call(s.cookie(), "GET", "/access-requests/mine", null).body());
+        JsonNode who = mine.path("identity");
+        assertThat(who.path("unitConfigured").asBoolean()).isFalse();
+        assertThat(who.path("statedUnitId").asText()).isEqualTo(unknown);
+        assertThat(who.path("statedUnitName").asText()).isEqualTo("وحدة غير مهيأة " + sfx);
+        assertThat(who.path("unit").isNull()).isTrue();
+        assertThat(mine.path("unit").isNull()).isTrue();
+
+        // the access request is refused until the unit exists in TMRKZ's tree
+        jdbc.sql("update request_type set active = false where kind = 'ACCESS'").update();
+        String type = requestType("ACCESS", finalOnly(), null);
+        try {
+            HttpResponse<String> refused = call(s.cookie(), "POST", "/access-requests",
+                    Map.of("roles", List.of("REQUESTER"), "reason", "أحتاج صلاحية لعملي في الوحدة"));
+            assertThat(refused.statusCode()).as(refused.body()).isEqualTo(400);
+            JsonNode body = JSON.readTree(refused.body());
+            assertThat(body.path("details").path("reason").asText()).isEqualTo("UNIT_NOT_CONFIGURED");
+            assertThat(body.path("message").asText()).contains("تم التحقق من هويتك، لكن وحدتك التنظيمية غير مهيأة في النظام");
+            assertThat(count("select count(*) from access_request where person_id = :p",
+                    UUID.fromString(JSON.readTree(call(s.cookie(), "GET", "/me", null).body()).path("id").asText()))).isZero();
+
+            // an administrator registers the unit under that Unit ID: what the directory stated now resolves, by ID only
+            unitWithId("LATE", null, unknown);
+            JsonNode now = JSON.readTree(call(s.cookie(), "GET", "/access-requests/mine", null).body());
+            assertThat(now.path("identity").path("unitConfigured").asBoolean()).isTrue();
+            assertThat(now.path("identity").path("unit").asText()).isEqualTo("جهة LATE");
+            assertThat(now.path("identity").path("statedUnitId").isNull()).isTrue();
+        } finally {
+            jdbc.sql("update request_type set active = false where code = :c").param("c", type).update();
+        }
+    }
+
+    @Test
+    @DisplayName("AUTH-03, AUTH-04: a zero-access person reaches no application API; being placed in a unit (even one holding a unit grant) gives nothing")
+    void zeroAccessReachesNothing() throws Exception {
+        UUID unit = unitWithId("ZA", null, "Z-" + sfx);
+        UUID granter = person("granter", "SYSTEM_ADMIN", unit);
+        // «موروثة من الوحدة» reaches only the users added to the unit (ADR-066), never someone the directory places there
+        jdbc.sql("insert into unit_grant(id, organization_id, role_code, valid_from, granted_by) values (:id, :o, 'REQUESTER', now(), :by)")
+                .param("id", UUID.randomUUID()).param("o", unit).param("by", granter).update();
+        employee("new3", "Z-" + sfx, "وحدة", "Z-" + sfx);
+        Signed s = signIn(uid("new3"), PASSWORD_OK);
+        assertThat(s.status()).as(String.valueOf(s.body())).isEqualTo(200);
+        JsonNode me = JSON.readTree(call(s.cookie(), "GET", "/me", null).body());
+        assertThat(me.path("permissions").size()).isZero();
+        assertThat(me.path("grants").size()).isZero();
+        assertThat(JSON.readTree(call(s.cookie(), "GET", "/access-requests/mine", null).body()).path("identity").path("unit").asText())
+                .as("placed in the unit, for structure only").isEqualTo("جهة ZA");
+        for (String path : List.of("/sites", "/requests", "/tasks", "/hr/status", "/identity-issues", "/stationing/current", "/organizations")) {
+            HttpResponse<String> r = call(s.cookie(), "GET", path, null);
+            assertThat(r.statusCode()).as(path).isEqualTo(403);
+            assertThat(JSON.readTree(r.body()).path("code").asText()).as(path).isEqualTo("NO_EFFECTIVE_ACCESS");
+        }
+        assertThat(call(s.cookie(), "POST", "/sites", Map.of("name", "موقع")).statusCode()).isEqualTo(403);
+        // only who they are, the access-request page and signing out
+        assertThat(call(s.cookie(), "GET", "/access-requests/mine", null).statusCode()).isEqualTo(200);
+        assertThat(call(s.cookie(), "GET", "/me", null).statusCode()).isEqualTo(200);
+        assertThat(call(s.cookie(), "POST", "/auth/logout", Map.of()).statusCode()).isEqualTo(200);
     }
 }

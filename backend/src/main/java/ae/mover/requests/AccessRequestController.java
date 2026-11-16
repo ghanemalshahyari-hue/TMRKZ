@@ -49,8 +49,8 @@ public class AccessRequestController {
     }
 
     @PutMapping("/offer")
-    public List<Map<String, Object>> saveOffer(Actor actor, @RequestBody Map<String, String> audiences) {
-        return requests.saveOffer(access.context(actor), audiences);
+    public List<Map<String, Object>> saveOffer(Actor actor, @RequestBody Map<String, Object> offer) {
+        return requests.saveOffer(access.context(actor), offer);
     }
 
     @GetMapping("/inbox")

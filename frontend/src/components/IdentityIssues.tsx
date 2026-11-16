@@ -11,6 +11,8 @@ const REASON: Record<IdentityIssue['reason'], string> = {
   INACTIVE: 'السجل غير نشط',
   STALE_SOURCE: 'بيانات الموارد البشرية غير محدثة',
   ALREADY_LINKED: 'السجل مرتبط بحساب آخر',
+  SOURCE_UNAVAILABLE: 'تعذر سؤال الموارد البشرية وقت الدخول',
+  DIRECTORY_CONFLICT: 'اسم الدخول أو الرقم مسجل لسجل آخر في تمركز',
 };
 
 /**

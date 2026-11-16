@@ -1,53 +1,12 @@
 import { useState } from 'react';
 import { api, newIdempotencyKey, urls } from '../api/client';
-import type { ApprovalVerification, DecisionKind, ExecutionTask, MyTask, RequestDetail, StageView } from '../api/types';
+import type { ApprovalVerification, DecisionKind, ExecutionTask, MyTask, RequestDetail } from '../api/types';
 import { useApp } from '../lib/app';
 import { fullDate, fullTime } from '../lib/dates';
-import { RESERVATION_STATUS, SIGNATURE_DISCLAIMER, TASK_STATE } from '../lib/labels';
+import { RESERVATION_STATUS, SIGNATURE_DISCLAIMER } from '../lib/labels';
 import { ClosureForm, CommunicationLog, RecordSummary, RelocationBlock, RevisionChangesBlock } from './RequestRecord';
 import { StatusPill } from './ui';
-
-function stageModeLabel(s: StageView): string {
-  if (s.mode === 'ANY') return 'تكفي موافقة واحدة';
-  return s.tasks.length > 1 ? 'مراجعات متوازية — يلزم الجميع' : 'مراجعة متسلسلة';
-}
-
-function Timeline({ stages }: { stages: StageView[] }) {
-  if (!stages.length) return <p className="micro muted">تظهر مراحل المراجعة بعد تقديم الطلب.</p>;
-  return (
-    <div className="timeline">
-      {stages.map((s, i) => {
-        const complete = s.state === 'COMPLETE' || s.state === 'CARRIED';
-        const active = s.state === 'ACTIVE';
-        return (
-          <div key={s.key} className={'timeline-item ' + (complete ? 'complete' : active ? 'active' : '')}>
-            <i>{complete ? '✓' : s.state === 'SKIPPED' ? '—' : i + 1}</i>
-            <div>
-              <b>{s.name}</b>
-              <br />
-              <small>
-                {stageModeLabel(s)} · {s.slaDays} يوم
-                {s.state === 'SKIPPED' ? ' · لم تنطبق شروط المرحلة' : s.state === 'CARRIED' ? ' · موافقة سابقة محفوظة وفق سياسة التعديل' : ''}
-              </small>
-              <div className="task-chips">
-                {s.tasks.map((t) => {
-                  const done = t.state === 'APPROVED';
-                  return (
-                    <span key={t.id ?? s.key + t.roleName} className={'task-chip ' + (done ? 'done' : '')} title={t.decidedBy ? t.decidedBy + ' · ' + fullTime(t.decidedAt) : TASK_STATE[t.state]}>
-                      {t.roleName}
-                      {t.orgName ? ' · ' + t.orgName : ''}
-                      {done ? ' ✓' : t.state !== 'OPEN' && TASK_STATE[t.state] ? ' · ' + TASK_STATE[t.state] : ''}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+import { Timeline } from './RouteTimeline';
 
 function ExecutionList({ request, tasks, onChanged }: { request: RequestDetail; tasks: ExecutionTask[]; onChanged: (r?: RequestDetail) => void }) {
   const { toast } = useApp();

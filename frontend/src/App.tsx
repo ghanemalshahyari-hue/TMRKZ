@@ -252,10 +252,9 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
   };
   // signing in is not a permission: a person with none has only the page to ask (ADR-044)
   const noAccess = me.permissions.length === 0;
-  // one request sent «للعلم» opens by its address even with no permission at all; the server decides whether it is this person's
-  const fyiAddress = /^#restationing\/[0-9a-f-]{36}$/.test(location.hash);
-  // «مركز الدعم» stays open to someone with no permission yet: they are the ones who most need help
-  const shownView: View = noAccess && !fyiAddress && view !== 'support' ? 'requestAccess' : view;
+  // «مركز الدعم» stays open to someone with no permission yet: they are the ones who most need help. Nothing else — not even a
+  // request sent to them «للعلم» (owner, 16 Nov 2026: «request page and support only»); the server refuses the rest
+  const shownView: View = noAccess && view !== 'support' ? 'requestAccess' : view;
   const links = useMemo(
     () => (noAccess ? [{ view: 'requestAccess' as View, label: 'طلب صلاحية', icon: 'shield' }, { view: 'support' as View, label: 'مركز الدعم', icon: 'help' }] : primaryNav(can, me.summaryOnly)),
     [can, me.summaryOnly, noAccess],

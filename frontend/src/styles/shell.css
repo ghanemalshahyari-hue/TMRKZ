@@ -802,3 +802,60 @@ textarea.sw-input { resize: vertical; min-height: 56px; }
 .sw-fill { flex: 1; min-height: 0; overflow: auto; padding: 0 8px 8px; display: flex; flex-direction: column; gap: 7px; scrollbar-width: thin; }
 .sw-fill > .sw-wizard { flex: 1; display: flex; flex-direction: column; gap: 7px; }
 .sw-fill > .sw-wizard > .sw-nav { margin-top: auto; position: sticky; bottom: 0; padding-top: 6px; background: linear-gradient(180deg, transparent, var(--tz-panel) 30%); }
+/* ADR-062: a hierarchy level passed for having no approver — amber, dashed, a skip mark; never the approved green */
+.tz-step.skipped .tz-step-mark { border-color: var(--tz-amber); border-style: dashed; background: rgba(233, 176, 79, 0.12); color: #f3cd86; }
+.tz-step.skipped::before { background: rgba(233, 176, 79, 0.45); }
+.rs-stages li.skipped { border-inline-start: 3px dashed var(--tz-amber, #c98a1a); }
+.rs-skipped, .fs-skipped { color: var(--tz-amber, #b7791f) !important; font-weight: 600; }
+/* a site inside the chosen camp (owner, 16 Nov 2026) */
+.tz-add-inside { margin-top: 8px; }
+.tz-add-inside-row { display: block; width: calc(100% - 16px); margin: 2px 8px 6px; padding: 5px 10px; border: 1px dashed var(--tz-teal, var(--accent)); border-radius: 8px;
+  background: transparent; color: var(--tz-teal, var(--accent)); font: inherit; font-size: 12px; font-weight: 600; text-align: start; cursor: pointer; }
+.tz-add-inside-row:hover { background: color-mix(in srgb, var(--tz-teal, var(--accent)) 10%, transparent); }
+
+/* «موقع جديد» more compact (owner, 16 Nov 2026: «reduce the size as it's too big») — the same steps, about a fifth smaller */
+.sw-wizard { gap: 6px; }
+.sw-wizard .sw-title { font-size: 13.5px; }
+.sw-wizard .sw-back { font-size: 11.5px; padding: 2px 8px; }
+.sw-wizard .sw-step { padding: 3px 5px; font-size: 11px; border-radius: 8px; }
+.sw-wizard .sw-step b { width: 16px; height: 16px; font-size: 10px; }
+.sw-wizard .sw-body { gap: 5px; }
+.sw-wizard .sw-q { gap: 4px; padding: 6px 8px; border-radius: 9px; }
+.sw-wizard .sw-qh { font-size: 12px; gap: 5px; }
+.sw-wizard .sw-n { width: 16px; height: 16px; font-size: 10px; }
+.sw-wizard .sw-input { font-size: 12px; padding: 4px 8px; border-radius: 7px; }
+.sw-wizard textarea.sw-input { min-height: 44px; }
+.sw-wizard .sw-choices { gap: 4px; }
+.sw-wizard .sw-choice { flex-basis: 84px; min-height: 26px; padding: 2px 7px; font-size: 11.5px; border-radius: 7px; }
+.sw-wizard .sw-picked { padding: 4px 8px; font-size: 11.5px; gap: 6px; border-width: 1.5px; }
+.sw-wizard .sw-ok { font-size: 13px; }
+.sw-wizard .sw-link { padding: 3px; font-size: 11.5px; }
+.sw-wizard .sw-hint, .sw-wizard .sw-small { font-size: 10.5px; }
+.sw-wizard .sw-err { padding: 4px 7px; font-size: 11px; }
+.sw-wizard .sw-row { padding: 3px 7px; font-size: 11.5px; }
+.sw-wizard .sw-way { padding: 6px 5px; font-size: 11.5px; }
+.sw-wizard .sw-go { min-height: 30px; font-size: 12.5px; border-radius: 9px; }
+.sw-wizard .sw-tree, .sw-wizard .ut { font-size: 12px; }
+.sw-wizard .ut-row { min-height: 25px; padding: 1px 5px; }
+.sw-wizard .ut-name { font-size: 12px; }
+.sw-wizard .ut-twist { width: 18px; height: 18px; font-size: 12px; }
+.sw-wizard .sw-prow { padding: 5px; gap: 4px 6px; }
+.sw-wizard .sw-mini { height: 24px; min-width: 26px; font-size: 11.5px; }
+.sw-wizard .sw-steps { gap: 4px; }
+.sw-wizard .sw-sub { gap: 5px; }
+.sw-wizard .sw-list { gap: 3px; max-height: 190px; }
+.sw-wizard .sw-more { padding: 3px 8px; font-size: 11.5px; }
+.sw-wizard .sw-sum { font-size: 11.5px; gap: 3px; }
+.sw-wizard .sw-symnow { padding: 4px 7px; font-size: 11.5px; gap: 6px; }
+.sw-wizard .sw-symart { width: 32px; height: 28px; }
+.sw-fill { gap: 5px; padding: 0 6px 6px; }
+/* «موقع جديد» of the setup administrator (ADR-067): six steps stay on one line in the narrow panel — the current step is
+   named, the others show their number (named on hover); the area cards keep the request editor's controls, a little smaller */
+.sw-steps.many .sw-step { flex: 0 0 auto; }
+.sw-steps.many .sw-step.on { flex: 1 1 auto; min-width: 0; }
+.sw-steps.many .sw-step:not(.on) span { display: none; }
+.sw-steps.many .sw-step.on span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sw-wizard .stw-proposal-panel { font-size: 11.5px; gap: 5px; }
+.sw-wizard .stw-proposal-panel .button { font-size: 11.5px; padding: 3px 7px; min-height: 26px; }
+.sw-wizard .tz-checks.compact { padding: 6px 8px; }
+.sw-wizard [data-unit-check] > .sw-hint { margin-top: 2px; }

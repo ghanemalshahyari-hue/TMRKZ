@@ -509,6 +509,19 @@ public class RestationingChecks {
 
     private Leg leg(String key, String label, StationingPolicy.Leg cfg, String fromGeo, String toGeo, RestationingContent c,
                     StationingPolicy policy, int policyVersion, Instant now, List<String> problems) {
+        return deploymentLeg(key, label, cfg, fromGeo, toGeo, c.scope(), c.exception(key), policy, policyVersion, now, problems);
+    }
+
+    /**
+     * One deployment leg as every request checks it: the area's shape, terrain, occupied ground (a hard block, O-08) and the
+     * policy's range centre to centre (O-04). Package-wide so «تهيئة المواقع والتمركز» (ADR-067) applies exactly the same rule.
+     *
+     * @param moving          the units whose own current site is not counted as occupied (they are the ones being placed)
+     * @param exceptionReason the written reason for a distance exception, or null where no exception can be given (the setup
+     *                        has no approval route, so a distance that needs one is refused there)
+     */
+    Leg deploymentLeg(String key, String label, StationingPolicy.Leg cfg, String fromGeo, String toGeo, List<UUID> moving,
+                      String exceptionReason, StationingPolicy policy, int policyVersion, Instant now, List<String> problems) {
         TerrainAssessment t = null;
         TerrainDecision decision = null;
         List<String> conflicts = List.of();
@@ -530,7 +543,7 @@ public class RestationingChecks {
                     problems.add(label + ": " + e.getMessage());
                 }
             }
-            conflicts = occupiedIntersecting(toGeo, c.scope(), now);
+            conflicts = occupiedIntersecting(toGeo, moving, now);
             if (!conflicts.isEmpty()) {
                 // O-08: a hard block, never a warning
                 problems.add(label + " تتداخل مع أرض مشغولة: " + String.join("، ", conflicts) + " — يجب نقلها إلى أرض خالية.");
@@ -544,7 +557,11 @@ public class RestationingChecks {
             case OUT_OF_RANGE -> problems.add(label + " خارج النطاق المسموح (" + Math.round(check.distanceM()) + " م، المسموح "
                     + Math.round(check.effectiveMinM()) + "–" + Math.round(check.effectiveMaxM()) + " م).");
             case NEEDS_EXCEPTION -> {
-                if (c.exception(key).length() < 5) {
+                if (exceptionReason == null) {
+                    problems.add(label + " تتجاوز النطاق المسموح (" + Math.round(check.distanceM()) + " م، المسموح "
+                            + Math.round(check.effectiveMinM()) + "–" + Math.round(check.effectiveMaxM())
+                            + " م) وتحتاج استثناء مسافة، والاستثناء لا يُمنح في التهيئة — ضعها ضمن النطاق، أو اطلبها لاحقاً بطلب منطقة انتشار.");
+                } else if (exceptionReason.trim().length() < 5) {
                     problems.add(label + " تحتاج استثناء مسافة بسبب مكتوب.");
                 }
             }

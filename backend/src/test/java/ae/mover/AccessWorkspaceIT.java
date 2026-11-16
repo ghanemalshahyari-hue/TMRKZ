@@ -273,5 +273,13 @@ class AccessWorkspaceIT extends IntegrationTest {
         assertThat(column(login("mgr").get("/access/workspace/units/" + orgA1 + "/matrix").body(), "FINAL_APPROVER").path("lock").asText())
                 .contains("العام");
         assertThat(login("admin").post("/memberships", fin).status()).isEqualTo(200);
+        // «مسؤوليات/مقاعد الوحدة» against «صلاحيات الشخص» (owner, 16 Nov 2026): told from the role's permissions
+        JsonNode matrix = login("admin").get("/access/workspace/units/" + orgA1 + "/matrix").body();
+        assertThat(column(matrix, "FINAL_APPROVER").path("seat").asBoolean()).as("decides others' requests: a unit responsibility").isTrue();
+        boolean personal = false;
+        for (JsonNode c : matrix.path("columns")) {
+            personal |= !c.path("seat").asBoolean();
+        }
+        assertThat(personal).as("personal permissions stay apart from the unit's responsibilities").isTrue();
     }
 }

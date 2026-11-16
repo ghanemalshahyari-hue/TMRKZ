@@ -164,7 +164,7 @@ export function HrSourcePanel() {
             <KeyValue k="عمر البيانات" v={age(status.dataAgeMinutes)} />
             <KeyValue
               k="النسخة المنشورة"
-              v={status.published ? `${status.published.activeUnits}/${status.published.units} جهة · ${status.published.activePeople}/${status.published.people} شخص` : '—'}
+              v={status.published ? `${status.published.activeUnits}/${status.published.units} جهة · ${status.published.activePeople}/${status.published.people} من مستخدمي تمركز` : '—'}
             />
             <KeyValue k="التشغيل التالي" v={status.nextRunAt ? fullTime(status.nextRunAt) : 'كل ' + Math.round(status.intervalSeconds / 60) + ' دقيقة'} />
             {lastRun && (
@@ -207,7 +207,7 @@ export function HrSourcePanel() {
                     <td>
                       <span className={'pill ' + (RUN_STATUS[r.status]?.[1] ?? '')}>{RUN_STATUS[r.status]?.[0] ?? r.status}</span>
                     </td>
-                    <td>{r.counts?.units != null ? `${r.counts.units} جهة · ${r.counts.people} شخص` : '—'}</td>
+                    <td>{r.counts?.units != null ? `${r.counts.units} جهة · ${r.counts.people} من مستخدمي تمركز` : '—'}</td>
                     <td className="micro">{r.errorMessage ?? (r.issues ? r.issues + ' ملاحظة تحقق' : '')}</td>
                   </tr>
                 ))}
