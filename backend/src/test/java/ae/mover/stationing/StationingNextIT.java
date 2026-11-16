@@ -351,6 +351,45 @@ class StationingNextIT extends RestationingTestBase {
     }
 
     @Test
+    @DisplayName("SEAT-01…04: «اعتماد عمليات الوحدة» belongs to the unit: the holder's grant ends, the same step waits for the next holder, who decides it; the history keeps the human who decided")
+    void seatSurvivesHolderChange() {
+        stationed(fresh, shared);
+        String seat = role("NXSEAT", "ORGANIZATION", "VIEW", "DECIDE_UNIT_OPERATIONS");
+        UUID holderA = person("seatA", seat, sec);
+        person("seatAdmin", "SYSTEM_ADMIN", top);
+        String id = request("DEPLOYMENT_AREAS", deployment(fresh, 0), sec);
+        assertThat(login("rq").post("/restationing-requests/" + id + "/submit", Map.of()).status()).isEqualTo(200);
+        decide("apSec", id, "APPROVE");
+        decide("apDept", id, "APPROVE");
+        decide("apTop", id, "APPROVE");
+        String stage = jdbc.sql("select id::text from restationing_stage where request_id = cast(:r as uuid) and permission = 'DECIDE_UNIT_OPERATIONS'")
+                .param("r", id).query(String.class).single();
+        // SEAT-01: the current holder (nearest the requesting unit) has the step
+        assertThat(login("seatA").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).isTrue();
+
+        // the holder leaves: the grant ends; the responsibility stays with the unit
+        String grantA = jdbc.sql("select id::text from membership where person_id = :p").param("p", holderA).query(String.class).single();
+        Res ended = login("seatAdmin").post("/memberships/" + grantA + "/end", Map.of("reason", "انتقل من الوحدة"));
+        assertThat(ended.status()).as(ended.toString()).isEqualTo(200);
+        // SEAT-02: the old holder loses the pending step
+        assertThat(login("seatA").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).as("A no longer holds it").isFalse();
+        assertThat(decide("seatA", id, "APPROVE").status()).isIn(403, 404);
+
+        // SEAT-03: the next holder of the same responsibility sees the SAME step — no new request, no new stage
+        person("seatB", seat, sec);
+        assertThat(login("seatB").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).isTrue();
+        assertThat(jdbc.sql("select count(*) from restationing_stage where request_id = cast(:r as uuid) and permission = 'DECIDE_UNIT_OPERATIONS'")
+                .param("r", id).query(Long.class).single()).as("the same stage").isEqualTo(1);
+        assertThat(decide("seatB", id, "APPROVE").status()).isEqualTo(200);
+        // SEAT-04: the decision records the human who actually decided; the earlier stages keep theirs
+        assertThat(jdbc.sql("select p.display_name from restationing_stage s join person p on p.id = s.decided_by where s.id = cast(:s as uuid)")
+                .param("s", stage).query(String.class).single()).isEqualTo("شخص seatB");
+        assertThat(jdbc.sql("select count(*) from restationing_stage where request_id = cast(:r as uuid) and mark = 'APPROVED' and decided_by is not null")
+                .param("r", id).query(Long.class).single()).as("history intact").isEqualTo(4);
+        assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).as("the workflow continues").isEqualTo("APPROVED_NOT_ACTIVATED");
+    }
+
+    @Test
     @DisplayName("OWN-01: the request belongs to the requesting unit: another requester of the unit edits and sends it; no requester decides it")
     void requestBelongsToTheUnit() {
         stationed(fresh, shared);

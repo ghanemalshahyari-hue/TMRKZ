@@ -116,7 +116,8 @@ public class WorkflowRuntime {
     }
 
     public static final String NO_ACCESS_MANAGER = "NO_ACCESS_MANAGER";
-    public static final String NO_ACCESS_MANAGER_TEXT = "لا يوجد مسؤول صلاحيات لهذه الوحدة — انتقل الطلب إلى الاعتماد النهائي";
+    /** The owner's words (LDAP first login §33, 16 Nov 2026). */
+    public static final String NO_ACCESS_MANAGER_TEXT = "تم التجاوز — لا يوجد مسؤول صلاحيات يغطي الوحدة";
 
     /**
      * A permission request whose unit has no access manager to recommend (or only the applicant) goes straight to the final

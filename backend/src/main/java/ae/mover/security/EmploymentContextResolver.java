@@ -67,8 +67,11 @@ public class EmploymentContextResolver {
     private final JdbcClient jdbc;
     private final Clock clock;
     private final AuditService audit;
+    private final org.springframework.beans.factory.ObjectProvider<ae.mover.hr.SeatRelease> seats;
 
-    public EmploymentContextResolver(JdbcClient jdbc, Clock clock, AuditService audit) {
+    public EmploymentContextResolver(JdbcClient jdbc, Clock clock, AuditService audit,
+                                     org.springframework.beans.factory.ObjectProvider<ae.mover.hr.SeatRelease> seats) {
+        this.seats = seats;
         this.jdbc = jdbc;
         this.clock = clock;
         this.audit = audit;
@@ -158,6 +161,9 @@ public class EmploymentContextResolver {
      */
     public void observe(UUID person, OidcClient.Identity id) {
         DirectoryProfile pr = id.profile();
+        Source mode = mode();
+        // the directory in force (Mode A): the unit it placed the person in before this sign-in, to see a move (owner §23)
+        Placement was = mode == Source.LDAP ? placement(person, Source.LDAP, profile(person), null) : null;
         jdbc.sql("""
                 insert into person_directory_profile(person_id, issuer, username, employee_number, display_name, rank, position,
                                                      unit_external_id, unit_name, main_unit_external_id, observed_at)
@@ -176,8 +182,13 @@ public class EmploymentContextResolver {
                     .param("r", pr.rank()).param("pos", pr.position()).param("unit", pr.unitId()).param("uname", pr.unitName())
                     .param("main", pr.mainUnitId()).param("p", person).update();
         }
-        if (mode() == Source.ORACLE) {
+        if (mode == Source.ORACLE) {
             checkAgreement(person);
+        } else if (was != null && was.origin() == UnitOrigin.SOURCE && pr.employment()) {
+            Placement now = placement(person, Source.LDAP, profile(person), null);
+            if (now.origin() == UnitOrigin.SOURCE && now.org() != null && !now.org().equals(was.org())) {
+                seats.getObject().directoryMove(person, was.org(), now.org(), clock.instant());
+            }
         }
     }
 

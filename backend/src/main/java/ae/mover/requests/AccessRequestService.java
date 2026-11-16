@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import ae.mover.access.AccessContext;
 import ae.mover.access.Permission;
 import ae.mover.audit.AuditService;
+import ae.mover.authz.GrantAdminService;
 import ae.mover.common.ApiException;
 import ae.mover.common.Db;
 import ae.mover.common.ErrorCode;
@@ -47,6 +48,8 @@ public class AccessRequestService {
     private static final String OFFERABLE = "r.scope <> 'ALL' and not (r.permissions && cast(array['CONFIGURE','MANAGE_ACCESS'] as text[]))";
     private static final String EVERYONE = "EVERYONE";
     private static final String MANAGER = "MANAGER";
+    /** Shown to the person asking, not requestable by them (V45, owner §36): the reviewer or the final approver may add it. */
+    private static final String SHOWN = "SHOWN";
 
     /**
      * Where a permission reaches (ADR-045): UNIT «وحدتي فقط», UNIT_TREE «وحدتي والوحدات التابعة», UNITS «وحدات محددة», SITES
@@ -58,7 +61,22 @@ public class AccessRequestService {
     public record NewRequest(List<String> roles, String reason, Scope scope) {
     }
 
-    public record Decide(String taskId, String decision, List<String> roles, String note, Scope scope, Boolean recommendReject) {
+    /**
+     * A decision. {@code REROUTE}: the person's unit changed since they asked — the same request starts over at their current
+     * unit (owner, LDAP first login §24). At the final step {@code grants} sets each role's own scope and validity (§14) and
+     * {@code fingerprint} is the one the preview of exactly those grants returned (§15); without {@code grants}, one scope for
+     * all the roles, as before.
+     */
+    public record Decide(String taskId, String decision, List<String> roles, String note, Scope scope, Boolean recommendReject,
+                         List<GrantAdminService.AccessGrantSpec> grants, String fingerprint) {
+
+        public Decide(String taskId, String decision, List<String> roles, String note, Scope scope, Boolean recommendReject) {
+            this(taskId, decision, roles, note, scope, recommendReject, null, null);
+        }
+    }
+
+    /** «الصلاحيات التي ستصبح فعالة»: what the final approval of these grants would write, before it does. */
+    public record Preview(String taskId, List<GrantAdminService.AccessGrantSpec> grants) {
     }
 
     private final JdbcClient jdbc;
@@ -74,11 +92,14 @@ public class AccessRequestService {
     private final DecisionService decisions;
     private final org.springframework.transaction.support.TransactionTemplate apart;
     private final EmploymentContextResolver employment;
+    private final GrantAdminService grants;
 
     public AccessRequestService(JdbcClient jdbc, Json json, Clock clock, FormService forms, WorkflowService workflows, PolicyService policies,
                                 RuntimeService runtime, TaskSync taskSync, AuditService audit, OutboxService outbox, DecisionService decisions,
-                                org.springframework.transaction.PlatformTransactionManager transactions, EmploymentContextResolver employment) {
+                                org.springframework.transaction.PlatformTransactionManager transactions, EmploymentContextResolver employment,
+                                GrantAdminService grants) {
         this.employment = employment;
+        this.grants = grants;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -156,11 +177,14 @@ public class AccessRequestService {
 
     private static final List<String> SCOPE_MODES = List.of("UNIT", "UNIT_TREE", "UNITS", "SITES");
 
-    /** The roles a new person may ask for, with how the system administrator describes them and the scopes they allow. */
+    /**
+     * The roles shown to a new person, with how the system administrator describes them and the scopes they allow; those
+     * shown for information only (SHOWN) carry {@code requestable: false}.
+     */
     private List<Map<String, Object>> requestable() {
         return jdbc.sql("""
-                select r.code, r.name, o.description, array_to_string(o.scope_modes, ',') as scope_modes, o.default_scope
-                from access_request_offer o join role_def r on r.code = o.role_code where o.audience = 'EVERYONE' and""" + " " + OFFERABLE
+                select r.code, r.name, o.audience, o.description, array_to_string(o.scope_modes, ',') as scope_modes, o.default_scope
+                from access_request_offer o join role_def r on r.code = o.role_code where o.audience in ('EVERYONE', 'SHOWN') and""" + " " + OFFERABLE
                 + " order by r.sort_order, r.code").query((rs, n) -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("code", rs.getString("code"));
@@ -168,6 +192,7 @@ public class AccessRequestService {
                     m.put("description", rs.getString("description"));
                     m.put("scopeModes", list(rs.getString("scope_modes")));
                     m.put("defaultScope", rs.getString("default_scope"));
+                    m.put("requestable", EVERYONE.equals(rs.getString("audience")));
                     return m;
                 }).list();
     }
@@ -206,7 +231,7 @@ public class AccessRequestService {
             if (!offerable.contains(code)) {
                 throw ApiException.validation("هذه الصلاحية لا تُعرض للطلب.");
             }
-            if (!EVERYONE.equals(audience) && !MANAGER.equals(audience)) {
+            if (!EVERYONE.equals(audience) && !MANAGER.equals(audience) && !SHOWN.equals(audience)) {
                 throw ApiException.validation("اختر لمن تظهر الصلاحية.");
             }
         });
@@ -279,6 +304,7 @@ public class AccessRequestService {
             m.put("scope", r.get("requested_scope") == null ? null : json.map(r.get("requested_scope").toString()));
             m.put("grantedScope", r.get("granted_scope") == null ? null : json.map(r.get("granted_scope").toString()));
             m.put("statusLabel", statusLabel(r, ctx.personId()));
+            m.put("atFinal", Boolean.TRUE.equals(r.get("at_final")));
             requests.add(m);
         }
         out.put("requests", requests);
@@ -326,7 +352,9 @@ public class AccessRequestService {
                     : Map.of("code", "APPROVED", "text", "تم اعتماد الصلاحيات وتفعيلها");
             case "REJECTED" -> Map.of("code", "REJECTED", "text", "تم الرفض");
             case "RETURNED" -> Map.of("code", "RETURNED", "text", "أعيد طلبك للتعديل");
-            default -> Map.of("code", "PENDING", "text", "طلبك بانتظار مراجعة مسؤول الصلاحيات");
+            // the owner's words (§7): with the access manager, then at the final approval
+            default -> Boolean.TRUE.equals(last.get("atFinal")) ? Map.of("code", "AT_FINAL", "text", "بانتظار الاعتماد النهائي")
+                    : Map.of("code", "PENDING", "text", "طلبك بانتظار مراجعة مسؤول الصلاحيات");
         };
     }
 
@@ -516,9 +544,12 @@ public class AccessRequestService {
             throw ApiException.validation("يُعاد إرسال الطلب بعد إرجاعه للتعديل فقط.");
         }
         UUID unit = unitOf(ctx.personId());
-        if (unit == null || !unit.equals(a.get("unit_org_id"))) {
-            throw ApiException.validation("تغيرت وحدتك منذ تقديم الطلب؛ قدّم طلباً جديداً لوحدتك الحالية.");
+        if (unit == null) {
+            throw noUnit(ctx.personId());
         }
+        // the same request, at the person's unit as it is now (owner, LDAP first login §24): never the old unit's scope
+        UUID was = (UUID) a.get("unit_org_id");
+        boolean moved = !unit.equals(was);
         List<String> roles = in == null || in.roles() == null ? List.of() : in.roles().stream().distinct().toList();
         if (roles.isEmpty() || !offered(EVERYONE).containsAll(roles)) {
             throw ApiException.validation("اختر صلاحية واحدة على الأقل من القائمة.");
@@ -562,8 +593,14 @@ public class AccessRequestService {
                 .param("pol", policy).param("by", ctx.personId()).param("now", Db.ts(now)).param("sha", Hashing.sha256(json.canonical(data))).update();
         jdbc.sql("""
                 update access_request set requested = string_to_array(:roles, ','), reason = :why, requested_scope = cast(:scope as jsonb), granted_scope = null,
-                       recommended_scope = null, recommended = null, recommend_reject = false, reviewed_name = null, reviewed_at = null, review_note = null where request_id = :r""")
-                .param("roles", String.join(",", roles)).param("why", reason).param("scope", scopeJson(scope)).param("r", requestId).update();
+                       recommended_scope = null, recommended = null, recommend_reject = false, reviewed_name = null, reviewed_at = null, review_note = null,
+                       granted_detail = null, unit_org_id = :u where request_id = :r""")
+                .param("roles", String.join(",", roles)).param("why", reason).param("scope", scopeJson(scope)).param("u", unit).param("r", requestId).update();
+        if (moved) {
+            jdbc.sql("update request set owner_org_id = :u where id = :r").param("u", unit).param("r", requestId).update();
+            audit.recordAs(ctx.actor(), "ACCESS_REQUEST_UNIT_CHANGED", "REQUEST", requestId.toString(), (String) a.get("number"),
+                    Map.of("from", String.valueOf(was), "to", unit.toString(), "revision", revision, "resubmitted", true), UNIT_CHANGED);
+        }
         Map<String, Object> vars = new HashMap<>();
         vars.put("requestId", requestId.toString());
         vars.put("revision", revision);
@@ -602,6 +639,7 @@ public class AccessRequestService {
             m.put("person", r.get("display_name"));
             m.put("employeeNo", r.get("employee_no"));
             m.put("unit", r.get("unit"));
+            m.put("unitId", r.get("unit_org_id").toString());
             m.put("movedTo", now != null && !now.equals(r.get("unit_org_id")) ? orgName(now) : null);
             m.put("reason", r.get("reason"));
             m.put("submittedAt", Db.toInstant(r.get("submitted_at")).toString());
@@ -622,7 +660,10 @@ public class AccessRequestService {
             m.put("scopeUnits", orgTree((UUID) r.get("unit_org_id")));
             m.put("scopeSites", linkedSites((UUID) r.get("unit_org_id")));
             m.put("scopeNames", scopeNames(r.get("requested_scope")));
-            m.put("extras", labelled(offered(MANAGER).stream().filter(c -> !shown.contains(c)).toList()));
+            List<String> extras = new ArrayList<>(offered(MANAGER));
+            offered(SHOWN).stream().filter(c -> !extras.contains(c)).forEach(extras::add);
+            m.put("extras", labelled(extras.stream().filter(c -> !shown.contains(c)).toList()));
+            m.put("seats", seatRoles(shown, extras));
             out.add(m);
         }
         return out;
@@ -640,16 +681,28 @@ public class AccessRequestService {
     /** A reviewer's decision advises; the final approver's grants. The engine checks who may decide this task, and rolls all of it back. */
     @Transactional
     public Map<String, Object> decide(AccessContext ctx, UUID requestId, Decide in) {
-        if (in == null || in.taskId() == null || !List.of("APPROVE", "REJECT", "RETURN").contains(String.valueOf(in.decision()))) {
+        if (in == null || in.taskId() == null || !List.of("APPROVE", "REJECT", "RETURN", "REROUTE").contains(String.valueOf(in.decision()))) {
             throw ApiException.validation("القرار يجب أن يكون اعتماداً أو رفضاً أو إرجاعاً.");
         }
         Map<String, Object> a = jdbc.sql("select person_id, unit_org_id, array_to_string(requested, ',') as asked, array_to_string(recommended, ',') as advised, requested_scope::text as asked_scope, recommended_scope::text as advised_scope from access_request where request_id = :r and open for update")
                 .param("r", requestId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
-        Map<String, Object> task = jdbc.sql("select final from task_assignment where id = cast(:t as uuid) and request_id = :r and status = 'OPEN'")
+        Map<String, Object> task = jdbc.sql("select final, role_code from task_assignment where id = cast(:t as uuid) and request_id = :r and status = 'OPEN'")
                 .param("t", in.taskId()).param("r", requestId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
         boolean isFinal = (Boolean) task.get("final");
         Instant now = clock.instant();
         boolean rejectAdvice = !isFinal && Boolean.TRUE.equals(in.recommendReject());
+        if ("APPROVE".equals(in.decision()) || "REROUTE".equals(in.decision())) {
+            UUID current = unitOf((UUID) a.get("person_id"));
+            if (current != null && !current.equals(a.get("unit_org_id"))) {
+                // re-read before anything is advised or granted (owner, LDAP first login §24): never the old unit's scope; the same
+                // request starts over at the person's current unit, through that unit's route
+                requireHolder(ctx, requestId, in.taskId());
+                return reroute(ctx, requestId, (UUID) a.get("unit_org_id"), current, isFinal);
+            }
+            if ("REROUTE".equals(in.decision())) {
+                throw ApiException.validation(current == null ? "لم يعد لمقدم الطلب وحدة؛ ارفض الطلب." : "وحدة مقدم الطلب لم تتغير؛ لا حاجة لإعادة التوجيه.");
+            }
+        }
         if ("APPROVE".equals(in.decision())) {
             // the final approval checks the person, the unit, the scope and each permission against today, not against the request
             String personStatus = jdbc.sql("select status from person where id = :p").param("p", a.get("person_id")).query(String.class).single();
@@ -657,26 +710,52 @@ public class AccessRequestService {
                 throw ApiException.validation("مقدم الطلب لم يعد نشطاً في الموارد البشرية؛ لا يُعتمد الطلب.");
             }
             UUID current = unitOf((UUID) a.get("person_id"));
-            if (current == null || !current.equals(a.get("unit_org_id"))) {
-                // re-read at the decision (owner, 16 Nov 2026): nothing is granted, and the refusal is audited on its own
+            if (current == null) {
+                // nowhere to move it: nothing is granted, and the refusal is audited on its own
                 Map<String, Object> changed = new LinkedHashMap<>();
                 changed.put("requestedFor", String.valueOf(a.get("unit_org_id")));
-                changed.put("now", current == null ? null : current.toString());
+                changed.put("now", null);
                 changed.put("final", isFinal);
                 apart.executeWithoutResult(t -> audit.recordAs(ctx.actor(), "ACCESS_REQUEST_UNIT_CHANGED", "REQUEST", requestId.toString(), null,
-                        changed, "الوحدة تغيرت أثناء طلب الصلاحية"));
-                throw ApiException.validation((current == null ? "لم يعد لمقدم الطلب وحدة" : "نُقل مقدم الطلب إلى «" + orgName(current) + "» بعد تقديمه")
-                        + "؛ ارفض الطلب ليقدّم طلباً جديداً لوحدته الجديدة.");
+                        changed, UNIT_CHANGED));
+                throw ApiException.validation("لم يعد لمقدم الطلب وحدة؛ ارفض الطلب ليقدّم طلباً جديداً حين تكون له وحدة.");
+            }
+            UUID unit = (UUID) a.get("unit_org_id");
+            if (isFinal && in.grants() != null) {
+                // role by role, exactly as previewed (§14-15)
+                List<GrantAdminService.PlannedGrant> plan = grants.planAccessGrants(ctx, (String) task.get("role_code"), (UUID) a.get("person_id"), unit,
+                        in.grants(), new HashSet<>(allowedRoles(a)));
+                List<String> refused = plan.stream().flatMap(p -> p.problems().stream()).toList();
+                if (!refused.isEmpty()) {
+                    throw ApiException.validation(String.join(" ", refused));
+                }
+                if (in.fingerprint() == null || !in.fingerprint().equals(fingerprint((UUID) a.get("person_id"), unit, plan))) {
+                    throw new ApiException(ErrorCode.STALE_REVISION, "تغيرت الصلاحيات أو نطاقاتها بعد المعاينة؛ راجع «الصلاحيات التي ستصبح فعالة» مرة أخرى ثم اعتمد.");
+                }
+                List<String> roles = plan.stream().map(p -> p.grant().roleCode()).toList();
+                jdbc.sql("update access_request set granted = string_to_array(:roles, ','), granted_scope = null, granted_detail = cast(:d as jsonb) where request_id = :r")
+                        .param("roles", String.join(",", roles)).param("d", json.write(plan.stream().map(GrantAdminService.PlannedGrant::spec).toList()))
+                        .param("r", requestId).update();
+                Map<String, Object> detail = new LinkedHashMap<>();
+                detail.put("roles", roles);
+                detail.put("grants", plan.stream().map(p -> {
+                    Map<String, Object> g = new LinkedHashMap<>();
+                    g.put("role", p.grant().roleCode());
+                    g.put("scope", p.scopeText());
+                    g.put("seat", p.seat());
+                    g.put("validTo", p.grant().validTo() == null ? null : p.grant().validTo().toString());
+                    g.put("held", p.held());
+                    return g;
+                }).toList());
+                detail.put("fingerprint", in.fingerprint());
+                audit.recordAs(ctx.actor(), "ACCESS_REQUEST_FINAL_APPROVED", "REQUEST", requestId.toString(), null, detail, in.note());
+                return close(ctx, requestId, in);
             }
             List<String> roles = in.roles() == null ? List.of() : in.roles().stream().distinct().toList();
-            List<String> allowed = new ArrayList<>(offered(EVERYONE));
-            allowed.addAll(offered(MANAGER));
-            allowed.addAll(list(a.get("asked")));
-            allowed.addAll(list(a.get("advised")));
+            List<String> allowed = allowedRoles(a);
             if (!rejectAdvice && (roles.isEmpty() || !allowed.containsAll(roles))) {
                 throw ApiException.validation("اختر صلاحية واحدة على الأقل من القائمة.");
             }
-            UUID unit = (UUID) a.get("unit_org_id");
             Scope scope = in.scope() != null ? checkScope(in.scope(), unit, ctx, isFinal)
                     : checkScope(storedScope(a.get(a.get("advised_scope") != null ? "advised_scope" : "asked_scope")), unit, ctx, isFinal);
             if (isFinal) {
@@ -695,6 +774,11 @@ public class AccessRequestService {
             detail.put("recommendReject", rejectAdvice);
             audit.recordAs(ctx.actor(), isFinal ? "ACCESS_REQUEST_FINAL_APPROVED" : "ACCESS_REQUEST_RECOMMENDED", "REQUEST", requestId.toString(), null, detail, in.note());
         }
+        return close(ctx, requestId, in);
+    }
+
+    /** The engine's decision on the task (who may decide it is checked there, and everything rolls back with it). */
+    private Map<String, Object> close(AccessContext ctx, UUID requestId, Decide in) {
         int revision = jdbc.sql("select current_revision from request where id = :r").param("r", requestId).query(Integer.class).single();
         decisions.decideAccess(ctx, UUID.fromString(in.taskId()), new DecisionInput(in.decision(), in.note(), null, revision, null, null));
         String status = jdbc.sql("select status from request where id = :r").param("r", requestId).query(String.class).single();
@@ -703,5 +787,235 @@ public class AccessRequestService {
             jdbc.sql("update access_request set open = false where request_id = :r").param("r", requestId).update();
         }
         return Map.of("status", status);
+    }
+
+    static final String UNIT_CHANGED = "الوحدة تغيرت أثناء طلب الصلاحية";
+
+    /** Everything the reviewer or the final approver may give for this request: what is offered, asked and advised. */
+    private List<String> allowedRoles(Map<String, Object> a) {
+        List<String> allowed = new ArrayList<>(offered(EVERYONE));
+        allowed.addAll(offered(SHOWN));
+        allowed.addAll(offered(MANAGER));
+        allowed.addAll(list(a.get("asked")));
+        allowed.addAll(list(a.get("advised")));
+        return allowed;
+    }
+
+    /** Which of these roles are a responsibility of the unit (a seat its current holder occupies, ADR-066), for the page. */
+    private List<String> seatRoles(List<String> a, List<String> b) {
+        List<String> codes = new ArrayList<>(a);
+        b.stream().filter(c -> !codes.contains(c)).forEach(codes::add);
+        if (codes.isEmpty()) {
+            return List.of();
+        }
+        String seatPermissions = String.join(",", Permission.STAGE_DECISIONS.stream().map(Enum::name).toList());
+        return jdbc.sql("select code from role_def where code = any(string_to_array(:c, ',')) and permissions && string_to_array(:p, ',')::text[]")
+                .param("c", String.join(",", codes)).param("p", seatPermissions).query(String.class).list();
+    }
+
+    /** The caller holds this open task now (the same list as «طلبات الصلاحية»), or the request is not theirs to act on. */
+    private void requireHolder(AccessContext ctx, UUID requestId, String taskId) {
+        if (decisions.accessTasks(ctx).stream().noneMatch(t -> t.id().equals(taskId) && t.requestId().equals(requestId.toString()))) {
+            throw ApiException.notFound();
+        }
+    }
+
+    /**
+     * The person moved while their access request waited (owner, LDAP first login §24): nothing is advised or granted for the old
+     * unit. The SAME request — its number, history and earlier revisions kept — starts over at the person's current unit as a
+     * new revision: the old unit's open steps are cancelled, the advice and any scope tied to the old unit are cleared (a scope
+     * of «وحدتي» or «وحدتي والتابعة» still reads the same), and the route is derived again from the current unit (its access
+     * manager, or straight to the final approval when none covers it). Audited «الوحدة تغيرت أثناء طلب الصلاحية».
+     */
+    private Map<String, Object> reroute(AccessContext ctx, UUID requestId, UUID from, UUID to, boolean atFinal) {
+        Map<String, Object> r = jdbc.sql("select number, type_code, current_revision, process_instance_id from request where id = :r for update")
+                .param("r", requestId).query().singleRow();
+        Map<String, Object> a = jdbc.sql("select array_to_string(requested, ',') as asked, reason, requested_scope::text as asked_scope from access_request where request_id = :r")
+                .param("r", requestId).query().singleRow();
+        String type = (String) r.get("type_code");
+        WorkflowService.PublishedWorkflow wf = workflows.latestPublished(type);
+        if (wf == null) {
+            throw new ApiException(ErrorCode.WORKFLOW_NOT_PUBLISHED, "لم يُفعَّل بعد مسار طلب الصلاحيات؛ راجع مدير النظام.");
+        }
+        Scope asked = storedScope(a.get("asked_scope"));
+        Scope kept = asked != null && List.of("UNIT", "UNIT_TREE").contains(asked.mode()) ? asked : null;
+        List<String> roles = list(a.get("asked"));
+        Instant now = clock.instant();
+        int revision = ((Number) r.get("current_revision")).intValue() + 1;
+        UUID form = forms.latestPublished(type).id();
+        UUID policy = policies.current().id();
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("roles", roles);
+        values.put("reason", a.get("reason"));
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("subject", "طلب صلاحيات");
+        Map<String, Object> noPeriod = new LinkedHashMap<>();
+        noPeriod.put("start", null);
+        noPeriod.put("end", null);
+        data.put("period", noPeriod);
+        data.put("ownerOrgId", to.toString());
+        data.put("resourceIds", List.of());
+        data.put("participantOrgIds", List.of());
+        data.put("infoOrgIds", List.of());
+        data.put("values", values);
+        data.put("formVersionId", form.toString());
+        data.put("workflowVersionId", wf.id().toString());
+        jdbc.sql("""
+                insert into request_revision(id, request_id, revision, data, form_version_id, workflow_version_id, policy_version_id,
+                    submitted_by, submitted_at, content_sha256, carried_stages)
+                values (:id, :req, :rev, cast(:data as jsonb), :form, :wf, :pol, :by, :now, :sha, '{}')""")
+                .param("id", UUID.randomUUID()).param("req", requestId).param("rev", revision).param("data", json.write(data)).param("form", form)
+                .param("wf", wf.id()).param("pol", policy).param("by", jdbc.sql("select created_by from request where id = :r").param("r", requestId).query(UUID.class).single())
+                .param("now", Db.ts(now)).param("sha", Hashing.sha256(json.canonical(data))).update();
+        jdbc.sql("""
+                update access_request set unit_org_id = :u, requested_scope = cast(:scope as jsonb), recommended = null, recommended_scope = null,
+                       recommend_reject = false, reviewed_name = null, reviewed_at = null, review_note = null, granted = null, granted_scope = null,
+                       granted_detail = null where request_id = :r""")
+                .param("u", to).param("scope", scopeJson(kept)).param("r", requestId).update();
+        jdbc.sql("update task_assignment set status = 'CANCELLED', closed_at = :now where request_id = :r and status = 'OPEN'")
+                .param("now", Db.ts(now)).param("r", requestId).update();
+        if (r.get("process_instance_id") != null) {
+            runtime.deleteProcessInstance((String) r.get("process_instance_id"), "UNIT_CHANGED");
+        }
+        // the route is derived when the process starts, from the request's owner: move it first
+        jdbc.sql("update request set owner_org_id = :u, current_revision = :rev where id = :id")
+                .param("u", to).param("rev", revision).param("id", requestId).update();
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("requestId", requestId.toString());
+        vars.put("revision", revision);
+        ProcessInstance pi = runtime.startProcessInstanceById(wf.processDefinitionId(), requestId.toString(), vars);
+        jdbc.sql("""
+                update request set updated_at = :now, version = version + 1,
+                       workflow_version_id = :wf, policy_version_id = :pol, process_instance_id = :pid where id = :id""")
+                .param("now", Db.ts(now)).param("wf", wf.id()).param("pol", policy)
+                .param("pid", pi.getId()).param("id", requestId).update();
+        if (!pi.isEnded()) {
+            taskSync.sync(requestId, revision, pi.getId(), wf.definition());
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("from", from.toString());
+        detail.put("to", to.toString());
+        detail.put("revision", revision);
+        detail.put("rerouted", true);
+        detail.put("atFinal", atFinal);
+        audit.recordAs(ctx.actor(), "ACCESS_REQUEST_UNIT_CHANGED", "REQUEST", requestId.toString(), (String) r.get("number"), detail, UNIT_CHANGED);
+        outbox.enqueue("REQUEST", requestId.toString(), "REQUEST_SUBMITTED", Map.of("requestId", requestId.toString(), "revision", revision));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("status", "SUBMITTED");
+        out.put("rerouted", true);
+        out.put("unit", orgName(to));
+        out.put("message", "نُقل مقدم الطلب إلى «" + orgName(to) + "»؛ أعيد توجيه الطلب نفسه إلى وحدته الحالية ولم يُمنح نطاق وحدته السابقة.");
+        return out;
+    }
+
+    // ---- the final approval, role by role (ADR-069) ------------------------------------------------------------------
+
+    /**
+     * «الصلاحيات التي ستصبح فعالة» (owner §15): for each role, its anchor, scope in words, descendants, levels, units covered
+     * today, validity, the unit's time routing for unit operations, and what blocks it — computed by the very plan the approval
+     * writes. The fingerprint returned must come back with the approval; anything changed in between is refused.
+     */
+    public Map<String, Object> preview(AccessContext ctx, UUID requestId, Preview in) {
+        if (in == null || in.taskId() == null) {
+            throw ApiException.validation("حدد المهمة.");
+        }
+        requireHolder(ctx, requestId, in.taskId());
+        Map<String, Object> a = jdbc.sql("""
+                select person_id, unit_org_id, array_to_string(requested, ',') as asked, array_to_string(recommended, ',') as advised
+                from access_request where request_id = :r and open""").param("r", requestId).query().listOfRows().stream().findFirst()
+                .orElseThrow(ApiException::notFound);
+        Map<String, Object> task = jdbc.sql("select final, role_code from task_assignment where id = cast(:t as uuid) and status = 'OPEN'")
+                .param("t", in.taskId()).query().singleRow();
+        if (!Boolean.TRUE.equals(task.get("final"))) {
+            throw ApiException.validation("المعاينة للاعتماد النهائي؛ التوصية لا تفعّل شيئاً.");
+        }
+        UUID person = (UUID) a.get("person_id");
+        UUID unit = (UUID) a.get("unit_org_id");
+        List<GrantAdminService.PlannedGrant> plan = grants.planAccessGrants(ctx, (String) task.get("role_code"), person, unit, in.grants(),
+                new HashSet<>(allowedRoles(a)));
+        List<Map<String, Object>> lines = new ArrayList<>();
+        for (GrantAdminService.PlannedGrant p : plan) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("role", p.grant().roleCode());
+            m.put("roleName", p.roleName());
+            m.put("seat", p.seat());
+            m.put("kind", p.seat() ? "مسؤولية/مقعد الوحدة" : "صلاحية شخصية");
+            m.put("home", Map.of("id", unit.toString(), "name", String.valueOf(orgName(unit))));
+            m.put("mode", p.grant().scopeMode());
+            m.put("all", p.grant().scopeAll());
+            m.put("scopeText", p.scopeText());
+            m.put("units", p.units());
+            m.put("anchors", p.anchors());
+            m.put("validFrom", p.spec().validFrom());
+            m.put("validTo", p.spec().validTo());
+            m.put("held", p.held());
+            m.put("problems", p.problems());
+            m.put("notes", p.notes());
+            lines.add(m);
+        }
+        UUID current = unitOf(person);
+        List<String> problems = new ArrayList<>(plan.stream().flatMap(p -> p.problems().stream()).toList());
+        if (current != null && !current.equals(unit)) {
+            problems.add(0, "نُقل مقدم الطلب إلى «" + orgName(current) + "» بعد تقديمه؛ يُعاد توجيه الطلب إلى وحدته الحالية ولا يُمنح نطاق وحدته السابقة.");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("person", jdbc.sql("select display_name from person where id = :p").param("p", person).query(String.class).single());
+        out.put("unit", orgName(unit));
+        out.put("lines", lines);
+        out.put("problems", problems);
+        out.put("fingerprint", fingerprint(person, unit, plan));
+        return out;
+    }
+
+    /** The approval's fingerprint: the person, the unit and every role with its normalised scope and validity. */
+    private String fingerprint(UUID person, UUID unit, List<GrantAdminService.PlannedGrant> plan) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("person", person.toString());
+        m.put("unit", unit.toString());
+        m.put("grants", plan.stream().map(GrantAdminService.PlannedGrant::spec).toList());
+        return Hashing.sha256(json.canonical(m));
+    }
+
+    /**
+     * The units the final approver may anchor a role at, for the request's person: the branch of their main unit (MAIN_UNIT_ID
+     * = ID, ADR-064), else of the top of their unit's path, with each unit's HR level — for whoever holds an open step of this
+     * request (a final approver needs no other right to read the tree). At most 3,000 units.
+     */
+    public Map<String, Object> scopeTree(AccessContext ctx, UUID requestId) {
+        if (decisions.accessTasks(ctx).stream().noneMatch(t -> t.requestId().equals(requestId.toString()))) {
+            throw ApiException.notFound();
+        }
+        UUID unit = jdbc.sql("select unit_org_id from access_request where request_id = :r").param("r", requestId).query(UUID.class).single();
+        List<Map<String, Object>> path = jdbc.sql("""
+                with recursive up(id, parent_id, depth) as (
+                  select id, parent_id, 0 from organization where id = :u
+                  union all select o.id, o.parent_id, up.depth + 1 from organization o join up on o.id = up.parent_id)
+                select up.id, up.depth, coalesce(h.is_main, false) as main from up join organization o on o.id = up.id
+                  left join hr_unit h on h.external_id = o.source_external_id and h.snapshot_id = (select id from hr_snapshot where status = 'PUBLISHED')
+                order by up.depth""").param("u", unit).query().listOfRows();
+        UUID root = path.stream().filter(p -> Boolean.TRUE.equals(p.get("main"))).map(p -> (UUID) p.get("id")).findFirst()
+                .orElse((UUID) path.get(path.size() - 1).get("id"));
+        List<Map<String, Object>> units = jdbc.sql("""
+                with recursive t(id, name, parent_id, depth) as (
+                  select id, name, parent_id, 0 from organization where id = :root
+                  union all select o.id, o.name, o.parent_id, t.depth + 1 from organization o join t on o.parent_id = t.id where o.status = 'ACTIVE')
+                select t.id, t.name, t.parent_id, t.depth, h.level, coalesce(h.is_main, false) as main from t join organization o on o.id = t.id
+                  left join hr_unit h on h.external_id = o.source_external_id and h.snapshot_id = (select id from hr_snapshot where status = 'PUBLISHED')
+                order by t.depth, t.name limit 3000""").param("root", root).query().listOfRows().stream().map(r -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", r.get("id").toString());
+                    m.put("name", r.get("name"));
+                    m.put("parentId", r.get("id").equals(root) || r.get("parent_id") == null ? null : r.get("parent_id").toString());
+                    m.put("depth", r.get("depth"));
+                    m.put("level", r.get("level"));
+                    m.put("main", r.get("main"));
+                    return m;
+                }).toList();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("unitId", unit.toString());
+        out.put("rootId", root.toString());
+        out.put("path", path.stream().map(p -> p.get("id").toString()).toList());
+        out.put("units", units);
+        return out;
     }
 }

@@ -110,7 +110,9 @@ export function AccessRequestPage() {
 
   const open = mine?.requests.some((r) => r.status === 'SUBMITTED');
   const returned = mine?.requests.find((r) => r.status === 'RETURNED') ?? null;
-  const offered = mine?.requestable.filter((r) => !mine.held.includes(r.code)) ?? [];
+  // shown and requestable; a role the administrator shows for information only is listed apart, without a tick (§36)
+  const offered = mine?.requestable.filter((r) => !mine.held.includes(r.code) && r.requestable !== false) ?? [];
+  const infoOnly = mine?.requestable.filter((r) => !mine.held.includes(r.code) && r.requestable === false) ?? [];
   // the scopes the chosen roles allow (set by the system administrator); a choice they no longer allow moves to their default
   const allowedScopes = useMemo(() => scopesFor(offered.filter((r) => roles.includes(r.code))), [offered, roles]);
   useEffect(() => {
@@ -154,6 +156,16 @@ export function AccessRequestPage() {
                   <span><b>{r.name}</b><br /><small className="muted">{r.description || ROLE_MEANING[r.code]}</small></span>
                 </label>
               ))}
+              {infoOnly.length > 0 && (
+                <div data-testid="access-info-only" style={{ marginTop: 8 }}>
+                  <p className="micro muted" style={{ margin: '4px 0' }}>صلاحيات لا تُطلب من هنا؛ يضيفها مسؤول الصلاحيات عند المراجعة إذا احتاجها عملك:</p>
+                  {infoOnly.map((r) => (
+                    <div key={r.code} className="micro" data-info-role={r.code} style={{ padding: '2px 0' }}>
+                      <b>{r.name}</b> — <span className="muted">{r.description || ROLE_MEANING[r.code]}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <label className="field" style={{ marginTop: 10 }}>
                 <span>لماذا تحتاجها؟</span>
                 <textarea aria-label="سبب الطلب" value={reason} onChange={(e) => setReason(e.target.value)} />

@@ -185,6 +185,91 @@ class RestationingHrSyncIT extends IntegrationTest {
         assertThat(parentOf(sec)).isEqualTo(deptA);
     }
 
+    @Test
+    @DisplayName("SEAT/OWN through the HR sync (owner §20, §23, §35): the approver's transfer releases the seat to the unit's next holder; the requester's transfer leaves the request with its unit")
+    void transfersThroughHrSync() throws Exception {
+        // TOP (L6) ← DEPT_A, DEPT_B (L7) ← SEC (L8) under DEPT_A; three HR people imported one by one (ADR-065)
+        unit("TOP", null, 6);
+        unit("DEPT_A", "TOP", 7);
+        unit("DEPT_B", "TOP", 7);
+        unit("SEC", "DEPT_A", 8);
+        personRow("1", "موظف قبول — مقدم الطلب", "SEC");
+        personRow("2", "موظف قبول — المعتمد أ", "DEPT_A");
+        personRow("3", "موظف قبول — المعتمد ب", "DEPT_A");
+        configure();
+        assertThat(syncNow().path("status").asText()).isEqualTo("SUCCEEDED");
+        UUID top = orgOf("TOP"), deptA = orgOf("DEPT_A"), deptB = orgOf("DEPT_B"), sec = orgOf("SEC");
+        UUID requesterA = imported("1", "SEC", "hrReqA");
+        UUID holderA = imported("2", "DEPT_A", "hrSeatA");
+        UUID holderB = imported("3", "DEPT_A", "hrSeatB");
+
+        String req = role("TREQ", "ORGANIZATION", "CREATE_RESTATIONING", "VIEW");
+        String seat = role("TSEAT", "ORGANIZATION", "APPROVE_HIERARCHY", "VIEW");
+        UUID personalGrant = membership(requesterA, req, sec, null);
+        UUID seatGrant = membership(holderA, seat, deptA, null);
+        person("req2", req, sec);          // another requester of SEC
+        person("reqB", req, deptB);        // a requester of the unit the requester moves to
+        person("apSec", seat, sec);
+        person("apTop", seat, top);
+        person("sysadmin", role("TPOL", "ALL", "CONFIGURE"), top);
+        stationed(sec, siteWithBoundary("TSEC", lat0, lng0, sec));
+        assertThat(publishPolicy().status()).isEqualTo(200);
+
+        Res created = login("hrReqA").post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "content", permanent(sec)));
+        assertThat(created.status()).as(created.toString()).isEqualTo(200);
+        String id = created.body().path("id").asText();
+        assertThat(login("hrReqA").post("/restationing-requests/" + id + "/submit", Map.of()).status()).isEqualTo(200);
+        assertThat(decide("apSec", id).status()).isEqualTo(200);
+        assertThat(login("hrSeatA").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).as("SEAT-01: A holds DEPT_A's step").isTrue();
+
+        // HR moves the requester and holder A to DEPT_B; the application's sync processes it
+        exec("update " + schema + ".people_t set unit_id = '" + u("DEPT_B") + "' where person_id in ('GP" + sfx + "-1', 'GP" + sfx + "-2')");
+        JsonNode moved = syncNow();
+        assertThat(moved.path("status").asText()).as(moved.toString()).isEqualTo("SUCCEEDED");
+        assertThat(jdbc.sql("select organization_id from affiliation where person_id = :p and valid_to is null").param("p", holderA).query(UUID.class).single())
+                .isEqualTo(deptB);
+
+        // the seat stays with DEPT_A: A's grant is released, audited; nothing moves to DEPT_B
+        assertThat(jdbc.sql("select ended_reason from membership where id = :m").param("m", seatGrant).query(String.class).single()).isEqualTo("SEAT_UNIT_LEFT");
+        assertThat(jdbc.sql("select count(*) from membership where person_id = :p and (valid_to is null or valid_to > now())").param("p", holderA)
+                .query(Long.class).single()).as("no seat copied to the new unit").isZero();
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'UNIT_SEAT_RELEASED' and entity_id = :p").param("p", holderA.toString())
+                .query(Long.class).single()).isEqualTo(1);
+        // SEAT-02: A no longer has the step
+        assertThat(login("hrSeatA").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).isFalse();
+        assertThat(decide("hrSeatA", id).status()).isIn(403, 404);
+        // SEAT-03: B becomes the holder of DEPT_A's responsibility and has the SAME step of the SAME request
+        membership(holderB, seat, deptA, null);
+        assertThat(login("hrSeatB").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).isTrue();
+        assertThat(decide("hrSeatB", id).status()).isEqualTo(200);
+        // SEAT-04: the human who decided is recorded
+        assertThat(jdbc.sql("select decided_by from restationing_stage where request_id = cast(:r as uuid) and unit_id = :u")
+                .param("r", id).param("u", deptA).query(UUID.class).single()).isEqualTo(holderB);
+
+        // OWN-01 (§35): the request stays SEC's; it is not DEPT_B's. The requester's own permission at SEC follows its policy
+        // (it follows the posting: it ends with the move, HR_TRANSFER); what they may do now depends on their new permissions
+        assertThat(jdbc.sql("select ended_reason from membership where id = :m").param("m", personalGrant).query(String.class).single())
+                .isEqualTo("HR_TRANSFER");
+        assertThat(login("hrReqA").get("/restationing-requests/" + id).status()).as("no longer SEC's requester").isIn(403, 404);
+        JsonNode byUnit = login("req2").get("/restationing-requests/" + id).body();
+        assertThat(byUnit.path("requestingUnit").path("id").asText()).as("still SEC's request").isEqualTo(sec.toString());
+        assertThat(byUnit.path("requester").path("name").asText()).as("who submitted it stays recorded").isEqualTo("موظف قبول — مقدم الطلب");
+        assertThat(login("reqB").get("/restationing-requests/" + id).status()).as("the new unit gains nothing over it").isIn(403, 404);
+        assertThat(jdbc.sql("select requesting_unit_id from restationing_request where id = cast(:r as uuid)").param("r", id).query(UUID.class).single())
+                .isEqualTo(sec);
+        // the workflow continues
+        assertThat(decide("apTop", id).status()).isEqualTo(200);
+    }
+
+    /** Imports a person of the test source into TMRKZ through «إضافة مستخدم» (ADR-065), signable as {@code login}. */
+    private UUID imported(String id, String unitId, String login) {
+        Res r = admin.post("/access/unit-members", Map.of("organizationId", orgOf(unitId).toString(), "employeeNo", "GN" + sfx + "-" + id));
+        assertThat(r.status()).as(r.toString()).isEqualTo(200);
+        UUID person = jdbc.sql("select id from person where employee_no = :e").param("e", "GN" + sfx + "-" + id).query(UUID.class).single();
+        jdbc.sql("update person set username = :u where id = :p").param("u", login + "-" + sfx).param("p", person).update();
+        return person;
+    }
+
     // ---- the test HR source --------------------------------------------------------------------------------
 
     private void exec(String... sql) {

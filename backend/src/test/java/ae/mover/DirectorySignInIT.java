@@ -377,6 +377,47 @@ class DirectorySignInIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("§23 before Oracle: the directory reports another Unit ID — as an HR transfer: seats released to the unit, grants that follow the posting end, an explicit one stays; a user of the new unit")
+    void directoryMoveReleasesSeats() throws Exception {
+        UUID main = unitWithId("MAINM", null, "MM-" + sfx);
+        UUID unitA = unitWithId("UNITA", main, "UA-" + sfx);
+        unitWithId("UNITB", main, "UB-" + sfx);
+        UUID unitB = jdbc.sql("select id from organization where source_external_id = :x").param("x", "UB-" + sfx).query(UUID.class).single();
+        employee("mover", "UA-" + sfx, "الوحدة أ", "MM-" + sfx);
+        Signed s = signIn(uid("mover"), PASSWORD_OK);
+        assertThat(s.status()).as(String.valueOf(s.body())).isEqualTo(200);
+        UUID person = UUID.fromString(JSON.readTree(call(s.cookie(), "GET", "/me", null).body()).path("id").asText());
+        // later granted at unit A: a seat of the unit and a personal permission; a user of unit A
+        UUID seat = membership(person, role("DSEAT", "ORGANIZATION", "VIEW", "DECIDE_UNIT_OPERATIONS"), unitA, null);
+        UUID own = membership(person, role("DPOST", "ORGANIZATION", "VIEW_OPERATIONAL_POSTURE"), unitA, null);
+        UUID explicit = membership(person, role("DXPL", "ORGANIZATION", "VIEW_OPERATIONAL_POSTURE"), unitA, null);
+        jdbc.sql("update membership set follows_affiliation = false where id = :m").param("m", explicit).update();
+        jdbc.sql("insert into unit_member(id, person_id, organization_id, acting, added_by, added_at) values (gen_random_uuid(), :p, :o, false, :p, now())")
+                .param("p", person).param("o", unitA).update();
+
+        // the directory now places the person in unit B
+        LDAP.modify("uid=" + uid("mover") + "," + PEOPLE, new com.unboundid.ldap.sdk.Modification(
+                com.unboundid.ldap.sdk.ModificationType.REPLACE, "departmentNumber", "UB-" + sfx));
+        Signed again = signIn(uid("mover"), PASSWORD_OK);
+        assertThat(again.status()).as(String.valueOf(again.body())).isEqualTo(200);
+        assertThat(jdbc.sql("select ended_reason from membership where id = :m").param("m", seat).query(String.class).single())
+                .as("the seat stays with unit A").isEqualTo("SEAT_UNIT_LEFT");
+        assertThat(jdbc.sql("select ended_reason from membership where id = :m").param("m", own).query(String.class).single())
+                .as("a personal permission follows its policy: it follows the posting").isEqualTo("DIRECTORY_UNIT_CHANGED");
+        assertThat(jdbc.sql("select valid_to is null from membership where id = :m").param("m", explicit).query(Boolean.class).single())
+                .as("an explicit grant that does not follow the posting stays").isTrue();
+        assertThat(count("select count(*) from unit_member where person_id = :p and organization_id = '" + unitA + "' and ended_at is null", person)).isZero();
+        assertThat(count("select count(*) from unit_member where person_id = :p and organization_id = '" + unitB + "' and ended_at is null", person)).isEqualTo(1);
+        assertThat(count("select count(*) from audit_event where action = 'IDENTITY_UNIT_CHANGED' and entity_id = :p", person.toString())).isEqualTo(1);
+        assertThat(count("select count(*) from audit_event where action = 'UNIT_SEAT_RELEASED' and entity_id = :p", person.toString())).isEqualTo(1);
+        assertThat(JSON.readTree(call(again.cookie(), "GET", "/access-requests/mine", null).body()).path("identity").path("unit").asText())
+                .isEqualTo("جهة UNITB");
+        // a third sign-in at the same unit changes nothing more
+        signIn(uid("mover"), PASSWORD_OK);
+        assertThat(count("select count(*) from audit_event where action = 'IDENTITY_UNIT_CHANGED' and entity_id = :p", person.toString())).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("AUTH-02: a Unit ID TMRKZ does not hold signs the person in with nothing; no unit is created; the request waits for the unit")
     void unknownUnit() throws Exception {
         String unknown = "U-NONE-" + sfx;

@@ -62,4 +62,16 @@ public class AccessRequestController {
     public Map<String, Object> decide(Actor actor, @PathVariable UUID id, @RequestBody AccessRequestService.Decide in) {
         return requests.decide(access.context(actor), id, in);
     }
+
+    /** «الصلاحيات التي ستصبح فعالة» before the final approval (ADR-069): what would be written, nothing written. */
+    @PostMapping("/{id}/preview")
+    public Map<String, Object> preview(Actor actor, @PathVariable UUID id, @RequestBody AccessRequestService.Preview in) {
+        return requests.preview(access.context(actor), id, in);
+    }
+
+    /** The units the final approver may anchor a role at: the person's main-unit branch, with HR levels (ADR-069). */
+    @GetMapping("/{id}/scope-tree")
+    public Map<String, Object> scopeTree(Actor actor, @PathVariable UUID id) {
+        return requests.scopeTree(access.context(actor), id);
+    }
 }

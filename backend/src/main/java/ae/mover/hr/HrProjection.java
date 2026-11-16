@@ -44,8 +44,10 @@ public class HrProjection {
     private final AccessService access;
     private final TaskRealignment realignment;
     private final AuditService audit;
+    private final SeatRelease seats;
 
-    public HrProjection(JdbcClient jdbc, Clock clock, AccessService access, TaskRealignment realignment, AuditService audit) {
+    public HrProjection(JdbcClient jdbc, Clock clock, AccessService access, TaskRealignment realignment, AuditService audit, SeatRelease seats) {
+        this.seats = seats;
         this.jdbc = jdbc;
         this.clock = clock;
         this.access = access;
@@ -242,6 +244,9 @@ public class HrProjection {
                 jdbc.sql("delete from user_session where person_id = :p").param("p", pid).update();
             } else if (c.get("new_org") != null && !c.get("new_org").equals(c.get("old_org"))) {
                 transfers++;
+                // first the unit's responsibilities the person held for the unit they left: they stay with that unit, released to
+                // its next holder and audited as such (ADR-069, §20/§23); then every other grant that follows the posting
+                grantsEnded += seats.release(pid, (UUID) c.get("old_org"), (UUID) c.get("new_org"), "ORACLE", now);
                 grantsEnded += jdbc.sql("""
                         update membership m set valid_to = greatest(:now, m.valid_from + interval '1 second'), ended_reason = 'HR_TRANSFER'
                         where m.person_id = :p and m.follows_affiliation and (m.valid_to is null or m.valid_to > :now)

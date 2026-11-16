@@ -669,13 +669,268 @@ public class GrantAdminService {
         return Map.of("total", total, "people", rows);
     }
 
+    // ---- the final approval of a permission request, role by role (ADR-069) -------------------------------------------
+
+    /**
+     * One role as the final access approver sets it (owner decision of 16 Nov 2026, LDAP first login §14): its own scope in the
+     * grant/target/levels model every grant uses — the role's default reach at the person's unit (mode ROLE), or explicit
+     * anchors (mode CUSTOM: a unit alone, with its descendants, or chosen levels under it; chosen units or sites) — and its
+     * validity. {@code validFrom} empty: from the activation.
+     */
+    public record AccessGrantSpec(String role, ScopeInput scope, String validFrom, String validTo) {
+    }
+
+    /** One anchor of a planned grant, as the preview shows it. */
+    public record PlannedAnchor(String kind, String id, String name, boolean includeDescendants, List<Integer> levels, int units) {
+    }
+
+    /**
+     * A role planned for activation: exactly what the final step will write ({@code grant}), in words ({@code scopeText}, the same
+     * wording every grant list uses), with what blocks it ({@code problems}) and what the approver should know ({@code notes}).
+     * {@code held}: the person already holds the role at the unit, so nothing new is written. {@code seat}: a responsibility of
+     * the unit that its current holder occupies (ADR-066), not a personal permission. {@code units}: units covered today, -1 for
+     * everything.
+     */
+    public record PlannedGrant(AccessGrantSpec spec, RawGrant grant, String roleName, boolean seat, String scopeText, int units,
+                               List<PlannedAnchor> anchors, boolean held, List<String> problems, List<String> notes) {
+    }
+
+    /**
+     * Plans a final access approval role by role (ADR-069). The same plan is shown before the approval («الصلاحيات التي ستصبح
+     * فعالة») and written by it, so the preview cannot differ from the result. Bounds: only roles in {@code allowed}; the whole
+     * system and the final-approval roles only from a global access manager (as every grant, ADR-058); a scoped decider —
+     * e.g. an access manager's «اعتماد نهائي لطلبات الصلاحية» companion — only within the units their own grant of the task's
+     * role covers; «معتمد السلسلة الهرمية» as TNQL's (one level, alone or with what lies below it, never a main unit); levels
+     * that find no unit are refused. Unknown roles or targets are refused at once; everything else is listed as a problem.
+     */
+    public List<PlannedGrant> planAccessGrants(AccessContext ctx, String taskRole, UUID person, UUID unit, List<AccessGrantSpec> specs,
+                                               Set<String> allowed) {
+        if (specs == null || specs.isEmpty()) {
+            throw ApiException.validation("اختر صلاحية واحدة على الأقل من القائمة.");
+        }
+        Instant now = clock.instant();
+        boolean global = ctx.canEverywhere(Permission.MANAGE_ACCESS);
+        List<Grant> deciding = ctx.grants().stream()
+                .filter(g -> g.has(Permission.APPROVE) && (taskRole == null || taskRole.equals(g.roleCode()))).toList();
+        boolean unbounded = global || deciding.stream().anyMatch(Grant::isAll);
+        String unitName = jdbc.sql("select name from organization where id = :o").param("o", unit).query(String.class).optional().orElse(null);
+        Set<String> seen = new HashSet<>();
+        List<PlannedGrant> out = new ArrayList<>();
+        for (AccessGrantSpec in : specs) {
+            if (in == null || in.role() == null || in.role().isBlank()) {
+                throw ApiException.validation("حدد الدور.");
+            }
+            String code = in.role();
+            if (!allowed.contains(code)) {
+                throw ApiException.validation("اختر صلاحية واحدة على الأقل من القائمة.");
+            }
+            Map<String, Object> role = jdbc.sql("select code, name, permissions, scope from role_def where code = :c")
+                    .param("c", code).query().listOfRows().stream().findFirst()
+                    .orElseThrow(() -> ApiException.validation("الدور غير موجود في السياسة المنشورة."));
+            String name = (String) role.get("name");
+            Set<Permission> perms = permissions(role.get("permissions"));
+            List<String> problems = new ArrayList<>();
+            List<String> notes = new ArrayList<>();
+            if (!seen.add(code)) {
+                problems.add("«" + name + "» مكرر؛ يُعطى كل دور مرة واحدة بنطاقه.");
+            }
+            ScopeInput scope = in.scope() == null ? new ScopeInput("ROLE", false, "AND", List.of()) : in.scope();
+            String mode = scope.mode() == null ? "ROLE" : scope.mode();
+            if (!List.of("ROLE", "CUSTOM").contains(mode)) {
+                throw ApiException.validation("نوع النطاق غير معروف.");
+            }
+            boolean all = "CUSTOM".equals(mode) && Boolean.TRUE.equals(scope.all());
+            List<GrantTarget> targets = new ArrayList<>();
+            if ("CUSTOM".equals(mode) && !all) {
+                for (TargetInput t : scope.targets() == null ? List.<TargetInput>of() : scope.targets()) {
+                    if (t == null || t.kind() == null || t.id() == null) {
+                        throw ApiException.validation("هدف نطاق غير مكتمل.");
+                    }
+                    if (!List.of(GrantTarget.ORGANIZATION, GrantTarget.SITE).contains(t.kind())) {
+                        throw ApiException.validation("نوع هدف النطاق غير معروف: " + t.kind());
+                    }
+                    boolean desc = !Boolean.FALSE.equals(t.includeDescendants());
+                    UUID targetId = uuid(t.id(), "هدف النطاق");
+                    GrantTarget target = new GrantTarget(t.kind(), targetId, desc);
+                    if (t.levels() != null && !t.levels().isEmpty()) {
+                        if (!GrantTarget.ORGANIZATION.equals(t.kind()) || !desc) {
+                            throw ApiException.validation("المستويات تُختار لجهة مع فروعها فقط.");
+                        }
+                        List<Integer> levels = t.levels().stream().distinct().sorted().toList();
+                        Set<UUID> reached = source.reach(targetId, levels);
+                        target = new GrantTarget(t.kind(), targetId, true, levels, reached);
+                    }
+                    GrantTarget chosen = target;
+                    if (targets.stream().noneMatch(x -> x.kind().equals(chosen.kind()) && x.id().equals(chosen.id()))) {
+                        targets.add(chosen);
+                    }
+                }
+                requireExisting(targets);
+                if (targets.isEmpty()) {
+                    problems.add("«" + name + "»: اختر وحدة أو موقعاً واحداً على الأقل، أو النطاق الافتراضي للدور.");
+                }
+            }
+            if (CHAIN_APPROVER.equals(code)) {
+                // as TNQL (ADR-061): no choice means «هذا المستوى فقط» at the person's unit
+                if (!"CUSTOM".equals(mode)) {
+                    mode = "CUSTOM";
+                    targets.clear();
+                    targets.add(new GrantTarget(GrantTarget.ORGANIZATION, unit, false));
+                }
+                if (all || targets.stream().anyMatch(t -> !GrantTarget.ORGANIZATION.equals(t.kind()) || !t.levels().isEmpty())) {
+                    problems.add("معتمد السلسلة الهرمية يُعيَّن على مستوى بعينه: «هذا المستوى فقط» أو «هذا المستوى ومع جميع الوحدات التابعة».");
+                }
+                for (GrantTarget t : targets) {
+                    if (mainUnit(t.id())) {
+                        problems.add("الوحدة الرئيسية ليست مستوى في السلسلة الهرمية — اختر مستوى تحتها");
+                    }
+                }
+            }
+            if (all && !global) {
+                problems.add("النطاق الشامل يمنحه مدير صلاحيات عام فقط.");
+            }
+            if (FINAL_ROLES.contains(code) && !global) {
+                problems.add("«" + name + "»: الاعتماد النهائي يمنحه ويسحبه مدير الصلاحيات العام فقط.");
+            }
+            if (perms.stream().anyMatch(p -> SYSTEM_ACTIONS.contains(p) || p == Permission.MANAGE_ACCESS)) {
+                problems.add("«" + name + "» دور إداري لا يُمنح بطلب صلاحية؛ يمنحه مدير الصلاحيات من مساحة الصلاحيات.");
+            }
+            for (GrantTarget t : targets) {
+                if (t.limited() && t.reached().isEmpty()) {
+                    problems.add("لا توجد وحدات في المستوى " + String.join(" و", t.levels().stream().map(String::valueOf).toList())
+                            + " تحت الجهة المختارة.");
+                }
+            }
+            Instant from = in.validFrom() == null || in.validFrom().isBlank() ? now : Times.parse(in.validFrom(), "بداية الصلاحية");
+            Instant to = in.validTo() == null || in.validTo().isBlank() ? null : Times.parse(in.validTo(), "نهاية الصلاحية");
+            if (from.isBefore(now.minus(java.time.Duration.ofMinutes(5)))) {
+                problems.add("«" + name + "»: بداية الصلاحية لا تكون في الماضي.");
+            }
+            if (to != null && !to.isAfter(from)) {
+                problems.add("«" + name + "»: نهاية الصلاحية يجب أن تكون بعد بدايتها.");
+            }
+            RawGrant g = new RawGrant(null, person, null, null, null, code, name, perms, (String) role.get("scope"), false, unit, unitName,
+                    null, null, mode, true, all, from, to, List.copyOf(targets));
+            RawGrant.Spec spec = g.spec();
+            // a scoped decider writes only inside the units their own grant of the task's role covers
+            if (!unbounded) {
+                Set<UUID> wanted = new HashSet<>();
+                spec.orgs().forEach(t -> wanted.addAll(t.includeDescendants() ? access.orgSubtree(t.id()) : Set.of(t.id())));
+                for (GrantTarget t : spec.sites()) {
+                    jdbc.sql("select organization_id from site_responsibility where site_id = :s and valid_to is null").param("s", t.id())
+                            .query(UUID.class).optional().ifPresentOrElse(wanted::add, () -> wanted.add(t.id()));
+                }
+                if (!wanted.isEmpty() && deciding.stream().noneMatch(d -> d.hasOrgLimit() && d.orgSubtree().containsAll(wanted))) {
+                    problems.add("نطاق «" + name + "» يتجاوز الوحدات التي يشملها اعتمادك لطلبات الصلاحية.");
+                }
+            }
+            String text = describe(g);
+            int units = spec.all() ? -1 : spec.orgs().stream().mapToInt(t -> t.includeDescendants() ? access.orgSubtree(t.id()).size() : 1).sum();
+            Names names = names(List.of(g));
+            List<PlannedAnchor> anchors = new ArrayList<>();
+            for (GrantTarget t : "CUSTOM".equals(mode) ? targets : spec.orgs()) {
+                int covered = GrantTarget.SITE.equals(t.kind()) ? 0 : t.limited() ? t.reached().size()
+                        : t.includeDescendants() ? access.orgSubtree(t.id()).size() : 1;
+                anchors.add(new PlannedAnchor(t.kind(), t.id().toString(), names.of(t), t.includeDescendants(), t.levels(), covered));
+            }
+            boolean held = jdbc.sql("""
+                    select count(*) from membership where person_id = :p and organization_id = :o and role_code = :r
+                      and valid_from <= :now and (valid_to is null or valid_to > :now)""")
+                    .param("p", person).param("o", unit).param("r", code).param("now", Db.ts(now)).query(Long.class).single() > 0;
+            if (held) {
+                notes.add("يحمل «" + name + "» في وحدته الآن؛ تبقى منحته الحالية كما هي ولا تُنشأ منحة ثانية.");
+            }
+            boolean seat = perms.stream().anyMatch(Permission.STAGE_DECISIONS::contains);
+            if (perms.contains(Permission.DECIDE_UNIT_OPERATIONS)) {
+                notes.addAll(timeRoutes(unit, spec.orgs()));
+            }
+            out.add(new PlannedGrant(new AccessGrantSpec(code, new ScopeInput(mode, all, "AND", targets.stream()
+                    .map(t -> new TargetInput(t.kind(), t.id().toString(), t.includeDescendants(), t.levels().isEmpty() ? null : t.levels())).toList()),
+                    in.validFrom() == null || in.validFrom().isBlank() ? null : from.toString(), to == null ? null : to.toString()),
+                    g, name, seat, text, units, anchors, held, problems, notes));
+        }
+        return out;
+    }
+
+    /** «اعتماد عمليات الوحدة حسب الوقت» set on a command above or inside the anchors (ADR-059): shown, never changed here. */
+    private List<String> timeRoutes(UUID unit, List<GrantTarget> orgs) {
+        Set<UUID> near = new HashSet<>();
+        near.add(unit);
+        orgs.forEach(t -> near.add(t.id()));
+        List<String> out = new ArrayList<>();
+        jdbc.sql("""
+                with recursive up(id, parent_id) as (
+                  select id, parent_id from organization where id = any(string_to_array(:ids, ',')::uuid[])
+                  union select o.id, o.parent_id from organization o join up on o.id = up.parent_id)
+                select o.name as command, r.name, to_char(r.time_from, 'HH24:MI') as f, to_char(r.time_to, 'HH24:MI') as t
+                  from unit_ops_route r join organization o on o.id = r.command_org_id
+                 where r.active and r.command_org_id in (select id from up) order by o.name, r.time_from""")
+                .param("ids", Db.ids(near)).query().listOfRows()
+                .forEach(r -> out.add("اعتماد عمليات الوحدة حسب الوقت في «" + r.get("command") + "»: الفترة «" + r.get("name") + "» "
+                        + r.get("f") + "–" + r.get("t") + " تحدد من يعتمد في وقتها."));
+        return out;
+    }
+
+    /** Writes one planned grant exactly as previewed: the grant at the person's unit, its targets and levels, its validity. */
+    private void writePlanned(AccessContext ctx, UUID requestId, PlannedGrant p) {
+        RawGrant g = p.grant();
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                insert into membership(id, person_id, organization_id, role_code, valid_from, valid_to, scope_mode, scope_combine, scope_all, granted_by)
+                values (:id, :p, :o, :r, :f, :to, :m, 'AND', :all, :by)""")
+                .param("id", id).param("p", g.personId()).param("o", g.orgId()).param("r", g.roleCode()).param("f", Db.ts(g.validFrom()))
+                .param("to", Db.ts(g.validTo())).param("m", g.scopeMode()).param("all", g.scopeAll()).param("by", ctx.personId()).update();
+        for (GrantTarget t : g.targets()) {
+            jdbc.sql("""
+                    insert into membership_scope_target(membership_id, kind, target_id, include_descendants, levels)
+                    values (:m, :k, :t, :d, string_to_array(nullif(:l, ''), ',')::int[])""")
+                    .param("m", id).param("k", t.kind()).param("t", t.id()).param("d", t.includeDescendants())
+                    .param("l", String.join(",", t.levels().stream().map(String::valueOf).toList())).update();
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("organizationId", g.orgId().toString());
+        detail.put("role", g.roleCode());
+        detail.put("accessRequest", requestId.toString());
+        detail.put("scope", p.scopeText());
+        detail.put("seat", p.seat());
+        if (g.validTo() != null) {
+            detail.put("validTo", g.validTo().toString());
+        }
+        audit.recordAs(ctx.actor(), "MEMBERSHIP_CREATED", "PERSON", g.personId().toString(), null, detail, null);
+    }
+
     /**
      * The final approval of a permission request (ADR-044): the roles granted become grants at the person's unit, each with its own
      * default reach. The decision is the authority here, checked by the engine. A role already held there is left as it is.
+     * Since ADR-069 a request approved role by role writes each role exactly as its approver previewed it.
      */
     public List<String> applyAccessRequest(AccessContext ctx, UUID requestId) {
-        Map<String, Object> a = jdbc.sql("select person_id, unit_org_id, array_to_string(granted, ',') as granted, granted_scope::text as scope from access_request where request_id = :r")
+        Map<String, Object> a = jdbc.sql("""
+                select person_id, unit_org_id, array_to_string(granted, ',') as granted, granted_scope::text as scope, granted_detail::text as detail
+                from access_request where request_id = :r""")
                 .param("r", requestId).query().singleRow();
+        if (a.get("detail") != null) {
+            List<AccessGrantSpec> specs = json.convert(json.tree(a.get("detail").toString()), new com.fasterxml.jackson.core.type.TypeReference<List<AccessGrantSpec>>() {
+            });
+            String taskRole = jdbc.sql("""
+                    select role_code from task_assignment where request_id = :r and final and status = 'APPROVED' order by closed_at desc nulls last limit 1""")
+                    .param("r", requestId).query(String.class).optional().orElse(null);
+            List<PlannedGrant> plan = planAccessGrants(ctx, taskRole, (UUID) a.get("person_id"), (UUID) a.get("unit_org_id"), specs,
+                    new HashSet<>(specs.stream().map(AccessGrantSpec::role).toList()));
+            List<String> refused = plan.stream().flatMap(p -> p.problems().stream()).toList();
+            if (!refused.isEmpty()) {
+                throw ApiException.validation(String.join(" ", refused));
+            }
+            List<String> made = new ArrayList<>();
+            for (PlannedGrant p : plan) {
+                if (!p.held()) {
+                    writePlanned(ctx, requestId, p);
+                    made.add(p.grant().roleCode());
+                }
+            }
+            addUnitMember(ctx, requestId, (UUID) a.get("person_id"), (UUID) a.get("unit_org_id"));
+            return made;
+        }
         Map<String, Object> scope = a.get("scope") == null ? null : json.map(a.get("scope").toString());
         String mode = scope == null ? null : (String) scope.get("mode");
         UUID person = (UUID) a.get("person_id");
@@ -683,6 +938,9 @@ public class GrantAdminService {
         Instant now = clock.instant();
         List<String> made = new ArrayList<>();
         for (String role : a.get("granted") == null ? new String[0] : ((String) a.get("granted")).split(",")) {
+            if (FINAL_ROLES.contains(role) && !ctx.canEverywhere(Permission.MANAGE_ACCESS)) {
+                throw ApiException.forbidden("الاعتماد النهائي يمنحه ويسحبه مدير الصلاحيات العام فقط.");
+            }
             long held = jdbc.sql("""
                     select count(*) from membership where person_id = :p and organization_id = :o and role_code = :r
                       and valid_from <= :now and (valid_to is null or valid_to > :now)""")
@@ -710,8 +968,16 @@ public class GrantAdminService {
                     Map.of("organizationId", unit.toString(), "role", role, "accessRequest", requestId.toString(), "scope", m == null ? "ROLE" : m), null);
             made.add(role);
         }
-        // an approved request makes the person one of the unit's users (owner, 16 Nov 2026, as TNQL: «من خلال طلب الصلاحيات»);
-        // they stay listed after their grants end, as a TNQL account does, until removed from the unit
+        addUnitMember(ctx, requestId, person, unit);
+        return made;
+    }
+
+    /**
+     * An approved request makes the person one of the unit's users (owner, 16 Nov 2026, as TNQL: «من خلال طلب الصلاحيات»);
+     * they stay listed after their grants end, as a TNQL account does, until removed from the unit.
+     */
+    private void addUnitMember(AccessContext ctx, UUID requestId, UUID person, UUID unit) {
+        Instant now = clock.instant();
         if (unit != null && jdbc.sql("""
                 insert into unit_member(id, person_id, organization_id, acting, added_by, added_at)
                 select :id, :p, :o, false, coalesce(cast(:by as uuid), :p), :now
@@ -720,7 +986,6 @@ public class GrantAdminService {
             audit.recordAs(ctx.actor(), "UNIT_MEMBER_ADDED", "PERSON", person.toString(), null,
                     Map.of("organizationId", unit.toString(), "acting", false, "accessRequest", requestId.toString()), null);
         }
-        return made;
     }
 
     static final String CHAIN_APPROVER = "CHAIN_APPROVER";

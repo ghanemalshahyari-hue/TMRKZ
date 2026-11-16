@@ -53,8 +53,9 @@ export function AccessOfferDialog({ onClose }: { onClose: () => void }) {
                 <span><b>{r.name}</b></span>
                 <select aria-label={r.name} data-offer={r.code} value={r.audience ?? ''} onChange={(e) => patch(r.code, { audience: e.target.value || null })}>
                   <option value="">لا تظهر</option>
-                  <option value="EVERYONE">تظهر لأي شخص جديد</option>
-                  <option value="MANAGER">يضيفها مدير صلاحيات الوحدة فقط</option>
+                  <option value="EVERYONE">تظهر ويمكن طلبها</option>
+                  <option value="SHOWN">تظهر للاطلاع ولا تُطلب — يضيفها المراجع</option>
+                  <option value="MANAGER">لا تظهر — يضيفها مدير صلاحيات الوحدة</option>
                 </select>
               </label>
               {r.audience && (

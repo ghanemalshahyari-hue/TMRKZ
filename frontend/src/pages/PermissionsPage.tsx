@@ -49,7 +49,7 @@ export function PermissionsPage() {
         en="ACCESS / POLICY STUDIO"
         title="مركز الصلاحيات"
         description="الإجراء المسموح ونطاق البيانات يُحددان بصورة مستقلة، وكل قرار يُفرض في الخادم وتؤكده خدمة قرارات الصلاحيات."
-        actions={<span className="flex" style={{ gap: 8 }}><button className="button compact primary" data-testid="aw-open" onClick={() => select(null)}>إدارة الصلاحيات والوحدات</button>{app.can('CONFIGURE') && <button className="button compact" data-testid="access-offer" onClick={() => setOfferOpen(true)}>الصلاحيات المعروضة للطلب</button>}<span className="pill">{global ? 'مدير صلاحيات عام' : 'مدير صلاحيات ضمن نطاق منحته'}</span></span>}
+        actions={<span className="flex" style={{ gap: 8 }}><button className="button compact primary" data-testid="aw-open" onClick={() => select(null)}>إدارة الصلاحيات والوحدات</button>{app.can('CONFIGURE') && <button className="button compact" data-testid="access-offer" onClick={() => setOfferOpen(true)}>الصلاحيات المتاحة للطلب</button>}<span className="pill">{global ? 'مدير صلاحيات عام' : 'مدير صلاحيات ضمن نطاق منحته'}</span></span>}
       />
       {offerOpen && <AccessOfferDialog onClose={() => setOfferOpen(false)} />}
       <div className="tabs access-tabs" role="tablist" aria-label="أقسام مركز الصلاحيات">

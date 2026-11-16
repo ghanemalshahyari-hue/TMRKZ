@@ -1202,7 +1202,7 @@ class WorkflowGraphIT extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("Asking for permissions: with no reviewer it goes to the final approval; refusal grants nothing and opens the way for a new request; a move stops the approval")
+    @DisplayName("ACCESS-04: with no reviewer it goes to the final approval, recorded in the owner's words; refusal grants nothing and opens the way for a new request; a move reroutes it")
     void askingWithoutReviewer() {
         opsHierarchy();
         accessRoles();
@@ -1215,7 +1215,7 @@ class WorkflowGraphIT extends IntegrationTest {
         assertThat(box.path("final").asBoolean()).as("nobody reviews this unit, so it comes straight here").isTrue();
         assertThat(box.path("reviewedBy").isNull() || box.path("reviewedBy").isMissingNode()).isTrue();
         // recorded, not inferred (owner, 16 Nov 2026): the step passed for want of an access manager, with the reason, audited once
-        assertThat(box.path("reviewSkipped").asText()).isEqualTo("لا يوجد مسؤول صلاحيات لهذه الوحدة — انتقل الطلب إلى الاعتماد النهائي");
+        assertThat(box.path("reviewSkipped").asText()).isEqualTo("تم التجاوز — لا يوجد مسؤول صلاحيات يغطي الوحدة");
         assertThat(jdbc.sql("select count(*) from request_route_skip where request_id = :r and reason_code = 'NO_ACCESS_MANAGER'").param("r", id).query(Long.class).single()).isEqualTo(1);
         assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :r and action = 'ACCESS_REVIEW_SKIPPED'").param("r", id.toString()).query(Long.class).single()).isEqualTo(1);
         Res refused = fin.post("/access-requests/" + id + "/decision", Map.of("taskId", box.path("taskId").asText(), "decision", "REJECT", "note", "لا يحتاج هذه الصلاحية في عمله الحالي"));
@@ -1224,17 +1224,207 @@ class WorkflowGraphIT extends IntegrationTest {
         Res again = me.post("/access-requests", Map.of("roles", List.of("REQUESTER"), "reason", "طلب جديد بعد الرفض"));
         assertThat(again.status()).as("a new request after a decision").isEqualTo(200);
         UUID second = UUID.fromString(again.body().path("id").asText());
-        // moved in HR while it waits: the approval stops, and says where to
+        // moved in HR while it waits: nothing is granted for the old unit; the same request starts over at the new one (§24)
         jdbc.sql("update affiliation set valid_to = now() where person_id = :p").param("p", asker).update();
         jdbc.sql("insert into affiliation(id, person_id, organization_id, valid_from) values (:i, :p, :o, now())").param("i", UUID.randomUUID()).param("p", asker).param("o", section).update();
         JsonNode moved = inboxItem(fin.get("/access-requests/inbox").body(), second);
         assertThat(moved.path("movedTo").asText()).isEqualTo("وحدة SECC");
-        Res stop = fin.post("/access-requests/" + second + "/decision", Map.of("taskId", moved.path("taskId").asText(), "decision", "APPROVE", "roles", List.of("REQUESTER")));
-        assertThat(stop.status()).isEqualTo(400);
-        assertThat(String.valueOf(stop.body())).contains("نُقل مقدم الطلب");
+        Res rerouted = fin.post("/access-requests/" + second + "/decision", Map.of("taskId", moved.path("taskId").asText(), "decision", "APPROVE", "roles", List.of("REQUESTER")));
+        assertThat(rerouted.status()).as(rerouted.toString()).isEqualTo(200);
+        assertThat(rerouted.body().path("rerouted").asBoolean()).isTrue();
+        assertThat(rerouted.body().path("message").asText()).contains("نُقل مقدم الطلب");
         assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", asker).query(Long.class).single()).as("nothing granted").isZero();
+        assertThat(jdbc.sql("select unit_org_id from access_request where request_id = :r").param("r", second).query(UUID.class).single()).isEqualTo(section);
         assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :r and action = 'ACCESS_REQUEST_UNIT_CHANGED' and reason = 'الوحدة تغيرت أثناء طلب الصلاحية'")
-                .param("r", second.toString()).query(Long.class).single()).as("the refusal is audited on its own").isEqualTo(1);
+                .param("r", second.toString()).query(Long.class).single()).as("audited").isEqualTo(1);
+        JsonNode again2 = inboxItem(fin.get("/access-requests/inbox").body(), second);
+        assertThat(again2.path("unit").asText()).isEqualTo("وحدة SECC");
+        assertThat(again2.path("movedTo").isNull() || again2.path("movedTo").isMissingNode()).as("the request now stands at the current unit").isTrue();
+    }
+
+    @Test
+    @DisplayName("ACCESS-01/02/03/05/06: asked 4, advised 3, granted 2 role by role; unit operations by levels under an anchor; the preview is exactly what is written")
+    void finalApproverSetsEachRole() {
+        opsHierarchy();
+        accessRoles();
+        UUID asker = zeroAccess("perRole", squad);
+        person("mgrPerRole", "UNIT_ACCESS_MANAGER", section);
+        person("finPerRole", "ACCESS_FINAL_APPROVER", root);
+        Api me = login("perRole");
+        // ACCESS-01: several roles at once, of every kind offered
+        Res sent = me.post("/access-requests", Map.of("roles", List.of("REQUESTER", "CHAIN_APPROVER", "UNIT_OPERATIONS_APPROVER", "FYI_RECEIVER"),
+                "reason", "أحتاجها لعملي في الوحدة"));
+        assertThat(sent.status()).as(sent.toString()).isEqualTo(200);
+        UUID id = UUID.fromString(sent.body().path("id").asText());
+        assertThat(me.get("/access-requests/mine").body().path("overall").path("text").asText()).isEqualTo("طلبك بانتظار مراجعة مسؤول الصلاحيات");
+
+        // ACCESS-02: the access manager advises a subset; nothing becomes effective
+        Api mgr = login("mgrPerRole");
+        JsonNode item = inboxItem(mgr.get("/access-requests/inbox").body(), id);
+        assertThat(item.path("seats").toString()).as("unit responsibilities are told apart").contains("UNIT_OPERATIONS_APPROVER").doesNotContain("REQUESTER\"");
+        assertThat(mgr.post("/access-requests/" + id + "/preview", Map.of("taskId", item.path("taskId").asText(), "grants", List.of(Map.of("role", "REQUESTER")))).status())
+                .as("the reviewer has no preview of activation").isEqualTo(400);
+        assertThat(mgr.post("/access-requests/" + id + "/decision", Map.of("taskId", item.path("taskId").asText(), "decision", "APPROVE",
+                "roles", List.of("REQUESTER", "UNIT_OPERATIONS_APPROVER", "FYI_RECEIVER"))).status()).isEqualTo(200);
+        assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", asker).query(Long.class).single()).isZero();
+        assertThat(me.get("/access-requests/mine").body().path("overall").path("text").asText()).as("the owner's words").isEqualTo("بانتظار الاعتماد النهائي");
+
+        // ACCESS-03/05: the final approver grants a different subset, each role with its own scope
+        Api fin = login("finPerRole");
+        JsonNode last = inboxItem(fin.get("/access-requests/inbox").body(), id);
+        String task = last.path("taskId").asText();
+        assertThat(fin.get("/access-requests/" + id + "/scope-tree").status()).isEqualTo(200);
+        assertThat(fin.get("/access-requests/" + id + "/scope-tree").body().path("rootId").asText()).as("the branch of the main unit").isEqualTo(main.toString());
+        assertThat(login("rSquad").get("/access-requests/" + id + "/scope-tree").status()).as("only whoever holds a step").isEqualTo(404);
+        String validTo = java.time.Instant.now().plus(java.time.Duration.ofDays(365)).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString();
+        List<Map<String, Object>> grants = List.of(
+                Map.of("role", "REQUESTER", "scope", Map.of("mode", "CUSTOM", "targets", List.of(Map.of("kind", "ORGANIZATION", "id", squad.toString(), "includeDescendants", false)))),
+                Map.of("role", "UNIT_OPERATIONS_APPROVER", "validTo", validTo, "scope", Map.of("mode", "CUSTOM",
+                        "targets", List.of(Map.of("kind", "ORGANIZATION", "id", section.toString(), "includeDescendants", true, "levels", List.of(6, 7))))));
+        JsonNode preview = fin.post("/access-requests/" + id + "/preview", Map.of("taskId", task, "grants", grants)).body();
+        assertThat(preview.path("problems").size()).as(preview.toString()).isZero();
+        JsonNode ops = preview.path("lines").get(1);
+        assertThat(ops.path("roleName").asText()).isEqualTo("معتمد عمليات الوحدة");
+        assertThat(ops.path("seat").asBoolean()).isTrue();
+        assertThat(ops.path("kind").asText()).isEqualTo("مسؤولية/مقعد الوحدة");
+        assertThat(ops.path("scopeText").asText()).isEqualTo("الجهة «وحدة SECC»: المستوى 6 و7");
+        assertThat(ops.path("units").asInt()).as("team and squad").isEqualTo(2);
+        assertThat(ops.path("anchors").get(0).path("levels").toString()).isEqualTo("[6,7]");
+        assertThat(ops.path("validTo").asText()).isEqualTo(validTo);
+        assertThat(preview.path("lines").get(0).path("kind").asText()).isEqualTo("صلاحية شخصية");
+        assertThat(preview.path("lines").get(0).path("scopeText").asText()).isEqualTo("الجهة «وحدة SQUADC» وحدها");
+        String fingerprint = preview.path("fingerprint").asText();
+        assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", asker).query(Long.class).single()).as("a preview writes nothing").isZero();
+
+        // what blocks: the whole system, levels with no unit (listed, never written)
+        JsonNode blocked = fin.post("/access-requests/" + id + "/preview", Map.of("taskId", task, "grants", List.of(
+                Map.of("role", "REQUESTER", "scope", Map.of("mode", "CUSTOM", "all", true)),
+                Map.of("role", "UNIT_OPERATIONS_APPROVER", "scope", Map.of("mode", "CUSTOM",
+                        "targets", List.of(Map.of("kind", "ORGANIZATION", "id", section.toString(), "includeDescendants", true, "levels", List.of(2)))))))).body();
+        assertThat(blocked.path("problems").toString()).contains("النطاق الشامل").contains("لا توجد وحدات في المستوى 2");
+        assertThat(fin.post("/access-requests/" + id + "/preview", Map.of("taskId", task, "grants", List.of(Map.of("role", "AUDITOR")))).status())
+                .as("never a role outside the lists").isEqualTo(400);
+
+        // §15: only what was previewed is approved
+        Map<String, Object> approve = new LinkedHashMap<>();
+        approve.put("taskId", task);
+        approve.put("decision", "APPROVE");
+        approve.put("grants", grants);
+        assertThat(fin.post("/access-requests/" + id + "/decision", approve).status()).as("no preview, no approval").isEqualTo(409);
+        approve.put("fingerprint", fingerprint);
+        approve.put("grants", List.of(grants.get(0)));
+        assertThat(fin.post("/access-requests/" + id + "/decision", approve).status()).as("changed after the preview").isEqualTo(409);
+        approve.put("grants", grants);
+        Res done = fin.post("/access-requests/" + id + "/decision", approve);
+        assertThat(done.status()).as(done.toString()).isEqualTo(200);
+        assertThat(done.body().path("status").asText()).isEqualTo("APPROVED");
+
+        // ACCESS-06: the result is the preview, word for word
+        assertThat(jdbc.sql("select array_to_string(requested, ',') || '|' || array_to_string(recommended, ',') || '|' || array_to_string(granted, ',') from access_request where request_id = :r")
+                .param("r", id).query(String.class).single())
+                .as("three sets apart").isEqualTo("REQUESTER,CHAIN_APPROVER,UNIT_OPERATIONS_APPROVER,FYI_RECEIVER|REQUESTER,UNIT_OPERATIONS_APPROVER,FYI_RECEIVER|REQUESTER,UNIT_OPERATIONS_APPROVER");
+        JsonNode held = login("admin").get("/access/grants?personId=" + asker).body();
+        Map<String, String> written = new LinkedHashMap<>();
+        held.forEach(g -> written.put(g.path("role").path("code").asText(), g.path("scopeText").asText()));
+        assertThat(written).containsOnly(Map.entry("REQUESTER", preview.path("lines").get(0).path("scopeText").asText()),
+                Map.entry("UNIT_OPERATIONS_APPROVER", ops.path("scopeText").asText()));
+        assertThat(jdbc.sql("""
+                select array_to_string(t.levels, ',') || '|' || t.include_descendants || '|' || (m.valid_to = cast(:to as timestamptz))
+                from membership m join membership_scope_target t on t.membership_id = m.id
+                where m.person_id = :p and m.role_code = 'UNIT_OPERATIONS_APPROVER'""").param("p", asker).param("to", validTo).query(String.class).single())
+                .isEqualTo("6,7|true|true");
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :r and action = 'ACCESS_REQUEST_FINAL_APPROVED' and detail::text like '%المستوى 6 و7%'")
+                .param("r", id.toString()).query(Long.class).single()).as("the approval records what was previewed").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("ACCESS-07: the person moves before the final approval; the same request is rerouted through the current unit; never the old unit's scope")
+    void movedBeforeFinalIsRerouted() {
+        opsHierarchy();
+        accessRoles();
+        UUID asker = zeroAccess("mover7", squad);
+        person("mgrMove7", "UNIT_ACCESS_MANAGER", section);
+        person("finMove7", "ACCESS_FINAL_APPROVER", root);
+        Api me = login("mover7");
+        UUID id = UUID.fromString(me.post("/access-requests", Map.of("roles", List.of("REQUESTER"), "reason", "أحتاجها لعملي في الوحدة",
+                "scope", Map.of("mode", "UNITS", "ids", List.of(squad.toString())))).body().path("id").asText());
+        String number = jdbc.sql("select number from request where id = :r").param("r", id).query(String.class).single();
+        Api mgr = login("mgrMove7");
+        JsonNode item = inboxItem(mgr.get("/access-requests/inbox").body(), id);
+        assertThat(mgr.post("/access-requests/" + id + "/decision", Map.of("taskId", item.path("taskId").asText(), "decision", "APPROVE", "roles", List.of("REQUESTER"))).status()).isEqualTo(200);
+
+        // HR moves the person to the main unit, which no access manager covers
+        jdbc.sql("update affiliation set valid_to = now() where person_id = :p").param("p", asker).update();
+        jdbc.sql("insert into affiliation(id, person_id, organization_id, valid_from) values (:i, :p, :o, now())").param("i", UUID.randomUUID()).param("p", asker).param("o", main).update();
+        Api fin = login("finMove7");
+        JsonNode last = inboxItem(fin.get("/access-requests/inbox").body(), id);
+        assertThat(last.path("movedTo").asText()).isEqualTo("وحدة MAINC");
+        JsonNode shown = fin.post("/access-requests/" + id + "/preview", Map.of("taskId", last.path("taskId").asText(), "grants", List.of(Map.of("role", "REQUESTER")))).body();
+        assertThat(shown.path("problems").get(0).asText()).as("the preview says so first").contains("نُقل مقدم الطلب");
+        Res r = fin.post("/access-requests/" + id + "/decision", Map.of("taskId", last.path("taskId").asText(), "decision", "REROUTE"));
+        assertThat(r.status()).as(r.toString()).isEqualTo(200);
+        assertThat(r.body().path("rerouted").asBoolean()).isTrue();
+
+        Map<String, Object> a = jdbc.sql("""
+                select a.unit_org_id, a.recommended is null as advice_cleared, a.requested_scope is null as scope_cleared, r.number, r.current_revision, r.owner_org_id, r.status
+                from access_request a join request r on r.id = a.request_id where a.request_id = :r""").param("r", id).query().singleRow();
+        assertThat(a.get("unit_org_id")).isEqualTo(main);
+        assertThat(a.get("owner_org_id")).isEqualTo(main);
+        assertThat(a.get("number")).as("the same request").isEqualTo(number);
+        assertThat(a.get("current_revision")).isEqualTo(2);
+        assertThat(a.get("status")).isEqualTo("SUBMITTED");
+        assertThat(a.get("advice_cleared")).as("advice for the old unit is not carried").isEqualTo(true);
+        assertThat(a.get("scope_cleared")).as("units of the old unit are not carried").isEqualTo(true);
+        assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", asker).query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :r and action = 'ACCESS_REQUEST_UNIT_CHANGED' and reason = 'الوحدة تغيرت أثناء طلب الصلاحية'")
+                .param("r", id.toString()).query(Long.class).single()).isEqualTo(1);
+        // the current unit's route: nobody reviews the main unit, recorded, and the final approval decides for it
+        JsonNode now = inboxItemOrNull(fin.get("/access-requests/inbox").body(), id);
+        assertThat(now).as(() -> "tasks: " + jdbc.sql("select stage_key || ':' || status || ':' || final || ':' || coalesce(target_org_id::text, '-') || ':' || by_scope || ':' || coalesce(array_to_string(scope_orgs, ','), '-') from task_assignment where request_id = :r")
+                .param("r", id).query(String.class).list() + " skips: " + jdbc.sql("select revision || ':' || reason_code from request_route_skip where request_id = :r").param("r", id).query(String.class).list()
+                + " main=" + main + " root=" + root).isNotNull();
+        assertThat(now.path("final").asBoolean()).isTrue();
+        assertThat(now.path("unit").asText()).isEqualTo("وحدة MAINC");
+        assertThat(now.path("reviewSkipped").asText()).isEqualTo("تم التجاوز — لا يوجد مسؤول صلاحيات يغطي الوحدة");
+        assertThat(inboxItemOrNull(mgr.get("/access-requests/inbox").body(), id)).as("the old unit's manager no longer has it").isNull();
+        JsonNode p = fin.post("/access-requests/" + id + "/preview", Map.of("taskId", now.path("taskId").asText(), "grants", List.of(Map.of("role", "REQUESTER")))).body();
+        Res granted = fin.post("/access-requests/" + id + "/decision", Map.of("taskId", now.path("taskId").asText(), "decision", "APPROVE",
+                "grants", List.of(Map.of("role", "REQUESTER")), "fingerprint", p.path("fingerprint").asText()));
+        assertThat(granted.status()).as(granted.toString()).isEqualTo(200);
+        assertThat(jdbc.sql("select organization_id from membership where person_id = :p").param("p", asker).query(UUID.class).single()).as("at the current unit").isEqualTo(main);
+    }
+
+    @Test
+    @DisplayName("§36: a role shown for information is not requestable; the reviewer may add it")
+    void shownNotRequestable() {
+        opsHierarchy();
+        accessRoles();
+        List<Map<String, Object>> before = jdbc.sql("select role_code, audience from access_request_offer").query().listOfRows();
+        try {
+            zeroAccess("shownAsker", squad);
+            person("shownMgr", "UNIT_ACCESS_MANAGER", section);
+            Api admin = login("admin");
+            assertThat(admin.put("/access-requests/offer", Map.of("REQUESTER", "EVERYONE", "CHAIN_APPROVER", "SHOWN")).status()).isEqualTo(200);
+            Api me = login("shownAsker");
+            JsonNode req = me.get("/access-requests/mine").body().path("requestable");
+            assertThat(req.toString()).contains("CHAIN_APPROVER");
+            req.forEach(r -> assertThat(r.path("requestable").asBoolean()).as(r.toString()).isEqualTo("REQUESTER".equals(r.path("code").asText())));
+            assertThat(me.post("/access-requests", Map.of("roles", List.of("CHAIN_APPROVER"), "reason", "أحتاجها لعملي في الوحدة")).status()).isEqualTo(400);
+            UUID id = UUID.fromString(me.post("/access-requests", Map.of("roles", List.of("REQUESTER"), "reason", "أحتاجها لعملي في الوحدة")).body().path("id").asText());
+            assertThat(inboxItem(login("shownMgr").get("/access-requests/inbox").body(), id).path("extras").toString()).contains("CHAIN_APPROVER");
+        } finally {
+            jdbc.sql("delete from access_request_offer").update();
+            before.forEach(r -> jdbc.sql("insert into access_request_offer(role_code, audience) values (:c, :a)").param("c", r.get("role_code")).param("a", r.get("audience")).update());
+        }
+    }
+
+    private static JsonNode inboxItemOrNull(JsonNode box, UUID request) {
+        for (JsonNode n : box) {
+            if (n.path("requestId").asText().equals(request.toString())) {
+                return n;
+            }
+        }
+        return null;
     }
 
     @Test

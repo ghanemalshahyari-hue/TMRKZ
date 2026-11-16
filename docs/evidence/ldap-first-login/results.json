@@ -1,0 +1,300 @@
+{
+ "at": "2026-11-16T11:24:32.211Z",
+ "base": "http://localhost:8088",
+ "label": "ACCEPTANCE ONLY — OWNER DECISION PENDING",
+ "request": "MV-2026-0001",
+ "restationing": "RS-2026-0004",
+ "fga": [
+  "قسم صحة 1-ب: published=true openfga=true (expected true)",
+  "قسم صحة 2-ب: published=true openfga=true (expected true)",
+  "مركز صحة واحد: published=false openfga=false (expected false)",
+  "إدارة الإطفاء 1: published=false openfga=false (expected false)"
+ ],
+ "passed": 46,
+ "total": 47,
+ "results": [
+  {
+   "id": "AUTH-01",
+   "pass": true,
+   "what": "دخول أول من الدليل دون إضافة يدوية: أُنشئ الشخص وربط حسابه",
+   "detail": "HR · - · ENTERPRISE_KEY"
+  },
+  {
+   "id": "AUTH-04",
+   "pass": true,
+   "what": "العضوية في الوحدة لا تمنح شيئاً: صفر صلاحيات بعد الدخول الأول",
+   "detail": "membership 0"
+  },
+  {
+   "id": "AUTH-01b",
+   "pass": true,
+   "what": "بطاقة الهوية: الاسم والوحدة الحالية والوحدة الرئيسية والحالة",
+   "detail": "لم تقدم طلب صلاحية الاسم موظف قبول أول (b) — وهمي الرقم 4980011 الرتبة نقيب المنصب وظيفة قبول — وهمية الوحدة قسم صحة 1-أ الوحدة الرئيسية إدارة الصحة الرئيسية رقم المستخدم acc69b.new1 مصدر البيانات الموارد البشرية"
+  },
+  {
+   "id": "AUTH-03a",
+   "pass": true,
+   "what": "الشريط العلوي لمن لا صلاحية له: «طلب صلاحية» و«مركز الدعم» والخروج فقط",
+   "detail": "تمركز TMRKZ طلب صلاحية مركز الدعم م ق موظف قبول أول (b) — وهمي المستخدم"
+  },
+  {
+   "id": "AUTH-03b",
+   "pass": true,
+   "what": "فتح #stationing يدوياً يعيده إلى صفحة طلب الصلاحية",
+   "detail": ""
+  },
+  {
+   "id": "AUTH-03c",
+   "pass": true,
+   "what": "الخادم يرفض واجهات التطبيق لمن لا صلاحية له (NO_EFFECTIVE_ACCESS)",
+   "detail": "7 of 7 refused"
+  },
+  {
+   "id": "AUTH-03d",
+   "pass": true,
+   "what": "صفحة طلب الصلاحية وحالتها تعمل",
+   "detail": ""
+  },
+  {
+   "id": "ADMIN-OFFER",
+   "pass": true,
+   "what": "مدير النظام يحدد «الصلاحيات المتاحة للطلب» دون تغيير الشيفرة (قبول: عرض واسع)",
+   "detail": "200"
+  },
+  {
+   "id": "SETUP-uam-UNIT_ACCESS_MANAGER",
+   "pass": true,
+   "what": "acc69b.uam: UNIT_ACCESS_MANAGER @ مركز صحة واحد",
+   "detail": "الجهة «مركز صحة واحد» وفروعها"
+  },
+  {
+   "id": "SETUP-fin-ACCESS_FINAL_APPROVER",
+   "pass": true,
+   "what": "acc69b.final: ACCESS_FINAL_APPROVER @ قيادة إدارة الصحة",
+   "detail": "نطاق شامل: جميع الجهات والمواقع (ممنوح صراحة)"
+  },
+  {
+   "id": "SETUP-req-STATIONING_REQUESTER",
+   "pass": true,
+   "what": "acc69b.req1b: STATIONING_REQUESTER @ قسم صحة 1-ب",
+   "detail": "الجهة «قسم صحة 1-ب» وفروعها"
+  },
+  {
+   "id": "SETUP-req2-STATIONING_REQUESTER",
+   "pass": true,
+   "what": "acc69b.req1b2: STATIONING_REQUESTER @ قسم صحة 1-ب",
+   "detail": "الجهة «قسم صحة 1-ب» وفروعها"
+  },
+  {
+   "id": "OFFER-SHOWN",
+   "pass": true,
+   "what": "صلاحية «تظهر للاطلاع ولا تُطلب» تظهر بلا علامة اختيار",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-01",
+   "pass": true,
+   "what": "MV-2026-0001: خمس صلاحيات من أنواع مختلفة في طلب واحد",
+   "detail": "STATIONING_REQUESTER,POSTURE_VIEWER,CHAIN_APPROVER,UNIT_OPERATIONS_APPROVER,FYI_DISTRIBUTOR"
+  },
+  {
+   "id": "STATUS-1",
+   "pass": true,
+   "what": "سطر الحالة: «طلبك بانتظار مراجعة مسؤول الصلاحيات»",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-02a",
+   "pass": true,
+   "what": "مسؤول صلاحيات الوحدة يرى «إرسال التوصية» ولا يرى «اعتماد وتفعيل»",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-02",
+   "pass": true,
+   "what": "المطلوب 5 والموصى به 3، ولا شيء فعّال بعد",
+   "detail": "membership=0"
+  },
+  {
+   "id": "ACCESS-02b",
+   "pass": true,
+   "what": "التوصية لا تفعّل أي صلاحية",
+   "detail": ""
+  },
+  {
+   "id": "STATUS-2",
+   "pass": true,
+   "what": "سطر الحالة: «بانتظار الاعتماد النهائي»",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-05",
+   "pass": true,
+   "what": "معتمد عمليات الوحدة: المرتكز «إدارة الصحة»، المستويان 9 و10، مقعد للوحدة",
+   "detail": "معتمد عمليات الوحدة مسؤولية/مقعد الوحدة إدارة الصحة الجهة «إدارة الصحة»: المستوى 9 و10 تشمل التابعة 9، 10 23من الاعتماد ← 16 نوفمبر 2027 —"
+  },
+  {
+   "id": "ACCESS-05b",
+   "pass": true,
+   "what": "إنشاء طلبات التمركز: الوحدة نفسها فقط، صلاحية شخصية",
+   "detail": "إنشاء طلبات التمركز صلاحية شخصية قسم صحة 1-أ الجهة «قسم صحة 1-أ» وحدها الوحدة وحدها — 1من الاعتماد ← دون نهاية —"
+  },
+  {
+   "id": "ACCESS-03",
+   "pass": true,
+   "what": "المعتمد النهائي منح مجموعة مختلفة (2 من 3 موصى بها) بنطاق كل دور",
+   "detail": "STATIONING_REQUESTER|قسم صحة 1-أ:1|false ; UNIT_OPERATIONS_APPROVER|إدارة الصحة:9,10|true"
+  },
+  {
+   "id": "ACCESS-SETS",
+   "pass": true,
+   "what": "المطلوب والموصى به والممنوح ثلاث مجموعات منفصلة",
+   "detail": ""
+  },
+  {
+   "id": "ACCESS-06",
+   "pass": true,
+   "what": "المعاينة تطابق النتيجة الفعلية حرفاً بحرف",
+   "detail": "الجهة «إدارة الصحة»: المستوى 9 و10"
+  },
+  {
+   "id": "FGA-قسم صحة 1-ب",
+   "pass": true,
+   "what": "اعتماد عمليات الوحدة في «قسم صحة 1-ب»: مسموح في القرار المنشور وفي OpenFGA",
+   "detail": "published=true openfga=true available=true"
+  },
+  {
+   "id": "FGA-قسم صحة 2-ب",
+   "pass": true,
+   "what": "اعتماد عمليات الوحدة في «قسم صحة 2-ب»: مسموح في القرار المنشور وفي OpenFGA",
+   "detail": "published=true openfga=true available=true"
+  },
+  {
+   "id": "FGA-مركز صحة واحد",
+   "pass": true,
+   "what": "اعتماد عمليات الوحدة في «مركز صحة واحد»: مرفوض في القرار المنشور وفي OpenFGA",
+   "detail": "published=false openfga=false available=true"
+  },
+  {
+   "id": "FGA-إدارة الإطفاء 1",
+   "pass": true,
+   "what": "اعتماد عمليات الوحدة في «إدارة الإطفاء 1»: مرفوض في القرار المنشور وفي OpenFGA",
+   "detail": "published=false openfga=false available=true"
+  },
+  {
+   "id": "NAV-AFTER",
+   "pass": false,
+   "what": "بعد التفعيل: يرى ما تسمح به منحتاه فقط، لا كامل التطبيق",
+   "detail": "تمركز TMRKZ الرئيسية إعادة التمركز الطلبات المواقع الوحدات التقارير المزيد 1 م ق موظف قبول أول (b) — وهمي إنشاء طلبات التمركز",
+   "note": "The check expected a «طلب جديد» link in the top bar; the requester's entries are «إعادة التمركز» in the bar and the «طلب جديد» button on the home page (screen 11). The admin-page part of the check passed (none of الصلاحيات والوحدات / تهيئة المواقع / الإعدادات / مركز الصلاحيات / سجل التدقيق shown) and API-AFTER passed. The check is corrected in the script; this run is reported as 46/47."
+  },
+  {
+   "id": "API-AFTER",
+   "pass": true,
+   "what": "الواجهات تتبع المنح: مركز الطلبات مفتوح، إدارة الصلاحيات والتهيئة مرفوضتان",
+   "detail": "{\"hub\":200,\"grants\":403,\"setup\":403}"
+  },
+  {
+   "id": "ACCESS-04a",
+   "pass": true,
+   "what": "موظف وحدة بلا مسؤول صلاحيات يقدم طلبه",
+   "detail": "200"
+  },
+  {
+   "id": "ACCESS-04",
+   "pass": true,
+   "what": "تم التجاوز — لا يوجد مسؤول صلاحيات يغطي الوحدة؛ الطلب عند المعتمد النهائي مباشرة",
+   "detail": "توصية المراجع: تم التجاوز — لا يوجد مسؤول صلاحيات يغطي الوحدة"
+  },
+  {
+   "id": "OWN-setup",
+   "pass": true,
+   "what": "مقدم طلبات «قسم صحة 1-ب» ينشئ طلب تمركز أولي باسم وحدته",
+   "detail": "RS-2026-0004"
+  },
+  {
+   "id": "OWN-submit",
+   "pass": true,
+   "what": "أُرسل الطلب",
+   "detail": "UNDER_REVIEW"
+  },
+  {
+   "id": "SEAT-01",
+   "pass": true,
+   "what": "صاحب المقعد الحالي (الموظف الأول، عمليات «إدارة الصحة» م9–10) يرى المهمة المعلقة",
+   "detail": "UNDER_REVIEW"
+  },
+  {
+   "id": "HR-SYNC",
+   "pass": true,
+   "what": "مزامنة الموارد البشرية نجحت ونقلت الشخصين",
+   "detail": "{\"units\": 1143, \"people\": 24, \"transfers\": 2, \"cycleUnits\": 0, \"durationMs\": 799, \"statements\": 5, \"activeUnits\": 1143, \"grantsEnded\": 3, \"orphanUnits\": 0, \"activePeople\": 24, \"linkedPeople\": 24, \"ski"
+  },
+  {
+   "id": "SEAT-REL",
+   "pass": true,
+   "what": "المقعد أُخلي للوحدة عند النقل (SEAT_UNIT_LEFT) ولم يُنقل إلى الوحدة الجديدة",
+   "detail": "UNIT_OPERATIONS_APPROVER:SEAT_UNIT_LEFT STATIONING_REQUESTER:HR_TRANSFER"
+  },
+  {
+   "id": "SEAT-02",
+   "pass": true,
+   "what": "صاحب المقعد السابق فقد المهمة المعلقة",
+   "detail": "403"
+  },
+  {
+   "id": "SETUP-opsb-UNIT_OPERATIONS_APPROVER",
+   "pass": true,
+   "what": "acc69b.opsb: UNIT_OPERATIONS_APPROVER @ عمليات إدارة الصحة",
+   "detail": "الجهة «إدارة الصحة»: المستوى 9 و10"
+  },
+  {
+   "id": "SEAT-03",
+   "pass": true,
+   "what": "صاحب المقعد الجديد يرى الطلب نفسه والمرحلة نفسها",
+   "detail": "stage a8928f56-8b4e-4a7f-9d90-0cc0cdd1544d"
+  },
+  {
+   "id": "SEAT-03b",
+   "pass": true,
+   "what": "صاحب المقعد الجديد يقرر المرحلة",
+   "detail": "UNDER_REVIEW"
+  },
+  {
+   "id": "SEAT-04",
+   "pass": true,
+   "what": "سجل القرار يحفظ الشخص الذي قرر فعلاً",
+   "detail": ""
+  },
+  {
+   "id": "OWN-01",
+   "pass": true,
+   "what": "بعد نقل مقدم الطلب: الطلب ما زال لـ«قسم صحة 1-ب»، ويراه مقدم طلبات الوحدة الآخر، ويبقى مقدمه في السجل",
+   "detail": "200 · قسم صحة 1-ب · مقدم طلبات قبول (b) — وهمي · UNDER_REVIEW"
+  },
+  {
+   "id": "OWN-02",
+   "pass": true,
+   "what": "مقدم الطلب المنقول لا يأخذ الطلب معه إلى وحدته الجديدة",
+   "detail": "403 · STATIONING_REQUESTER:HR_TRANSFER"
+  },
+  {
+   "id": "OWN-03",
+   "pass": true,
+   "what": "ملكية الطلب لم تتغير في قاعدة البيانات",
+   "detail": ""
+  },
+  {
+   "id": "ADMIN-OFFER-RESTORED",
+   "pass": true,
+   "what": "«الصلاحيات المتاحة للطلب» أُعيدت إلى ما كانت عليه قبل القبول",
+   "detail": "REQUESTER,CHAIN_APPROVER,UNIT_OPERATIONS_APPROVER,FYI_RECEIVER"
+  },
+  {
+   "id": "OFFLINE",
+   "pass": true,
+   "what": "لا طلب خارج localhost",
+   "detail": ""
+  }
+ ]
+}
