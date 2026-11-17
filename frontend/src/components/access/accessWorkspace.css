@@ -1,20 +1,20 @@
 /* «إدارة الصلاحيات والوحدات» (ADR-058): the layout of TNQL's access workspace in TMRKZ's own theme, both modes. */
-.aw { display: grid; gap: 14px; }
+.aw { display: grid; gap: 10px; }
 .aw-card, .aw-hero, .aw-stat, .aw-note { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; color: var(--ink); }
-.aw-hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 22px 26px; }
+.aw-hero { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; }
 .aw-eyebrow { display: block; font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
-.aw-hero h1 { margin: 0 0 6px; font-size: 26px; line-height: 1.3; }
-.aw-hero p { margin: 0; color: var(--muted); font-size: 13px; }
+.aw-hero h1 { margin: 0 0 4px; font-size: 20px; line-height: 1.3; }
+.aw-hero p { margin: 0; color: var(--muted); font-size: 12px; }
 .aw-studio { white-space: nowrap; }
 
-.aw-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
-.aw-stat { padding: 14px 18px; display: grid; gap: 2px; }
+.aw-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.aw-stat { padding: 8px 12px; display: grid; gap: 1px; }
 .aw-stat b { font: 700 24px Arial, sans-serif; }
 .aw-stat span { font-size: 12px; color: var(--muted); }
 
-.aw-card { padding: 14px; min-width: 0; }
-.aw-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.aw-head h2 { margin: 0; font-size: 16px; }
+.aw-card { padding: 10px; min-width: 0; }
+.aw-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.aw-head h2 { margin: 0; font-size: 14px; }
 .aw-head small { color: var(--muted); font-size: 11px; }
 .aw-num { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 5px; border-radius: 7px; font: 700 11px Arial, sans-serif;
   background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
@@ -24,11 +24,11 @@
 
 .aw-find-row { display: flex; gap: 10px; align-items: center; }
 .aw-seg { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
-.aw-seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; padding: 6px 14px; border-radius: 9px; cursor: pointer; }
+.aw-seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px; cursor: pointer; }
 .aw-seg button.on { background: var(--paper); color: var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 .aw-search-in { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 0 10px; background: var(--paper); }
 .aw-search-in .icon { width: 15px; height: 15px; color: var(--muted); flex: none; }
-.aw-search-in input { border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; padding: 8px 0; width: 100%; outline: none; }
+.aw-search-in input { border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12px; padding: 5px 0; width: 100%; outline: none; }
 .aw-search-in:focus-within { border-color: var(--accent); }
 .aw-grow { flex: 1; }
 .aw-hits { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; max-height: 260px; overflow: auto; }
@@ -38,7 +38,7 @@
 .aw-hits small { color: var(--muted); font-size: 11px; }
 
 /* the side panels' widths are the viewer's (owner, 16 Nov 2026): set on the dividers between the columns, see panelWidths.ts */
-.aw-cols { display: grid; grid-template-columns: var(--aw-tree, 330px) 14px minmax(0, 1fr); gap: 14px 0; align-items: start; }
+.aw-cols { display: grid; grid-template-columns: var(--aw-tree, 330px) 12px minmax(0, 1fr); gap: 10px 0; align-items: start; }
 .aw-divider { align-self: stretch; position: relative; cursor: col-resize; touch-action: none; outline: none; min-height: 120px; }
 .aw-divider > span { position: absolute; top: 0; bottom: 0; inset-inline-start: 50%; width: 2px; transform: translateX(-50%); border-radius: 2px; background: transparent; transition: background .12s; }
 /* the grip follows the scroll, so it stays in view beside a long list */
@@ -53,22 +53,22 @@ body:has(.aw-divider.dragging) { user-select: none; cursor: col-resize; }
 .aw-nodes, .aw-nodes ul { list-style: none; margin: 8px 0 0; padding: 0; }
 .aw-nodes ul { margin: 0; }
 .aw-tree > .aw-nodes { max-height: 640px; overflow: auto; }
-.aw-node { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 9px; border: 1px solid transparent; }
+.aw-node { display: flex; align-items: center; gap: 5px; padding: 2px 5px; border-radius: 8px; border: 1px solid transparent; }
 .aw-node.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .aw-twist { width: 20px; height: 20px; flex: none; display: inline-grid; place-items: center; border: 1px solid var(--line); border-radius: 6px;
   background: transparent; color: var(--ink); font: 700 13px Arial, sans-serif; cursor: pointer; padding: 0; }
 .aw-leaf { border-color: transparent; color: var(--muted); cursor: default; }
-.aw-node-name { flex: 1; min-width: 0; text-align: start; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; font-weight: 600;
+.aw-node-name { flex: 1; min-width: 0; text-align: start; border: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12px; font-weight: 600;
   cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 0; }
 .aw-counts { flex: none; display: inline-flex; align-items: center; gap: 2px; font-size: 10px; color: var(--muted); }
 .aw-counts .icon { width: 11px; height: 11px; }
 
-.aw-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
-.aw-manage, .aw-audit { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; min-width: 0; }
+.aw-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.aw-manage, .aw-audit { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
 .aw-main .aw-head { margin-bottom: 0; }
 .aw-title { display: grid; }
 .aw-tabs { margin-inline-start: auto; display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
-.aw-tabs button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; padding: 7px 14px; border-radius: 9px; cursor: pointer; }
+.aw-tabs button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 8px; cursor: pointer; }
 .aw-tabs button.on { background: var(--paper); color: var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
 .aw-empty { display: grid; place-items: center; gap: 6px; padding: 48px 12px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 14px; }
 .aw-empty .icon { width: 30px; height: 30px; }
@@ -94,7 +94,7 @@ body:has(.aw-divider.dragging) { user-select: none; cursor: col-resize; }
 .aw-avatar { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-weight: 700;
   background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); }
 .aw-who { display: grid; gap: 2px; min-width: 0; }
-.aw-who b, .aw-user b { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.aw-who b, .aw-user b { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
 .aw-who small, .aw-user small { color: var(--muted); font-size: 11px; }
 .aw-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
 .aw-dot.on { background: var(--green); }
@@ -109,7 +109,7 @@ body:has(.aw-divider.dragging) { user-select: none; cursor: col-resize; }
 .aw-acts .icon-button { width: 34px; height: 34px; border-radius: 9px; color: var(--accent); }
 .aw-acts .icon-button .icon { width: 16px; height: 16px; }
 
-.aw-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 9px 12px; border-radius: 12px; font-size: 12px;
+.aw-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 5px 10px; border-radius: 10px; font-size: 11px;
   border: 1px dashed color-mix(in srgb, var(--orange) 55%, var(--line)); background: color-mix(in srgb, var(--orange) 7%, transparent); }
 .aw-bar > span, .aw-bar > div { flex: 1; min-width: 200px; display: grid; gap: 3px; }
 .aw-bar.confirm { border-style: solid; border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
@@ -117,14 +117,14 @@ body:has(.aw-divider.dragging) { user-select: none; cursor: col-resize; }
 .aw-bar.ok { border-style: solid; border-color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); display: flex; }
 .aw-bar.ok .icon { width: 16px; height: 16px; color: var(--green); }
 .aw-bad-line { color: var(--red); }
-.aw-bulk { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid var(--accent); border-radius: 12px; font-size: 12px; }
+.aw-bulk { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 5px 10px; border: 1px solid var(--accent); border-radius: 12px; font-size: 12px; }
 
 .aw-table { overflow: auto; max-height: 560px; border: 1px solid var(--line); border-radius: 12px; }
-.aw-matrix { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
-.aw-matrix th { position: sticky; top: 0; z-index: 1; background: var(--soft); padding: 8px 10px; text-align: center; font-weight: 700; white-space: nowrap;
+.aw-matrix { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 11px; }
+.aw-matrix th { position: sticky; top: 0; z-index: 1; background: var(--soft); padding: 4px 6px; text-align: center; font-weight: 700; white-space: nowrap;
   border-bottom: 1px solid var(--line); }
 .aw-matrix th .icon { width: 12px; height: 12px; vertical-align: -1px; }
-.aw-matrix td { padding: 7px 10px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: middle; }
+.aw-matrix td { padding: 3px 6px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: middle; }
 .aw-matrix td.aw-user small { display: block; }
 .aw-matrix .aw-pick { width: 34px; }
 /* the row's choice and name stay in view while the roles scroll sideways, as in the movement programme */
@@ -132,9 +132,9 @@ body:has(.aw-divider.dragging) { user-select: none; cursor: col-resize; }
    while the permission columns scroll under them, with an accent edge after the position; narrower in a narrow panel, unpinned
    below 600 px — as admin-access-workspace.css `.pm-user-col` */
 .aw-table { container-type: inline-size; container-name: aw-matrix; }
-.aw-matrix { --w-pick: 36px; --w-mil: 100px; --w-rank: 100px; --w-name: 164px; --w-uid: 120px; --w-pos: 140px; }
+.aw-matrix { --w-pick: 36px; --w-mil: 120px; --w-rank: 100px; --w-name: 164px; --w-uid: 120px; --w-pos: 140px; }
 .aw-matrix .aw-pick, .aw-matrix .aw-c-mil, .aw-matrix .aw-c-rank, .aw-matrix .aw-user, .aw-matrix .aw-c-uid, .aw-matrix .aw-c-pos {
-  position: sticky; z-index: 2; background: var(--paper); box-sizing: border-box; text-align: start; }
+  position: sticky; z-index: 2; background: var(--paper); box-sizing: border-box; text-align: center; }
 .aw-matrix th.aw-pick, .aw-matrix th.aw-c-mil, .aw-matrix th.aw-c-rank, .aw-matrix th.aw-user, .aw-matrix th.aw-c-uid, .aw-matrix th.aw-c-pos {
   z-index: 3; background: var(--soft); text-align: center; }
 .aw-matrix .aw-pick { inset-inline-start: 0; width: var(--w-pick); min-width: var(--w-pick); max-width: var(--w-pick); padding-inline: 4px; text-align: center; }
@@ -146,18 +146,18 @@ body:has(.aw-divider.dragging) { user-select: none; cursor: col-resize; }
   color: var(--muted); overflow-wrap: anywhere; border-inline-end: 3px solid var(--accent); box-shadow: -9px 0 16px -12px color-mix(in srgb, var(--accent) 75%, transparent); }
 .aw-matrix th.aw-c-pos { color: inherit; }
 @container aw-matrix (max-width: 900px) {
-  .aw-matrix { --w-pick: 32px; --w-mil: 88px; --w-rank: 84px; --w-name: 132px; --w-uid: 96px; --w-pos: 112px; }
+  .aw-matrix { --w-pick: 32px; --w-mil: 104px; --w-rank: 84px; --w-name: 132px; --w-uid: 96px; --w-pos: 112px; }
   .aw-matrix .aw-pick, .aw-matrix .aw-c-mil, .aw-matrix .aw-c-rank, .aw-matrix .aw-user, .aw-matrix .aw-c-uid, .aw-matrix .aw-c-pos { padding: 6px; font-size: 11.5px; }
 }
 @container aw-matrix (max-width: 600px) {
   .aw-matrix td.aw-pick, .aw-matrix td.aw-c-mil, .aw-matrix td.aw-c-rank, .aw-matrix td.aw-user, .aw-matrix td.aw-c-uid, .aw-matrix td.aw-c-pos { position: static; }
   .aw-matrix th.aw-pick, .aw-matrix th.aw-c-mil, .aw-matrix th.aw-c-rank, .aw-matrix th.aw-user, .aw-matrix th.aw-c-uid, .aw-matrix th.aw-c-pos { inset-inline-start: auto; }
 }
-.aw-matrix th { white-space: normal; min-width: 76px; max-width: 120px; line-height: 1.3; }
+.aw-matrix th { white-space: normal; min-width: 62px; max-width: 100px; line-height: 1.25; }
 .aw-cell { white-space: nowrap; }
 .aw-cell.inh { background: color-mix(in srgb, var(--green) 9%, var(--paper)); }
 .aw-cell.staged { box-shadow: inset 0 0 0 2px var(--orange); }
-.aw-cell input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--blue); cursor: pointer; vertical-align: middle; }
+.aw-cell input[type='checkbox'] { width: 14px; height: 14px; accent-color: var(--blue); cursor: pointer; vertical-align: middle; }
 .aw-mark { margin-inline-start: 4px; font-size: 12px; font-weight: 700; }
 .aw-mark.inh { color: var(--green); }
 .aw-mark.tmp { color: var(--orange); }
@@ -165,7 +165,7 @@ body:has(.aw-divider.dragging) { user-select: none; cursor: col-resize; }
 .aw-lock .icon { width: 14px; height: 14px; }
 .aw-assign { min-width: 0; padding: 3px 8px; font-size: 11px; min-height: 0; }
 
-.aw-legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; color: var(--ink); }
+.aw-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10px; color: var(--ink); }
 .aw-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .aw-legend .sq { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 .sq.direct { background: var(--blue); }
