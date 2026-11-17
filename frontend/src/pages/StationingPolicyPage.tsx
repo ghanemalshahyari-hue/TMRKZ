@@ -209,6 +209,9 @@ export function StationingPolicyPage() {
               <legend>{leg === 'primary' ? 'الموقع ← منطقة الانتشار الرئيسية' : 'الرئيسية ← منطقة الانتشار الفرعية'}</legend>
               <label>من ({distWord}) <NumberField value={toDist(values[leg].minM)} onChange={(v) => set({ [leg]: { ...values[leg], minM: fromDist(v) ?? 0 } })} /></label>
               <label>إلى ({distWord}) <NumberField value={toDist(values[leg].maxM)} onChange={(v) => set({ [leg]: { ...values[leg], maxM: fromDist(v) ?? 0 } })} /></label>
+              {/* the area's own size (owner brief §9; ADR-088): free within these limits, checked by the server; empty: no limit */}
+              <label>أدنى مساحة ({areaWord}) <NumberField value={values[leg].minAreaM2 != null ? toArea(values[leg].minAreaM2) : null} onChange={(v) => set({ [leg]: { ...values[leg], minAreaM2: v == null ? null : fromArea(v) } })} /></label>
+              <label>أقصى مساحة ({areaWord}) <NumberField value={values[leg].maxAreaM2 != null ? toArea(values[leg].maxAreaM2) : null} onChange={(v) => set({ [leg]: { ...values[leg], maxAreaM2: v == null ? null : fromArea(v) } })} /></label>
               <TerrainExtraField
                 on={values[leg].terrainApplies}
                 extra={values[leg].terrainExtra ?? null}

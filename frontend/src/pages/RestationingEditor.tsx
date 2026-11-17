@@ -489,6 +489,15 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
       return;
     }
     const d = areaDefaultRef.current.value;
+    const k = shapingRef.current;
+    if (p === editTargetRef.current && k) {
+      // a ready shape from the area's toolbar, of the policy's initial area (owner brief §7)
+      shapingRef.current = null;
+      setShaping(null);
+      const ring = readyShape({ lat, lng }, k, d?.areaM2 ?? 90_000);
+      editorRef.current?.load({ type: 'Polygon', coordinates: [[...ring, ring[0]].map((q) => [q.lng, q.lat])] } as unknown as SiteGeometry, false);
+      return;
+    }
     if (p === editTargetRef.current && d) editorRef.current?.load(initialArea({ lat, lng }, d), false);
   };
 
@@ -985,8 +994,19 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
               placing={placing === deployTarget}
               areaDefault={areaDefault}
               policyVersion={policyVersion}
+              shaping={placing === deployTarget ? shaping : null}
+              onShape={(k) => {
+                editorRef.current?.cancelDrawing();
+                const on = !(placing === deployTarget && shaping === k);
+                shapingRef.current = on ? k : null;
+                setShaping(on ? k : null);
+                setPlacing(on ? deployTarget : null);
+                if (on) frameLeg(deployTarget, null);
+              }}
               onPlace={() => {
                 editorRef.current?.cancelDrawing();
+                shapingRef.current = null;
+                setShaping(null);
                 const on = placing !== deployTarget;
                 setPlacing(on ? deployTarget : null);
                 // the whole distance the area may be at, so the place can be clicked

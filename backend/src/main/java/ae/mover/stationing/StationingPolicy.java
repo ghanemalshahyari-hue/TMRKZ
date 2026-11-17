@@ -157,9 +157,19 @@ public record StationingPolicy(
     }
 
     /** One deployment relation: stationing site → primary, primary → alternative (centre to centre, O-04). */
-    public record Leg(double minM, double maxM, boolean terrainApplies, TerrainExtra terrainExtra) {
+    /**
+     * One deployment leg: its distance range, the terrain, and (owner brief §9, 18 Nov 2026; ADR-088) the area the area may
+     * have — {@code minAreaM2} optional, {@code maxAreaM2} its maximum; null (every version published before them): no limit.
+     * The shape is free within them; the server checks them.
+     */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    public record Leg(double minM, double maxM, boolean terrainApplies, TerrainExtra terrainExtra, Double minAreaM2, Double maxAreaM2) {
+        public Leg(double minM, double maxM, boolean terrainApplies, TerrainExtra terrainExtra) {
+            this(minM, maxM, terrainApplies, terrainExtra, null, null);
+        }
+
         public Leg(double minM, double maxM, boolean terrainApplies) {
-            this(minM, maxM, terrainApplies, null);
+            this(minM, maxM, terrainApplies, null, null, null);
         }
     }
 
@@ -215,6 +225,10 @@ public record StationingPolicy(
         for (var leg : List.of(primary, alternative)) {
             if (leg.minM() < 0 || leg.maxM() <= 0 || leg.minM() > leg.maxM()) {
                 out.add("نطاق مسافة غير صالح: " + leg.minM() + "–" + leg.maxM() + " م");
+            }
+            if ((leg.minAreaM2() != null && leg.minAreaM2() < 0) || (leg.maxAreaM2() != null && !(leg.maxAreaM2() > 0))
+                    || (leg.minAreaM2() != null && leg.maxAreaM2() != null && leg.minAreaM2() > leg.maxAreaM2())) {
+                out.add("حدود مساحة منطقة الانتشار غير صالحة: " + leg.minAreaM2() + "–" + leg.maxAreaM2() + " م²");
             }
         }
         Set<String> codes = classificationProblems(out);

@@ -2383,3 +2383,7 @@ Addition: the stationing requester is displayed «مقدم الطلب»; MOVER's
 ## ADR-087 The maximum footprint is decided by the final approver, not refused (owner, 17 Nov 2026)
 
 **Decision.** As a distance beyond the range (ADR-078), a proposed site larger than the policy's maximum is a flag, not a refusal: the checks say `areaOverMax`, every stage sees it, the submission's audit line records the area and the maximum, and the final approver accepts it with the request or returns it for the unit to reorganise the area. The requester may also bring the shape within the maximum in one click (`SiteEditor.scaleToArea`). The policy keeps the value; only its effect changes.
+
+## ADR-088 The deployment areas' own area limits in the stationing policy (owner brief §9, 18 Nov 2026)
+
+**Decision.** `StationingPolicy.Leg` gains optional `minAreaM2` and `maxAreaM2` (written only when set, so versions published before them read back unchanged and compare without spurious changes). The leg check refuses an area outside them, the same check for a request and for the setup; publishing refuses a minimum above the maximum. Unlike the proposed site's footprint (ADR-087), these are hard limits: the brief says the shape is free within them.

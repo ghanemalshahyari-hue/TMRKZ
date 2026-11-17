@@ -16,7 +16,7 @@ import { resolveAreaDefault, type AreaDefault } from '../lib/deploymentDefault';
 import { readyShape, type ShapeKind } from '../lib/shapeTransform';
 import { ToolGlyph } from '../components/stationing/ToolGlyph';
 import {
-  AREA_NAME, AREA_STEPS, MEASURED_FROM, areaChip, areaStepProblem, campTree, kmChip, overReason, rangeText, startStep, unitChoices, unitForest, verdictOf,
+  AREA_NAME, AREA_STEPS, MEASURED_FROM, areaChip, areaStepProblem, areaVerdict, campTree, kmChip, overReason, rangeText, startStep, unitChoices, unitForest, verdictOf,
   type AreaRole, type AreaStep, type CampNode, type UnitNode,
 } from '../lib/deploymentAreasFlow';
 import { distanceM, type LatLng } from '../lib/geo';
@@ -468,6 +468,7 @@ export function DeploymentAreasRequest({ onClose }: { onClose: () => void }) {
           <span className="da-chip">{areaChip(x.area)}</span>
           {r === role && dims && <span className="da-chip" data-testid={`dims-${r}`}>{Math.round(dims.width).toLocaleString('ar-AE')} م × {Math.round(dims.length).toLocaleString('ar-AE')} م</span>}
           {x.verdict && <span className={'da-chip is-' + x.verdict.tone}>{x.verdict.text}</span>}
+          {areaVerdict(x.area, leg) && <span className={'da-chip is-' + areaVerdict(x.area, leg)!.tone} data-testid={`area-verdict-${r}`}>{areaVerdict(x.area, leg)!.text}</span>}
           <button type="button" className={'da-chip da-info' + (info === r ? ' on' : '')} aria-expanded={info === r} aria-label="التفاصيل" data-testid={`info-${r}`} onClick={() => setInfo(info === r ? null : r)}>ⓘ</button>
         </div>
         {info === r && (
@@ -478,6 +479,7 @@ export function DeploymentAreasRequest({ onClose }: { onClose: () => void }) {
             <div><dt>الحد الأدنى</dt><dd>{leg ? kmChip(leg.minM) : '—'}</dd></div>
             <div><dt>الحد الأقصى</dt><dd>{leg ? kmChip(leg.maxM) : '—'}{leg?.terrainApplies ? ' (يزيد بطبيعة الأرض)' : ''}</dd></div>
             <div><dt>سبب التجاوز</dt><dd>{x.over || '—'}</dd></div>
+            {(leg?.minAreaM2 != null || leg?.maxAreaM2 != null) && <div><dt>حدود المساحة</dt><dd>{leg?.minAreaM2 != null ? areaChip(leg.minAreaM2) : '—'} – {leg?.maxAreaM2 != null ? areaChip(leg.maxAreaM2) : '—'}</dd></div>}
             <div><dt>نسخة السياسة</dt><dd>{policy ? policy.version : 'لا سياسة نافذة'}</dd></div>
           </dl>
         )}

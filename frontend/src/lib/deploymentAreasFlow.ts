@@ -127,6 +127,14 @@ export function verdictOf(distanceM: number, leg: { minM: number; maxM: number; 
   return leg.terrainApplies ? { text: '! أبعد من الحد الأساسي', tone: 'warn' } : { text: '✗ أبعد من المسموح', tone: 'bad' };
 }
 
+/** The area against the policy's limits of this leg (ADR-088); null when it has none. The server refuses outside them. */
+export function areaVerdict(areaM2: number, leg: { minAreaM2?: number | null; maxAreaM2?: number | null } | null): Verdict | null {
+  if (!leg || (leg.minAreaM2 == null && leg.maxAreaM2 == null)) return null;
+  if (leg.maxAreaM2 != null && areaM2 > leg.maxAreaM2) return { text: '✗ أكبر من المساحة المسموحة', tone: 'bad' };
+  if (leg.minAreaM2 != null && areaM2 < leg.minAreaM2) return { text: '✗ أصغر من المساحة المسموحة', tone: 'bad' };
+  return { text: '✓ المساحة ضمن المسموح', tone: 'ok' };
+}
+
 /** «المسموح 5–8 كم» */
 export const rangeText = (leg: { minM: number; maxM: number }) =>
   `المسموح ${(leg.minM / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 1 })}–${kmChip(leg.maxM)}`;

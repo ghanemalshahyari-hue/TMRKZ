@@ -1274,8 +1274,9 @@ export type TerrainExtra = { kind: 'ABSOLUTE' | 'PERCENT'; value: number };
 export type StationingPolicyValues = {
   maxFootprintAreaM2: number;
   deploymentRequirement: 'REQUIRED' | 'OPTIONAL' | null;
-  primary: { minM: number; maxM: number; terrainApplies: boolean; terrainExtra?: TerrainExtra | null };
-  alternative: { minM: number; maxM: number; terrainApplies: boolean; terrainExtra?: TerrainExtra | null };
+  /** Each leg's distance range, terrain, and (ADR-088) the area's own limits — null or absent: none. */
+  primary: { minM: number; maxM: number; terrainApplies: boolean; terrainExtra?: TerrainExtra | null; minAreaM2?: number | null; maxAreaM2?: number | null };
+  alternative: { minM: number; maxM: number; terrainApplies: boolean; terrainExtra?: TerrainExtra | null; minAreaM2?: number | null; maxAreaM2?: number | null };
   /** The footprint's maximum on ground that is not flat. Null or absent: none. */
   footprintTerrainExtra?: TerrainExtra | null;
   terrainSlopeClassification: { datasetCode: string; datasetVersion: string; classes: SlopeClassValue[] };

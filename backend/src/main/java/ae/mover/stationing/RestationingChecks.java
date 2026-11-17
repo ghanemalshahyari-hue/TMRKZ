@@ -549,6 +549,14 @@ public class RestationingChecks {
                     problems.add(label + ": " + e.getMessage());
                 }
             }
+            // the area's own size within the policy's limits (owner brief §9; ADR-088): the shape is free inside them
+            double area = geo.areaM2(toGeo);
+            if (cfg.maxAreaM2() != null && area > cfg.maxAreaM2()) {
+                problems.add(label + " أكبر من المساحة المسموحة (" + Math.round(area) + " م²، الحد الأقصى " + Math.round(cfg.maxAreaM2()) + " م²).");
+            }
+            if (cfg.minAreaM2() != null && area < cfg.minAreaM2()) {
+                problems.add(label + " أصغر من المساحة المسموحة (" + Math.round(area) + " م²، الحد الأدنى " + Math.round(cfg.minAreaM2()) + " م²).");
+            }
             conflicts = occupiedIntersecting(toGeo, moving, now);
             if (!conflicts.isEmpty()) {
                 // O-08: a hard block, never a warning

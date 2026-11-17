@@ -360,6 +360,31 @@ class SiteSetupIT extends RestationingTestBase {
         assertThat(areas(fresh2)).isZero();
     }
 
+    @Test
+    @DisplayName("SETUP-08 the policy's area limits of each deployment area are checked by the server (owner brief §9; ADR-088); a minimum above the maximum is not published")
+    void areaLimits() {
+        Res policy = login("sysadmin").get("/stationing/policy");
+        Map<String, Object> values = new LinkedHashMap<>(JSON.convertValue(policy.body().path("inForce").path("values"), Map.class));
+        Map<String, Object> primary = new LinkedHashMap<>(JSON.convertValue(policy.body().path("inForce").path("values").path("primary"), Map.class));
+        primary.put("minAreaM2", 200_000);
+        primary.put("maxAreaM2", 100_000);
+        values.put("primary", primary);
+        assertThat(login("sysadmin").post("/stationing/policy/versions", Map.of("values", values, "reason", "حدود مساحة للاختبار", "reference", "اختبار")).status())
+                .as("a minimum above the maximum is refused").isEqualTo(400);
+        primary.put("minAreaM2", 1_000);
+        primary.put("maxAreaM2", 50_000);
+        values.put("primary", primary);
+        Res published = login("sysadmin").post("/stationing/policy/versions", Map.of("values", values, "reason", "حدود مساحة للاختبار", "reference", "اختبار"));
+        assertThat(published.status()).as(published.toString()).isEqualTo(200);
+        // the unit's primary area (about 0.18 km²) is above the 50,000 m² maximum: refused, nothing written
+        Res big = login("setup").post("/site-setup", body("L", List.of(unit(fresh, 0))));
+        assertThat(big.status()).isEqualTo(400);
+        assertThat(String.join(" ", problems(big))).contains("أكبر من المساحة المسموحة");
+        assertThat(sitesNamed("L")).isZero();
+        // read back: the limits are part of the version in force
+        assertThat(login("sysadmin").get("/stationing/policy").body().path("inForce").path("values").path("primary").path("maxAreaM2").asDouble()).isEqualTo(50_000);
+    }
+
     private static JsonNode readTree(String s) {
         try {
             return JSON.readTree(s);

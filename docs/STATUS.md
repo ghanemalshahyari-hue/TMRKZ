@@ -1003,3 +1003,9 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Server:** the policy's maximum footprint no longer refuses a request; `RestationingChecks.Result.areaOverMax()` flags it on the checks every stage reads (`areaOverMax`), the submission's audit line records it, the final approver accepts it or returns the request (the existing return path).
 - **Screens:** the re-stationing editor keeps an oversized site valid (no red, «التالي» on) and says the approver decides, beside «ضبط المساحة على المسموح»; the checks card shows «⚠ المساحة تتجاوز الحد الأقصى» to every stage; the policy studio's wording follows.
 - **Checks:** `RestationingWorkflowIT` 16/16 (an oversized site is flagged, not refused; a smaller maximum flags a draft); `restationing-geometry.mjs` G7 updated to the new rule (not re-run here).
+
+## The area limits of each deployment area, and the toolbar on every area step (18 Nov 2026; ADR-088, ADR-084)
+
+- **Policy (owner brief §9):** each leg may have `minAreaM2` and `maxAreaM2` (optional; versions without them have no limit). The policy studio edits them per area; publishing refuses a minimum above the maximum; the server refuses an area outside them (`RestationingChecks.deploymentLeg`, every request and the setup); «طلب مناطق انتشار» shows an area chip («✓ المساحة ضمن المسموح» / «✗ أكبر/أصغر») and the limits in «ⓘ».
+- **Re-stationing areas:** the same toolbar as everywhere (select with the frame and handles, move, circle, ellipse, square, rectangle, free drawing, vertices, undo, redo, reset); the square keeps the policy's initial shape; the old buttons' accessible names stay on the square and free-drawing tools.
+- **Checks:** `SiteSetupIT` SETUP-08 (limits refused, a minimum above the maximum not published, the limits read back), `StationingRulesTest`, `StationingFoundationIT`, `RestationingWorkflowIT` — 70 tests; frontend 347.

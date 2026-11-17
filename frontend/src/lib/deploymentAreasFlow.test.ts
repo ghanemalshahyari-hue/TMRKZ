@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AREA_NAME, areaStepProblem, campTree, overReason, startStep, unitChoices, unitForest, verdictOf } from './deploymentAreasFlow';
+import { AREA_NAME, areaStepProblem, areaVerdict, campTree, overReason, startStep, unitChoices, unitForest, verdictOf } from './deploymentAreasFlow';
 
 const unit = (id: string, state: string, site = true) => ({ id, name: 'وحدة ' + id, state, site: site ? { id: 's' + id, name: 'موقع ' + id } : null });
 
@@ -52,6 +52,13 @@ describe('«طلب مناطق انتشار» (owner brief §4, phase 3)', () => 
     expect(areaStepProblem({ unitId: 'a', primary: null, alternative: null }, 3)).toContain('الرئيسية');
     expect(areaStepProblem({ unitId: 'a', primary: {}, alternative: null }, 4)).toContain('الفرعية');
     expect(areaStepProblem({ unitId: 'a', primary: {}, alternative: {} }, 4)).toBe('');
+  });
+
+  it('judges the area by the leg\'s own limits when the policy has them', () => {
+    expect(areaVerdict(50_000, { minAreaM2: 1_000, maxAreaM2: 40_000 })?.tone).toBe('bad');
+    expect(areaVerdict(500, { minAreaM2: 1_000, maxAreaM2: 40_000 })?.text).toContain('أصغر');
+    expect(areaVerdict(20_000, { minAreaM2: 1_000, maxAreaM2: 40_000 })?.tone).toBe('ok');
+    expect(areaVerdict(20_000, { minAreaM2: null, maxAreaM2: null })).toBeNull();
   });
 
   it('judges the distance by the policy range; beyond the base maximum the terrain may still allow it', () => {
