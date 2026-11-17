@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '../api/client';
+import { useApp } from '../lib/app';
 import { DEFAULT_BOARD, LIMITS, NOTE_KIND, boardProblem, moveNote, newNote, visibleNotes, type NoteKind, type SignInBoard, type SignInNote } from '../lib/signInNotes';
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -6,13 +8,28 @@ const today = () => new Date().toISOString().slice(0, 10);
 /**
  * «إرشادات صفحة الدخول» in the settings (owner, 17 Nov 2026): the board the sign-in page shows beside the form, edited here —
  * its heading, each note (guidance or an important notice, optional dates, hidden or shown), its order, new notes and
- * removed ones — with the board as it will look. Interface first: «حفظ» is connected to the server, and the sign-in page
- * reads the saved board, after the owner accepts the screen.
+ * removed ones — with the board as it will look. Saved on the server (audited); the sign-in page reads it (ADR-083).
  */
 export function SignInNotesSettings() {
+  const app = useApp();
   const [board, setBoard] = useState<SignInBoard>(DEFAULT_BOARD);
   const [open, setOpen] = useState<string | null>(null);
   const [savePending, setSavePending] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  // the saved board, or the page's own notes when none was saved
+  useEffect(() => {
+    api.signInBoard().then((r) => r.saved && r.board && setBoard(r.board), () => undefined);
+  }, []);
+  const save = () => {
+    setBusy(true);
+    setErr('');
+    api.saveSignInBoard(board).then((b) => {
+      setBoard(b);
+      setSavePending(true);
+      app.toast('حُفظت إرشادات صفحة الدخول');
+    }, (e: Error) => setErr(e.message)).finally(() => setBusy(false));
+  };
   const problem = boardProblem(board);
   const set = (b: Partial<SignInBoard>) => (setBoard({ ...board, ...b }), setSavePending(false));
   const setNote = (id: string, n: Partial<SignInNote>) => set({ notes: board.notes.map((x) => (x.id === id ? { ...x, ...n } : x)) });
@@ -77,10 +94,11 @@ export function SignInNotesSettings() {
           <label className="field"><span>السطر الأخير</span><input aria-label="السطر الأخير" maxLength={LIMITS.subheading} value={board.footer} onChange={(e) => set({ footer: e.target.value })} /></label>
           {problem && <p className="sg-err" role="alert">{problem}</p>}
           <div className="sg-add">
-            <button type="button" className="button primary" data-testid="save-notes" disabled={!!problem} onClick={() => setSavePending(true)}>حفظ</button>
+            <button type="button" className="button primary" data-testid="save-notes" disabled={!!problem || busy} onClick={save}>{busy ? 'جارٍ الحفظ…' : 'حفظ'}</button>
             <button type="button" className="button" onClick={() => (setBoard(DEFAULT_BOARD), setOpen(null), setSavePending(false))}>استعادة الإرشادات الأصلية</button>
           </div>
-          {savePending && <p className="micro muted" role="status" data-testid="notes-pending">نسخة الشاشة للمراجعة: لم يُحفظ شيء. يُربط الحفظ بالخادم وتقرأ صفحة الدخول الإرشادات المحفوظة بعد موافقة المالك على الشاشة.</p>}
+          {savePending && <p className="micro muted" role="status" data-testid="notes-saved">✓ حُفظت، وتظهر في صفحة الدخول.</p>}
+          {err && <p className="sg-err" role="alert">{err}</p>}
         </div>
         <aside className="sg-preview" aria-label="معاينة لوحة الدخول" data-testid="signin-preview">
           <small className="sg-preview-label">كما تظهر اليوم في صفحة الدخول</small>

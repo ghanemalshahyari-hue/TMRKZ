@@ -255,6 +255,7 @@
 :root[data-theme="dark"] .da-hover.is-warn { color: #e2bc78; }
 :root[data-theme="dark"] .da-hover.is-bad { color: #e1837a; }
 :root[data-theme="dark"] .da-tool.is-del { color: #e1837a; }
+:root[data-theme="dark"] .rs-delreq { color: #e1837a; }
 
 /* styles/map.css — light */
 :root[data-theme="light"] .segmented { background: #fbf9f6; }

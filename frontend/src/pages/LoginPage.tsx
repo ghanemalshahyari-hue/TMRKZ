@@ -3,6 +3,7 @@ import { ApiError, api } from '../api/client';
 import type { AuthStatus, Me } from '../api/types';
 import { ThemeToggle } from '../components/ThemeToggle';
 import '../styles/signin.css';
+import { DEFAULT_BOARD, visibleNotes, type SignInBoard } from '../lib/signInNotes';
 
 /** Messages for the error the server put in the address after a refused automatic sign-in (never a fallback). */
 const ERRORS: Record<string, string> = {
@@ -95,6 +96,13 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
   const [password, setPassword] = useState('');
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
+  // «إرشادات صفحة الدخول» (ADR-083): the board saved in the settings, read before signing in; the page's own notes otherwise
+  const [board, setBoard] = useState<SignInBoard>(() => ({ ...DEFAULT_BOARD, notes: visibleNotes(DEFAULT_BOARD.notes, new Date().toISOString().slice(0, 10)) }));
+  useEffect(() => {
+    api.signInNotices().then((r) => {
+      if (r.saved) setBoard({ heading: r.heading ?? '', subheading: r.subheading ?? '', footer: r.footer ?? '', notes: (r.notes ?? []).map((n) => ({ ...n, hidden: false, from: null, to: null })) });
+    }, () => undefined);
+  }, []);
   const usernameRef = useRef<HTMLInputElement>(null);
   const returnTo = '/' + (window.location.hash.startsWith('#auth-error') ? '' : window.location.hash);
 
@@ -236,26 +244,19 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
           </div>
         </main>
         <aside className="tm-board" aria-label="إرشادات الدخول">
+          {/* «إرشادات صفحة الدخول» from the settings (ADR-083); the page's own notes until one is saved */}
           <header className="tm-board-head">
-            <strong>إرشادات الدخول</strong>
-            <small>نظام المواقع والمرافق والإجراءات الإدارية</small>
+            <strong>{board.heading}</strong>
+            <small>{board.subheading}</small>
           </header>
-          <article className="tm-note">
-            <span className="tm-note-meta">الدخول الآلي</span>
-            <b>بالحساب المؤسسي</b>
-            <p>يتم عبر خدمة الدخول المؤسسية، ولا يطلب كلمة المرور إذا كنت قد سجلت الدخول فيها حديثاً.</p>
-          </article>
-          <article className="tm-note">
-            <span className="tm-note-meta">الإدخال اليدوي</span>
-            <b>حساب محلي أو حساب مؤسسي</b>
-            <p>يتحقق Keycloak من حسابي admin وdeveloper المحليين، ويتحقق الدليل المؤسسي من باقي الحسابات. لا يحفظ النظام كلمة المرور.</p>
-          </article>
-          <article className="tm-note">
-            <span className="tm-note-meta">الصلاحيات والحماية</span>
-            <b>الصلاحيات من جهتك</b>
-            <p>تُمنح الصلاحيات وفق انتمائك الوظيفي. يُوقف الدخول مؤقتاً بعد محاولات خاطئة متكررة.</p>
-          </article>
-          <footer className="tm-board-foot">التشغيل داخل الشبكة الداخلية فقط</footer>
+          {board.notes.map((n) => (
+            <article key={n.id} className={'tm-note' + (n.kind === 'NOTICE' ? ' is-notice' : '')} data-note-kind={n.kind}>
+              {n.meta && <span className="tm-note-meta">{n.meta}</span>}
+              <b>{n.title}</b>
+              <p>{n.text}</p>
+            </article>
+          ))}
+          <footer className="tm-board-foot">{board.footer}</footer>
         </aside>
       </section>
     </div>

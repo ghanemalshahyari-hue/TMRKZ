@@ -3,7 +3,9 @@
 //  2. the site's card: its facts, one «تعديل», and «حذف الموقع» for the administrator / «طلب حذف» for everyone else;
 //  3. «إعدادات النظام ← إرشادات صفحة الدخول»: the sign-in page's notes edited, added, ordered, hidden and removed, with a preview.
 // On http://localhost:8088 as the platform administrator, and as a synthetic requester of MOVER's directory (HR_AI) who
-// manages one unit's site. Nothing is deleted, requested or saved.
+// manages one unit's site. Connected (ADR-086): the deletion panel reads the server's impact; on these sites the server
+// names what stops a deletion (requests that refer to them), so nothing is deleted; the requester's «طلب حذف» is REAL and
+// the administrator then refuses it (the run leaves no open request behind).
 //   OTHER=juma.ghfly4 node tests/acceptance/site-card-review.mjs
 import { mkdirSync, readFileSync, rmSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -85,12 +87,15 @@ for (const theme of ['light', 'dark']) {
     await page.getByTestId('site-edit').getByRole('button', { name: 'إلغاء' }).click();
     // the administrator deletes a camp: its inside sites go with it, each named in a warning first (owner, 17 Nov 2026)
     await page.getByTestId('delete-site').click();
+    await page.getByTestId('delete-ack').waitFor({ timeout: 10000 });
+    await page.waitForTimeout(800);
     const imp = await text(page.getByTestId('delete-panel'));
     const warn = await text(page.getByTestId('delete-related'));
     await page.getByLabel('سبب الحذف').fill('موقع أُنشئ للاختبار — اختبار قبول وهمي');
-    ok(imp.includes('نهائياً') && warn.includes(kid.name) && await page.getByTestId('confirm-delete').isDisabled(), 'deleting a camp warns that its inside sites are deleted with it, naming each; erased completely', warn.slice(0, 160));
     await page.getByTestId('delete-ack').check();
-    ok(await page.getByTestId('confirm-delete').isEnabled(), 'it is confirmed only once «أفهم أن الحذف نهائي ويشمل المواقع الداخلية» is ticked and a reason given');
+    ok(imp.includes('نهائياً') && warn.includes(kid.name), 'deleting a camp warns that its inside sites are deleted with it, naming each; erased completely', warn.slice(0, 160));
+    const block1 = await page.getByTestId('delete-blockers').innerText().catch(() => '');
+    ok(block1.includes('الطلب') && await page.getByTestId('confirm-delete').isDisabled(), 'the server says what stops it (a request refers to the site): «حذف الموقع» stays off', block1.replace(/\s+/g, ' ').slice(0, 160));
     await page.locator('.tz-site-work').screenshot({ path: `${OUT}05-delete-with-inside-${theme}.png` });
     // a camp where a unit is stationed: the impact is said before the reason
     await page.getByTestId('setup-tree').locator(`[data-site="${stationed.siteCode}"]`).first().click();
@@ -101,8 +106,8 @@ for (const theme of ['light', 'dark']) {
     ok(imp2.includes(stationed.orgName) && imp2.includes('بلا تمركز') && imp2.includes('سجل التدقيق'), 'deleting says what goes with it: the unit\'s initial stationing and areas (the unit back to no stationing); one audit line stays', imp2.slice(0, 200));
     await page.getByLabel('سبب الحذف').fill('موقع أُنشئ للاختبار — اختبار قبول وهمي');
     await page.getByTestId('delete-ack').check();
-    await page.getByTestId('confirm-delete').click();
-    ok(await page.getByTestId('delete-pending').count() === 1, '«حذف الموقع» says it is not connected yet (the screen first)');
+    const block2 = await page.getByTestId('delete-blockers').innerText().catch(() => '');
+    ok(await page.getByTestId('confirm-delete').isDisabled() === (block2.length > 0), 'the delete is off exactly when the server names a reason', block2.replace(/\s+/g, ' ').slice(0, 160) || 'nothing stops it');
     await page.locator('.tz-site-work').screenshot({ path: `${OUT}06-delete-${theme}.png` });
   }
   await ctx.close();
@@ -124,8 +129,27 @@ for (const theme of ['light', 'dark']) {
   await page.getByLabel('سبب طلب الحذف').fill('الموقع لم يعد مستخدماً — اختبار قبول وهمي');
   await page.getByTestId('delete-ack').check();
   await page.getByTestId('send-delete-request').click();
-  ok(await page.getByTestId('delete-pending').count() === 1, '«إرسال طلب الحذف» says it is not connected yet (the screen first)');
+  await page.getByTestId('delete-request-open').waitFor({ timeout: 15000 });
+  ok(true, '«إرسال طلب الحذف» sends the request; the panel now says it waits for the system administrator', await page.getByTestId('delete-request-open').innerText());
   await page.locator('.tz-site-work').screenshot({ path: `${OUT}07-request-delete-light.png` });
+  await ctx.close();
+}
+// the administrator sees the request on the site and refuses it (the run leaves nothing open)
+{
+  const { ctx, page } = await open(admin, 'light', '#siteSetup');
+  const code = sites.find((s) => s.id === otherSite.id)?.code;
+  await page.getByTestId('setup-tree').locator(`[data-site="${code}"]`).first().waitFor({ timeout: 30000 });
+  await page.waitForTimeout(1500);
+  ok(await page.getByTestId('setup-tree').locator(`[data-site="${code}"]`).getByTestId('delete-requested').count() === 1, 'the administrator sees «طلب حذف» on the site in the list');
+  await page.getByTestId('setup-tree').locator(`[data-site="${code}"]`).first().click();
+  await page.getByTestId('delete-site').click();
+  await page.getByTestId('delete-request-open').waitFor({ timeout: 10000 });
+  await page.getByLabel('سبب الحذف').fill('الموقع ما زال مستخدماً — اختبار قبول وهمي');
+  await page.locator('.tz-site-work').screenshot({ path: `${OUT}08-admin-decides-light.png` });
+  await page.getByTestId('refuse-delete').click();
+  await page.waitForTimeout(1500);
+  const open2 = (await apiGet(admin, '/site-deletion-requests')).filter((q) => q.siteId === otherSite.id);
+  ok(open2.length === 0, 'the administrator refuses: the request is closed, the site stays', `open now: ${open2.length}`);
   await ctx.close();
 }
 
@@ -138,7 +162,7 @@ for (const theme of ['light', 'dark']) {
   if (theme === 'light') {
     const prev = await text(page.getByTestId('signin-preview'));
     ok(['الدخول الآلي', 'الإدخال اليدوي', 'الصلاحيات والحماية'].every((w) => prev.includes(w)), 'the settings start from the three notes the sign-in page shows today', prev.slice(0, 120));
-    await page.screenshot({ path: `${OUT}08-signin-notes-${theme}.png` });
+    await page.screenshot({ path: `${OUT}09-signin-notes-${theme}.png` });
     await page.getByTestId('add-notice').click();
     await page.getByLabel('التصنيف').fill('صيانة مجدولة');
     await page.getByLabel('عنوان الإرشاد').fill('توقف الخدمة للتحديث');
@@ -150,10 +174,14 @@ for (const theme of ['light', 'dark']) {
     ok(!prev3.includes('بالحساب المؤسسي'), 'a hidden note leaves the preview');
     await page.getByTestId('delete-note-1').click();
     ok(await page.locator('[data-note]').count() === 3, 'a note is removed with ✕');
+    await page.screenshot({ path: `${OUT}10-signin-notes-edited-${theme}.png` });
+    // saved for real (ADR-083): the run saves the page's own notes back, so the sign-in page is as it was
+    await page.getByRole('button', { name: 'استعادة الإرشادات الأصلية' }).click();
     await page.getByTestId('save-notes').click();
-    ok(await page.getByTestId('notes-pending').count() === 1, '«حفظ» says it is not connected yet (the screen first)');
-    await page.screenshot({ path: `${OUT}09-signin-notes-edited-${theme}.png` });
-  } else await page.screenshot({ path: `${OUT}08-signin-notes-${theme}.png` });
+    await page.getByTestId('notes-saved').waitFor({ timeout: 15000 });
+    const pub = await (await fetch(BASE + '/api/v1/auth/notices')).json();
+    ok(pub.saved === true && pub.notes.map((n) => n.title).join('|') === 'بالحساب المؤسسي|حساب محلي أو حساب مؤسسي|الصلاحيات من جهتك', '«حفظ» saves the board; the sign-in page reads it before anyone signs in', pub.notes.map((n) => n.title).join('، '));
+  } else await page.screenshot({ path: `${OUT}09-signin-notes-${theme}.png` });
   await ctx.close();
 }
 ok(JSON.stringify((await apiGet(admin, '/sites')).map((s) => s.id + s.status)) === sitesBefore, 'nothing was deleted');

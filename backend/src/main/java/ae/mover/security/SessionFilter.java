@@ -34,6 +34,8 @@ public class SessionFilter extends OncePerRequestFilter {
     private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS");
     private static final Set<String> PUBLIC = Set.of(
             "GET /api/v1/auth/status",
+            // «إرشادات صفحة الدخول»: only the notes shown today (ADR-083)
+            "GET /api/v1/auth/notices",
             "GET /api/v1/auth/oidc/start",
             "GET /api/v1/auth/oidc/callback",
             "POST /api/v1/auth/directory/login",

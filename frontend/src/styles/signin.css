@@ -271,3 +271,6 @@ html, body { margin: 0; min-height: 100%; }
 }
 .tm .theme-toggle:hover { border-color: var(--tm-gold); color: var(--tm-gold); }
 .tm .theme-toggle svg { width: 18px; height: 18px; }
+/* an important notice on the sign-in board (ADR-083) */
+.tm-note.is-notice { border-color: var(--tm-gold); box-shadow: inset 3px 0 0 var(--tm-gold); }
+

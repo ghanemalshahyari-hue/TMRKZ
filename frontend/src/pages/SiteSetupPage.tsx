@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent } from 'maplibre-gl';
 import { Marker, NavigationControl, ScaleControl } from 'maplibre-gl';
-import { api, newIdempotencyKey, type SiteOccupants, type SiteSetupBody, type SiteSetupCheck } from '../api/client';
+import { api, newIdempotencyKey, type SiteDeletionImpact, type SiteDeletionRequest, type SiteOccupants, type SiteSetupBody, type SiteSetupCheck } from '../api/client';
 import type { GeoPolygon, RestationingLeg, RestationingRequest, SiteDetail, SiteGeometry, StationingPolicyValues } from '../api/types';
 import { PITCH_3D, SITE_LOOK, SiteEditor, addOverlayLayer, frame, installedTerrain3d, type MapView, type SiteLive } from '../components/map/maplibre';
 import type { BasemapMode, Terrain3dSource } from '../components/map/maplibre/offlineStyle';
@@ -82,7 +82,10 @@ export function SiteSetupPage() {
   const [cardEdit, setCardEdit] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [delReason, setDelReason] = useState('');
-  const [delDone, setDelDone] = useState<'' | 'deleted' | 'requested'>('');
+  const [delImpact, setDelImpact] = useState<SiteDeletionImpact | null>(null);
+  const [delErr, setDelErr] = useState('');
+  // the administrator sees which sites someone asked to delete (ADR-086)
+  const [delRequests, setDelRequests] = useState<SiteDeletionRequest[]>([]);
   const [delAck, setDelAck] = useState(false);
   // the site list as a tree (owner, 17 Nov 2026): a camp's inside sites behind its arrow
   const [openSites, setOpenSites] = useState<Set<string>>(new Set());
@@ -699,7 +702,7 @@ export function SiteSetupPage() {
           ) : <span className="rs-twisty-gap" aria-hidden="true" />}
           <button className={'rs-item' + (s.siteId === selected ? ' active' : '')} data-site={s.code} onClick={() => (setAdding(false), setSelected(s.siteId))}>
             <span className="rs-item-head"><b>{s.name}</b><small className="tz-code">{s.code}</small></span>
-            <small>{depth === 0 ? 'موقع رئيسي' : 'موقع داخلي'} · {s.boundary ? 'حدود مسجلة' : 'علامة'}{kids.length > 0 && <span className="rs-kids"> · {kids.length === 1 ? 'موقع داخلي واحد' : kids.length + ' مواقع داخلية'}</span>}</small>
+            <small>{depth === 0 ? 'موقع رئيسي' : 'موقع داخلي'} · {s.boundary ? 'حدود مسجلة' : 'علامة'}{kids.length > 0 && <span className="rs-kids"> · {kids.length === 1 ? 'موقع داخلي واحد' : kids.length + ' مواقع داخلية'}</span>}{delRequests.some((q) => q.siteId === s.siteId) && <span className="rs-delreq" data-testid="delete-requested"> · طلب حذف</span>}</small>
           </button>
         </div>
         {canSites && s.siteId === selected && (
@@ -955,9 +958,28 @@ export function SiteSetupPage() {
     setCardEdit(false);
     setDelOpen(false);
     setDelReason('');
-    setDelDone('');
+    setDelImpact(null);
+    setDelErr('');
     setDelAck(false);
   }, [selected]);
+  useEffect(() => {
+    if (admin) api.siteDeletionRequests().then(setDelRequests, () => setDelRequests([]));
+  }, [admin, app.revision]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the impact comes from the server when the panel opens: the inside sites, the units, and what stops it
+  useEffect(() => {
+    if (!delOpen || !site) return;
+    setDelImpact(null);
+    api.siteDeletion(site.siteId).then(setDelImpact, (e: Error) => setDelErr(e.message));
+  }, [delOpen, site?.siteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const runDelete = (what: () => Promise<unknown>, done: string, after?: () => void) => {
+    setDelErr('');
+    setBusy(true);
+    what().then(() => {
+      app.toast(done);
+      app.bump();
+      after?.();
+    }, (e: Error) => setDelErr(e.message)).finally(() => setBusy(false));
+  };
   const facts: [string, React.ReactNode][] = site ? [
     ['النوع', detail?.kind || '—'],
     ['المكان', detail?.parentId ? `داخل «${nameOf(detail.parentId)}»` : 'موقع رئيسي'],
@@ -971,37 +993,68 @@ export function SiteSetupPage() {
   const subtree = (id: string): typeof sites => (byParent.get(id) ?? []).flatMap((k) => [k, ...subtree(k.siteId)]);
   const related = site ? subtree(site.siteId) : [];
   const unitsAt = (id: string) => registered.current.filter((r) => r.siteId === id).map((r) => `«${r.orgName}»`);
+  const pendingDel = delImpact?.pending ?? null;
+  const blockers = delImpact?.blockers ?? [];
+  const insideDel = delImpact?.inside ?? related.map((k) => ({ id: k.siteId, code: k.code, name: k.name }));
   const deletePanel = site && (
     <section className="tz-card sc-delete" data-testid="delete-panel">
       <h4>{admin ? `حذف «${site.name}» نهائياً؟` : `طلب حذف «${site.name}»`}</h4>
+      {!delImpact && !delErr && <p className="sw-hint">جارٍ فحص ما يشمله الحذف…</p>}
       <ul className="sc-impact">
         <li>يُحذف الموقع نهائياً من النظام: بياناته وحدوده ورمزه. لا يمكن التراجع عن الحذف.</li>
-        {!!occ?.stationed.length && <li>يُحذف تمركز {occ.stationed.map((u) => `«${u.orgName}»`).join('، ')} المبدئي فيه ومناطق انتشاره، وتعود الوحدة بلا تمركز.</li>}
+        {!!delImpact?.stationed.length && <li>يُحذف تمركز {delImpact.stationed.map((u) => `«${u.unit}»`).join('، ')} فيه ومناطق انتشاره، وتعود الوحدة بلا تمركز.</li>}
         <li>يبقى في سجل التدقيق سطر واحد: من حذف الموقع ومتى ولماذا.</li>
         {!admin && <li>يصل الطلب إلى مدير النظام، فيعتمد الحذف أو يرفضه، ويصلك قراره.</li>}
       </ul>
-      {related.length > 0 && (
+      {insideDel.length > 0 && (
         <div className="sc-warn" role="alert" data-testid="delete-related">
-          <b>⚠ يُحذف معه {related.length === 1 ? 'موقع داخلي واحد' : related.length + ' مواقع داخلية'} وكل ما فيها:</b>
+          <b>⚠ يُحذف معه {insideDel.length === 1 ? 'موقع داخلي واحد' : insideDel.length + ' مواقع داخلية'} وكل ما فيها:</b>
           <ul>
-            {related.map((k) => {
-              const u = unitsAt(k.siteId);
-              return <li key={k.siteId}>«{k.name}» <small className="tz-code">{k.code}</small>{u.length ? ` — ويُحذف تمركز ${u.join('، ')} فيه` : ''}</li>;
+            {insideDel.map((k) => {
+              const u = unitsAt(k.id);
+              return <li key={k.id}>«{k.name}» <small className="tz-code">{k.code}</small>{u.length ? ` — ويُحذف تمركز ${u.join('، ')} فيه` : ''}</li>;
             })}
           </ul>
         </div>
       )}
-      <label className="sc-ack"><input type="checkbox" data-testid="delete-ack" checked={delAck} onChange={(e) => setDelAck(e.target.checked)} />
-        <span>{related.length ? 'أفهم أن الحذف نهائي ويشمل المواقع الداخلية أعلاه.' : 'أفهم أن الحذف نهائي.'}</span></label>
-      <label className="sw-f"><span className="sw-l">{admin ? 'سبب الحذف' : 'سبب طلب الحذف'}</span>
-        <textarea className="sw-input" rows={2} aria-label={admin ? 'سبب الحذف' : 'سبب طلب الحذف'} value={delReason} onChange={(e) => setDelReason(e.target.value)} />
-      </label>
+      {blockers.length > 0 && (
+        <div className="sc-warn" role="alert" data-testid="delete-blockers">
+          <b>لا يُحذف الآن:</b>
+          <ul>{blockers.map((b) => <li key={b}>{b}</li>)}</ul>
+        </div>
+      )}
+      {pendingDel && (
+        <p className={admin ? 'sc-pending' : 'sw-hint'} data-testid="delete-request-open">
+          {admin ? `طلب حذف من ${pendingDel.requester}: «${pendingDel.reason}»` : `طلب حذف مفتوح بانتظار مدير النظام: «${pendingDel.reason}»`}
+        </p>
+      )}
+      {(admin || !pendingDel) && (
+        <>
+          <label className="sc-ack"><input type="checkbox" data-testid="delete-ack" checked={delAck} onChange={(e) => setDelAck(e.target.checked)} />
+            <span>{insideDel.length ? 'أفهم أن الحذف نهائي ويشمل المواقع الداخلية أعلاه.' : 'أفهم أن الحذف نهائي.'}</span></label>
+          <label className="sw-f"><span className="sw-l">{admin ? (pendingDel ? 'سبب القرار' : 'سبب الحذف') : 'سبب طلب الحذف'}</span>
+            <textarea className="sw-input" rows={2} aria-label={admin ? 'سبب الحذف' : 'سبب طلب الحذف'} value={delReason} onChange={(e) => setDelReason(e.target.value)} />
+          </label>
+        </>
+      )}
       <div className="sc-actions">
-        <button type="button" className="button sc-danger" data-testid={admin ? 'confirm-delete' : 'send-delete-request'} disabled={delReason.trim().length < 5 || !delAck}
-          onClick={() => setDelDone(admin ? 'deleted' : 'requested')}>{admin ? (related.length ? `حذف الموقع و${related.length === 1 ? 'موقعه الداخلي' : 'مواقعه الداخلية'}` : 'حذف الموقع') : 'إرسال طلب الحذف'}</button>
-        <button type="button" className="button" onClick={() => { setDelOpen(false); setDelDone(''); setDelAck(false); }}>إلغاء</button>
+        {admin && (
+          <button type="button" className="button sc-danger" data-testid="confirm-delete" disabled={busy || !delImpact || blockers.length > 0 || delReason.trim().length < 5 || !delAck}
+            onClick={() => runDelete(() => (pendingDel ? api.decideSiteDeletion(pendingDel.id, 'APPROVE', delReason) : api.deleteSite(site.siteId, delReason)), 'حُذف الموقع', () => { setDelOpen(false); setSelected(null); setDelReason(''); })}>
+            {pendingDel ? 'اعتماد الحذف' : insideDel.length ? `حذف الموقع و${insideDel.length === 1 ? 'موقعه الداخلي' : 'مواقعه الداخلية'}` : 'حذف الموقع'}
+          </button>
+        )}
+        {admin && pendingDel && (
+          <button type="button" className="button" data-testid="refuse-delete" disabled={busy || delReason.trim().length < 5}
+            onClick={() => runDelete(() => api.decideSiteDeletion(pendingDel.id, 'REFUSE', delReason), 'رُفض طلب الحذف', () => { setDelOpen(false); setDelReason(''); })}>رفض الطلب</button>
+        )}
+        {!admin && !pendingDel && (
+          <button type="button" className="button sc-danger" data-testid="send-delete-request" disabled={busy || !delImpact || delReason.trim().length < 5 || !delAck}
+            onClick={() => runDelete(() => api.requestSiteDeletion(site.siteId, delReason), 'أُرسل طلب الحذف إلى مدير النظام', () => api.siteDeletion(site.siteId).then(setDelImpact))}>إرسال طلب الحذف</button>
+        )}
+        <button type="button" className="button" onClick={() => { setDelOpen(false); setDelAck(false); setDelErr(''); }}>إغلاق</button>
       </div>
-      {delDone && <p className="sw-hint" role="status" data-testid="delete-pending">نسخة الشاشة للمراجعة: لم {delDone === 'deleted' ? 'يُحذف' : 'يُرسل'} شيء. يُربط {delDone === 'deleted' ? 'الحذف' : 'طلب الحذف واعتماده'} بالخادم بعد موافقة المالك على الشاشة.</p>}
+      {delErr && <p className="sw-err" role="alert" data-testid="delete-error">{delErr}</p>}
     </section>
   );
   const sitePanel = site && (
@@ -1019,7 +1072,7 @@ export function SiteSetupPage() {
           <div className="sc-actions" data-testid="site-actions">
             {mayManage && <button type="button" className="button primary" data-testid="edit-site" onClick={openEdit}>تعديل</button>}
             {canSites && <button type="button" className="button" data-testid="add-inside" onClick={() => startAdd({ siteId: site.siteId, name: site.name })}>＋ موقع داخل</button>}
-            {mayManage && <button type="button" className="button sc-danger-link" data-testid={admin ? 'delete-site' : 'request-delete'} aria-pressed={delOpen} onClick={() => { setDelOpen(!delOpen); setDelDone(''); }}>{admin ? 'حذف الموقع' : 'طلب حذف'}</button>}
+            {mayManage && <button type="button" className="button sc-danger-link" data-testid={admin ? 'delete-site' : 'request-delete'} aria-pressed={delOpen} onClick={() => { setDelOpen(!delOpen); setDelErr(''); }}>{admin ? 'حذف الموقع' : 'طلب حذف'}</button>}
           </div>
         )}
         {cardEdit && detail && (

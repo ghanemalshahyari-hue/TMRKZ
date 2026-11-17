@@ -36,6 +36,8 @@ public record StationingEvent(
         TEMPORARY_STATIONING_CANCELLED,
         STATIONING_RETURNED,
         STATIONING_CORRECTED,
+        /** The site was deleted (ADR-086): the unit's stationing there is gone, it is stationed nowhere. */
+        STATIONING_REMOVED,
         SITE_LINK_CREATED,
         SITE_LINK_ENDED
     }

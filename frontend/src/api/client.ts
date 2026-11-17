@@ -1,3 +1,4 @@
+import type { SignInBoard } from '../lib/signInNotes';
 import type {
   HierarchyLevel,
   SiteLinkRecord,
@@ -308,6 +309,16 @@ export type HubAction = { action: string; allowed: boolean; reason: string | nul
 export type HubUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; state: string; site: { id: string; name: string; lat: number | null; lng: number | null; geometry: { type: string; coordinates: unknown } | null } | null; actions: HubAction[] };
 export type RequestHub = { actions: HubAction[]; units: HubUnit[]; unitsTotal: number };
 /** «موقع جديد» of the setup administrator (ADR-067): the site, its initial stationing and each unit's two areas, in one save. */
+export type SiteDeletionRequest = { id: string; siteId: string; siteCode: string; siteName: string; requester: string; reason: string; requestedAt: string; state: string; decisionReason: string | null };
+export type SiteDeletionImpact = {
+  site: { id: string; code: string; name: string };
+  inside: { id: string; code: string; name: string }[];
+  stationed: { unit: string; site: string }[];
+  blockers: string[];
+  canDelete: boolean;
+  canRequest: boolean;
+  pending: SiteDeletionRequest | null;
+};
 export type SiteSetupBody = {
   site: { code: string; name: string; kind: string; parentId?: string | null; responsibleOrgId: string | null; capacity?: number | null; location: { lat: number; lng: number }; notes?: string | null; reason?: string; symbol?: string | null };
   boundary: { geometry: SiteGeometry; crs: string; expectedVersion: number; reason: string; method: string } | null;
@@ -664,6 +675,16 @@ export const api = {
   }) => post<Site>('/sites', body),
   updateSite: (id: string, body: { code: string; name: string; kind: string; parentId: string | null; responsibleOrgId?: string | null; capacity: number | null; location: { lat: number; lng: number } | null; notes?: string | null; reason: string }) => put<Site>(`/sites/${id}`, body),
   createSiteWithBoundary: (body: { site: { code: string; name: string; kind: string; parentId?: string | null; responsibleOrgId: string | null; capacity?: number | null; location: { lat: number; lng: number }; notes?: string | null; reason?: string; symbol?: string | null }; boundary: { geometry: SiteGeometry; crs: string; expectedVersion: number; reason: string; method: string } }) => post<Site>('/sites/with-boundary', body),
+  /** «إرشادات صفحة الدخول» (ADR-083): today's notes before sign-in; the whole board in the settings. */
+  signInNotices: () => get<{ saved: boolean; heading?: string; subheading?: string; footer?: string; notes?: { id: string; kind: 'GUIDE' | 'NOTICE'; meta: string; title: string; text: string }[] }>('/auth/notices'),
+  signInBoard: () => get<{ saved: boolean; board?: SignInBoard }>('/settings/sign-in-notes'),
+  saveSignInBoard: (board: SignInBoard) => put<SignInBoard>('/settings/sign-in-notes', board),
+  /** Deleting a site (ADR-086): its impact and blockers, the administrator's delete, a request, and the decision on one. */
+  siteDeletion: (id: string) => get<SiteDeletionImpact>(`/sites/${id}/deletion`),
+  deleteSite: (id: string, reason: string) => post<{ deleted: string[]; unitsStationedNowhere: string[] }>(`/sites/${id}/deletion`, { reason }),
+  requestSiteDeletion: (id: string, reason: string) => post<SiteDeletionRequest>(`/sites/${id}/deletion-requests`, { reason }),
+  siteDeletionRequests: () => get<SiteDeletionRequest[]>('/site-deletion-requests'),
+  decideSiteDeletion: (id: string, decision: 'APPROVE' | 'REFUSE', reason: string) => post<unknown>(`/site-deletion-requests/${id}/decision`, { decision, reason }),
   setSiteSymbol: (id: string, body: { symbol: string | null; reason: string }) => put<{ sidc?: string; standard?: string }>(`/sites/${id}/symbol`, body),
   saveSiteGeometry: (id: string, body: { geometry: SiteGeometry; crs: string; expectedVersion: number; reason: string; method: string }) => post<unknown>(`/sites/${id}/geometry`, body),
   siteOccupants: (id: string) => get<SiteOccupants>(`/sites/${id}/occupants`),
