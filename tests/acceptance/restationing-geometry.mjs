@@ -441,8 +441,8 @@ try {
     const sub = await (await as(user)).post(`/restationing-requests/${id}/submit`, {});
     const v = await viewOf(user, id);
     const landed = dist(partsOf(v.content.site.geometry)[0][0][2], target);
-    ok(warn.includes('المساحة تتجاوز الحد الأقصى المعتمد') && ch.problems.some((x) => x.includes('تتجاوز الحد الأقصى المعتمد')) && sub.status === 400 && siteProblemIn(sub, 'تتجاوز الحد الأقصى المعتمد') && v.state === 'DRAFT', 'G7',
-      'beyond the configured maximum footprint: shown immediately and refused by the server (hard block)', `${await readout(page)}; server: ${ch.problems.find((x) => x.includes('تتجاوز'))}; submit ${sub.status}; state ${v.state}; vertex landed ${Math.round(landed)} m from the aimed point`);
+    ok(ch.areaOverMax === true && !ch.problems.some((x) => x.includes('تتجاوز الحد الأقصى')) && sub.status === 200,
+      'beyond the configured maximum footprint: flagged for the final approver, who accepts it or returns it; the request is sent (ADR-087)', `${await readout(page)}; server: ${ch.problems.find((x) => x.includes('تتجاوز'))}; submit ${sub.status}; state ${v.state}; vertex landed ${Math.round(landed)} m from the aimed point`);
     await page.screenshot({ path: shot('G7-max-area.png') });
     await page.context().close();
   }

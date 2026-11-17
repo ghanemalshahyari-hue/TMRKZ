@@ -49,6 +49,11 @@ public class RestationingChecks {
         public boolean ok() {
             return problems.isEmpty();
         }
+
+        /** The proposed site's area is beyond the policy's maximum: a flag for the approvers, not a refusal (ADR-087). */
+        public boolean areaOverMax() {
+            return siteAreaM2 != null && siteAreaM2 > maxFootprintAreaM2 + 0.5;
+        }
     }
 
     private final JdbcClient jdbc;
@@ -347,10 +352,8 @@ public class RestationingChecks {
             } else {
                 area = geo.areaM2(siteGeo);
                 maxFootprint = maxFootprintFor(siteGeo, policy, policyVersion);
-                if (area > maxFootprint) {
-                    problems.add("مساحة الموقع المقترح (" + Math.round(area) + " م²) تتجاوز الحد الأقصى المعتمد ("
-                            + Math.round(maxFootprint) + " م²).");
-                }
+                // beyond the maximum the request still goes: flagged on every stage, decided by its final approver, who may
+                // return it to reorganise the area (owner, 17 Nov 2026; ADR-087) — as a distance beyond the range (ADR-078)
                 siteConflicts = occupiedIntersecting(siteGeo, c.scope(), now);
                 if (!siteConflicts.isEmpty()) {
                     problems.add("الموقع المقترح يتداخل مع: " + String.join("، ", siteConflicts));

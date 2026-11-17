@@ -223,7 +223,7 @@ export function StationingPolicyPage() {
             <NumberField label="الحد الأقصى لمساحة الموقع المقترح" value={toArea(values.maxFootprintAreaM2)} onChange={(v) => set({ maxFootprintAreaM2: fromArea(v) })} />
             {values.maxFootprintAreaM2 > 0 && (
               <span className="muted" data-testid="max-footprint-m2">
-                = {metres2(values.maxFootprintAreaM2)}: لا يُقبل موقع مقترح أكبر من هذه المساحة
+                = {metres2(values.maxFootprintAreaM2)}: الموقع المقترح الأكبر منها يُعرض على المعتمد النهائي، فيقبله أو يعيد الطلب لتعديل المساحة
               </span>
             )}
           </label>

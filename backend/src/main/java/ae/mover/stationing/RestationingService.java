@@ -393,6 +393,10 @@ public class RestationingService {
             detail.put("carried", carried.size());
             detail.put("terrain", view.get("terrain"));
             detail.put("site", siteFacts(r.content()));
+            if (res.areaOverMax()) {
+                // the area beyond the maximum, sent for the final approver to decide (ADR-087)
+                detail.put("areaOverMax", Map.of("areaM2", Math.round(res.siteAreaM2()), "maxM2", Math.round(res.maxFootprintAreaM2())));
+            }
             if (res.needsDistanceException()) {
                 // O-17: the written reason of every distance exception, with the submission it belongs to; the final approver
                 // decides the excess with the request (ADR-078)
@@ -1852,6 +1856,7 @@ public class RestationingService {
         m.put("policyVersion", policyVersion);
         m.put("siteAreaM2", res.siteAreaM2() == null ? null : Math.round(res.siteAreaM2()));
         m.put("maxFootprintAreaM2", Math.round(res.maxFootprintAreaM2()));
+        m.put("areaOverMax", res.areaOverMax());
         m.put("siteConflicts", res.siteConflicts());
         List<Map<String, Object>> legs = new ArrayList<>();
         List<Map<String, Object>> terrainAudit = new ArrayList<>();

@@ -350,4 +350,5 @@ select.sw-input { appearance: auto; }
 .da-draft { width: 100%; margin-top: 6px; }
 .sc-pending { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--accent); background: var(--soft); font-size: 13px; font-weight: 700; }
 .rs-delreq { color: #c0392b; font-weight: 700; }
+.rs-over { color: #c98a1b; font-weight: 700; }
 

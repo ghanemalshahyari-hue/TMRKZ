@@ -236,10 +236,13 @@ class RestationingWorkflowIT extends RestationingTestBase {
         Map<String, Object> partial = new LinkedHashMap<>(onOwn);
         partial.put("scope", List.of(team.toString()));
         assertThat(problems(create("req", partial))).anyMatch(p -> p.contains("يتداخل"));
-        // footprint beyond the policy maximum
+        // footprint beyond the policy maximum: not a refusal, a flag the approvers decide (ADR-087)
         Map<String, Object> big = permanent(List.of(sec));
         big.put("site", Map.of("geometry", square(lat0 - 0.03, lng0, 0.004), "shape", "DRAWN"));
-        assertThat(problems(create("req", big))).anyMatch(p -> p.contains("الحد الأقصى"));
+        String bigId = create("req", big);
+        JsonNode bigChecks = login("req").get("/restationing-requests/" + bigId + "/checks").body();
+        assertThat(texts(bigChecks.path("problems"))).noneMatch(p -> p.contains("الحد الأقصى"));
+        assertThat(bigChecks.path("areaOverMax").asBoolean()).isTrue();
         // one deployment area alone, with the policy requiring both
         Map<String, Object> one = permanent(List.of(sec));
         one.put("alternative", null);
@@ -338,7 +341,7 @@ class RestationingWorkflowIT extends RestationingTestBase {
         String fresh = create("req", permanent(List.of(sec)));
         JsonNode draft = login("req").get("/restationing-requests/" + fresh + "/checks").body();
         assertThat(draft.path("policyVersion").asInt()).as("a draft is checked against the version in force").isGreaterThan(pinned);
-        assertThat(texts(draft.path("problems"))).anyMatch(p -> p.contains("الحد الأقصى"));
+        assertThat(draft.path("areaOverMax").asBoolean()).as("the new, smaller maximum flags the draft (ADR-087)").isTrue();
     }
 
     @SuppressWarnings("unchecked")

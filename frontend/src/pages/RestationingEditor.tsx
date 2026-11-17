@@ -304,7 +304,7 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
     guideRef.current = new PointerGuide(m);
     m.on('mousemove', (e) => moveRef.current(e));
     // the maximum footprint is the site's rule; a deployment area has none
-    editorRef.current = new SiteEditor(m, { onChange: (l, f) => onSiteRef.current(l, f), maxAreaM2: () => (editTargetRef.current === 'site' ? maxAreaRef.current : null), onDrawShape: (shape) => slopeInsideRef.current?.update(editTargetRef.current, shape ? [[shape]] : null, true) });
+    editorRef.current = new SiteEditor(m, { onChange: (l, f) => onSiteRef.current(l, f), maxAreaM2: () => null, onDrawShape: (shape) => slopeInsideRef.current?.update(editTargetRef.current, shape ? [[shape]] : null, true) });
     editorRef.current.load(contentRef.current.site?.geometry ?? null);
     loadedTarget.current = 'site';
     // the current site stays visible as reference above the copy that starts exactly on it
@@ -1301,7 +1301,7 @@ function PlaceControls({ editor, listeners, setMode, maxAreaM2, occupiedHits, sh
       {!open && area != null && maxAreaM2 != null && area > maxAreaM2 && (
         <div className="stw-fit" data-testid="fit-area">
           <button type="button" className="button primary" onClick={() => editor.current?.scaleToArea(maxAreaM2)}>ضبط المساحة على المسموح ({formatArea(maxAreaM2)})</button>
-          <small>يُصغَّر الشكل كله بالنسبة نفسها حول مركزه حتى الحد الأقصى، ويبقى في مكانه. «تراجع» يعيده.</small>
+          <small>المساحة تتجاوز الحد الأقصى ({formatArea(maxAreaM2)}). يمكنك المتابعة والإرسال: يُعرض التجاوز على المعتمد النهائي، فيقبله أو يعيد الطلب لتعديل المساحة. أو صغّر الشكل كله بالنسبة نفسها حول مركزه حتى الحد الأقصى («تراجع» يعيده).</small>
         </div>
       )}
 

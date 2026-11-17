@@ -1237,6 +1237,8 @@ export type RestationingChecks = {
   route?: { key: string; kind: string; label: string; unit: Ref | null; satisfies: string[]; final: boolean }[];
   /** A leg beyond the range within the exception margin: the request is flagged and the final approver decides it (ADR-078). */
   needsDistanceException?: boolean;
+  /** The proposed site's area beyond the policy's maximum: flagged, the final approver decides or returns it (ADR-087). */
+  areaOverMax?: boolean;
 };
 
 /** One authoritative stationing of a unit at a site (`GET /stationing/current`); a site link is a different record. */

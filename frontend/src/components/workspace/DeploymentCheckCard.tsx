@@ -29,6 +29,11 @@ export function DeploymentCheckCard({ request, checks, compact = false }: { requ
           مساحة موقع إعادة التمركز: <b>{Number(checks.siteAreaM2).toLocaleString('ar-AE')} م²</b> من حد {Number(checks.maxFootprintAreaM2).toLocaleString('ar-AE')} م²
         </p>
       )}
+      {checks?.areaOverMax && (
+        <p className="tz-fact-line rs-over" data-testid="area-over-max">
+          ⚠ المساحة تتجاوز الحد الأقصى: يقرر المعتمد النهائي قبولها، أو يعيد الطلب لتعديل المساحة.
+        </p>
+      )}
       {rows.map((r) => (
         <div key={r.leg} className={'tz-leg rs-leg ' + r.tone} data-leg={r.leg}>
           <div className="tz-leg-head">
