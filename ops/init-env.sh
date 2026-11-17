@@ -6,7 +6,8 @@ rand() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c "$1"; }
 if [ -f .env ]; then
   # Existing values are never changed; keys introduced by later versions are added once.
   for k in TMRKZ_HR_SETTINGS_KEY:48 TMRKZ_OIDC_CLIENT_SECRET:48 TMRKZ_KEYCLOAK_DB_PASSWORD:32 TMRKZ_KEYCLOAK_ADMIN_PASSWORD:32 \
-           TMRKZ_OPENFGA_DB_PASSWORD:32 TMRKZ_OPENFGA_API_TOKEN:48 TMRKZ_PLATFORM_ADMIN_PASSWORD:20            TMRKZ_PLATFORM_DEVELOPER_PASSWORD:20; do
+           TMRKZ_OPENFGA_DB_PASSWORD:32 TMRKZ_OPENFGA_API_TOKEN:48 TMRKZ_PLATFORM_OIDC_CLIENT_SECRET:48 \
+           TMRKZ_PLATFORM_ADMIN_PASSWORD:20 TMRKZ_PLATFORM_DEVELOPER_PASSWORD:20; do
     name=${k%%:*}; len=${k##*:}
     grep -q "^$name=" .env || { echo "$name=$(rand "$len")" >> .env; echo "added $name"; }
   done
@@ -18,6 +19,7 @@ fi
   echo "MOVER_ATTESTATION_KEY=$(rand 48)"
   echo "TMRKZ_HR_SETTINGS_KEY=$(rand 48)"
   echo "TMRKZ_OIDC_CLIENT_SECRET=$(rand 48)"
+  echo "TMRKZ_PLATFORM_OIDC_CLIENT_SECRET=$(rand 48)"
   echo "TMRKZ_KEYCLOAK_DB_PASSWORD=$(rand 32)"
   echo "TMRKZ_KEYCLOAK_ADMIN_PASSWORD=$(rand 32)"
   echo "TMRKZ_OPENFGA_DB_PASSWORD=$(rand 32)"

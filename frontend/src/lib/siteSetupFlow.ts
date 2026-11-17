@@ -80,6 +80,19 @@ export function toggleUnit(units: UnitPlan[], u: { id: string; name: string }): 
   return units.some((x) => x.id === u.id) ? units.filter((x) => x.id !== u.id) : [...units, { id: u.id, name: u.name, primary: null, alternative: null }];
 }
 
+/**
+ * The responsible unit is the stationed unit (owner, 17 Nov 2026, ADR-076): in the setup it heads the plan and stays there
+ * while it is responsible; a unit that was responsible before and was added that way leaves with its areas. A responsible unit
+ * stationed elsewhere (`blocked`) is not added — the page says why.
+ */
+export function withResponsible(units: UnitPlan[], responsible: { id: string; name: string } | null, previous: string | null, blocked: string): UnitPlan[] {
+  const out = previous && previous !== responsible?.id ? units.filter((u) => u.id !== previous) : units;
+  if (!responsible) return out;
+  if (blocked) return out.filter((u) => u.id !== responsible.id);
+  const have = out.find((u) => u.id === responsible.id);
+  return [have ?? { id: responsible.id, name: responsible.name, primary: null, alternative: null }, ...out.filter((u) => u.id !== responsible.id)];
+}
+
 /** One unit's area placed, moved or removed; the other unit's areas, and its own other area, stay as they are. */
 export function withArea(units: UnitPlan[], id: string, role: 'primary' | 'alternative', g: GeoPolygon | null): UnitPlan[] {
   return units.map((u) => (u.id === id ? { ...u, [role]: g } : u));

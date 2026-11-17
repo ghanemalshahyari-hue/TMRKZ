@@ -1,6 +1,7 @@
 package ae.mover;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.File;
 import java.net.InetAddress;
@@ -249,6 +250,82 @@ class DirectorySignInIT extends IntegrationTest {
             Files.move(aside, CA_FILE, StandardCopyOption.REPLACE_EXISTING);
         }
         assertThat(signIn(uid("carol"), PASSWORD_OK).status()).isEqualTo(200);
+    }
+
+    /** The manual authenticator for another directory: service search, or the direct bind of ADR-070. */
+    private static ae.mover.security.DirectoryAuthenticator authenticator(String url, Path caDir, boolean direct) {
+        return new ae.mover.security.DirectoryAuthenticator(new ae.mover.security.LdapProperties(url, true, "cn=service," + BASE,
+                "service-secret", BASE, "uid", "entryUUID", "employeeNumber", "inetOrgPerson", caDir.toString(), null, 3000, 5000, 0, 0,
+                null, null, null, null, null, direct ? "uid={username}," + PEOPLE : null, null));
+    }
+
+    @Test
+    @DisplayName("ADR-070: a trusted directory certificate issued for another host name is refused over StartTLS and LDAPS, before any bind")
+    void wrongHostname() throws Exception {
+        // A second fictional directory whose certificate (trusted through its CA folder) names directory.elsewhere.test and
+        // 127.0.0.1 only: dialled as "localhost" the name does not match; dialled as 127.0.0.1 it does (the control).
+        Path dir = Files.createTempDirectory("tmrkz-ldap-host");
+        File keystore = dir.resolve("other.p12").toFile();
+        String keytool = Path.of(System.getProperty("java.home"), "bin", "keytool").toString();
+        run(keytool, "-genkeypair", "-alias", "other", "-keyalg", "RSA", "-keysize", "2048", "-dname", "CN=directory.elsewhere.test",
+                "-ext", "SAN=dns:directory.elsewhere.test,ip:127.0.0.1", "-validity", "2", "-keystore", keystore.getPath(),
+                "-storetype", "PKCS12", "-storepass", "changeit", "-keypass", "changeit");
+        Path ca = Files.createDirectories(dir.resolve("ca"));
+        run(keytool, "-exportcert", "-rfc", "-alias", "other", "-keystore", keystore.getPath(), "-storetype", "PKCS12",
+                "-storepass", "changeit", "-file", ca.resolve("other-ca.pem").toString());
+        List<String> requests = new java.util.concurrent.CopyOnWriteArrayList<>();
+        InMemoryDirectoryServerConfig cfg = new InMemoryDirectoryServerConfig(BASE);
+        cfg.addAdditionalBindCredentials("cn=service," + BASE, "service-secret");
+        SSLUtil server = new SSLUtil(new KeyStoreKeyManager(keystore, "changeit".toCharArray(), "PKCS12", "other"), new TrustAllTrustManager());
+        cfg.setListenerConfigs(
+                InMemoryListenerConfig.createLDAPConfig("starttls", InetAddress.getLoopbackAddress(), 0, server.createSSLSocketFactory()),
+                InMemoryListenerConfig.createLDAPSConfig("ldaps", InetAddress.getLoopbackAddress(), 0, server.createSSLServerSocketFactory(),
+                        new SSLUtil(new TrustAllTrustManager()).createSSLSocketFactory()));
+        cfg.setAccessLogHandler(new java.util.logging.Handler() {
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                requests.add(String.valueOf(record.getMessage()));
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        });
+        InMemoryDirectoryServer other = new InMemoryDirectoryServer(cfg);
+        other.add("dn: " + BASE, "objectClass: domain", "dc: tmrkz");
+        other.add("dn: " + PEOPLE, "objectClass: organizationalUnit", "ou: people");
+        other.add("dn: uid=hostcheck," + PEOPLE, "objectClass: inetOrgPerson", "uid: hostcheck", "cn: Host check", "sn: check",
+                "employeeNumber: E-hostcheck", "userPassword: " + PASSWORD_OK);
+        other.startListening();
+        try {
+            int startTls = other.getListenPort("starttls");
+            int ldaps = other.getListenPort("ldaps");
+            for (String url : List.of("ldap://localhost:" + startTls, "ldaps://localhost:" + ldaps)) {
+                for (boolean direct : List.of(false, true)) {
+                    ae.mover.security.DirectoryAuthenticator wrongHost = authenticator(url, ca, direct);
+                    assertThatThrownBy(() -> wrongHost.authenticate("hostcheck", PASSWORD_OK))
+                            .as(url + (direct ? " direct" : " service"))
+                            .isInstanceOfSatisfying(ae.mover.security.DirectoryAuthenticator.DirectoryException.class,
+                                    e -> assertThat(e.failure()).isEqualTo(ae.mover.security.DirectoryAuthenticator.Failure.TLS));
+                }
+            }
+            assertThat(requests).as("no credential reached a directory whose name did not match").noneMatch(m -> m.contains("BIND"));
+
+            // the control: the same certificate and trust, dialled by a name it carries, binds and finds the person
+            for (String url : List.of("ldap://127.0.0.1:" + startTls, "ldaps://127.0.0.1:" + ldaps)) {
+                for (boolean direct : List.of(false, true)) {
+                    assertThat(authenticator(url, ca, direct).authenticate("hostcheck", PASSWORD_OK).username())
+                            .as(url + (direct ? " direct" : " service")).isEqualTo("hostcheck");
+                }
+            }
+            assertThat(requests).anyMatch(m -> m.contains("BIND"));
+        } finally {
+            other.shutDown(true);
+        }
     }
 
     @Test

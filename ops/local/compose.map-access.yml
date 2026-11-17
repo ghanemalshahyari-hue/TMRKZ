@@ -1,0 +1,12 @@
+# Shared-folder map access for the one local installation. ops/local/up.sh derives TMRKZ_MAP_GID from
+# TMRKZ_MAP_ROOT. The map stays read-only; the worker is nginx, never root. Mounting these two source files also lets
+# an offline installation receive the map-serving correction without rebuilding its preserved web image.
+services:
+  web:
+    entrypoint: ["/bin/sh", "/etc/tmrkz/map-worker.sh"]
+    command: ["nginx", "-g", "daemon off;"]
+    environment:
+      TMRKZ_MAP_GID: ${TMRKZ_MAP_GID:?run through ops/local/up.sh}
+    volumes:
+      - ./ops/local/map-worker.sh:/etc/tmrkz/map-worker.sh:ro
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro

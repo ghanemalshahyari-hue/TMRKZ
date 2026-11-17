@@ -1312,6 +1312,11 @@ public class RestationingService {
 
     /** The units a right reaches through the actor's grants, each confirmed like every other check. */
     public Set<UUID> reach(AccessContext ctx, Permission permission) {
+        if (ctx.canEverywhere(permission)) {
+            // a grant over everything, confirmed once, reaches every unit: no per-unit confirmation over the whole tree
+            // (a system administrator's «طلب إعادة التمركز», ADR-073)
+            return new HashSet<>(jdbc.sql("select id from organization").query(UUID.class).list());
+        }
         Set<UUID> ids = new HashSet<>();
         for (Grant g : ctx.grants()) {
             if (!g.has(permission)) {

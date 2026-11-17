@@ -127,10 +127,26 @@ public class RequestHubService {
                 continue; // the person does not hold this right: no card at all
             }
             boolean allowed = offered.stream().anyMatch(x -> Boolean.TRUE.equals(x.get("allowed")));
+            if (!allowed && "RESTATIONING".equals(kind) && all.size() > units.size()) {
+                // the list holds the first units only; a re-stationing may be asked for any stationed unit in reach (a system
+                // administrator reaches every unit, ADR-073)
+                allowed = anyStationed(requests.reach(ctx, Permission.CREATE_RESTATIONING), now);
+            }
             cards.add(action(kind, allowed, String.valueOf(offered.get(0).get("reason")), null));
         }
         out.put("actions", cards);
         return out;
+    }
+
+    /** Whether any of these units has a stationing in effect now (the same record the home counts read). */
+    private boolean anyStationed(Set<UUID> units, Instant now) {
+        if (units.isEmpty()) {
+            return false;
+        }
+        return jdbc.sql("""
+                select exists (select 1 from org_stationing s where s.organization_id = any(string_to_array(:ids, ',')::uuid[])
+                   and s.valid_from <= :now and (s.valid_to is null or s.valid_to > :now) and s.start_held_at is null)""")
+                .param("ids", Db.ids(List.copyOf(units))).param("now", Db.ts(now)).query(Boolean.class).single();
     }
 
     @SuppressWarnings("unchecked")

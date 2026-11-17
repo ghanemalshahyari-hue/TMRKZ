@@ -36,7 +36,8 @@
     ]
   },
   "scopeMappings": [
-    { "client": "tmrkz-web", "roles": ["tmrkz-platform"] }
+    { "client": "tmrkz-web", "roles": ["tmrkz-platform"] },
+    { "client": "tmrkz-platform-password", "roles": ["tmrkz-platform"] }
   ],
   "clients": [
     {
@@ -150,6 +151,45 @@
           "config": {
             "user.attribute": "tmrkz_position",
             "claim.name": "tmrkz_position",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "tmrkz-platform-password",
+      "name": "TMRKZ manual platform accounts",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${TMRKZ_PLATFORM_OIDC_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "consentRequired": false,
+      "frontchannelLogout": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": {
+        "use.refresh.tokens": "false",
+        "post.logout.redirect.uris": "${TMRKZ_PUBLIC_URL}/?signed-out=1"
+      },
+      "defaultClientScopes": ["basic", "profile"],
+      "optionalClientScopes": [],
+      "protocolMappers": [
+        {
+          "name": "platform role",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "tmrkz_roles",
+            "multivalued": "true",
             "jsonType.label": "String",
             "id.token.claim": "true",
             "access.token.claim": "false",

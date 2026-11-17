@@ -25,7 +25,7 @@ import { formatArea } from '../lib/footprint';
 import { distanceM } from '../lib/geo';
 import { legText } from '../lib/requestMap';
 import { anchorOf, partsOf, siteArea } from '../lib/siteGeometry';
-import { isSetupAdmin, lastStep, nextStep, policyLeg, prevStep, setupBody, setupProblem, stepsFor, toggleUnit, unitBlock, unitLines, withArea, type SetupStep, type UnitPlan } from '../lib/siteSetupFlow';
+import { isSetupAdmin, lastStep, nextStep, policyLeg, prevStep, setupBody, setupProblem, stepsFor, toggleUnit, unitBlock, unitLines, withArea, withResponsible, type SetupStep, type UnitPlan } from '../lib/siteSetupFlow';
 import { symbolEntry } from '../lib/siteSymbols';
 import { MAIN_KINDS, cornersOf, outlineOf, rowsOf, shapeText, stepProblem, type PointRow } from '../lib/siteWizard';
 import { previewLeg } from '../lib/terrainAnalysis';
@@ -108,6 +108,14 @@ export function SiteSetupPage() {
   const steps = stepsFor(admin);
   const last = lastStep(admin);
   const [plan, setPlan] = useState<UnitPlan[]>([]);
+  // the responsible unit is the stationed unit (owner, 17 Nov 2026, ADR-076): it heads the setup's plan while responsible
+  const ownerBlock = admin && owner ? unitBlock(owner.id, registered.current) : '';
+  const previousOwner = useRef<string | null>(null);
+  useEffect(() => {
+    if (!admin) return;
+    setPlan((p) => withResponsible(p, owner, previousOwner.current, ownerBlock));
+    previousOwner.current = owner?.id ?? null;
+  }, [admin, owner?.id, ownerBlock]); // eslint-disable-line react-hooks/exhaustive-deps
   const [active, setActive] = useState<string | null>(null);
   const [placingArea, setPlacingArea] = useState(false);
   const [areaVertices, setAreaVertices] = useState(4);
@@ -731,7 +739,7 @@ export function SiteSetupPage() {
       ))}
       {card(4, 'أي وحدة مسؤولة عنه؟', (
         owner && !ownerOpen ? (
-          <div className="sw-picked" data-testid="owner-picked"><span className="sw-ok">✓</span><div><b>{owner.name}</b><small>تدير الموقع، ولا يعني ذلك أنها متمركزة فيه.</small></div>
+          <div className="sw-picked" data-testid="owner-picked"><span className="sw-ok">✓</span><div><b>{owner.name}</b><small>{admin ? (ownerBlock ? `تدير الموقع، وهي ${ownerBlock}.` : 'الجهة المسؤولة هي الوحدة المتمركزة في هذا الموقع.') : 'تدير الموقع، ولا يعني ذلك أنها متمركزة فيه.'}</small></div>
             <button type="button" className="sw-link" onClick={() => setOwnerOpen(true)}>تغيير</button></div>
         ) : (
           // the units as their hierarchy, loaded one level at a time, with a search across every branch the person may see
@@ -833,14 +841,16 @@ export function SiteSetupPage() {
         <>
           <div className="sw-sub sw-tree" data-testid="setup-units">
             <UnitTree source={unitSource} label="وحدات التمركز الابتدائي" search="ابحث عن وحدة في كل الفروع…" searchLabel="بحث عن وحدة للتمركز" revision={app.revision}
-              checked={chosen} checkData="setup-unit" onCheck={(o) => setPlan((p) => toggleUnit(p, o))} disabled={(o) => (chosen.has(o.id) ? null : unitBlock(o.id, registered.current) || null)} />
+              checked={chosen} checkData="setup-unit" onCheck={(o) => { if (o.id !== owner?.id) setPlan((p) => toggleUnit(p, o)); }}
+              disabled={(o) => (o.id === owner?.id && !ownerBlock ? 'الجهة المسؤولة' : chosen.has(o.id) ? null : unitBlock(o.id, registered.current) || null)} />
           </div>
-          <p className="sw-hint">اختياري. تُختار الوحدات التي لا تمركز لها فقط، كل وحدة بنفسها: لا ينتقل معها من يتبعها، ولا يتغير الهيكل التنظيمي.</p>
+          {owner && ownerBlock && <p className="sw-hint" data-testid="owner-blocked">الجهة المسؤولة «{owner.name}» {ownerBlock}؛ لا تتمركز هنا مرة ثانية.</p>}
+          <p className="sw-hint">{owner && !ownerBlock ? `«${owner.name}» الجهة المسؤولة، فهي متمركزة في هذا الموقع. ` : ''}تُضاف وحدات أخرى إن وُجدت، التي لا تمركز لها فقط، كل وحدة بنفسها: لا ينتقل معها من يتبعها، ولا يتغير الهيكل التنظيمي.</p>
         </>
       ))}
       {card(2, plan.length ? `المختارة (${plan.length})` : 'المختارة', plan.length ? (
         <ul className="sw-list" data-testid="setup-chosen">
-          {plan.map((u) => <li key={u.id} className="sw-row"><b>{u.name}</b><button type="button" className="sw-link" onClick={() => setPlan((p) => toggleUnit(p, u))}>إزالة</button></li>)}
+          {plan.map((u) => <li key={u.id} className="sw-row"><b>{u.name}</b>{u.id === owner?.id ? <span className="pill" data-testid="setup-responsible">الجهة المسؤولة</span> : <button type="button" className="sw-link" onClick={() => setPlan((p) => toggleUnit(p, u))}>إزالة</button>}</li>)}
         </ul>
       ) : <p className="sw-hint">لم تُختر وحدة: يُسجَّل الموقع وحده.</p>)}
       {requirementHint && <p className="sw-hint" data-testid="setup-requirement">{requirementHint}</p>}

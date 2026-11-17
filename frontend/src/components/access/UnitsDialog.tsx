@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../api/client';
-import type { HierarchyLevel } from '../../api/types';
-import type { TreeItem, TreeSource } from '../tree/tree';
+import type { HierarchyLevel, OrgBranch } from '../../api/types';
+import type { TreeSource } from '../tree/tree';
 import { UnitTree } from '../tree/UnitTree';
 import { Dialog, DialogHead, Icon } from '../ui';
 import './unitsDialog.css';
@@ -35,18 +35,7 @@ export function chainCoveredText(u: UnitChoice, units: number | undefined): stri
  * chosen units, each with its own reach. A newly ticked unit starts as «الوحدة فقط», so nothing widens without being chosen; a
  * final approver is given a whole unit with its levels, or every unit. The server still refuses what the granter may not give.
  */
-/**
- * A tree the dialog is given instead of asking the access workspace's endpoints: the final approval of a permission request
- * (ADR-069) anchors roles in the person's main-unit branch, read with the request itself, and counts what a choice covers locally.
- */
-export type LocalUnits = {
-  source: TreeSource<TreeItem>;
-  levels: HierarchyLevel[];
-  mainIds: Set<string>;
-  count: (id: string, mode: UnitChoice['mode'], levels: number[]) => number | undefined;
-};
-
-export function UnitsDialog({ roleName, home, value, everything, finalApprover, chain = false, person, local, allowEverything = true, onSave, onClose }: {
+export function UnitsDialog({ roleName, home, value, everything, finalApprover, chain = false, person, onSave, onClose }: {
   roleName: string;
   home: { id: string; name: string };
   value: UnitChoice[];
@@ -55,28 +44,25 @@ export function UnitsDialog({ roleName, home, value, everything, finalApprover, 
   /** «معتمد السلسلة الهرمية» (ADR-061, TNQL's dialog): «هذا المستوى فقط» (the default) or with every unit below it; no main unit. */
   chain?: boolean;
   person?: string;
-  local?: LocalUnits;
-  /** «كل الوحدات الحالية والمستقبلية» for a final approver: only a global access manager gives it */
-  allowEverything?: boolean;
   onSave: (units: UnitChoice[], everything: boolean) => void;
   onClose: () => void;
 }) {
   const [rows, setRows] = useState<UnitChoice[]>(value);
   const [all, setAll] = useState(everything);
-  const [mainIds, setMainIds] = useState<Set<string>>(local?.mainIds ?? new Set());
-  const [levels, setLevels] = useState<HierarchyLevel[]>(local?.levels ?? []);
+  const [mainIds, setMainIds] = useState<Set<string>>(new Set());
+  const [levels, setLevels] = useState<HierarchyLevel[]>([]);
   const [covered, setCovered] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const asked = useRef<Record<string, string>>({});
 
   useEffect(() => {
-    if (!local) api.hierarchyLevels().then(setLevels).catch(() => setLevels([]));
-  }, [local]);
+    api.hierarchyLevels().then(setLevels).catch(() => setLevels([]));
+  }, []);
 
   // the one units tree (owner, 16 Nov 2026): from the main units the granter may reach, and a search inside them only
-  const mainRef = useRef<Set<string>>(local?.mainIds ?? new Set());
-  const source = useMemo<TreeSource<TreeItem>>(
-    () => local?.source ?? ({
+  const mainRef = useRef<Set<string>>(new Set());
+  const source = useMemo<TreeSource<OrgBranch>>(
+    () => ({
       roots: async () => {
         const mains = await api.grantRoots();
         mainRef.current = new Set(mains.map((m) => m.id));
@@ -91,7 +77,7 @@ export function UnitsDialog({ roleName, home, value, everything, finalApprover, 
             .map((h) => ({ item: h, path: (h.path ?? []).map((x) => x.name).join(' ‹ '), trail: (h.path ?? []).map((x) => x.id) })),
         ),
     }),
-    [local],
+    [],
   );
 
   // what each row covers today, asked only when the row's reach changes
@@ -100,16 +86,11 @@ export function UnitsDialog({ roleName, home, value, everything, finalApprover, 
       const key = r.mode + ':' + r.levels.join(',');
       if (asked.current[r.id] === key || r.mode === 'ONE' || (r.mode === 'LEVELS' && !r.levels.length)) continue;
       asked.current[r.id] = key;
-      if (local) {
-        const n = local.count(r.id, r.mode, r.levels);
-        if (n != null) setCovered((c) => ({ ...c, [r.id]: n }));
-        continue;
-      }
       api.scopePreview(r.id, true, r.mode === 'LEVELS' ? r.levels : undefined)
         .then((p) => setCovered((c) => ({ ...c, [r.id]: p.units })))
         .catch(() => undefined);
     }
-  }, [rows, local]);
+  }, [rows]);
 
   const chosen = useMemo(() => new Set(rows.map((r) => r.id)), [rows]);
   const isMain = (id: string) => chain && mainIds.has(id);
@@ -140,7 +121,7 @@ export function UnitsDialog({ roleName, home, value, everything, finalApprover, 
             )}
           </div>
         )}
-        {finalApprover && !chain && allowEverything && (
+        {finalApprover && !chain && (
           <label className="check-label">
             <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} /> كل الوحدات الحالية والمستقبلية
           </label>

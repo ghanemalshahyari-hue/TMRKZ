@@ -409,6 +409,50 @@ class StationingNextIT extends RestationingTestBase {
     }
 
     @Test
+    @DisplayName("ADR-073: «مدير النظام» submits «طلب إعادة تمركز» for any unit; the request is that unit's, goes through the approvals and is never decided by the administrator; the other request types stay with their own roles")
+    void systemAdministratorRequestsRestationing() {
+        UUID adminId = person("platformAdmin", "SYSTEM_ADMIN", top);
+        Api admin = login("platformAdmin");
+        String perms = admin.get("/me").body().path("permissions").toString();
+        assertThat(perms).as("one operational right, no reading or deciding").contains("CREATE_RESTATIONING", "CONFIGURE", "MANAGE_ACCESS")
+                .doesNotContain("\"VIEW\"", "APPROVE", "CREATE_INITIAL_STATIONING", "CREATE_DEPLOYMENT_REQUEST", "REQUEST_SITE_REGISTRATION");
+        Res units = admin.get("/restationing-requests/units");
+        assertThat(units.status()).as(units.toString()).isEqualTo(200);
+        assertThat(units.body().toString()).as("every unit, in every branch").contains(sec.toString(), team.toString(), otherSec.toString());
+        JsonNode restationCard = null;
+        for (JsonNode c : admin.get("/request-hub").body().path("actions")) {
+            if ("RESTATIONING".equals(c.path("action").asText())) {
+                restationCard = c;
+            }
+        }
+        assertThat(restationCard).as("«طلب إعادة تمركز» card in «طلب جديد»").isNotNull();
+        assertThat(restationCard.path("allowed").asBoolean()).as("a stationed unit is in reach, even beyond the listed units: " + restationCard).isTrue();
+
+        Res made = admin.post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "content", permanent(List.of(sec))));
+        assertThat(made.status()).as(made.toString()).isEqualTo(200);
+        String id = made.body().path("id").asText();
+        assertThat(made.body().path("can").path("submit").asBoolean()).isTrue();
+        Map<String, Object> row = jdbc.sql("select requesting_unit_id, requester_id from restationing_request where id = :id")
+                .param("id", UUID.fromString(id)).query().singleRow();
+        assertThat(row.get("requesting_unit_id")).as("the request belongs to the unit it is made for").isEqualTo(sec);
+        assertThat(row.get("requester_id")).as("the administrator is its submitter").isEqualTo(adminId);
+
+        Res sent = admin.post("/restationing-requests/" + id + "/submit", Map.of());
+        assertThat(sent.status()).as(sent.toString()).isEqualTo(200);
+        Res own = decide("platformAdmin", id, "APPROVE");
+        assertThat(own.status()).as("the administrator never decides it: " + own).isEqualTo(403);
+        assertThat(login("req").get("/restationing-requests/" + id).status()).as("the unit's own requester follows it").isEqualTo(200);
+        assertThat(decide("apSec", id, "APPROVE").status()).as("the hierarchy decides it as anyone's").isEqualTo(200);
+
+        Res initialByAdmin = admin.post("/restationing-requests", Map.of("requestingUnitId", fresh.toString(), "purpose", "INITIAL_STATIONING",
+                "content", initial(List.of(fresh))));
+        assertThat(initialByAdmin.status()).as("initial stationing stays with its own role: " + initialByAdmin).isEqualTo(403);
+        Res areasByAdmin = admin.post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "purpose", "DEPLOYMENT_AREAS",
+                "content", deployment(sec, 0)));
+        assertThat(areasByAdmin.status()).as("deployment areas stay with their own role: " + areasByAdmin).isEqualTo(403);
+    }
+
+    @Test
     @DisplayName("FYI: a recipient reads the one request; nothing else, nobody else in the branch; no mutation; it ends as designed; audited; a person with no permission at all is refused")
     void fyiReadsOneRequestOnly() {
         stationed(fresh, shared);

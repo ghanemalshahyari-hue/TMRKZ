@@ -143,7 +143,9 @@ try {
     watch(page, 't.requester');
     await signInManual(page, 't.requester');
     await page.goto(BASE + '/#org');
-    await page.locator('.org-node').filter({ hasText: 'الخدمات المشتركة' }).first().click();
+    const orgTree = page.getByTestId('org-page-tree');
+    await orgTree.getByRole('searchbox', { name: 'البحث في شجرة الجهات' }).fill('الخدمات المشتركة');
+    await orgTree.locator('.ut-hit').filter({ hasText: 'الخدمات المشتركة' }).first().click();
     const row = page.locator('tr').filter({ hasText: 'مركز الخدمات' }).filter({ has: page.getByRole('button', { name: 'على الخريطة' }) }).first();
     await row.waitFor({ timeout: 10000 });
     await row.getByRole('button', { name: 'على الخريطة' }).click();

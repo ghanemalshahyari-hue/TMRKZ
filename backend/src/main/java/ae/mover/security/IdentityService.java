@@ -490,11 +490,13 @@ public class IdentityService {
 
     /**
      * A lasting platform account («admin», «developer»): a local user of the identity provider holding the realm role
-     * tmrkz-platform, AND a login the installation names in TMRKZ_PLATFORM_ACCOUNTS. A directory user of the same name
-     * holds no such role, and the manual directory path never states it.
+     * tmrkz-platform, AND a login the installation names in TMRKZ_PLATFORM_ACCOUNTS, AND issued by the approved local platform
+     * issuer (ADR-071): the same role name from the external enterprise realm never creates or renews platform rights. A
+     * directory user of the same name holds no such role, and the manual directory path never states it.
      */
     private boolean platform(OidcClient.Identity id) {
-        return id.platformRole() && props.platformAccount(id.username());
+        return id.platformRole() && props.platformAccount(id.username()) && id.issuer() != null
+                && id.issuer().equals(props.platformIssuer());
     }
 
     /**

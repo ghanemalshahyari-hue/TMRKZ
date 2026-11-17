@@ -66,8 +66,11 @@ public class Bootstrap implements ApplicationRunner {
 
     private void seedRoles() {
         Object[][] roles = {
-                // Configuration rights never imply reading request content or deciding (owner decision 2026-10-29).
-                {"SYSTEM_ADMIN", "مدير النظام", "CONFIGURE,MANAGE_ACCESS,MANAGE_FACILITIES,VIEW_SOURCE_IDENTIFIERS", "ALL", false, true, 1},
+                // Configuration rights never imply reading request content or deciding (owner decision 2026-10-29); the one
+                // operational right is «طلب إعادة التمركز» for any unit, which goes through the approvals like anyone's
+                // (owner decision 17 Nov 2026, ADR-073; V46 adds it to an existing installation); and «تهيئة المواقع» with the
+                // stationing it records — site links and stationing corrections over everything (owner, 17 Nov 2026, ADR-076; V48).
+                {"SYSTEM_ADMIN", "مدير النظام", "CONFIGURE,MANAGE_ACCESS,MANAGE_FACILITIES,VIEW_SOURCE_IDENTIFIERS,CREATE_RESTATIONING,MANAGE_SITE_LINKS,CORRECT_STATIONING", "ALL", false, true, 1},
                 {"REQUESTER", "مقدم الطلب", "VIEW,CREATE,EDIT,EXECUTE", "ORGANIZATION", false, false, 2},
                 {"FACILITIES_REVIEWER", "مراجع المرافق", "VIEW,REVIEW,EXPORT,EXECUTE,CLOSE", "ALL", false, false, 3},
                 {"ORG_MANAGER", "مدير الجهة", "VIEW,CREATE,EDIT,REVIEW,EXPORT", "ORGANIZATION", false, false, 4},

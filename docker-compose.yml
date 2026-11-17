@@ -48,33 +48,57 @@ services:
       TMRKZ_HR_SETTINGS_KEY: ${TMRKZ_HR_SETTINGS_KEY:?set TMRKZ_HR_SETTINGS_KEY (32+ chars) in .env; run ops/init-env.sh}
       TMRKZ_HR_SYNC_INTERVAL_SECONDS: ${TMRKZ_HR_SYNC_INTERVAL_SECONDS:-3600}
       MOVER_SECURE_COOKIE: ${MOVER_SECURE_COOKIE:-false}
-      # Enterprise sign-in (Keycloak federating the directory). The browser reaches Keycloak through the web entry
-      # point under /auth; the backend uses the internal address for the token and key endpoints.
-      TMRKZ_OIDC_ISSUER: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}/auth/realms/tmrkz
-      TMRKZ_OIDC_INTERNAL_URL: http://keycloak:8080/auth/realms/tmrkz
-      TMRKZ_OIDC_CLIENT_ID: tmrkz-web
-      TMRKZ_OIDC_CLIENT_SECRET: ${TMRKZ_OIDC_CLIENT_SECRET:?set TMRKZ_OIDC_CLIENT_SECRET in .env; run ops/init-env.sh}
+      # Automatic employee sign-in: an external enterprise Keycloak client (Duty's model, ADR-071). Local defaults
+      # preserve development/test stacks; they do not change to enterprise until TMRKZ_ENTERPRISE_OIDC_* are supplied.
+      TMRKZ_OIDC_ISSUER: ${TMRKZ_ENTERPRISE_OIDC_ISSUER:-}
+      TMRKZ_OIDC_INTERNAL_URL: ${TMRKZ_ENTERPRISE_OIDC_INTERNAL_URL:-}
+      TMRKZ_OIDC_CLIENT_ID: ${TMRKZ_ENTERPRISE_OIDC_CLIENT_ID:-}
+      TMRKZ_OIDC_CLIENT_SECRET: ${TMRKZ_ENTERPRISE_OIDC_CLIENT_SECRET:-}
+      TMRKZ_LOCAL_OIDC_ISSUER: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}/auth/realms/tmrkz
+      TMRKZ_LOCAL_OIDC_INTERNAL_URL: http://keycloak:8080/auth/realms/tmrkz
+      TMRKZ_LOCAL_OIDC_CLIENT_ID: tmrkz-web
+      TMRKZ_LOCAL_OIDC_CLIENT_SECRET: ${TMRKZ_OIDC_CLIENT_SECRET:?set TMRKZ_OIDC_CLIENT_SECRET in .env; run ops/init-env.sh}
       TMRKZ_OIDC_REDIRECT_URI: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}/api/v1/auth/oidc/callback
       TMRKZ_OIDC_POST_LOGOUT_REDIRECT_URI: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}/?signed-out=1
       TMRKZ_OIDC_LINK_KEY: ${TMRKZ_OIDC_LINK_KEY:-DOMAIN_ACCOUNT}
-      # The two lasting platform accounts (Keycloak local users with the realm role tmrkz-platform; ops/platform-accounts.sh)
+      # The two lasting platform accounts use only the independent local provider and its dedicated manual client.
       TMRKZ_PLATFORM_ACCOUNTS: ${TMRKZ_PLATFORM_ACCOUNTS:-admin,developer}
+      TMRKZ_PLATFORM_OIDC_CLIENT_ID: ${TMRKZ_PLATFORM_OIDC_CLIENT_ID:-tmrkz-platform-password}
+      TMRKZ_PLATFORM_OIDC_CLIENT_SECRET: ${TMRKZ_PLATFORM_OIDC_CLIENT_SECRET:?set TMRKZ_PLATFORM_OIDC_CLIENT_SECRET in .env; run ops/init-env.sh}
+      TMRKZ_PLATFORM_OIDC_ISSUER: ${TMRKZ_PLATFORM_OIDC_ISSUER:-}
+      TMRKZ_PLATFORM_OIDC_INTERNAL_URL: ${TMRKZ_PLATFORM_OIDC_INTERNAL_URL:-}
+      TMRKZ_PLATFORM_BROWSER_CLIENT_ID: ${TMRKZ_PLATFORM_BROWSER_CLIENT_ID:-}
+      TMRKZ_PLATFORM_BROWSER_CLIENT_SECRET: ${TMRKZ_PLATFORM_BROWSER_CLIENT_SECRET:-}
+      TMRKZ_PLATFORM_BROWSER_REDIRECT_URI: ${TMRKZ_PLATFORM_BROWSER_REDIRECT_URI:-}
+      TMRKZ_PLATFORM_BROWSER_POST_LOGOUT_REDIRECT_URI: ${TMRKZ_PLATFORM_BROWSER_POST_LOGOUT_REDIRECT_URI:-}
       # «المساعد الذكي» (ADR-056), as TNQL: an OpenAI-compatible model server the site runs (Ollama on a development PC, the
       # organisation's own server in the isolated network). Off unless .env turns it on; the guide answers without it.
       TMRKZ_AI_ENABLED: ${TMRKZ_AI_ENABLED:-false}
       TMRKZ_AI_BASE_URL: ${TMRKZ_AI_BASE_URL:-http://host.docker.internal:11434/v1}
       TMRKZ_AI_MODEL: ${TMRKZ_AI_MODEL:-qwen2.5:7b}
       TMRKZ_AI_API_KEY: ${TMRKZ_AI_API_KEY:-}
-      # Manual sign-in: username and password verified by the same directory (LDAP bind over TLS), as in TNQL.
-      LDAP_URL: ${LDAP_URL:?set LDAP_URL to the enterprise directory (ldaps://... or ldap://... with LDAP_START_TLS=true)}
+      # Manual sign-in: optional backend-only overrides let enterprise direct-bind coexist with local Keycloak users.
+      # Spring selects each TMRKZ_MANUAL_* value first, then the equivalent shared LDAP setting (ADR-070).
+      LDAP_URL: ${LDAP_URL:-}
       LDAP_START_TLS: ${LDAP_START_TLS:-true}
-      LDAP_BIND_DN: ${LDAP_BIND_DN:?set LDAP_BIND_DN (read-only service account)}
-      LDAP_BIND_CREDENTIAL: ${LDAP_BIND_CREDENTIAL:?set LDAP_BIND_CREDENTIAL}
-      LDAP_USERS_DN: ${LDAP_USERS_DN:?set LDAP_USERS_DN}
+      LDAP_BIND_DN: ${LDAP_BIND_DN:-}
+      LDAP_BIND_CREDENTIAL: ${LDAP_BIND_CREDENTIAL:-}
+      LDAP_USERS_DN: ${LDAP_USERS_DN:-}
       LDAP_USERNAME_ATTRIBUTE: ${LDAP_USERNAME_ATTRIBUTE:-uid}
       LDAP_UUID_ATTRIBUTE: ${LDAP_UUID_ATTRIBUTE:-entryUUID}
       LDAP_EMPLOYEE_NUMBER_ATTRIBUTE: ${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:-employeeNumber}
       LDAP_USER_OBJECT_CLASS: ${LDAP_USER_OBJECT_CLASS:-inetOrgPerson}
+      LDAP_DIRECT_BIND_PATTERN: ${LDAP_DIRECT_BIND_PATTERN:-}
+      TMRKZ_MANUAL_LDAP_URL: ${TMRKZ_MANUAL_LDAP_URL:-}
+      TMRKZ_MANUAL_LDAP_START_TLS: ${TMRKZ_MANUAL_LDAP_START_TLS:-}
+      TMRKZ_MANUAL_LDAP_BIND_DN: ${TMRKZ_MANUAL_LDAP_BIND_DN:-}
+      TMRKZ_MANUAL_LDAP_BIND_CREDENTIAL: ${TMRKZ_MANUAL_LDAP_BIND_CREDENTIAL:-}
+      TMRKZ_MANUAL_LDAP_USERS_DN: ${TMRKZ_MANUAL_LDAP_USERS_DN:-}
+      TMRKZ_MANUAL_LDAP_USERNAME_ATTRIBUTE: ${TMRKZ_MANUAL_LDAP_USERNAME_ATTRIBUTE:-}
+      TMRKZ_MANUAL_LDAP_UUID_ATTRIBUTE: ${TMRKZ_MANUAL_LDAP_UUID_ATTRIBUTE:-}
+      TMRKZ_MANUAL_LDAP_EMPLOYEE_NUMBER_ATTRIBUTE: ${TMRKZ_MANUAL_LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:-}
+      TMRKZ_MANUAL_LDAP_USER_OBJECT_CLASS: ${TMRKZ_MANUAL_LDAP_USER_OBJECT_CLASS:-}
+      TMRKZ_MANUAL_LDAP_DIRECT_BIND_PATTERN: ${TMRKZ_MANUAL_LDAP_DIRECT_BIND_PATTERN:-}
       TMRKZ_LDAP_CA_DIR: /etc/tmrkz/ldap-ca
       # ADR-068: which directory attributes / ID-token claims carry unit ID, unit name, main unit ID, rank and position.
       # Empty: not read (the default). Keycloak's mappers: ops/keycloak/set-employment-attributes.sh.

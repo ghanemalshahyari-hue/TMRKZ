@@ -35,8 +35,12 @@ import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * Enterprise sign-in only (ADR-015): the browser is sent to the identity provider and comes back to the callback,
- * which links the identity and opens a server-side session. There is no local password form, demo switch or any other
+ * which links the identity and opens a server-side session. There is no TMRKZ password, demo switch or any other
  * fallback; when the provider is not configured or unreachable the sign-in page says so.
+ *
+ * <p>Three routes (ADR-070, ADR-071): automatic sign-in at the automatic (external enterprise) provider; the manual form for
+ * the lasting platform accounts, verified only by the local provider's platform-password client; the manual form for everyone
+ * else, verified only by the directory. Step-up and logout use the session's own provider; no route falls back to another.
  */
 @RestController
 @RequestMapping("/api/v1")
@@ -80,8 +84,9 @@ public class AuthController {
     @GetMapping("/auth/status")
     public Map<String, Object> status() {
         boolean configured = oidc.configured();
+        // manual: the directory, or the lasting platform accounts' own password client (ADR-070)
         return Map.of("provider", "OIDC", "configured", configured, "reachable", configured && oidc.reachable(),
-                "manual", directory.configured());
+                "manual", directory.configured() || oidc.passwordConfigured());
     }
 
     public record DirectoryLogin(String username, String password) {
@@ -92,12 +97,20 @@ public class AuthController {
         }
     }
 
-    /** Manual sign-in: the directory verifies the password (LDAP bind over TLS); TMRKZ links and opens a session. */
+    /**
+     * Manual sign-in. A login the installation names as a lasting platform account (TMRKZ_PLATFORM_ACCOUNTS) goes first and
+     * exclusively to the local provider's backend-only platform-password client (ADR-070): a refused password is never tried
+     * against the directory, and the session is provider-backed. Every other login: the directory verifies the password (LDAP
+     * bind over TLS); TMRKZ links and opens a session.
+     */
     @PostMapping("/auth/directory/login")
     public ResponseEntity<Map<String, Object>> directoryLogin(@RequestBody(required = false) DirectoryLogin in, HttpServletRequest request) {
         String username = in == null ? null : in.username();
         String ip = request.getRemoteAddr();
         throttle.check(username, ip);
+        if (oidcProps.platformAccount(username)) {
+            return platformLogin(username, in.password(), ip, request);
+        }
         DirectoryAuthenticator.DirectoryUser user;
         try {
             user = directory.authenticate(username, in == null ? null : in.password());
@@ -119,6 +132,27 @@ public class AuthController {
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, session.toString()).body(me(r.actor()));
     }
 
+    /**
+     * A lasting platform account through the manual form (ADR-070): the local provider verifies the password and returns a
+     * verified ID token; the identity then goes through the unchanged {@link IdentityService#resolve} and the session carries
+     * the provider's issuer and token (continuity, provider logout and normal step-up), never the directory's.
+     */
+    private ResponseEntity<Map<String, Object>> platformLogin(String username, String password, String ip, HttpServletRequest request) {
+        OidcClient.Identity id;
+        try {
+            id = oidc.platformPassword(username, password);
+        } catch (OidcClient.PasswordRejected e) {
+            throttle.failed(username, ip);
+            throw new ApiException(ErrorCode.IDENTITY_SIGN_IN_FAILED, "اسم المستخدم أو كلمة المرور غير صحيحة.");
+        }
+        UUID person = identities.resolve(id);
+        throttle.succeeded(username);
+        AuthService.LoginResult r = auth.issueSession(person, id.issuer(), id.idToken(), id.authTime(), ip, request.getHeader("User-Agent"));
+        ResponseCookie session = ResponseCookie.from(SessionFilter.COOKIE, r.token()).httpOnly(true)
+                .secure(props.secureCookie()).sameSite("Strict").path("/").maxAge(auth.sessionLifetime()).build();
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, session.toString()).body(me(r.actor()));
+    }
+
     public record PasswordInput(String password) {
 
         @Override
@@ -133,9 +167,15 @@ public class AuthController {
         String subject = jdbc.sql("select subject from identity_link where person_id = :p and issuer = :i")
                 .param("p", actor.personId()).param("i", directory.issuer()).query(String.class).optional()
                 .orElseThrow(() -> new ApiException(ErrorCode.REAUTHENTICATION_FAILED, "حسابك غير مربوط بالدليل المؤسسي."));
+        // the linked login (as the directory last stated it, else the person's User ID): a direct bind needs it, and the entry
+        // it names must still carry the linked stable identifier (ADR-070)
+        String login = jdbc.sql("""
+                select coalesce(d.username, p.username) from person p
+                left join person_directory_profile d on d.person_id = p.id and d.issuer = :i
+                where p.id = :p""").param("p", actor.personId()).param("i", directory.issuer()).query(String.class).optional().orElse(null);
         throttle.check("id:" + subject, null);
         try {
-            directory.reauthenticate(subject, in == null ? null : in.password());
+            directory.reauthenticate(subject, login, in == null ? null : in.password());
         } catch (DirectoryAuthenticator.DirectoryException e) {
             if (e.failure() == DirectoryAuthenticator.Failure.INVALID_CREDENTIALS) {
                 throttle.failed("id:" + subject, null);
@@ -173,10 +213,14 @@ public class AuthController {
     public record ReauthInput(String returnTo) {
     }
 
-    /** Step-up before a sensitive action: the provider asks for the credentials again (prompt=login, max_age=0). */
+    /**
+     * Step-up before a sensitive action: the provider asks for the credentials again (prompt=login, max_age=0). The provider is
+     * the session's own (ADR-071): a platform session steps up at the local platform provider, never at the enterprise one.
+     */
     @PostMapping("/auth/reauth")
     public ResponseEntity<Map<String, Object>> reauth(Actor actor, @RequestBody(required = false) ReauthInput in) {
-        OidcClient.Started s = oidc.start("REAUTH", in == null ? "/" : in.returnTo(), actor.sessionId());
+        OidcClient.Started s = oidc.start("REAUTH", in == null ? "/" : in.returnTo(), actor.sessionId(),
+                oidc.providerOf(auth.issuer(actor.sessionId()).orElse(null)));
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, browserCookie(s.browserBinding(), 600).toString())
                 .body(Map.of("redirect", s.redirectUrl()));
     }
@@ -213,9 +257,11 @@ public class AuthController {
         AuthService.Ended ended = auth.logout(actor);
         ResponseCookie cookie = ResponseCookie.from(SessionFilter.COOKIE, "").httpOnly(true).secure(props.secureCookie())
                 .sameSite("Strict").path("/").maxAge(0).build();
-        // A provider session is ended at the provider, which returns to the sign-in page; a directory session returns directly.
-        String redirect = ended.idToken() != null && !directory.issuer().equals(ended.issuer())
-                ? oidc.endSessionUrl(ended.idToken()) : SIGNED_OUT;
+        // A provider session is ended at its own provider (ADR-071), which returns to the sign-in page; a directory session, or
+        // one whose provider is no longer configured, returns directly. No provider ends another's session.
+        String provider = ended.idToken() != null && !directory.issuer().equals(ended.issuer())
+                ? oidc.endSessionUrl(ended.issuer(), ended.idToken()) : null;
+        String redirect = provider != null ? provider : SIGNED_OUT;
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(Map.of("redirect", redirect));
     }
 

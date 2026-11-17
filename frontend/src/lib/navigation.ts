@@ -17,15 +17,34 @@ export function setSupportSeat(seat: string | null | undefined) {
   supportSeat = seat ?? null;
 }
 
+/**
+ * A system administrator («مدير النظام», owner 17 Nov 2026, ADR-075) does not see «طلب صلاحية» (they manage access and cannot be
+ * granted a role by themselves) nor «طلب جديد» when their only request right is the role's own «طلب إعادة التمركز» — that is
+ * started from «إعادة التمركز». A request right from any other grant keeps «طلب جديد».
+ */
+let systemAdmin = false;
+let otherRequestRights = false;
+export function setGrantFacts(grants: { roleCode: string; permissions: Permission[] }[] | null | undefined) {
+  const list = grants ?? [];
+  systemAdmin = list.some((g) => g.roleCode === 'SYSTEM_ADMIN');
+  otherRequestRights = list.some((g) => g.roleCode !== 'SYSTEM_ADMIN' && g.permissions.some((p) => STATIONING_REQUEST_RIGHTS.includes(p)));
+}
+
+/** Where «＋ طلب جديد» goes: «طلب جديد», or straight to the re-stationing editor for a system administrator who does not see it. */
+export function newRequestHref(): string {
+  return systemAdmin && !otherRequestRights ? '#restationing/new?purpose=RESTATIONING' : '#newRequest';
+}
+
 /** Server-enforced permissions decide what each screen shows; this mirrors them for navigation only. */
 export function restriction(view: View, can: (p: Permission) => boolean, summaryOnly: boolean): boolean {
-  if (view === 'docs' || view === 'home' || view === 'requestAccess' || view === 'support') return false;
+  if (view === 'requestAccess') return systemAdmin;
+  if (view === 'docs' || view === 'home' || view === 'support') return false;
   // a configuration administrator opens it to give the first seats; the queue itself answers seat holders only
   if (view === 'supportConsole') return !supportSeat && !can('CONFIGURE');
   // the read-only posture opens with its own right, and that right opens nothing else
   if (view === 'posture') return !can('VIEW_OPERATIONAL_POSTURE');
   if (view === 'siteSetup') return !(can('MANAGE_FACILITIES') || can('MANAGE_SITE_LINKS') || can('CORRECT_STATIONING'));
-  if (view === 'newRequest') return !STATIONING_REQUEST_RIGHTS.some((p) => can(p));
+  if (view === 'newRequest') return !STATIONING_REQUEST_RIGHTS.some((p) => can(p)) || (systemAdmin && !otherRequestRights);
   if (view === 'allRequests') return !STATIONING_RIGHTS.some((p) => can(p)) && !can('REVIEW');
   if (view === 'accessInbox') return !can('REVIEW');
   if (view === 'workflow' && !FLOW_STUDIO_UI_ENABLED) return true;

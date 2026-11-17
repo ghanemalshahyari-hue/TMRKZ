@@ -13,8 +13,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -31,6 +33,7 @@ import com.nimbusds.jose.proc.JWSVerificationKeySelector;
 import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jose.util.DefaultResourceRetriever;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jwt.proc.DefaultJWTClaimsVerifier;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 
@@ -45,6 +48,15 @@ import ae.mover.common.Json;
  * Each attempt is single use, expires after ten minutes, and is bound to the browser that started it by an HttpOnly
  * cookie, so a stolen callback URL cannot complete someone else's sign-in. The ID token is verified against the
  * provider's published keys, issuer, audience, expiry and the nonce of this attempt.
+ *
+ * <p>Two independent providers (ADR-071): the automatic one ({@link Provider#ENTERPRISE}: the external enterprise realm once
+ * configured) and the local platform one ({@link Provider#PLATFORM}). Each has its own endpoints, client, expected issuer and
+ * audience, and its own key cache, so a token is never accepted through the other provider. The provider of an attempt is kept
+ * in the namespace of its generated nonce ({@code enterprise.} / {@code platform.}): the stored attempt selects the exchange and
+ * the checks, and the whole nonce is verified exactly in the signed ID token. Purposes stay LOGIN / REAUTH (no migration).
+ *
+ * <p>The lasting platform accounts may also sign in with the manual form through the backend-only platform-password client
+ * (ADR-070, {@link #platformPassword}); never the browser client.
  */
 @Component
 public class OidcClient {
@@ -59,7 +71,8 @@ public class OidcClient {
     private final OidcProperties props;
     private final Json json;
     private final HttpClient http;
-    private volatile JWKSource<SecurityContext> keys;
+    /** One key cache per provider: the platform verifier never sees the enterprise keys, and the reverse. */
+    private final Map<Provider, JWKSource<SecurityContext>> keys = new EnumMap<>(Provider.class);
 
     public OidcClient(JdbcClient jdbc, Clock clock, OidcProperties props, Json json) {
         this.jdbc = jdbc;
@@ -70,8 +83,42 @@ public class OidcClient {
                 .followRedirects(HttpClient.Redirect.NEVER).build();
     }
 
+    /** The provider an attempt or a session belongs to; its name is the namespace of the attempt's nonce. */
+    public enum Provider {
+        ENTERPRISE("enterprise."), PLATFORM("platform.");
+
+        private final String namespace;
+
+        Provider(String namespace) {
+            this.namespace = namespace;
+        }
+
+        /** The provider of a stored attempt; an attempt from before the namespaces is the automatic provider's. */
+        static Provider ofNonce(String nonce) {
+            return nonce != null && nonce.startsWith(PLATFORM.namespace) ? PLATFORM : ENTERPRISE;
+        }
+    }
+
+    private OidcProperties.Provider endpoints(Provider p) {
+        return p == Provider.PLATFORM ? props.platform() : props.automatic();
+    }
+
+    /** Automatic sign-in is configured. */
     public boolean configured() {
         return props.configured();
+    }
+
+    /** The manual form can sign in a lasting platform account (the platform-password client exists and accounts are named). */
+    public boolean passwordConfigured() {
+        return props.passwordConfigured() && !props.platformAccounts().isEmpty();
+    }
+
+    /**
+     * The provider of a TMRKZ session, from the issuer stored with it: the platform provider when it is a separate realm and
+     * issued this session; otherwise the automatic one.
+     */
+    public Provider providerOf(String sessionIssuer) {
+        return props.separateProviders() && props.platformIssuer().equals(sessionIssuer) ? Provider.PLATFORM : Provider.ENTERPRISE;
     }
 
     public record Started(String redirectUrl, String browserBinding) {
@@ -100,15 +147,28 @@ public class OidcClient {
         }
     }
 
+    /** The provider refused the submitted platform password (the caller counts it like a wrong directory password). */
+    public static final class PasswordRejected extends Exception {
+        PasswordRejected() {
+            super("platform password rejected", null, false, false);
+        }
+    }
+
+    /** Automatic sign-in or step-up through the automatic provider. */
     public Started start(String purpose, String returnTo, String sessionId) {
-        if (!props.configured()) {
+        return start(purpose, returnTo, sessionId, Provider.ENTERPRISE);
+    }
+
+    public Started start(String purpose, String returnTo, String sessionId, Provider provider) {
+        OidcProperties.Provider p = endpoints(provider);
+        if (!p.configured()) {
             throw new ApiException(ErrorCode.IDENTITY_PROVIDER_NOT_CONFIGURED,
                     "الدخول المؤسسي غير مهيأ في بيئة التشغيل؛ لا يوجد دخول بديل.");
         }
         String state = random(32);
         String browser = random(32);
         String verifier = random(48);
-        String nonce = random(24);
+        String nonce = provider.namespace + random(24);
         Instant now = clock.instant();
         jdbc.sql("delete from oidc_login where expires_at < :now").param("now", Db.ts(now)).update();
         jdbc.sql("""
@@ -119,8 +179,8 @@ public class OidcClient {
                 .param("exp", Db.ts(now.plus(ATTEMPT_LIFETIME))).update();
         Map<String, String> q = new LinkedHashMap<>();
         q.put("response_type", "code");
-        q.put("client_id", props.clientId());
-        q.put("redirect_uri", props.redirectUri());
+        q.put("client_id", p.clientId());
+        q.put("redirect_uri", p.redirectUri());
         q.put("scope", "openid profile");
         q.put("state", state);
         q.put("nonce", nonce);
@@ -134,7 +194,7 @@ public class OidcClient {
         } else {
             q.put("max_age", String.valueOf(props.loginMaxAgeSeconds()));
         }
-        return new Started(props.authorizationEndpoint() + "?" + form(q), browser);
+        return new Started(p.authorizationEndpoint() + "?" + form(q), browser);
     }
 
     /** Completes the attempt identified by {@code state}; any failure is a refusal, never a fallback. */
@@ -151,16 +211,124 @@ public class OidcClient {
                 ((String) attempt.get("browser_hash")).getBytes(StandardCharsets.US_ASCII))) {
             throw failed("لم تبدأ محاولة الدخول من هذا المتصفح.");
         }
+        String nonce = (String) attempt.get("nonce");
+        Provider provider = Provider.ofNonce(nonce);
+        OidcProperties.Provider p = endpoints(provider);
+        if (!p.configured()) {
+            throw failed("مزود الهوية الذي بدأت معه المحاولة لم يعد مهيأً؛ ابدأ الدخول من جديد.");
+        }
         Map<String, String> body = new LinkedHashMap<>();
         body.put("grant_type", "authorization_code");
         body.put("code", code);
-        body.put("redirect_uri", props.redirectUri());
+        body.put("redirect_uri", p.redirectUri());
         body.put("code_verifier", (String) attempt.get("code_verifier"));
-        String basic = Base64.getEncoder().encodeToString((enc(props.clientId()) + ":" + enc(props.clientSecret()))
-                .getBytes(StandardCharsets.UTF_8));
-        HttpResponse<String> res;
+        HttpResponse<String> res = post(p.tokenEndpoint(), p.clientId(), p.clientSecret(), body);
+        if (res.statusCode() != 200) {
+            log.warn("OIDC token exchange refused with HTTP {}", res.statusCode());
+            throw failed("رفض مزود الهوية إتمام الدخول.");
+        }
+        String idToken = json.tree(res.body()).path("id_token").asText(null);
+        if (idToken == null) {
+            throw failed("لم يُرجع مزود الهوية رمز الهوية.");
+        }
+        JWTClaimsSet claims = verify(provider, idToken, nonce, p.clientId());
         try {
-            res = http.send(HttpRequest.newBuilder(URI.create(props.tokenEndpoint()))
+            Instant at = authenticationTime(claims, (String) attempt.get("purpose"), Db.toInstant(attempt.get("created_at")));
+            return identity(claims, at, idToken, (String) attempt.get("purpose"), (String) attempt.get("return_to"),
+                    (String) attempt.get("session_id"));
+        } catch (java.text.ParseException e) {
+            throw failed("رمز الهوية يحمل بيانات غير صالحة.");
+        }
+    }
+
+    /**
+     * Manual sign-in of a lasting platform account (ADR-070): the submitted login and password go only to the local provider's
+     * backend-only confidential client (direct password grant). A login the installation does not name never reaches that client.
+     * The returned ID token is verified with the platform provider's own keys, issuer and the dedicated client as audience; its
+     * user must be the submitted login, named by the installation, and hold the provider's {@code tmrkz-platform} role.
+     *
+     * @throws PasswordRejected the provider refused the login and password (to be counted by the caller's throttle)
+     */
+    public Identity platformPassword(String login, String password) throws PasswordRejected {
+        if (!passwordConfigured()) {
+            throw new ApiException(ErrorCode.IDENTITY_PROVIDER_NOT_CONFIGURED, "دخول حسابات المنصة اليدوي غير مهيأ في هذه البيئة.");
+        }
+        String account = login == null ? null : login.trim().toLowerCase(Locale.ROOT);
+        if (account == null || !props.platformAccount(account)) {
+            throw failed("اسم المستخدم أو كلمة المرور غير صحيحة.");
+        }
+        if (password == null || password.isEmpty() || password.length() > 1024) {
+            throw new PasswordRejected();
+        }
+        OidcProperties.Provider p = props.platform();
+        Instant started = clock.instant();
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("grant_type", "password");
+        body.put("username", account);
+        body.put("password", password);
+        body.put("scope", "openid profile");
+        HttpResponse<String> res = post(p.tokenEndpoint(), props.passwordClientId(), props.passwordClientSecret(), body);
+        if (res.statusCode() >= 500) {
+            log.warn("Platform password grant: provider answered HTTP {}", res.statusCode());
+            throw new ApiException(ErrorCode.IDENTITY_PROVIDER_UNAVAILABLE, "تعذر الوصول إلى مزود الهوية؛ لا يوجد دخول بديل.");
+        }
+        if (res.statusCode() != 200) {
+            String error = json.tree(res.body()).path("error").asText("");
+            if ("invalid_grant".equals(error)) {
+                throw new PasswordRejected();
+            }
+            log.warn("Platform password grant refused with HTTP {} ({})", res.statusCode(), safeError(error));
+            throw failed("رفض مزود الهوية إتمام الدخول.");
+        }
+        String idToken = json.tree(res.body()).path("id_token").asText(null);
+        if (idToken == null) {
+            throw failed("لم يُرجع مزود الهوية رمز الهوية.");
+        }
+        JWTClaimsSet claims = verify(Provider.PLATFORM, idToken, null, props.passwordClientId());
+        try {
+            String azp = claims.getStringClaim("azp");
+            if (azp != null && !props.passwordClientId().equals(azp)) {
+                throw failed("رمز الهوية صادر لتطبيق آخر.");
+            }
+            String username = claims.getStringClaim("preferred_username");
+            String stated = username == null ? null : username.trim().toLowerCase(Locale.ROOT);
+            if (!account.equals(stated) || !props.platformAccount(stated)) {
+                log.warn("Platform password grant refused: the ID token names another user");
+                throw failed("رمز الهوية لا يخص الحساب المُدخل.");
+            }
+            Instant at = directGrantTime(claims, started);
+            Identity id = identity(claims, at, idToken, "LOGIN", "/", null);
+            if (!id.platformRole()) {
+                // the provider no longer states the platform role: entry refused, never an ordinary sign-in through this client
+                throw new ApiException(ErrorCode.IDENTITY_NOT_LINKED, "لم يعد هذا الحساب من حسابات المنصة الدائمة.",
+                        Map.of("reason", "PLATFORM_REVOKED"));
+            }
+            return id;
+        } catch (java.text.ParseException e) {
+            throw failed("رمز الهوية يحمل بيانات غير صالحة.");
+        }
+    }
+
+    private Identity identity(JWTClaimsSet claims, Instant at, String idToken, String purpose, String returnTo, String sessionId)
+            throws java.text.ParseException {
+        String name = claims.getStringClaim("name");
+        String username = claims.getStringClaim("preferred_username");
+        Object key = "DOMAIN_ACCOUNT".equals(props.linkKey()) ? username : claims.getClaim(props.enterpriseKeyClaim());
+        String enterpriseKey = key instanceof List<?> l ? (l.size() == 1 ? String.valueOf(l.get(0)) : null)
+                : key == null ? null : String.valueOf(key).trim();
+        Object roles = claims.getClaim(OidcProperties.ROLES_CLAIM);
+        boolean platform = roles instanceof List<?> r ? r.contains(OidcProperties.PLATFORM_ROLE) : OidcProperties.PLATFORM_ROLE.equals(roles);
+        DirectoryProfile profile = new DirectoryProfile(single(claims, props.enterpriseKeyClaim()), single(claims, props.rankClaim()),
+                single(claims, props.positionClaim()), single(claims, props.unitIdClaim()), single(claims, props.unitNameClaim()),
+                single(claims, props.mainUnitIdClaim()), props.employmentClaims());
+        return new Identity(claims.getIssuer(), claims.getSubject(), enterpriseKey == null || enterpriseKey.isEmpty() ? null : enterpriseKey,
+                name, username, at, idToken, purpose, returnTo, sessionId, platform, profile);
+    }
+
+    private HttpResponse<String> post(String endpoint, String clientId, String clientSecret, Map<String, String> body) {
+        String basic = Base64.getEncoder().encodeToString((enc(clientId) + ":" + enc(clientSecret)).getBytes(StandardCharsets.UTF_8));
+        try {
+            return http.send(HttpRequest.newBuilder(URI.create(endpoint))
                     .timeout(Duration.ofMillis(props.httpTimeoutMs()))
                     .header("Content-Type", "application/x-www-form-urlencoded").header("Authorization", "Basic " + basic)
                     .POST(HttpRequest.BodyPublishers.ofString(form(body))).build(), HttpResponse.BodyHandlers.ofString());
@@ -171,33 +339,10 @@ public class OidcClient {
             Thread.currentThread().interrupt();
             throw new ApiException(ErrorCode.IDENTITY_PROVIDER_UNAVAILABLE, "انقطع الاتصال بمزود الهوية.");
         }
-        if (res.statusCode() != 200) {
-            log.warn("OIDC token exchange refused with HTTP {}", res.statusCode());
-            throw failed("رفض مزود الهوية إتمام الدخول.");
-        }
-        String idToken = json.tree(res.body()).path("id_token").asText(null);
-        if (idToken == null) {
-            throw failed("لم يُرجع مزود الهوية رمز الهوية.");
-        }
-        JWTClaimsSet claims = verify(idToken, (String) attempt.get("nonce"));
-        try {
-            Instant at = authenticationTime(claims, (String) attempt.get("purpose"), Db.toInstant(attempt.get("created_at")));
-            String name = claims.getStringClaim("name");
-            String username = claims.getStringClaim("preferred_username");
-            Object key = "DOMAIN_ACCOUNT".equals(props.linkKey()) ? username : claims.getClaim(props.enterpriseKeyClaim());
-            String enterpriseKey = key instanceof List<?> l ? (l.size() == 1 ? String.valueOf(l.get(0)) : null)
-                    : key == null ? null : String.valueOf(key).trim();
-            Object roles = claims.getClaim(OidcProperties.ROLES_CLAIM);
-            boolean platform = roles instanceof List<?> r ? r.contains(OidcProperties.PLATFORM_ROLE) : OidcProperties.PLATFORM_ROLE.equals(roles);
-            DirectoryProfile profile = new DirectoryProfile(single(claims, props.enterpriseKeyClaim()), single(claims, props.rankClaim()),
-                    single(claims, props.positionClaim()), single(claims, props.unitIdClaim()), single(claims, props.unitNameClaim()),
-                    single(claims, props.mainUnitIdClaim()), props.employmentClaims());
-            return new Identity(claims.getIssuer(), claims.getSubject(), enterpriseKey == null || enterpriseKey.isEmpty() ? null : enterpriseKey,
-                    name, username, at, idToken, (String) attempt.get("purpose"), (String) attempt.get("return_to"),
-                    (String) attempt.get("session_id"), platform, profile);
-        } catch (java.text.ParseException e) {
-            throw failed("رمز الهوية يحمل بيانات غير صالحة.");
-        }
+    }
+
+    private static String safeError(String error) {
+        return error == null ? "" : error.replaceAll("[^A-Za-z_]", "");
     }
 
     /** One text value of a configured claim (null name: not read); a list counts only when it holds exactly one value. */
@@ -235,15 +380,59 @@ public class OidcClient {
         return at;
     }
 
-    JWTClaimsSet verify(String idToken, String nonce) {
+    /**
+     * The password verification time of the synchronous direct password grant ONLY (ADR-070). Keycloak issues this ID token only
+     * after it has checked the submitted password, and omits {@code auth_time}; so the verified {@code iat} of a token issued for
+     * this very attempt is that time: it must be no earlier than the attempt began and not in the future (60 s clock skew each
+     * way). When the provider does state {@code auth_time}, it is mandatory and must be just as fresh. Never used for an
+     * authorization-code response or a step-up, which always require {@code auth_time}.
+     */
+    Instant directGrantTime(JWTClaimsSet claims, Instant attemptStarted) {
+        Instant now = clock.instant();
+        java.util.Date iat = claims.getIssueTime();
+        if (iat == null) {
+            throw failed("لم يُثبت مزود الهوية وقت إصدار رمز الهوية؛ رُفض الدخول.");
+        }
+        Instant issued = iat.toInstant();
+        Instant at = issued;
+        if (claims.getClaims().containsKey("auth_time")) {
+            if (!(claims.getClaim("auth_time") instanceof Number n)) {
+                throw failed("وقت المصادقة في رمز الهوية غير صالح؛ رُفض الدخول.");
+            }
+            at = Instant.ofEpochSecond(n.longValue());
+        }
+        for (Instant t : List.of(issued, at)) {
+            if (t.isAfter(now.plus(CLOCK_SKEW))) {
+                throw failed("وقت المصادقة في رمز الهوية لاحق للوقت الحالي؛ رُفض الدخول.");
+            }
+            if (t.isBefore(attemptStarted.minus(CLOCK_SKEW))) {
+                throw failed("رمز الهوية لم يصدر لهذه المحاولة؛ رُفض الدخول.");
+            }
+        }
+        return at;
+    }
+
+    /**
+     * The signed ID token of {@code provider}: its own keys, its issuer, {@code audience} among the audiences, expiry, and — for a
+     * browser attempt — exactly this attempt's nonce.
+     */
+    JWTClaimsSet verify(Provider provider, String idToken, String nonce, String audience) {
+        OidcProperties.Provider p = endpoints(provider);
+        if (p.issuer() == null || audience == null) {
+            throw failed("مزود الهوية غير مهيأ؛ رُفض الدخول.");
+        }
         try {
-            DefaultJWTProcessor<SecurityContext> p = new DefaultJWTProcessor<>();
-            p.setJWSKeySelector(new JWSVerificationKeySelector<>(Set.of(JWSAlgorithm.RS256, JWSAlgorithm.PS256, JWSAlgorithm.ES256), keys()));
-            p.setJWTClaimsSetVerifier(new DefaultJWTClaimsVerifier<>(props.clientId(),
-                    new JWTClaimsSet.Builder().issuer(props.issuer()).claim("nonce", nonce).build(), Set.of("sub", "iat", "exp")));
-            JWTClaimsSet claims = p.process(idToken, null);
+            DefaultJWTProcessor<SecurityContext> proc = new DefaultJWTProcessor<>();
+            proc.setJWSKeySelector(new JWSVerificationKeySelector<>(Set.of(JWSAlgorithm.RS256, JWSAlgorithm.PS256, JWSAlgorithm.ES256),
+                    keys(provider)));
+            JWTClaimsSet.Builder exact = new JWTClaimsSet.Builder().issuer(p.issuer());
+            if (nonce != null) {
+                exact.claim("nonce", nonce);
+            }
+            proc.setJWTClaimsSetVerifier(new DefaultJWTClaimsVerifier<>(audience, exact.build(), Set.of("sub", "iat", "exp")));
+            JWTClaimsSet claims = proc.process(idToken, null);
             String azp = claims.getStringClaim("azp");
-            if (claims.getAudience().size() > 1 && !props.clientId().equals(azp)) {
+            if (claims.getAudience().size() > 1 && !audience.equals(azp)) {
                 throw failed("رمز الهوية صادر لتطبيق آخر.");
             }
             return claims;
@@ -255,27 +444,58 @@ public class OidcClient {
         }
     }
 
-    private JWKSource<SecurityContext> keys() throws java.net.MalformedURLException {
-        JWKSource<SecurityContext> k = keys;
-        if (k == null) {
-            k = JWKSourceBuilder.create(URI.create(props.jwksEndpoint()).toURL(),
-                    new DefaultResourceRetriever(props.httpTimeoutMs(), props.httpTimeoutMs(), 512 * 1024)).retrying(true).build();
-            keys = k;
+    private JWKSource<SecurityContext> keys(Provider provider) throws java.net.MalformedURLException {
+        synchronized (keys) {
+            JWKSource<SecurityContext> k = keys.get(provider);
+            if (k == null) {
+                k = JWKSourceBuilder.create(URI.create(endpoints(provider).jwksEndpoint()).toURL(),
+                        new DefaultResourceRetriever(props.httpTimeoutMs(), props.httpTimeoutMs(), 512 * 1024)).retrying(true).build();
+                keys.put(provider, k);
+            }
+            return k;
         }
-        return k;
     }
 
-    public String endSessionUrl(String idToken) {
-        if (!props.configured()) {
-            return "/";
+    /**
+     * The end-session address of the provider that issued this session's ID token (the session's own issuer), or null when the
+     * session's issuer is no configured provider: then only the TMRKZ session ends. A platform session signed in with the
+     * password client logs out with that client and its token; no browser client is required for it.
+     */
+    public String endSessionUrl(String sessionIssuer, String idToken) {
+        if (sessionIssuer == null) {
+            return null;
+        }
+        Provider provider = providerOf(sessionIssuer);
+        OidcProperties.Provider p = endpoints(provider);
+        if (p.issuer() == null || !p.issuer().equals(sessionIssuer)) {
+            return null;
+        }
+        // a platform session opened by the manual form holds the password client's token: that client ends it
+        String client = props.passwordClientId() != null && sessionIssuer.equals(props.platformIssuer())
+                && audience(idToken).contains(props.passwordClientId()) ? props.passwordClientId() : p.clientId();
+        if (client == null) {
+            return null;
         }
         Map<String, String> q = new LinkedHashMap<>();
-        q.put("client_id", props.clientId());
-        q.put("post_logout_redirect_uri", props.postLogoutRedirectUri() == null ? "/" : props.postLogoutRedirectUri());
+        q.put("client_id", client);
+        q.put("post_logout_redirect_uri", p.postLogoutRedirectUri() == null ? "/" : p.postLogoutRedirectUri());
         if (idToken != null) {
             q.put("id_token_hint", idToken);
         }
-        return props.endSessionEndpoint() + "?" + form(q);
+        return p.endSessionEndpoint() + "?" + form(q);
+    }
+
+    /** The audiences of a token this server stored after verifying it (read only to choose the logout client). */
+    private static List<String> audience(String idToken) {
+        if (idToken == null) {
+            return List.of();
+        }
+        try {
+            List<String> aud = SignedJWT.parse(idToken).getJWTClaimsSet().getAudience();
+            return aud == null ? List.of() : aud;
+        } catch (java.text.ParseException e) {
+            return List.of();
+        }
     }
 
     /** Only local absolute paths are accepted as return targets (no scheme, host or protocol-relative path). */
@@ -314,7 +534,7 @@ public class OidcClient {
         return params.entrySet().stream().map(e -> enc(e.getKey()) + "=" + enc(e.getValue())).collect(Collectors.joining("&"));
     }
 
-    /** For the health of the sign-in path: the provider's key set answers over the back channel. */
+    /** For the health of the automatic sign-in path: the provider's key set answers over the back channel. */
     public boolean reachable() {
         if (!props.configured()) {
             return false;

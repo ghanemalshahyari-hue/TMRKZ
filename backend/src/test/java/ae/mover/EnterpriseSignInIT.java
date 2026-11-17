@@ -47,12 +47,22 @@ class EnterpriseSignInIT extends IntegrationTest {
 
     static final String CLIENT = "tmrkz-web";
     static final String SECRET = "test-client-secret-0123456789";
+    /** The backend-only platform-password client (ADR-070): direct password grant only, its own secret and audience. */
+    static final String PASSWORD_CLIENT = "tmrkz-platform-password";
+    static final String PASSWORD_SECRET = "test-password-client-secret-0123456789";
     static final HttpServer PROVIDER;
     static final RSAKey KEY;
     static final RSAKey OTHER_KEY;
+    /** The signing key of the second realm ({@link #platformIssuer()}): the local platform provider of ADR-071. */
+    static final RSAKey PLATFORM_KEY;
     static final Map<String, Grant> CODES = new ConcurrentHashMap<>();
+    /** Password grants the stub provider accepts: login -> (password, ID token returned for it). */
+    static final Map<String, Grant> PASSWORDS = new ConcurrentHashMap<>();
+    /** Every token-endpoint path called, in order (which realm the backend went to). */
+    static final List<String> TOKEN_CALLS = new java.util.concurrent.CopyOnWriteArrayList<>();
     static volatile boolean tokenEndpointDown;
 
+    /** {@code challenge}: the PKCE challenge of a code, or the password of a password grant. */
     record Grant(String challenge, String idToken) {
     }
 
@@ -60,36 +70,74 @@ class EnterpriseSignInIT extends IntegrationTest {
         try {
             KEY = new RSAKeyGenerator(2048).keyID("k1").generate();
             OTHER_KEY = new RSAKeyGenerator(2048).keyID("k1").generate();
+            PLATFORM_KEY = new RSAKeyGenerator(2048).keyID("p1").generate();
             PROVIDER = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
-            PROVIDER.createContext("/realms/test/protocol/openid-connect/certs", ex -> {
-                byte[] b = new JWKSet(KEY.toPublicJWK()).toString().getBytes(StandardCharsets.UTF_8);
-                ex.getResponseHeaders().add("Content-Type", "application/json");
-                ex.sendResponseHeaders(200, b.length);
-                ex.getResponseBody().write(b);
-                ex.close();
-            });
-            PROVIDER.createContext("/realms/test/protocol/openid-connect/token", ex -> {
-                Map<String, String> form = parse(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-                String basic = "Basic " + Base64.getEncoder().encodeToString((CLIENT + ":" + SECRET).getBytes(StandardCharsets.UTF_8));
-                Grant g = CODES.remove(form.getOrDefault("code", ""));
-                boolean ok = !tokenEndpointDown && basic.equals(ex.getRequestHeaders().getFirst("Authorization")) && g != null
-                        && "authorization_code".equals(form.get("grant_type"))
-                        && g.challenge().equals(s256(form.getOrDefault("code_verifier", "")));
-                byte[] b = (ok ? "{\"token_type\":\"Bearer\",\"access_token\":\"opaque\",\"id_token\":\"" + g.idToken() + "\"}"
-                        : "{\"error\":\"invalid_grant\"}").getBytes(StandardCharsets.UTF_8);
-                ex.getResponseHeaders().add("Content-Type", "application/json");
-                ex.sendResponseHeaders(tokenEndpointDown ? 500 : ok ? 200 : 400, b.length);
-                ex.getResponseBody().write(b);
-                ex.close();
-            });
+            for (Map.Entry<String, RSAKey> realm : Map.of("test", KEY, "platform", PLATFORM_KEY).entrySet()) {
+                PROVIDER.createContext("/realms/" + realm.getKey() + "/protocol/openid-connect/certs", ex -> {
+                    byte[] b = new JWKSet(realm.getValue().toPublicJWK()).toString().getBytes(StandardCharsets.UTF_8);
+                    ex.getResponseHeaders().add("Content-Type", "application/json");
+                    ex.sendResponseHeaders(200, b.length);
+                    ex.getResponseBody().write(b);
+                    ex.close();
+                });
+                PROVIDER.createContext("/realms/" + realm.getKey() + "/protocol/openid-connect/token", EnterpriseSignInIT::token);
+            }
             PROVIDER.start();
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
     }
 
+    /**
+     * The stub's token endpoint, the same in both realms: the browser client's authorization code (PKCE) and, like Keycloak's
+     * direct grant, the platform-password client's password grant (HTTP 401 invalid_grant for wrong credentials).
+     */
+    private static void token(com.sun.net.httpserver.HttpExchange ex) throws java.io.IOException {
+        TOKEN_CALLS.add(ex.getRequestURI().getPath());
+        Map<String, String> form = parse(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+        String authorization = ex.getRequestHeaders().getFirst("Authorization");
+        String idToken = null;
+        int status;
+        String error = "invalid_grant";
+        if ("password".equals(form.get("grant_type"))) {
+            boolean client = basic(PASSWORD_CLIENT, PASSWORD_SECRET).equals(authorization);
+            Grant g = PASSWORDS.get(form.getOrDefault("username", ""));
+            boolean ok = client && g != null && g.challenge().equals(form.get("password"))
+                    && List.of(form.getOrDefault("scope", "").split(" ")).contains("openid");
+            if (!client) {
+                error = "invalid_client";
+            }
+            idToken = ok ? g.idToken() : null;
+            status = ok ? 200 : 401;
+        } else {
+            Grant g = CODES.remove(form.getOrDefault("code", ""));
+            boolean ok = basic(CLIENT, SECRET).equals(authorization) && g != null && "authorization_code".equals(form.get("grant_type"))
+                    && g.challenge().equals(s256(form.getOrDefault("code_verifier", "")));
+            idToken = ok ? g.idToken() : null;
+            status = ok ? 200 : 400;
+        }
+        if (tokenEndpointDown) {
+            status = 500;
+        }
+        byte[] b = (status == 200 ? "{\"token_type\":\"Bearer\",\"access_token\":\"opaque\",\"id_token\":\"" + idToken + "\"}"
+                : "{\"error\":\"" + error + "\"}").getBytes(StandardCharsets.UTF_8);
+        ex.getResponseHeaders().add("Content-Type", "application/json");
+        ex.sendResponseHeaders(status, b.length);
+        ex.getResponseBody().write(b);
+        ex.close();
+    }
+
+    private static String basic(String client, String secret) {
+        return "Basic " + Base64.getEncoder().encodeToString((client + ":" + secret).getBytes(StandardCharsets.UTF_8));
+    }
+
     static String issuer() {
         return "http://localhost:" + PROVIDER.getAddress().getPort() + "/realms/test";
+    }
+
+    /** A second realm of the same stub with its own key: the local platform provider when a test separates the two. */
+    static String platformIssuer() {
+        return "http://localhost:" + PROVIDER.getAddress().getPort() + "/realms/platform";
     }
 
     @DynamicPropertySource
@@ -102,6 +150,9 @@ class EnterpriseSignInIT extends IntegrationTest {
         r.add("tmrkz.oidc.post-logout-redirect-uri", () -> "http://tmrkz.test/");
         r.add("tmrkz.oidc.link-key", () -> "DOMAIN_ACCOUNT");
         r.add("tmrkz.oidc.platform-accounts", () -> "platform.admin.it, Platform.Dev.IT");
+        // ADR-070: the platform accounts' manual form goes to this provider's backend-only password client
+        r.add("tmrkz.oidc.password-client-id", () -> PASSWORD_CLIENT);
+        r.add("tmrkz.oidc.password-client-secret", () -> PASSWORD_SECRET);
         // ADR-068: the claims the identity provider maps from the directory (names as in ops/keycloak/set-employment-attributes.sh)
         r.add("tmrkz.oidc.unit-id-claim", () -> "tmrkz_unit_id");
         r.add("tmrkz.oidc.unit-name-claim", () -> "tmrkz_unit_name");
@@ -435,8 +486,11 @@ class EnterpriseSignInIT extends IntegrationTest {
         Browser unnamed = new Browser();
         assertThat(location(unnamed.get(callbackWithRoles(authorizationOf(unnamed.get("/api/v1/auth/oidc/start")), UUID.randomUUID().toString(),
                 "someone" + sfx, platformRole)))).startsWith("/#auth-error=IDENTITY_NOT_LINKED");
-        assertThat(jdbc.sql("select count(*) from person where employee_no like 'PLATFORM-%'").query(Long.class).single()).isEqualTo(1);
-        assertThat(jdbc.sql("select count(*) from audit_event where action = 'PLATFORM_GRANT_RENEWED'").query(Long.class).single()).isZero();
+        // counted for this class's two logins only: other classes (DualProviderSignInIT) keep platform accounts of their own
+        assertThat(jdbc.sql("select count(*) from person where employee_no like 'PLATFORM-%' and employee_no in " + OWN_PLATFORM)
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'PLATFORM_GRANT_RENEWED' and entity_id in " + OWN_PLATFORM_IDS)
+                .query(Long.class).single()).isZero();
 
         // Lasting: a grant ended by someone is current again at the next sign-in; the same person, the same link.
         jdbc.sql("update membership set valid_to = now(), ended_reason = 'TEST' where person_id = :p and role_code = 'SYSTEM_ADMIN' and valid_to is null")
@@ -445,7 +499,8 @@ class EnterpriseSignInIT extends IntegrationTest {
         again.get(callbackWithRoles(authorizationOf(again.get("/api/v1/auth/oidc/start")), adminSub, "platform.admin.it", platformRole));
         assertThat(JSON.readTree(again.get("/api/v1/me").body()).path("id").asText()).isEqualTo(admin.toString());
         assertThat(JSON.readTree(again.get("/api/v1/me").body()).path("permissions").toString()).contains("MANAGE_ACCESS");
-        assertThat(jdbc.sql("select count(*) from audit_event where action = 'PLATFORM_GRANT_RENEWED'").query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'PLATFORM_GRANT_RENEWED' and entity_id in " + OWN_PLATFORM_IDS)
+                .query(Long.class).single()).isEqualTo(1);
 
         // The developer (named in another case) is a person of its own with the same rights.
         Browser dev = new Browser();
@@ -458,7 +513,123 @@ class EnterpriseSignInIT extends IntegrationTest {
         Browser revoked = new Browser();
         assertThat(location(revoked.get(callbackWithRoles(authorizationOf(revoked.get("/api/v1/auth/oidc/start")), adminSub, "platform.admin.it",
                 List.of("default-roles-tmrkz"))))).isEqualTo("/#auth-error=IDENTITY_NOT_LINKED&reason=PLATFORM_REVOKED");
-        assertThat(jdbc.sql("select count(*) from audit_event where action = 'PLATFORM_ACCOUNT_CREATED'").query(Long.class).single()).isEqualTo(2);
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'PLATFORM_ACCOUNT_CREATED' and entity_id in " + OWN_PLATFORM_IDS)
+                .query(Long.class).single()).isEqualTo(2);
+    }
+
+    private static final String OWN_PLATFORM = "('PLATFORM-platform.admin.it', 'PLATFORM-platform.dev.it')";
+    private static final String OWN_PLATFORM_IDS = "(select id::text from person where employee_no in " + OWN_PLATFORM + ")";
+
+    /** The ID token the provider returns for a direct password grant (Keycloak: no auth_time unless stated, fresh iat). */
+    private static String passwordToken(String subject, String account, List<String> roles, RSAKey signer, String issuer, String audience,
+                                        Instant issuedAt, Long authTime) throws Exception {
+        JWTClaimsSet.Builder c = new JWTClaimsSet.Builder().issuer(issuer).subject(subject).audience(audience)
+                .issueTime(Date.from(issuedAt)).expirationTime(Date.from(Instant.now().plusSeconds(300)))
+                .claim("preferred_username", account).claim("name", "حساب " + account).claim("azp", audience);
+        if (roles != null) {
+            c.claim("tmrkz_roles", roles);
+        }
+        if (authTime != null) {
+            c.claim("auth_time", authTime);
+        }
+        SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(signer.getKeyID()).type(JOSEObjectType.JWT).build(), c.build());
+        jwt.sign(new RSASSASigner(signer));
+        return jwt.serialize();
+    }
+
+    private static boolean session(HttpResponse<String> r) {
+        return r.headers().allValues("Set-Cookie").stream().anyMatch(c -> c.startsWith("MOVER_SESSION=") && !c.contains("Max-Age=0"));
+    }
+
+    @Test
+    @DisplayName("ADR-070: a platform account signs in with the manual form only through the platform-password client — verified token, never the directory")
+    void manualPlatformAccounts() throws Exception {
+        List<String> platformRole = List.of("default-roles-tmrkz", "tmrkz-platform");
+        String admin = "platform.admin.it";
+        String subject = "manual-" + sfx;
+        String password = "Platform#Manual-" + sfx;
+        PASSWORDS.put(admin, new Grant(password, passwordToken(subject, admin, platformRole, KEY, issuer(), PASSWORD_CLIENT, Instant.now(), null)));
+        TOKEN_CALLS.clear();
+
+        // The named account, typed in any case: the provider checks the password; TMRKZ opens a provider-backed session.
+        Browser b = new Browser();
+        HttpResponse<String> ok = b.post("/api/v1/auth/directory/login", write(Map.of("username", " Platform.Admin.IT ", "password", password)));
+        assertThat(ok.statusCode()).as(ok.body()).isEqualTo(200);
+        assertThat(session(ok)).isTrue();
+        assertThat(TOKEN_CALLS).containsExactly("/realms/test/protocol/openid-connect/token");
+        com.fasterxml.jackson.databind.JsonNode me = JSON.readTree(b.get("/api/v1/me").body());
+        assertThat(me.path("signInMethod").asText()).as("provider-backed, not DIRECTORY").isEqualTo("PROVIDER");
+        assertThat(me.path("permissions").toString()).contains("CONFIGURE", "MANAGE_ACCESS", "AUDIT");
+        UUID person = UUID.fromString(me.path("id").asText());
+        assertThat(jdbc.sql("select employee_no from person where id = :p").param("p", person).query(String.class).single())
+                .isEqualTo("PLATFORM-platform.admin.it");
+        Map<String, Object> link = jdbc.sql("select issuer, subject, method from identity_link where person_id = :p").param("p", person)
+                .query().singleRow();
+        assertThat(link).containsEntry("issuer", issuer()).containsEntry("subject", subject).containsEntry("method", "PLATFORM");
+        Map<String, Object> stored = jdbc.sql("""
+                select issuer, authenticated_at is not null as fresh, id_token is not null as token from user_session
+                where person_id = :p order by created_at desc limit 1""").param("p", person).query().singleRow();
+        assertThat(stored).containsEntry("issuer", issuer()).containsEntry("fresh", true).containsEntry("token", true);
+        // the session ends at the provider with the password client's own token
+        String out = JSON.readTree(b.post("/api/v1/auth/logout", "{}").body()).path("redirect").asText();
+        assertThat(out).startsWith(issuer() + "/protocol/openid-connect/logout?").contains("client_id=" + PASSWORD_CLIENT).contains("id_token_hint=");
+        assertThat(b.get("/api/v1/me").statusCode()).isEqualTo(401);
+
+        // A wrong platform password is refused by the provider and never tried against the directory (none is configured
+        // here: a directory attempt would answer IDENTITY_PROVIDER_NOT_CONFIGURED); it counts toward the login's lock.
+        TOKEN_CALLS.clear();
+        HttpResponse<String> wrong = new Browser().post("/api/v1/auth/directory/login", write(Map.of("username", admin, "password", "not-the-password")));
+        assertThat(wrong.statusCode()).isEqualTo(401);
+        assertThat(JSON.readTree(wrong.body()).path("code").asText()).isEqualTo("IDENTITY_SIGN_IN_FAILED");
+        assertThat(session(wrong)).isFalse();
+        assertThat(TOKEN_CALLS).hasSize(1);
+        assertThat(jdbc.sql("select failures from login_throttle where key = :k").param("k", "u:" + admin).query(Integer.class).single()).isEqualTo(1);
+
+        // A login the installation does not name never reaches the password client, even if the provider would accept it.
+        String unnamed = "someone" + sfx;
+        PASSWORDS.put(unnamed, new Grant(password, passwordToken("unnamed-" + sfx, unnamed, platformRole, KEY, issuer(), PASSWORD_CLIENT, Instant.now(), null)));
+        TOKEN_CALLS.clear();
+        HttpResponse<String> other = new Browser().post("/api/v1/auth/directory/login", write(Map.of("username", unnamed, "password", password)));
+        assertThat(other.statusCode()).as("the directory's answer: not configured here").isEqualTo(503);
+        assertThat(JSON.readTree(other.body()).path("code").asText()).isEqualTo("IDENTITY_PROVIDER_NOT_CONFIGURED");
+        assertThat(TOKEN_CALLS).isEmpty();
+        assertThat(jdbc.sql("select count(*) from person where username = :u").param("u", unnamed).query(Long.class).single()).isZero();
+
+        // What the provider returns must be this account's signed, fresh token for the dedicated client.
+        long now = Instant.now().getEpochSecond();
+        Map<String, String> refused = new LinkedHashMap<>();
+        refused.put("another user", passwordToken("dev-" + sfx, "platform.dev.it", platformRole, KEY, issuer(), PASSWORD_CLIENT, Instant.now(), null));
+        refused.put("browser client audience", passwordToken(subject, admin, platformRole, KEY, issuer(), CLIENT, Instant.now(), null));
+        refused.put("another issuer", passwordToken(subject, admin, platformRole, KEY, "http://evil.test/realms/test", PASSWORD_CLIENT, Instant.now(), null));
+        refused.put("another key", passwordToken(subject, admin, platformRole, OTHER_KEY, issuer(), PASSWORD_CLIENT, Instant.now(), null));
+        refused.put("stale iat", passwordToken(subject, admin, platformRole, KEY, issuer(), PASSWORD_CLIENT, Instant.now().minusSeconds(600), null));
+        refused.put("future iat", passwordToken(subject, admin, platformRole, KEY, issuer(), PASSWORD_CLIENT, Instant.now().plusSeconds(600), null));
+        refused.put("stale auth_time", passwordToken(subject, admin, platformRole, KEY, issuer(), PASSWORD_CLIENT, Instant.now(), now - 3600));
+        for (Map.Entry<String, String> bad : refused.entrySet()) {
+            PASSWORDS.put(admin, new Grant(password, bad.getValue()));
+            Browser x = new Browser();
+            HttpResponse<String> r = x.post("/api/v1/auth/directory/login", write(Map.of("username", admin, "password", password)));
+            assertThat(r.statusCode()).as(bad.getKey()).isEqualTo(401);
+            assertThat(JSON.readTree(r.body()).path("code").asText()).as(bad.getKey()).isEqualTo("IDENTITY_SIGN_IN_FAILED");
+            assertThat(session(r)).as(bad.getKey()).isFalse();
+            assertThat(x.get("/api/v1/me").statusCode()).as(bad.getKey()).isEqualTo(401);
+        }
+        assertThat(jdbc.sql("select count(*) from person where employee_no = 'PLATFORM-platform.dev.it' and id in "
+                + "(select person_id from identity_link where subject = :s)").param("s", "dev-" + sfx).query(Long.class).single()).isZero();
+
+        // When the provider does state auth_time, a fresh one is accepted.
+        PASSWORDS.put(admin, new Grant(password, passwordToken(subject, admin, platformRole, KEY, issuer(), PASSWORD_CLIENT, Instant.now(), now)));
+        assertThat(new Browser().post("/api/v1/auth/directory/login", write(Map.of("username", admin, "password", password))).statusCode()).isEqualTo(200);
+
+        // Losing the provider's platform role refuses entry; it never becomes an ordinary sign-in through this client.
+        PASSWORDS.put(admin, new Grant(password, passwordToken(subject, admin, List.of("default-roles-tmrkz"), KEY, issuer(), PASSWORD_CLIENT,
+                Instant.now(), null)));
+        HttpResponse<String> revoked = new Browser().post("/api/v1/auth/directory/login", write(Map.of("username", admin, "password", password)));
+        assertThat(revoked.statusCode()).isEqualTo(403);
+        assertThat(JSON.readTree(revoked.body()).path("details").path("reason").asText()).isEqualTo("PLATFORM_REVOKED");
+        assertThat(session(revoked)).isFalse();
+        PASSWORDS.remove(admin);
+        PASSWORDS.remove(unnamed);
     }
 
     @Test

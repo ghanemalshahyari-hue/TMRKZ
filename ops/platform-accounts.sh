@@ -45,4 +45,4 @@ ensure() {
 ensure admin '$ADMIN_PW' 'مدير' 'النظام'
 ensure developer '$DEV_PW' 'مطوّر' 'النظام'
 EOF
-echo "platform accounts ready: admin, developer (sign in at $(value TMRKZ_PUBLIC_URL) with «الدخول الآلي بالحساب المؤسسي»)"
+echo "platform accounts ready: admin, developer (automatic Keycloak sign-in, or manual through the protected ADR-070 client)"

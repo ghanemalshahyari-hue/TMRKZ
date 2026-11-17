@@ -23,7 +23,8 @@ import ae.mover.security.Actor;
  * their TMRKZ identity (matched by source identifier, never by name), HR fields are overwritten only here, local
  * additions live elsewhere and are untouched. Affiliation changes end grants that no longer fit, disable departed
  * people everywhere at once, and hand open tasks to {@link TaskRealignment}. Since ADR-065 the whole unit tree is applied
- * but only the people the snapshot asked HR for (its scope): the linked people of a sync, or one imported person.
+ * but only the people the snapshot asked HR for (its scope): the linked people of a sync, or one imported person. Since
+ * ADR-072 the organisation part also runs alone ({@link #applyOrganizations}) for the authorised unit-file replacement.
  */
 @Component
 public class HrProjection {
@@ -75,15 +76,48 @@ public class HrProjection {
         }
     }
 
+    /**
+     * What the organisation part of a projection did. {@code created}: units new to TMRKZ. {@code updated}: distinct
+     * organisations that became Oracle's by their already stored Unit ID ({@code adopted}) or whose HR name or status changed,
+     * each counted once. {@code retired}: ACTIVE organisations retired because no unit of the snapshot carries their Unit ID,
+     * including {@code localRetired}: unmatched LOCAL units, retired only when the caller authorised it (ADR-072).
+     */
+    public record OrganizationResult(int created, int updated, int retired, int adopted, int localRetired) {
+    }
+
+    /** The raw counts of one organisation projection; {@link #apply} reports them exactly as before ADR-072. */
+    private record Organizations(int created, int adopted, int fieldUpdates, int distinctUpdated, int retired,
+                                 int localRetired) {
+    }
+
     /** Must run inside the publish transaction. {@code cycleUnits}: source units on a parent cycle, kept as roots. */
     public Result apply(UUID snapshot, Set<String> cycleUnits) {
         Instant now = clock.instant();
         jdbc.sql("select set_config('tmrkz.hr_projection', 'on', true)").query().singleRow();
         Map<String, Object> s = Map.of("s", snapshot, "now", Db.ts(now), "cycles", String.join(",", cycleUnits));
-        int[] orgs = organizations(s);
+        // the ordinary sync never retires LOCAL units: local additions TMRKZ made itself stay as they are
+        Organizations orgs = organizations(s, false);
         Result people = people(snapshot, null, now);
-        return new Result(orgs[0], orgs[1], orgs[2], people.peopleCreated(), people.peopleAdopted(), people.peopleUpdated(),
-                people.peopleDisabled(), people.transfers(), people.grantsEnded(), people.tasksRealigned());
+        return new Result(orgs.created(), orgs.fieldUpdates() + orgs.adopted(), orgs.retired(), people.peopleCreated(),
+                people.peopleAdopted(), people.peopleUpdated(), people.peopleDisabled(), people.transfers(), people.grantsEnded(),
+                people.tasksRealigned());
+    }
+
+    /**
+     * The organisation part alone, for the authorised Oracle unit-file replacement (ADR-072): the same identity rules as
+     * {@link #apply} (match by the stored Unit ID only, adopt a LOCAL unit holding it, keep UUIDs, two-step re-parenting), but
+     * no person, affiliation, grant, session or task is read or changed. {@code cycleUnits}: as for {@link #apply}.
+     * {@code retireUnmatchedLocal}: also retire every ACTIVE LOCAL unit that no ACTIVE unit of the snapshot claims by its
+     * stored Unit ID; only that explicitly authorised replacement passes true. The ordinary sync never does, so it leaves
+     * unrelated LOCAL units alone. Must run inside the caller's transaction.
+     */
+    public OrganizationResult applyOrganizations(UUID snapshot, Set<String> cycleUnits, boolean retireUnmatchedLocal) {
+        jdbc.sql("select set_config('tmrkz.hr_projection', 'on', true)").query().singleRow();
+        Map<String, Object> s = Map.of("s", java.util.Objects.requireNonNull(snapshot), "now", Db.ts(clock.instant()),
+                "cycles", String.join(",", cycleUnits));
+        Organizations orgs = organizations(s, retireUnmatchedLocal);
+        return new OrganizationResult(orgs.created(), orgs.distinctUpdated(), orgs.retired() + orgs.localRetired(),
+                orgs.adopted(), orgs.localRetired());
     }
 
     /**
@@ -95,15 +129,17 @@ public class HrProjection {
         return people(snapshot, java.util.Objects.requireNonNull(externalId), clock.instant());
     }
 
-    private int[] organizations(Map<String, Object> s) {
+    private Organizations organizations(Map<String, Object> s, boolean retireUnmatchedLocal) {
         // ---- organisations -------------------------------------------------------------------------------------
         // A unit TMRKZ already holds under the same Unit ID (resolved from the directory before Oracle was in force, ADR-068 §25)
         // becomes Oracle's: the Unit ID is the join, so a second node is never made for it.
-        int orgAdopted = jdbc.sql("""
+        List<UUID> adoptedIds = jdbc.sql("""
                 update organization o set source = 'HR', version = o.version + 1
                 from hr_unit u where u.snapshot_id = :s and o.source = 'LOCAL' and o.source_external_id = u.external_id
-                  and not exists (select 1 from organization x where x.source = 'HR' and x.source_external_id = u.external_id)""")
-                .params(s).update();
+                  and not exists (select 1 from organization x where x.source = 'HR' and x.source_external_id = u.external_id)
+                returning o.id""")
+                .params(s).query(UUID.class).list();
+        int orgAdopted = adoptedIds.size();
         if (orgAdopted > 0) {
             audit.system("HR_UNITS_ADOPTED", "HR_SNAPSHOT", String.valueOf(s.get("s")), null, Map.of("count", orgAdopted));
         }
@@ -114,17 +150,35 @@ public class HrProjection {
                 from hr_unit u where u.snapshot_id = :s
                   and not exists (select 1 from organization o where o.source = 'HR' and o.source_external_id = u.external_id)""")
                 .params(s).update();
-        int orgUpdated = jdbc.sql("""
+        List<UUID> updatedIds = jdbc.sql("""
                 update organization o set name = u.name, status = case when u.active then 'ACTIVE' else 'RETIRED' end,
                        version = o.version + 1
                 from hr_unit u where u.snapshot_id = :s and o.source = 'HR' and o.source_external_id = u.external_id
-                  and (o.name <> u.name or o.status <> case when u.active then 'ACTIVE' else 'RETIRED' end)""")
-                .params(s).update();
+                  and (o.name <> u.name or o.status <> case when u.active then 'ACTIVE' else 'RETIRED' end)
+                returning o.id""")
+                .params(s).query(UUID.class).list();
+        int orgUpdated = updatedIds.size();
         int orgRetired = jdbc.sql("""
                 update organization o set status = 'RETIRED', version = o.version + 1
                 where o.source = 'HR' and o.status = 'ACTIVE'
                   and not exists (select 1 from hr_unit u where u.snapshot_id = :s and u.external_id = o.source_external_id)""")
                 .params(s).update();
+        // Only the explicitly authorised unit-file replacement (ADR-072) retires LOCAL units: every ACTIVE one that no ACTIVE
+        // unit of the snapshot claims by its stored Unit ID (one that is claimed was adopted above). Retired, never deleted:
+        // its UUID, history and references stay; the caller ends what was live on it.
+        int localRetired = 0;
+        if (retireUnmatchedLocal) {
+            localRetired = jdbc.sql("""
+                    update organization o set status = 'RETIRED', version = o.version + 1
+                    where o.source = 'LOCAL' and o.status = 'ACTIVE'
+                      and not exists (select 1 from hr_unit u where u.snapshot_id = :s and u.external_id = o.source_external_id
+                                        and u.active)""")
+                    .params(s).update();
+            if (localRetired > 0) {
+                audit.system("HR_LOCAL_UNITS_RETIRED", "HR_SNAPSHOT", String.valueOf(s.get("s")), null,
+                        Map.of("count", localRetired));
+            }
+        }
         // Re-parent in two steps so an intermediate state never forms a cycle: detach every node whose parent changes,
         // then attach the new parents (any subset of an acyclic final tree is acyclic). Orphans and cycle members stay
         // roots; no parent is ever invented.
@@ -138,7 +192,9 @@ public class HrProjection {
                 .params(s).update();
         jdbc.sql("update organization o set parent_id = t.parent from (" + target + ") t where o.id = t.id and o.parent_id is distinct from t.parent")
                 .params(s).update();
-        return new int[] {orgCreated, orgUpdated + orgAdopted, orgRetired};
+        java.util.Set<UUID> changed = new java.util.HashSet<>(adoptedIds);
+        changed.addAll(updatedIds);
+        return new Organizations(orgCreated, orgAdopted, orgUpdated, changed.size(), orgRetired, localRetired);
     }
 
     private Result people(UUID snapshot, String one, Instant now) {

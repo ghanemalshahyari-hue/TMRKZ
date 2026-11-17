@@ -21,9 +21,26 @@ UP="--build"; OFF=""
 if [ "${TMRKZ_OFFLINE:-}" = 1 ]; then UP="--no-build --pull never"; OFF="-f ops/local/compose.offline.yml"; fi
 # a new version built on this connected machine while the application stays on its isolated network
 if [ "${TMRKZ_OFFLINE:-}" = 1 ] && [ "${TMRKZ_BUILD:-}" = 1 ]; then UP="--build"; fi
+# Optional manual enterprise-LDAP override: keep Keycloak/local platform accounts on the stand-in and attach only the
+# fixed raw-TLS relay of compose.enterprise-manual.yml. Its generated gateway belongs to this compose network.
+MANUAL="$(sed -n 's/^TMRKZ_MANUAL_LDAP_URL=//p' .env | tail -n 1 | tr -d '\r' | tr -d "'\"")"
+MANUAL_FILE=""; MANUAL_OPT=""
+if [ -n "$MANUAL" ]; then
+  MANUAL_FILE=":ops/local/compose.enterprise-manual.yml"
+  MANUAL_OPT="-f ops/local/compose.enterprise-manual.yml"
+fi
+# Nginx drops Compose group_add values when it becomes the nginx user. Preserve the map mount's numeric group in
+# /etc/group instead (map-worker.sh), which is required on vboxsf mounts that ignore chmod and retain mode 0770.
+MAP_ROOT="$(sed -n 's/^TMRKZ_MAP_ROOT=//p' .env | tail -n 1 | tr -d '\r')"; MAP_ROOT="${MAP_ROOT:-./map-runtime}"
+MAP_GID=0
+if [ -d "$MAP_ROOT" ]; then
+  MAP_GID="$(stat -c %g "$MAP_ROOT" 2>/dev/null || stat -f %g "$MAP_ROOT")"
+fi
+export TMRKZ_MAP_GID="$MAP_GID"
+MAP_FILE=":ops/local/compose.map-access.yml"; MAP_OPT="-f ops/local/compose.map-access.yml"
 restore() {
   [ -n "${TMRKZ_RESTORE:-}" ] || return 0
-  COMPOSE_PATH_SEPARATOR=":" COMPOSE_FILE="$1${OFF:+:ops/local/compose.offline.yml}" RESTORE_DATA_ONLY=1 \
+  COMPOSE_PATH_SEPARATOR=":" COMPOSE_FILE="$1${OFF:+:ops/local/compose.offline.yml}${MANUAL_FILE}${MAP_FILE}" RESTORE_DATA_ONLY=1 \
     sh ops/restore.sh "$TMRKZ_RESTORE" tmrkz-mover "${PORT:-8088}"
 }
 case "$DIRECTORY" in
@@ -31,7 +48,7 @@ case "$DIRECTORY" in
   *)
     echo "[up] enterprise directory from .env: $DIRECTORY (no stand-in)"
     restore docker-compose.yml
-    docker compose -p tmrkz-mover -f docker-compose.yml $OFF up -d $UP "$@"
+    docker compose -p tmrkz-mover -f docker-compose.yml $OFF $MANUAL_OPT $MAP_OPT up -d $UP "$@"
     STANDIN=no ;;
 esac
 if [ "${STANDIN:-yes}" = yes ]; then
@@ -49,16 +66,22 @@ if [ ! -f "$G/certs/ca.crt" ]; then
   rm -f "$G/certs/ldap.csr" "$G/certs/ext.cnf"
 fi
 cp "$G/certs/ca.crt" "$G/truststore/tmrkz-local-directory-ca.pem"
+# Some shared filesystems retain 0770 on chmod; Keycloak is uid 1000 and cannot enter that bind mount.
+LOCAL_TRUSTSTORE="${TMRKZ_LOCAL_TRUSTSTORE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/tmrkz-mover/local-truststore}"
+mkdir -p "$LOCAL_TRUSTSTORE"
+cp "$G/certs/ca.crt" "$LOCAL_TRUSTSTORE/tmrkz-local-directory-ca.pem"
+chmod 755 "$LOCAL_TRUSTSTORE"
+chmod 644 "$LOCAL_TRUSTSTORE/"*.pem
 # the users container only: no person is created here
 printf 'dn: ou=people,dc=tmrkz,dc=local\nobjectClass: organizationalUnit\nou: people\n' > "$G/ldap/50-people-container.ldif"
 
 export LOCAL_LDAP_ADMIN_PASSWORD="$(cat "$G/ldap-admin-password")"
 export LDAP_URL="ldap://openldap:389" LDAP_START_TLS="true" LDAP_BIND_DN="cn=admin,dc=tmrkz,dc=local"
 export LDAP_BIND_CREDENTIAL="$LOCAL_LDAP_ADMIN_PASSWORD" LDAP_USERS_DN="ou=people,dc=tmrkz,dc=local"
-export TMRKZ_TRUSTSTORE_DIR="./$G/truststore"
+export TMRKZ_TRUSTSTORE_DIR="$LOCAL_TRUSTSTORE"
 
 restore docker-compose.yml:ops/local/compose.local-directory.yml
-docker compose -p tmrkz-mover -f docker-compose.yml -f ops/local/compose.local-directory.yml $OFF up -d $UP "$@"
+docker compose -p tmrkz-mover -f docker-compose.yml -f ops/local/compose.local-directory.yml $OFF $MANUAL_OPT $MAP_OPT up -d $UP "$@"
 fi
 i=0
 until [ "$(curl -s -o /dev/null -w '%{http_code}' "$LOCAL/auth/realms/tmrkz/.well-known/openid-configuration")" = 200 ] \
@@ -70,4 +93,5 @@ i=0
 until sh ops/platform-accounts.sh tmrkz-mover; do
   i=$((i + 1)); [ $i -ge 5 ] && { echo "platform accounts not created; re-run: sh ops/platform-accounts.sh tmrkz-mover"; exit 1; }; sleep 10
 done
+sh ops/keycloak/set-platform-password-client.sh tmrkz-mover
 echo "TMRKZ is up at $URL — sign in as admin or developer (passwords: TMRKZ_PLATFORM_*_PASSWORD in .env)"

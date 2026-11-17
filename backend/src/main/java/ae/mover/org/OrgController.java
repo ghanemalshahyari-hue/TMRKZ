@@ -40,9 +40,10 @@ public class OrgController {
     public record RevokeInput(String reason) {
     }
 
+    /** ACTIVE units by default; {@code includeRetired=true} is AUDIT-gated history within the same scope (ADR-072). */
     @GetMapping("/organizations/tree")
-    public List<OrganizationService.OrgNode> tree(Actor actor) {
-        return orgs.tree(access.context(actor));
+    public List<OrganizationService.OrgNode> tree(Actor actor, @RequestParam(required = false) Boolean includeRetired) {
+        return orgs.tree(access.context(actor), Boolean.TRUE.equals(includeRetired));
     }
 
     @GetMapping("/organizations/{id}")

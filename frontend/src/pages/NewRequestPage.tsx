@@ -36,6 +36,10 @@ export function NewRequestPage() {
             {c.allowed ? (
               c.action === 'SITE_REGISTRATION' ? (
                 <a className="button primary" href={newRequestHashFor('SITE_REGISTRATION', hub.units.find((u) => u.actions.some((a) => a.action === 'SITE_REGISTRATION' && a.allowed))?.id)}>بدء الطلب</a>
+              ) : c.action === 'RESTATIONING' && hub.unitsTotal > hub.units.length ? (
+                // the list below holds the first units only (e.g. a system administrator reaches every unit, ADR-073): the
+                // editor starts from the current site on the map and reaches them all
+                <a className="button primary" href={newRequestHashFor('RESTATIONING')}>بدء الطلب</a>
               ) : (
                 <button className="button primary" onClick={() => open(c)}>{c.action === ACCESS ? 'فتح الطلب' : 'اختر الوحدة'}</button>
               )

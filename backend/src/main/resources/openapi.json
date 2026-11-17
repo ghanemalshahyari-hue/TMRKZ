@@ -434,7 +434,33 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/access/fyi-mains": {
@@ -634,7 +660,33 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "organizationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "personId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeEnded",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/access/grants/{id}/replace": {
@@ -1313,7 +1365,25 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "descendants",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "levels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/access/status": {
@@ -1377,7 +1447,25 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/access/unit-members": {
@@ -1960,7 +2048,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "UNITS",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/access/workspace/summary": {
@@ -2024,7 +2122,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "parent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/access/workspace/units/{id}": {
@@ -2170,6 +2278,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -2272,6 +2388,30 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -2645,7 +2785,41 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/auth/directory/login": {
@@ -2832,7 +3006,33 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/auth/oidc/start": {
@@ -2864,7 +3064,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "return",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/auth/reauth": {
@@ -3038,7 +3248,25 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/delegations": {
@@ -4112,7 +4340,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/hr/runs/{id}/issues": {
@@ -4372,6 +4610,114 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/hr/unit-imports/preview": {
+      "post": {
+        "tags": [
+          "OracleUnitImport"
+        ],
+        "operationId": "preview",
+        "summary": "preview",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hr/unit-imports/{id}/publish": {
+      "post": {
+        "tags": [
+          "OracleUnitImport"
+        ],
+        "operationId": "publish",
+        "summary": "publish",
+        "responses": {
+          "200": {
+            "description": "OK — see docs/api/API_V1.md for the JSON shape"
+          },
+          "400": {
+            "description": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED"
+          },
+          "401": {
+            "description": "UNAUTHENTICATED"
+          },
+          "403": {
+            "description": "FORBIDDEN (also missing X-Requested-With on non-GET) / SEPARATION_OF_DUTIES (deciding a request one made, ADR-027)"
+          },
+          "404": {
+            "description": "RESOURCE_NOT_FOUND (also used for objects outside the caller's scope)"
+          },
+          "409": {
+            "description": "STALE_REVISION / TASK_ALREADY_COMPLETED / RESERVATION_CONFLICT / IDEMPOTENCY_CONFLICT / ATTACHMENT_NOT_READY / WORKFLOW_NOT_PUBLISHED"
+          },
+          "503": {
+            "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Requested-With",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mover"
+              ]
+            }
+          }
+        ]
       }
     },
     "/api/v1/identity-issues": {
@@ -4702,7 +5048,97 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "open",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceIds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orgId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeSubOrgs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "packageId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "zoom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "siteIds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/map/imports": {
@@ -4737,6 +5173,30 @@
         },
         "parameters": [
           {
+            "name": "file",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "crs",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "targetSiteId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "X-Requested-With",
             "in": "header",
             "required": true,
@@ -4747,7 +5207,26 @@
               ]
             }
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/map/imports/{id}": {
@@ -4937,7 +5416,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "all",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -4970,6 +5459,14 @@
         },
         "parameters": [
           {
+            "name": "file",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "X-Requested-With",
             "in": "header",
             "required": true,
@@ -4980,7 +5477,26 @@
               ]
             }
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/map/packages/{code}/{version}/status": {
@@ -5487,7 +6003,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/notifications/{id}/read": {
@@ -5668,7 +6194,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/organizations/tree": {
@@ -5700,7 +6236,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "includeRetired",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/organizations/{id}": {
@@ -5942,7 +6488,33 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/placement/check": {
@@ -6529,7 +7101,25 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/request-hub": {
@@ -6625,7 +7215,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/request-hub/units/{id}": {
@@ -6879,7 +7479,97 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "false",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "false",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -6964,7 +7654,57 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "false",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "false",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/requests/{id}": {
@@ -7091,6 +7831,22 @@
             }
           },
           {
+            "name": "fieldId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "file",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "X-Requested-With",
             "in": "header",
             "required": true,
@@ -7101,7 +7857,26 @@
               ]
             }
           }
-        ]
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "fieldId": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/requests/{id}/boundaries": {
@@ -7139,6 +7914,14 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -7184,6 +7967,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -7223,6 +8014,15 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Replays return the stored result; reuse with a different body → 409 IDEMPOTENCY_CONFLICT",
             "schema": {
               "type": "string"
             }
@@ -7569,7 +8369,41 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/reservations/{id}/change-requests": {
@@ -7788,6 +8622,22 @@
             "name": "id",
             "in": "path",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -8980,7 +9830,33 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orgId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "false",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       },
       "post": {
         "tags": [
@@ -9332,7 +10208,25 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/sites/tree": {
@@ -9364,7 +10258,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "parentId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/sites/with-boundary": {
@@ -10090,7 +10994,25 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "orgId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "siteId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/stationing/hierarchy-levels": {
@@ -10196,7 +11118,25 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "100",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/stationing/outbox/{eventId}/replay": {
@@ -10960,7 +11900,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/support/console/cases/{id}/act": {
@@ -11403,6 +12353,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -11677,7 +12643,17 @@
           "503": {
             "description": "SIGNATURE_PROVIDER_UNAVAILABLE / AUTHZ_UNAVAILABLE / AUTHZ_SYNC_PENDING / HR_SOURCE_UNAVAILABLE / IDENTITY_PROVIDER_UNAVAILABLE"
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "orgIds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/unit-symbols/catalog": {

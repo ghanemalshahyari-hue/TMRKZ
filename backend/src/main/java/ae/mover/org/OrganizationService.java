@@ -85,8 +85,21 @@ public class OrganizationService {
         return out;
     }
 
+    /** The ordinary, ACTIVE-only organisation tree. */
     public List<OrgNode> tree(AccessContext ctx) {
+        return tree(ctx, false);
+    }
+
+    /**
+     * The scoped organisation tree. Ordinarily ACTIVE units only (ADR-072): an ACTIVE unit whose parent is retired keeps its
+     * real parent in the database but is shown as a root of this tree, with no parent reference to the retired unit.
+     * {@code includeRetired} is history: it additionally requires AUDIT, keeps the same scope and shows the real parents.
+     */
+    public List<OrgNode> tree(AccessContext ctx, boolean includeRetired) {
         ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_ACCESS, Permission.MANAGE_FACILITIES, Permission.CONFIGURE);
+        if (includeRetired) {
+            ctx.require(Permission.AUDIT);
+        }
         Set<UUID> visible = visibleOrgs(ctx);
         Map<UUID, Integer> siteCounts = new HashMap<>();
         jdbc.sql("select organization_id, count(*) as n from site_responsibility where valid_to is null group by organization_id")
@@ -98,7 +111,10 @@ public class OrganizationService {
                 .query((rs, n) -> memberCounts.put(Db.uuid(rs, "organization_id"), rs.getInt("n"))).list();
         Map<UUID, List<OrgNode>> children = new LinkedHashMap<>();
         Map<UUID, Map<String, Object>> rows = new LinkedHashMap<>();
-        jdbc.sql("select id, code, name, parent_id, status from organization order by code").query().listOfRows()
+        jdbc.sql("""
+                select o.id, o.code, o.name, o.parent_id, o.status, p.status as parent_status
+                from organization o left join organization p on p.id = o.parent_id
+                where :all or o.status = 'ACTIVE' order by o.code""").param("all", includeRetired).query().listOfRows()
                 .forEach(r -> rows.put((UUID) r.get("id"), r));
         List<UUID> order = new ArrayList<>(rows.keySet());
         java.util.Collections.reverse(order);
@@ -109,8 +125,10 @@ public class OrganizationService {
             if (visible != null && !visible.contains(id)) {
                 continue;
             }
+            // the active tree never names a retired unit, not even as a parent: its ACTIVE child is a navigation root there
+            boolean retiredParent = !includeRetired && r.get("parent_id") != null && !"ACTIVE".equals(r.get("parent_status"));
             OrgNode node = new OrgNode(id.toString(), (String) r.get("code"), (String) r.get("name"),
-                    r.get("parent_id") == null ? null : r.get("parent_id").toString(), (String) r.get("status"),
+                    r.get("parent_id") == null || retiredParent ? null : r.get("parent_id").toString(), (String) r.get("status"),
                     children.getOrDefault(id, List.of()), siteCounts.getOrDefault(id, 0), memberCounts.getOrDefault(id, 0));
             built.put(id, node);
             UUID parent = (UUID) r.get("parent_id");
@@ -171,22 +189,30 @@ public class OrganizationService {
         ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.MANAGE_ACCESS, Permission.MANAGE_FACILITIES, Permission.CONFIGURE);
     }
 
-    /** Top of the visible tree: organisations whose parent is not visible to the actor. */
+    /**
+     * Top of the visible ACTIVE tree: ACTIVE organisations whose parent is not visible to the actor or is not ACTIVE. An
+     * ACTIVE unit under a retired parent (ADR-072) is a navigation root here and keeps its real {@code parentId}; no other
+     * parent is invented and the retired one grants nothing.
+     */
     public List<OrgBranch> roots(AccessContext ctx) {
         requireOrgReader(ctx);
         Set<UUID> visible = visibleOrgs(ctx);
         List<Map<String, Object>> rows = jdbc.sql("""
-                select o.id, o.code, o.name, o.parent_id from organization o where o.status = 'ACTIVE'
-                  and (o.parent_id is null or :all or o.id = any(string_to_array(:ids, ',')::uuid[]))
+                select o.id, o.code, o.name, o.parent_id, coalesce(p.status = 'ACTIVE', false) as parent_active
+                from organization o left join organization p on p.id = o.parent_id
+                where o.status = 'ACTIVE'
+                  and (o.parent_id is null or p.status is distinct from 'ACTIVE' or :all
+                       or o.id = any(string_to_array(:ids, ',')::uuid[]))
                 order by o.code""").param("all", visible == null).param("ids", visible == null ? "" : Db.ids(visible))
                 .query().listOfRows();
         List<UUID> roots = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             UUID id = (UUID) r.get("id");
             UUID parent = (UUID) r.get("parent_id");
+            boolean parentActive = Boolean.TRUE.equals(r.get("parent_active"));
             boolean visibleSelf = visible == null || visible.contains(id);
-            boolean parentVisible = parent != null && (visible == null || visible.contains(parent));
-            if (visibleSelf && !parentVisible && (visible != null || parent == null)) {
+            boolean parentVisible = parent != null && parentActive && (visible == null || visible.contains(parent));
+            if (visibleSelf && !parentVisible) {
                 roots.add(id);
             }
         }

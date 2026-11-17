@@ -203,7 +203,7 @@ public class HrSyncService {
                 .stream().findFirst().orElse(null);
         if (src == null) {
             finish(runId, trigger, requestedBy, null, null, started, "FAILED", "HR_SOURCE_NOT_CONFIGURED",
-                    "لم يُهيأ مصدر الموارد البشرية.", Map.of(), overrideReason, null);
+                    "لم يُهيأ مصدر الموارد البشرية.", new LinkedHashMap<>(), overrideReason, null);
             return;
         }
         UUID sourceId = (UUID) src.get("id");
@@ -212,7 +212,7 @@ public class HrSyncService {
                 where source_id = :s and status = 'PUBLISHED'""").param("s", sourceId).query().listOfRows().stream().findFirst().orElse(null);
         if (mapping == null) {
             finish(runId, trigger, requestedBy, sourceId, null, started, "FAILED", "HR_MAPPING_NOT_PUBLISHED",
-                    "لا يوجد إصدار تعيين منشور لمصدر الموارد البشرية.", Map.of(), overrideReason, null);
+                    "لا يوجد إصدار تعيين منشور لمصدر الموارد البشرية.", new LinkedHashMap<>(), overrideReason, null);
             return;
         }
         UUID mappingId = (UUID) mapping.get("id");
@@ -584,6 +584,7 @@ public class HrSyncService {
                 .param("m", message).update();
     }
 
+    /** {@code counts} must be mutable: the duration is added to it. */
     private void finish(UUID runId, String trigger, UUID requestedBy, UUID sourceId, UUID mappingId, Instant started, String status,
                         String code, String message, Map<String, Object> counts, String overrideReason, UUID snapshot) {
         Instant now = clock.instant();

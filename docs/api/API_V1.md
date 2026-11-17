@@ -82,7 +82,7 @@ type Grant = {
 
 | Method & path | Notes |
 |---|---|
-| `GET /organizations/tree` | Scoped tree: `OrgNode[]` where `OrgNode = { id, code, name, parentId, status, children: OrgNode[], siteCount, memberCount }` |
+| `GET /organizations/tree` | Scoped ACTIVE tree: `OrgNode[]` where `OrgNode = { id, code, name, parentId, status, children: OrgNode[], siteCount, memberCount }`. `?includeRetired=true` additionally requires AUDIT and preserves scope. An ACTIVE child of a retired parent keeps its actual parent ID in the database but appears as a navigation root: in the ordinary tree its `parentId` is null (the retired unit is not named), while `GET /organizations/roots` and `?includeRetired=true` show the real `parentId`; no replacement parent is invented. |
 | `GET /organizations/{id}` | `{ org: OrgNode (no children), members: Member[], sites: SiteSummary[] }` |
 | `GET /organizations/{id}/children` | `OrgNode[]` (lazy loading for large trees) |
 | `GET /people?q=&page=&size=` | `Page<{ id, displayName, employeeNo, username, status }>` — CONFIGURE |
@@ -259,6 +259,9 @@ type VersionInfo = { id: string; version: number; status: 'DRAFT'|'PUBLISHED'|'R
 | `GET /integrations` | `{ code, name, status: 'NOT_CONNECTED'|'FILE_IMPORT'|'BUILT_IN', description, lastRun: { id, status, startedAt, stats }|null }[]` |
 | `POST /integrations/org-structure/preview` | `{ rows: { code, name, parentCode|null }[] }` → `{ runId, valid, errors: { row, code, message }[], summary: { create, update, unchanged } }` |
 | `POST /integrations/org-structure/runs/{runId}/commit` | applies a valid preview |
+| `POST /hr/unit-imports/preview` | **CONFIGURE + reason (≥10 chars).** `{ storageKey, reason }` selects only a regular private `unit-import/` file. Validates exact source schema/hash/column contract/timestamps and canonical unit hierarchy, then returns `{ runId, status: 'PREVIEWED'|'INVALID', sourceSyncedAtUtc, snapshotId, effects: Record<string,number>, payloadSha256, liveOracleRead: false }`. No source unit IDs or person records are returned. An hourly STAGING cleanup does not discard a PREVIEWED import snapshot. |
+| `POST /hr/unit-imports/{runId}/publish` | **CONFIGURE.** Re-locks and re-verifies the staged private payload, semantic column contract and current-tree fingerprint/effects, then atomically carries the previous person mirror forward, publishes Oracle units and retires unmatched units (history preserved). The response is the stored actual result on first commit and idempotent replay. A changed file/structure, expired/invalid preview, collision or open-business effect is refused; no partial publication occurs. Source timestamps must not be treated as a live Oracle connection or success timestamp. |
+
 | `GET /system/info` | `{ version, timezone, serverTime, database: 'UP', outboxPending, mapPackages }` |
 
 ```ts

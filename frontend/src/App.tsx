@@ -27,7 +27,7 @@ import { SitesPage } from './pages/SitesPage';
 import { WorkflowStudio } from './pages/WorkflowStudio';
 import { clearDesktopUser, startDesktopNotifications } from './lib/desktopNotifications';
 import { LAST_VIEW_KEY } from './lib/support';
-import { setSupportSeat } from './lib/navigation';
+import { setGrantFacts, setSupportSeat } from './lib/navigation';
 import { SupportConsolePage } from './pages/SupportConsolePage';
 import { SupportPage } from './pages/SupportPage';
 import { FloatingAssist } from './components/assist/FloatingAssist';
@@ -139,6 +139,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     }
   }, [view]);
   setSupportSeat(me.supportSeat);
+  setGrantFacts(me.grants);
 
   // reference data shared by screens; reloaded after mutations and identity changes
   // each list is asked for only with a right its endpoint accepts (a user holding one single action asks for none)

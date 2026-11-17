@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 import javax.naming.AuthenticationException;
 import javax.naming.CommunicationException;
 import javax.naming.Context;
+import javax.naming.NameNotFoundException;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.ServiceUnavailableException;
@@ -28,11 +29,15 @@ import javax.naming.directory.SearchControls;
 import javax.naming.directory.SearchResult;
 import javax.naming.ldap.InitialLdapContext;
 import javax.naming.ldap.LdapContext;
+import javax.naming.ldap.LdapName;
 import javax.naming.ldap.StartTlsRequest;
 import javax.naming.ldap.StartTlsResponse;
 import javax.net.SocketFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLHandshakeException;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManagerFactory;
 
 import org.slf4j.Logger;
@@ -40,18 +45,29 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Verifies a username and password against the enterprise directory, as TNQL's manual sign-in does: a read-only service
- * account finds exactly one entry for the login name, then the person's own password is checked by binding as that entry.
- * Every connection is protected (LDAPS or StartTLS) and trusts only the CA certificates in the configured folder, with
- * host-name checking; credentials are never sent before the channel is secured. TMRKZ keeps no password.
+ * Verifies a username and password against the enterprise directory, as TNQL's manual sign-in does. Two profiles:
+ * <ul>
+ * <li>direct user bind (ADR-070, {@link LdapProperties#direct()}): the person binds as the name the installation's pattern makes
+ * of the login, then that same authenticated connection finds exactly one entry for the login and reads its stable identifier,
+ * login, name and the configured employment attributes;</li>
+ * <li>service search (ADR-016): a read-only service account finds exactly one entry for the login name, then the person's own
+ * password is checked by binding as that entry.</li>
+ * </ul>
+ * Every connection is protected (LDAPS or StartTLS) and trusts only the CA certificates in the configured folder; JSSE endpoint
+ * identification is set explicitly on both the LDAPS socket and the StartTLS wrapping socket, so a certificate issued for another
+ * host name is refused. Credentials are never sent before the channel is secured and an empty password is never bound. A refusal
+ * is never an opportunity to try the other profile. TMRKZ keeps no password.
  */
 @Component
 public class DirectoryAuthenticator {
 
     private static final Logger log = LoggerFactory.getLogger(DirectoryAuthenticator.class);
     private static final Pattern ATTRIBUTE = Pattern.compile("^[A-Za-z][A-Za-z0-9-]{0,63}$");
-    /** SSL context used by {@link TrustedSocketFactory} for LDAPS connections (JNDI instantiates factories by class). */
-    private static volatile SSLContext ldapsContext;
+    /**
+     * A login that may be placed in a direct-bind pattern: letters, digits, dot, hyphen and underscore only, so it can change
+     * neither a DN nor a UPN (nothing to escape, nothing to inject); anything else is the uniform wrong-credentials answer.
+     */
+    private static final Pattern DIRECT_LOGIN = Pattern.compile("^[\\p{L}\\p{N}][\\p{L}\\p{N}._-]{0,127}$");
 
     private final LdapProperties props;
 
@@ -99,80 +115,175 @@ public class DirectoryAuthenticator {
         if (username == null || username.isBlank() || username.length() > 128 || username.chars().anyMatch(c -> c < 0x20)) {
             throw invalid();
         }
+        if (props.direct()) {
+            return direct(username.trim(), password);
+        }
         return verify(props.usernameAttribute(), username.trim(), password);
     }
 
-    /** Re-verifies the password of a linked person, found by the stable identifier (step-up before approval). */
-    public DirectoryUser reauthenticate(String uuid, String password) throws DirectoryException {
+    /**
+     * Re-verifies the password of a linked person (step-up before approval). Service search: the entry is found by the stable
+     * identifier. Direct bind: the person binds again with the linked login, and the entry found must carry the linked stable
+     * identifier; any other entry is a refusal.
+     */
+    public DirectoryUser reauthenticate(String uuid, String login, String password) throws DirectoryException {
+        if (uuid == null || uuid.isBlank()) {
+            throw invalid();
+        }
+        if (props.direct()) {
+            if (login == null || login.isBlank() || login.length() > 128) {
+                throw invalid();
+            }
+            DirectoryUser user = direct(login.trim(), password);
+            if (!user.uuid().equalsIgnoreCase(uuid.trim())) {
+                log.warn("Directory step-up refused: the linked login now names another directory entry");
+                throw invalid();
+            }
+            return user;
+        }
         return verify(props.uuidAttribute(), uuid, password);
     }
 
-    private DirectoryUser verify(String attribute, String value, String password) throws DirectoryException {
+    /**
+     * Direct user bind (ADR-070): the person's own bind over the protected channel, then, on that same authenticated
+     * connection, exactly one entry for the login under the users DN.
+     */
+    private DirectoryUser direct(String username, String password) throws DirectoryException {
         if (!props.configured()) {
+            throw new DirectoryException(Failure.NOT_CONFIGURED, "directory not configured", null);
+        }
+        // An empty password would be an unauthenticated bind, which many directories accept: never attempted.
+        if (password == null || password.isEmpty() || password.length() > 1024) {
+            throw invalid();
+        }
+        if (!DIRECT_LOGIN.matcher(username).matches()) {
+            throw invalid();
+        }
+        checkAttributes(props.usernameAttribute());
+        String principal = props.directBindPattern().replace(LdapProperties.USERNAME_MARKER, username);
+        LdapContext ctx = connect(principal, password, true);
+        try {
+            SearchResult entry = unique(ctx, props.usernameAttribute(), username);
+            LdapName bound = dn(principal);
+            if (bound != null && !bound.equals(dn(entry.getNameInNamespace()))) {
+                // a DN pattern: the entry found for the login must be the entry that has just authenticated
+                log.warn("Directory direct bind refused: the entry found for the login is not the bound entry");
+                throw invalid();
+            }
+            return user(entry);
+        } catch (NamingException e) {
+            throw translate(e);
+        } finally {
+            close(ctx);
+        }
+    }
+
+    /** Service search (ADR-016): the read-only account finds exactly one entry, then the person binds as that entry. */
+    private DirectoryUser verify(String attribute, String value, String password) throws DirectoryException {
+        if (!props.configured() || props.bindDn() == null || props.bindCredential() == null) {
             throw new DirectoryException(Failure.NOT_CONFIGURED, "directory not configured", null);
         }
         // An empty password would be an unauthenticated bind, which many directories accept: never allowed.
         if (password == null || password.isEmpty() || password.length() > 1024) {
             throw invalid();
         }
-        if (!ATTRIBUTE.matcher(attribute).matches() || !ATTRIBUTE.matcher(props.userObjectClass()).matches()) {
-            throw new DirectoryException(Failure.NOT_CONFIGURED, "invalid directory attribute configuration", null);
-        }
+        checkAttributes(attribute);
         DirectoryUser user;
-        LdapContext service = connect(props.bindDn(), props.bindCredential());
+        LdapContext service = connect(props.bindDn(), props.bindCredential(), false);
         try {
-            SearchControls controls = new SearchControls();
-            controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-            controls.setCountLimit(2);
-            controls.setTimeLimit(props.readTimeoutMs());
-            java.util.List<String> returning = new java.util.ArrayList<>(java.util.List.of(props.uuidAttribute(), props.usernameAttribute(),
-                    props.employeeNumberAttribute(), "displayName", "cn"));
-            returning.addAll(props.employmentAttributes());
-            controls.setReturningAttributes(returning.stream().distinct().toArray(String[]::new));
-            String filter = "(&(objectClass=" + props.userObjectClass() + ")(" + attribute + "={0}))";
-            // Active Directory's objectGUID is binary: it is kept as hex text and searched with its bytes.
-            Object arg = binaryUuid() && attribute.equalsIgnoreCase(props.uuidAttribute()) ? HexFormat.of().parseHex(value) : value;
-            NamingEnumeration<SearchResult> results = service.search(props.usersDn(), filter, new Object[]{arg}, controls);
-            SearchResult first = null;
-            int count = 0;
-            try {
-                while (results.hasMore()) {
-                    SearchResult r = results.next();
-                    count++;
-                    if (first == null) {
-                        first = r;
-                    }
-                }
-            } catch (javax.naming.SizeLimitExceededException e) {
-                count = 2;
-            }
-            if (count == 0) {
-                throw invalid();
-            }
-            if (count > 1) {
-                throw new DirectoryException(Failure.AMBIGUOUS, "more than one directory entry for the login name", null);
-            }
-            Attributes a = first.getAttributes();
-            String uuid = text(a.get(props.uuidAttribute()));
-            if (uuid == null) {
-                throw new DirectoryException(Failure.UNAVAILABLE, "directory entry has no stable identifier", null);
-            }
-            String employeeNumber = text(a.get(props.employeeNumberAttribute()));
-            DirectoryProfile profile = new DirectoryProfile(employeeNumber, optional(a, props.rankAttribute()),
-                    optional(a, props.positionAttribute()), optional(a, props.unitIdAttribute()), optional(a, props.unitNameAttribute()),
-                    optional(a, props.mainUnitIdAttribute()), !props.employmentAttributes().isEmpty());
-            user = new DirectoryUser(first.getNameInNamespace(), uuid, lower(text(a.get(props.usernameAttribute()))), employeeNumber,
-                    text(a.get("displayName")) != null ? text(a.get("displayName")) : text(a.get("cn")), profile);
+            user = user(unique(service, attribute, value));
         } catch (NamingException e) {
             throw translate(e);
         } finally {
             close(service);
         }
-        close(connect(user.dn(), password)); // the person's own bind: succeeds only with the right password
+        close(connect(user.dn(), password, true)); // the person's own bind: succeeds only with the right password
         return user;
     }
 
-    private LdapContext connect(String principal, String credential) throws DirectoryException {
+    private void checkAttributes(String attribute) throws DirectoryException {
+        for (String a : new String[]{attribute, props.userObjectClass(), props.uuidAttribute(), props.usernameAttribute(),
+                props.employeeNumberAttribute()}) {
+            if (a == null || !ATTRIBUTE.matcher(a).matches()) {
+                throw new DirectoryException(Failure.NOT_CONFIGURED, "invalid directory attribute configuration", null);
+            }
+        }
+    }
+
+    /** Exactly one entry of the configured class whose {@code attribute} equals {@code value}; none or several is a refusal. */
+    private SearchResult unique(LdapContext ctx, String attribute, String value) throws NamingException, DirectoryException {
+        SearchControls controls = new SearchControls();
+        controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+        controls.setCountLimit(2);
+        controls.setTimeLimit(props.readTimeoutMs());
+        java.util.List<String> returning = new java.util.ArrayList<>(java.util.List.of(props.uuidAttribute(), props.usernameAttribute(),
+                props.employeeNumberAttribute(), "displayName", "cn"));
+        returning.addAll(props.employmentAttributes());
+        controls.setReturningAttributes(returning.stream().distinct().toArray(String[]::new));
+        String filter = "(&(objectClass=" + props.userObjectClass() + ")(" + attribute + "={0}))";
+        // Active Directory's objectGUID is binary: it is kept as hex text and searched with its bytes.
+        Object arg;
+        try {
+            arg = binaryUuid() && attribute.equalsIgnoreCase(props.uuidAttribute()) ? HexFormat.of().parseHex(value) : value;
+        } catch (IllegalArgumentException e) {
+            throw invalid();
+        }
+        NamingEnumeration<SearchResult> results = ctx.search(props.usersDn(), filter, new Object[]{arg}, controls);
+        SearchResult first = null;
+        int count = 0;
+        try {
+            while (results.hasMore()) {
+                SearchResult r = results.next();
+                count++;
+                if (first == null) {
+                    first = r;
+                }
+            }
+        } catch (javax.naming.SizeLimitExceededException e) {
+            count = 2;
+        }
+        if (count == 0) {
+            throw invalid();
+        }
+        if (count > 1) {
+            throw new DirectoryException(Failure.AMBIGUOUS, "more than one directory entry for the login name", null);
+        }
+        return first;
+    }
+
+    /** The verified person as the entry states them; an entry without its stable identifier or login is refused. */
+    private DirectoryUser user(SearchResult entry) throws NamingException, DirectoryException {
+        Attributes a = entry.getAttributes();
+        String uuid = text(a.get(props.uuidAttribute()));
+        if (uuid == null) {
+            throw new DirectoryException(Failure.UNAVAILABLE, "directory entry has no stable identifier", null);
+        }
+        String login = lower(text(a.get(props.usernameAttribute())));
+        if (login == null) {
+            throw new DirectoryException(Failure.UNAVAILABLE, "directory entry has no readable login", null);
+        }
+        String employeeNumber = text(a.get(props.employeeNumberAttribute()));
+        DirectoryProfile profile = new DirectoryProfile(employeeNumber, optional(a, props.rankAttribute()),
+                optional(a, props.positionAttribute()), optional(a, props.unitIdAttribute()), optional(a, props.unitNameAttribute()),
+                optional(a, props.mainUnitIdAttribute()), !props.employmentAttributes().isEmpty());
+        return new DirectoryUser(entry.getNameInNamespace(), uuid, login, employeeNumber,
+                text(a.get("displayName")) != null ? text(a.get("displayName")) : text(a.get("cn")), profile);
+    }
+
+    /** A DN-shaped bind name (null for a UPN or another name that is not a DN). */
+    private static LdapName dn(String name) {
+        if (name == null || name.indexOf('=') < 0) {
+            return null;
+        }
+        try {
+            return new LdapName(name);
+        } catch (javax.naming.InvalidNameException e) {
+            return null;
+        }
+    }
+
+    /** {@code person}: the bind is the person's own, so a name the directory does not hold is the uniform wrong-credentials answer. */
+    private LdapContext connect(String principal, String credential, boolean person) throws DirectoryException {
         String url = props.url().trim();
         boolean ldaps = url.toLowerCase(Locale.ROOT).startsWith("ldaps://");
         Hashtable<String, Object> env = new Hashtable<>();
@@ -189,18 +300,23 @@ public class DirectoryAuthenticator {
         try {
             SSLContext ssl = sslContext();
             if (ldaps) {
-                ldapsContext = ssl;
                 env.put("java.naming.ldap.factory.socket", TrustedSocketFactory.class.getName());
                 env.put(Context.SECURITY_AUTHENTICATION, "simple");
                 env.put(Context.SECURITY_PRINCIPAL, principal);
                 env.put(Context.SECURITY_CREDENTIALS, credential);
-                return new InitialLdapContext(env, null);
+                // JNDI creates the socket on this thread, inside the constructor, through TrustedSocketFactory.getDefault()
+                TrustedSocketFactory.CURRENT.set(ssl);
+                try {
+                    return new InitialLdapContext(env, null);
+                } finally {
+                    TrustedSocketFactory.CURRENT.remove();
+                }
             }
-            // StartTLS: connect without credentials, secure the channel (host name checked), then bind.
+            // StartTLS: connect without credentials, secure the channel (host name checked by JSSE), then bind.
             env.put(Context.SECURITY_AUTHENTICATION, "none");
             ctx = new InitialLdapContext(env, null);
             StartTlsResponse tls = (StartTlsResponse) ctx.extendedOperation(new StartTlsRequest());
-            tls.negotiate(ssl.getSocketFactory());
+            tls.negotiate(new TrustedSocketFactory(ssl));
             ctx.addToEnvironment(Context.SECURITY_AUTHENTICATION, "simple");
             ctx.addToEnvironment(Context.SECURITY_PRINCIPAL, principal);
             ctx.addToEnvironment(Context.SECURITY_CREDENTIALS, credential);
@@ -210,6 +326,9 @@ public class DirectoryAuthenticator {
             close(ctx);
             log.warn("Directory TLS negotiation failed: {}", e.getMessage());
             throw new DirectoryException(Failure.TLS, "TLS negotiation with the directory failed", e);
+        } catch (NameNotFoundException e) {
+            close(ctx);
+            throw person ? invalid() : translate(e);
         } catch (NamingException e) {
             close(ctx);
             throw translate(e);
@@ -309,37 +428,76 @@ public class DirectoryAuthenticator {
         }
     }
 
-    /** LDAPS socket factory over the configured trust (JNDI instantiates it through {@code getDefault()}). */
-    public static final class TrustedSocketFactory extends SocketFactory {
-        private final SocketFactory delegate = ldapsContext.getSocketFactory();
+    /**
+     * Socket factory over the configured trust, for LDAPS (JNDI instantiates it through {@code getDefault()}) and for the
+     * StartTLS wrapping socket. Every SSL socket it makes has JSSE endpoint identification switched on, so the directory's
+     * certificate must name the host that was dialled.
+     */
+    public static final class TrustedSocketFactory extends SSLSocketFactory {
+        /** The trust of the LDAPS connection being opened on this thread. */
+        static final ThreadLocal<SSLContext> CURRENT = new ThreadLocal<>();
+        private final SSLSocketFactory delegate;
+
+        TrustedSocketFactory(SSLContext context) {
+            this.delegate = context.getSocketFactory();
+        }
 
         public static SocketFactory getDefault() {
-            return new TrustedSocketFactory();
+            SSLContext context = CURRENT.get();
+            if (context == null) {
+                throw new IllegalStateException("no directory trust for this connection");
+            }
+            return new TrustedSocketFactory(context);
+        }
+
+        private static Socket identified(Socket socket) {
+            if (socket instanceof SSLSocket ssl) {
+                SSLParameters parameters = ssl.getSSLParameters();
+                parameters.setEndpointIdentificationAlgorithm("HTTPS");
+                ssl.setSSLParameters(parameters);
+            }
+            return socket;
         }
 
         @Override
         public Socket createSocket() throws IOException {
-            return delegate.createSocket();
+            return identified(delegate.createSocket());
         }
 
         @Override
         public Socket createSocket(String host, int port) throws IOException {
-            return delegate.createSocket(host, port);
+            return identified(delegate.createSocket(host, port));
         }
 
         @Override
         public Socket createSocket(String host, int port, InetAddress localHost, int localPort) throws IOException {
-            return delegate.createSocket(host, port, localHost, localPort);
+            return identified(delegate.createSocket(host, port, localHost, localPort));
         }
 
         @Override
         public Socket createSocket(InetAddress host, int port) throws IOException {
-            return delegate.createSocket(host, port);
+            return identified(delegate.createSocket(host, port));
         }
 
         @Override
         public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
-            return delegate.createSocket(address, port, localAddress, localPort);
+            return identified(delegate.createSocket(address, port, localAddress, localPort));
+        }
+
+        /** The StartTLS layer over the plain connection: {@code host} is the name dialled, checked against the certificate. */
+        @Override
+        public Socket createSocket(Socket socket, String host, int port, boolean autoClose) throws IOException {
+            return identified(delegate.createSocket(socket, host, port, autoClose));
+        }
+
+        @Override
+        public String[] getDefaultCipherSuites() {
+            return delegate.getDefaultCipherSuites();
+        }
+
+        @Override
+        public String[] getSupportedCipherSuites() {
+            return delegate.getSupportedCipherSuites();
         }
     }
 }

@@ -67,6 +67,9 @@ mover:
 
 tmrkz:
   oidc:
+    # Automatic (employee) sign-in, ADR-071: the external enterprise Keycloak client when an issuer is supplied (Compose feeds
+    # these from TMRKZ_ENTERPRISE_OIDC_*); while the issuer is empty, the whole local provider below. Every empty value counts as
+    # not supplied (OidcProperties normalises it), so an empty Compose value never erases a default or borrows another provider.
     # Public realm URL (appears as "iss" in tokens and serves the browser) and the same realm on the internal network.
     issuer: ${TMRKZ_OIDC_ISSUER:}
     internal-base-url: ${TMRKZ_OIDC_INTERNAL_URL:}
@@ -74,6 +77,25 @@ tmrkz:
     client-secret: ${TMRKZ_OIDC_CLIENT_SECRET:}
     redirect-uri: ${TMRKZ_OIDC_REDIRECT_URI:}
     post-logout-redirect-uri: ${TMRKZ_OIDC_POST_LOGOUT_REDIRECT_URI:}
+    # The local Keycloak realm of the lasting platform accounts (ADR-071): stable values, independent of the enterprise provider.
+    local-issuer: ${TMRKZ_LOCAL_OIDC_ISSUER:}
+    local-internal-base-url: ${TMRKZ_LOCAL_OIDC_INTERNAL_URL:}
+    local-client-id: ${TMRKZ_LOCAL_OIDC_CLIENT_ID:tmrkz-web}
+    local-client-secret: ${TMRKZ_LOCAL_OIDC_CLIENT_SECRET:}
+    local-redirect-uri: ${TMRKZ_LOCAL_OIDC_REDIRECT_URI:}
+    local-post-logout-redirect-uri: ${TMRKZ_LOCAL_OIDC_POST_LOGOUT_REDIRECT_URI:}
+    # Optional overrides of the platform provider (platform step-up and logout); empty: the local provider above. They never
+    # default to the enterprise provider while local values exist.
+    platform-issuer: ${TMRKZ_PLATFORM_OIDC_ISSUER:}
+    platform-internal-base-url: ${TMRKZ_PLATFORM_OIDC_INTERNAL_URL:}
+    platform-client-id: ${TMRKZ_PLATFORM_BROWSER_CLIENT_ID:}
+    platform-client-secret: ${TMRKZ_PLATFORM_BROWSER_CLIENT_SECRET:}
+    platform-redirect-uri: ${TMRKZ_PLATFORM_BROWSER_REDIRECT_URI:}
+    platform-post-logout-redirect-uri: ${TMRKZ_PLATFORM_BROWSER_POST_LOGOUT_REDIRECT_URI:}
+    # ADR-070: the backend-only confidential client through which the platform accounts use the manual form (direct password
+    # grant at the platform provider only; ops/keycloak/set-platform-password-client.sh). No secret: manual platform sign-in off.
+    password-client-id: ${TMRKZ_PLATFORM_OIDC_CLIENT_ID:tmrkz-platform-password}
+    password-client-secret: ${TMRKZ_PLATFORM_OIDC_CLIENT_SECRET:}
     # First sign-in links on DOMAIN_ACCOUNT (preferred_username = HR domain account, as TNQL) or EMPLOYEE_NUMBER.
     link-key: ${TMRKZ_OIDC_LINK_KEY:DOMAIN_ACCOUNT}
     enterprise-key-claim: ${TMRKZ_OIDC_EMPLOYEE_NUMBER_CLAIM:employee_number}
@@ -91,7 +113,9 @@ tmrkz:
     rank-claim: ${TMRKZ_OIDC_CLAIM_RANK:}
     position-claim: ${TMRKZ_OIDC_CLAIM_POSITION:}
   ldap:
-    # Manual sign-in (username and password verified by the directory); the same values configure Keycloak.
+    # Manual sign-in (username and password verified by the directory); the same LDAP_* values configure Keycloak's federation.
+    # LDAP_DIRECT_BIND_PATTERN (ADR-070): exactly one {username}, e.g. {username}@corp.example — the person binds as themselves
+    # and that connection reads their entry; empty: the read-only service account (bind-dn) finds the entry first.
     url: ${LDAP_URL:}
     start-tls: ${LDAP_START_TLS:true}
     bind-dn: ${LDAP_BIND_DN:}
@@ -101,6 +125,21 @@ tmrkz:
     uuid-attribute: ${LDAP_UUID_ATTRIBUTE:entryUUID}
     employee-number-attribute: ${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:employeeNumber}
     user-object-class: ${LDAP_USER_OBJECT_CLASS:inetOrgPerson}
+    direct-bind-pattern: ${LDAP_DIRECT_BIND_PATTERN:}
+    # ADR-070: backend-only overrides of the manual authenticator. Each one supplied is taken before the shared value above
+    # (an empty one is not supplied; LdapProperties applies the choice, since a placeholder cannot skip an empty variable).
+    # A manual URL never receives the shared service account: its bind DN and credential come from these values alone.
+    manual:
+      url: ${TMRKZ_MANUAL_LDAP_URL:}
+      start-tls: ${TMRKZ_MANUAL_LDAP_START_TLS:}
+      bind-dn: ${TMRKZ_MANUAL_LDAP_BIND_DN:}
+      bind-credential: ${TMRKZ_MANUAL_LDAP_BIND_CREDENTIAL:}
+      users-dn: ${TMRKZ_MANUAL_LDAP_USERS_DN:}
+      username-attribute: ${TMRKZ_MANUAL_LDAP_USERNAME_ATTRIBUTE:}
+      uuid-attribute: ${TMRKZ_MANUAL_LDAP_UUID_ATTRIBUTE:}
+      employee-number-attribute: ${TMRKZ_MANUAL_LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:}
+      user-object-class: ${TMRKZ_MANUAL_LDAP_USER_OBJECT_CLASS:}
+      direct-bind-pattern: ${TMRKZ_MANUAL_LDAP_DIRECT_BIND_PATTERN:}
     ca-dir: ${TMRKZ_LDAP_CA_DIR:/etc/tmrkz/ldap-ca}
     # ADR-068: names of the directory attributes carrying the employment attributes in this organisation. Empty: not read.
     unit-id-attribute: ${LDAP_ATTR_UNIT_ID:}

@@ -239,7 +239,7 @@ export function isAbort(e: unknown): boolean {
   return e instanceof DOMException && e.name === 'AbortError';
 }
 
-export type RoleName = { code: string; name: string };
+type RoleName = { code: string; name: string };
 /**
  * Who the person is, from the one employment context (ADR-068): Oracle while it is in force, the directory before.
  * `unitConfigured` false: the source names a Unit ID TMRKZ does not hold; `statedUnitId`/`statedUnitName` are then as received.
@@ -270,34 +270,10 @@ export type AccessMine = {
   held: string[];
   /** who the person is, for the zero-access page (owner, 16 Nov 2026) */
   identity?: AccessIdentity;
-  /** one line for the whole page: NONE | PENDING | AT_FINAL | RETURNED | PARTLY_APPROVED | APPROVED | REJECTED */
+  /** one line for the whole page: NONE | PENDING | RETURNED | PARTLY_APPROVED | APPROVED | REJECTED */
   overall?: { code: string; text: string };
-  requests: { statusLabel?: string; scope?: AccessScope | null; id: string; number: string; status: string; note: string | null; submittedAt: string; reason: string; unit: string; requested: RoleName[]; granted: RoleName[]; waiting: string | null; atFinal?: boolean }[];
+  requests: { statusLabel?: string; scope?: AccessScope | null; id: string; number: string; status: string; note: string | null; submittedAt: string; reason: string; unit: string; requested: RoleName[]; granted: RoleName[]; waiting: string | null }[];
 };
-/** One role as the final access approver sets it (ADR-069): its own scope in the grant/target/levels model, and validity. */
-export type AccessGrantTarget = { kind: 'ORGANIZATION' | 'SITE'; id: string; includeDescendants: boolean; levels?: number[] | null };
-export type AccessGrantSpec = { role: string; scope?: { mode: 'ROLE' | 'CUSTOM'; all?: boolean; targets?: AccessGrantTarget[] }; validFrom?: string | null; validTo?: string | null };
-/** «الصلاحيات التي ستصبح فعالة»: computed by the very plan the approval writes. */
-export type AccessPreviewLine = {
-  role: string;
-  roleName: string;
-  seat: boolean;
-  kind: string;
-  home: { id: string; name: string };
-  mode: 'ROLE' | 'CUSTOM';
-  all: boolean;
-  scopeText: string;
-  units: number;
-  anchors: { kind: string; id: string; name: string; includeDescendants: boolean; levels: number[]; units: number }[];
-  validFrom: string | null;
-  validTo: string | null;
-  held: boolean;
-  problems: string[];
-  notes: string[];
-};
-export type AccessPreview = { person: string; unit: string; lines: AccessPreviewLine[]; problems: string[]; fingerprint: string };
-/** The person's main-unit branch with HR levels, for anchoring a role at the final approval. */
-export type AccessScopeTree = { unitId: string; rootId: string; path: string[]; units: { id: string; name: string; parentId: string | null; depth: number; level: number | null; main: boolean }[] };
 export type AccessInboxItem = {
   /** recorded when the review step was passed because the unit has no access manager (owner, 16 Nov 2026) */
   reviewSkipped?: string | null;
@@ -309,12 +285,9 @@ export type AccessInboxItem = {
   person: string;
   employeeNo: string;
   unit: string;
-  unitId?: string;
   movedTo: string | null;
   reason: string;
   submittedAt: string;
-  /** roles that are a responsibility of the unit (seats), not personal permissions (ADR-066) */
-  seats?: string[];
   requested: RoleName[];
   recommended: RoleName[] | null;
   reviewedBy: string | null;
@@ -363,7 +336,7 @@ export type SiteOccupants = { stationed: { orgId: string; orgName: string }[]; l
 export type AccessOfferRow = { code: string; name: string; audience: string | null; description?: string | null; scopeModes?: ScopeMode[] | null; defaultScope?: ScopeMode | null };
 export type ScopeMode = 'UNIT' | 'UNIT_TREE' | 'UNITS' | 'SITES';
 /** A role on the page to ask: its description and the scopes it may be asked with, set in «الصلاحيات المتاحة للطلب». */
-export type OfferedRole = { code: string; name: string; description?: string | null; scopeModes?: ScopeMode[] | null; defaultScope?: ScopeMode | null; requestable?: boolean };
+export type OfferedRole = { code: string; name: string; description?: string | null; scopeModes?: ScopeMode[] | null; defaultScope?: ScopeMode | null };
 
 export type UnitOpsRoute = { id: string; name: string; from: string; to: string; days: number[]; active: boolean; targets: { id: string; name: string }[] };
 /** A request's approval stamps (ADR-055): who approved each stamped stage, in which capacity and unit, when. */
@@ -613,10 +586,8 @@ export const api = {
   accessOffer: () => get<AccessOfferRow[]>('/access-requests/offer'),
   saveAccessOffer: (offer: Record<string, { audience: string; description?: string | null; scopeModes?: ScopeMode[] | null; defaultScope?: ScopeMode | null }>) =>
     put<AccessOfferRow[]>('/access-requests/offer', offer),
-  decideAccessRequest: (id: string, body: { taskId: string; decision: string; roles?: string[]; note?: string; scope?: AccessScope; recommendReject?: boolean; grants?: AccessGrantSpec[]; fingerprint?: string }) =>
-    post<{ status: string; rerouted?: boolean; message?: string; unit?: string }>(`/access-requests/${id}/decision`, body),
-  accessPreview: (id: string, body: { taskId: string; grants: AccessGrantSpec[] }) => post<AccessPreview>(`/access-requests/${id}/preview`, body),
-  accessScopeTree: (id: string) => get<AccessScopeTree>(`/access-requests/${id}/scope-tree`),
+  decideAccessRequest: (id: string, body: { taskId: string; decision: string; roles: string[]; note?: string; scope?: AccessScope; recommendReject?: boolean }) =>
+    post<{ status: string }>(`/access-requests/${id}/decision`, body),
   scopePreview: (organizationId: string, descendants: boolean, levels?: number[]) =>
     get<{ units: number }>('/access/scope-preview' + query({ organizationId, descendants, levels: levels?.length ? levels.join(',') : undefined })),
   grantRoots: () => get<OrgBranch[]>('/access/grant-roots'),

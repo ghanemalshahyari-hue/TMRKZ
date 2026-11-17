@@ -2,6 +2,7 @@ import { PURPOSE_TITLE, isPurpose } from '../../lib/requestPurpose';
 import { useMemo, useState } from 'react';
 import type { RestationingListItem, RestationingState } from '../../api/types';
 import { fullDate } from '../../lib/dates';
+import { newRequestHref } from '../../lib/navigation';
 import { Icon } from '../ui';
 import { StatePill } from './StatePill';
 
@@ -39,7 +40,7 @@ export function RequestDrawer({ items, selected, onSelect, open, setOpen, canCre
           <span className="tz-chip">{items?.length ?? '…'}</span>
           <Icon name="chevron" />
         </button>
-        {canCreate && <a className="button primary compact tz-new" href="#newRequest" data-create={!!onCreate}>＋ طلب جديد</a>}
+        {canCreate && <a className="button primary compact tz-new" href={newRequestHref()} data-create={!!onCreate}>＋ طلب جديد</a>}
       </div>
       {open && (
         <>

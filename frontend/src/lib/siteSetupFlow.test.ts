@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GeoPolygon, Permission } from '../api/types';
-import { SETUP_STEPS, SITE_STEPS, isSetupAdmin, lastStep, nextStep, policyLeg, prevStep, setupBody, setupProblem, stepsFor, toggleUnit, unitBlock, unitLines, withArea, type UnitPlan } from './siteSetupFlow';
+import { SETUP_STEPS, SITE_STEPS, isSetupAdmin, lastStep, nextStep, policyLeg, prevStep, setupBody, setupProblem, stepsFor, toggleUnit, unitBlock, unitLines, withArea, withResponsible, type UnitPlan } from './siteSetupFlow';
 
 const sq: GeoPolygon = { type: 'Polygon', coordinates: [[[54, 24], [54.01, 24], [54.01, 24.01], [54, 24.01], [54, 24]]] };
 const grant = (permissions: Permission[], all: boolean) => ({ permissions, all });
@@ -124,5 +124,26 @@ describe('the leg on the page before the server checks it', () => {
   it('nothing is guessed for a leg with terrain, or without a policy', () => {
     expect(policyLeg('alternative', 4000, values)).toBeUndefined();
     expect(policyLeg('primary', 6000, null)).toBeUndefined();
+  });
+});
+
+// the responsible unit is the stationed unit (owner, 17 Nov 2026, ADR-076)
+describe('responsible unit stationed by the setup', () => {
+  const police = { id: 'P', name: 'الشرطة' };
+  it('heads the plan, keeps an earlier entry with its areas, and other units stay', () => {
+    expect(withResponsible([], police, null, '').map((u) => u.id)).toEqual(['P']);
+    const planned = [{ id: 'X', name: 'أخرى', primary: null, alternative: null }, { id: 'P', name: 'الشرطة', primary: sq, alternative: null }];
+    const out = withResponsible(planned, police, 'P', '');
+    expect(out.map((u) => u.id)).toEqual(['P', 'X']);
+    expect(out[0].primary).toBe(sq);
+  });
+  it('a change of responsible unit replaces the one added before; none responsible leaves the others', () => {
+    const plan = withResponsible([{ id: 'X', name: 'أخرى', primary: null, alternative: null }], police, null, '');
+    expect(withResponsible(plan, { id: 'Q', name: 'وحدة' }, 'P', '').map((u) => u.id)).toEqual(['Q', 'X']);
+    expect(withResponsible(plan, null, 'P', '').map((u) => u.id)).toEqual(['X']);
+  });
+  it('a responsible unit stationed elsewhere is not stationed here', () => {
+    const plan = withResponsible([], police, null, '');
+    expect(withResponsible(plan, police, 'P', 'متمركزة في «موقع آخر»')).toEqual([]);
   });
 });

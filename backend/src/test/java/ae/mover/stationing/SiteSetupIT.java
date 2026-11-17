@@ -178,6 +178,24 @@ class SiteSetupIT extends RestationingTestBase {
     }
 
     @Test
+    @DisplayName("SETUP-07 «مدير النظام» holds the setup (ADR-076): the six-step save stations its unit with both areas; «تثبيت» on a site's card stations another; still no request content")
+    void systemAdministratorSetsUp() {
+        person("platformAdmin", "SYSTEM_ADMIN", top);
+        Api admin = login("platformAdmin");
+        Res r = admin.post("/site-setup", body("ADM", List.of(unit(fresh, 0))), "setup-adm-" + sfx);
+        assertThat(r.status()).as(r.toString()).isEqualTo(200);
+        UUID site = UUID.fromString(r.body().path("site").path("id").asText());
+        assertThat(jdbc.sql("select origin from org_stationing where organization_id = :o and site_id = :s and valid_to is null")
+                .param("o", fresh).param("s", site).query(String.class).single()).as("stationed by the setup").isEqualTo("SETUP");
+        assertThat(count("select count(*) from deployment_area where site_id = :p0 and state = 'ACTIVE'", site)).isEqualTo(2);
+        Res fixed = admin.post("/stationing/corrections", Map.of("organizationId", fresh2.toString(), "siteId", site.toString(),
+                "reason", "الجهة المسؤولة هي الوحدة المتمركزة"));
+        assertThat(fixed.status()).as("«تثبيت» on the site's card: " + fixed).isEqualTo(200);
+        assertThat(admin.get("/me").body().path("permissions").toString()).as("still no reading or deciding")
+                .contains("CORRECT_STATIONING", "MANAGE_SITE_LINKS").doesNotContain("\"VIEW\"", "APPROVE");
+    }
+
+    @Test
     @DisplayName("SETUP-02 a unit already stationed is refused and nothing at all is written (no site, no stationing, no area, no audit, no event)")
     void stationedUnitRefused() {
         long outboxBefore = count("select count(*) from stationing_outbox where organization_id = :p0", fresh);

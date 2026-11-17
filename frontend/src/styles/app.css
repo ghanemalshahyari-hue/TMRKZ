@@ -152,13 +152,3 @@ tr.clickable { cursor: pointer; }
 .offer-scopes { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; padding: 6px 8px; border-radius: 8px; }
 .offer-scopes legend { font-size: 12px; }
 .offer-scopes .field { flex-basis: 100%; }
-
-/* the final access approval, role by role (ADR-069): each role with its own units, levels and validity, then the preview */
-.final-role { padding: 8px 0; border-bottom: 1px solid var(--tz-line, #e4e0d6); }
-.final-role[data-chosen='false'] { opacity: 0.8; }
-.final-role-body { display: grid; gap: 6px; margin: 6px 0 0; padding-inline-start: 26px; }
-.final-role-body .field.compact { margin: 0; }
-.final-anchors { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.pill.seat { background: color-mix(in srgb, var(--orange) 14%, transparent); color: var(--orange); }
-.access-preview .data-table td { vertical-align: top; }
-.access-preview[data-stale='true'] table { opacity: 0.55; }

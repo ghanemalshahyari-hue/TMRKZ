@@ -79,7 +79,8 @@ const Icon = {
 /**
  * The sign-in page, laid out like TNQL's: one card with two ways in.
  * «الدخول الآلي» goes through the identity provider (Keycloak); «الإدخال اليدوي» opens the username and password form in
- * the same card, checked by the enterprise directory (LDAP). TMRKZ keeps no password.
+ * the same card. The allow-listed local platform accounts authenticate through Keycloak; every other login is checked by
+ * the enterprise directory (LDAP). TMRKZ keeps no password.
  */
 export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
   const [status, setStatus] = useState<AuthStatus | null>(null);
@@ -176,13 +177,13 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
                     onClick={(e) => !automaticReady && e.preventDefault()}
                   >
                     {Icon.key}
-                    <span className="tm-submit-label">{automaticReady ? 'الدخول الآلي بالحساب المؤسسي' : 'الدخول الآلي غير متاح الآن'}</span>
+                    <span className="tm-submit-label">{automaticReady ? 'الدخول الآلي برقم الــــ U' : 'الدخول الآلي غير متاح الآن'}</span>
                   </a>
                 )}
                 {status.manual && (
                   <button type="button" className="tm-ghost" onClick={() => setManual(true)}>
                     {Icon.user}
-                    <span>إدخال اسم المستخدم وكلمة المرور يدوياً</span>
+                    <span>إدخال رقم الـــــ U وكلمة المرور يدويا</span>
                   </button>
                 )}
                 {!status.configured && !status.manual && (
@@ -226,9 +227,9 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
                 </button>
                 <button type="button" className="tm-ghost" onClick={back}>
                   <span className="tm-arrow">{Icon.back}</span>
-                  <span>العودة إلى خيارات الدخول</span>
+                  <span>العودة لخيارات الدخول</span>
                 </button>
-                <p className="tm-help">يتحقق الدليل المؤسسي من كلمة المرور ولا يحفظها النظام.</p>
+                <p className="tm-help">الحساب المحلي يتحقق منه Keycloak، والحساب المؤسسي يتحقق منه الدليل. لا يحفظ النظام كلمة المرور.</p>
               </form>
             )}
             <p className="tm-foot">بيئة تشغيل داخلية معزولة · TMRKZ نسخة 1.0.0</p>
@@ -246,8 +247,8 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
           </article>
           <article className="tm-note">
             <span className="tm-note-meta">الإدخال اليدوي</span>
-            <b>اسم المستخدم وكلمة المرور</b>
-            <p>بيانات حسابك في الدليل المؤسسي نفسها المستخدمة في أجهزة العمل. يتحقق منها الدليل، ولا يحفظها النظام.</p>
+            <b>حساب محلي أو حساب مؤسسي</b>
+            <p>يتحقق Keycloak من حسابي admin وdeveloper المحليين، ويتحقق الدليل المؤسسي من باقي الحسابات. لا يحفظ النظام كلمة المرور.</p>
           </article>
           <article className="tm-note">
             <span className="tm-note-meta">الصلاحيات والحماية</span>

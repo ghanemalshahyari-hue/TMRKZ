@@ -11,7 +11,7 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 SRC = ROOT / "backend" / "src" / "main" / "java"
 MAPPING = re.compile(r'@(Get|Post|Put|Patch|Delete)Mapping\((?:value\s*=\s*)?"([^"]+)"')
-METHOD = re.compile(r'public\s+[\w<>\[\], .?]+\s+(\w+)\s*\(([^)]*(?:\([^)]*\)[^)]*)*)\)', re.S)
+METHOD = re.compile(r'public\s+[\w<>\[\], .?]+\s+(\w+)\s*\((.*?)\)\s*(?:throws\s+[\w.,\s]+)?\{', re.S)
 ERRORS = {
     "400": "VALIDATION_FAILED / INVALID_WORKFLOW / SIGNATURE_REQUIRED",
     "401": "UNAUTHENTICATED",
@@ -30,6 +30,8 @@ for java in sorted(SRC.rglob("*Controller.java")):
     for m in MAPPING.finditer(text):
         verb, path = m.group(1).lower(), m.group(2)
         sig = METHOD.search(text, m.end())
+        if sig is None:
+            raise ValueError(f"Cannot parse the method following {m.group(0)} in {java}")
         name, params = sig.group(1), sig.group(2)
         full = prefix + path
         op = {

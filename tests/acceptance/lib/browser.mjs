@@ -61,7 +61,7 @@ export function watch(page, who) {
 /** Automatic path: TMRKZ → Keycloak sign-in page (TMRKZ theme) → directory → TMRKZ. Nothing is injected. */
 export async function signInAutomatic(page, user) {
   await page.goto(BASE + '/');
-  await page.getByText('الدخول الآلي بالحساب المؤسسي').click();
+  await page.getByText('الدخول الآلي برقم الــــ U').click();
   await page.locator('#username').fill(user);
   await page.locator('#password').fill(PASSWORD);
   await page.locator('#kc-login').click();
@@ -71,7 +71,7 @@ export async function signInAutomatic(page, user) {
 /** Manual path of the same sign-in page: username and password checked by the directory. */
 export async function signInManual(page, user) {
   await page.goto(BASE + '/');
-  await page.getByText('إدخال اسم المستخدم وكلمة المرور يدوياً').click();
+  await page.getByText('إدخال رقم الـــــ U وكلمة المرور يدويا').click();
   await page.locator('#tm-username').fill(account(user));
   await page.locator('#tm-password').fill(PASSWORD);
   await page.getByRole('button', { name: 'تسجيل الدخول' }).click();

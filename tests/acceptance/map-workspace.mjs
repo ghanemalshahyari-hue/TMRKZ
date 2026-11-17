@@ -982,7 +982,7 @@ await step('MAP-17', 'عرض هاتف ولوحة مفاتيح: اختيار وإ
     check(sw <= iw + 1, 'horizontal scroll at ' + where + ': ' + sw + ' > ' + iw);
   };
   await page.goto(BASE + '/');
-  await page.getByRole('button', { name: 'إدخال اسم المستخدم وكلمة المرور يدوياً' }).focus();
+  await page.getByRole('button', { name: 'إدخال رقم الـــــ U وكلمة المرور يدويا' }).focus();
   await page.keyboard.press('Enter');
   await page.locator('#tm-username').focus();
   await page.keyboard.type('t.requester2');
