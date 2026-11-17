@@ -5,12 +5,12 @@ import { StatePill } from '../components/workspace/StatePill';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
 import { PURPOSE_TITLE, isPurpose } from '../lib/requestPurpose';
+import { EXCEEDS_CHIP } from '../lib/workspace';
 
 const FILTERS: [string, string][] = [
   ['ALL', 'الكل'],
   ['ACCESS', 'طلبات الصلاحيات'],
   ['SITE', 'اعتماد المواقع'],
-  ['INITIAL', 'التمركز الأولي'],
   ['DEPLOYMENT', 'مناطق الانتشار'],
   ['RESTATIONING', 'إعادة التمركز'],
   ['MY_TURN', 'بانتظار قراري'],
@@ -53,7 +53,7 @@ export function AllRequestsPage() {
                   <td>{i.type === 'ACCESS' ? 'طلب صلاحية' : isPurpose(i.type) ? PURPOSE_TITLE[i.type] : i.type}</td>
                   <td>{i.requestingUnit?.name ?? '—'}{i.person ? ' · ' + i.person : ''}</td>
                   <td>{i.stateLabel ?? <StatePill state={i.state as never} />}</td>
-                  <td>{i.currentStage ?? '—'}{i.myTurn ? ' — بانتظارك' : ''}{i.fyiPending ? ' — تحديد وحدات العلم بانتظارك' : ''}{i.activatable ? ' — التفعيل بانتظارك' : ''}</td>
+                  <td>{i.currentStage ?? '—'}{i.myTurn ? ' — بانتظارك' : ''}{i.fyiPending ? ' — تحديد وحدات العلم بانتظارك' : ''}{i.activatable ? ' — التفعيل بانتظارك' : ''}{i.exceedsPolicy && <> <span className="pill orange" data-exceeds>{EXCEEDS_CHIP}</span></>}</td>
                   <td>{i.updatedAt ? fullDate(i.updatedAt) : '—'}</td>
                 </tr>
               ))}

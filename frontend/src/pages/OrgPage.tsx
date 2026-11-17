@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import type { Delegation, Member, OrgDetail, RoleDef } from '../api/types';
+import { pickableRoles } from '../lib/rolePicker';
 import { PersonPicker } from '../components/access/pickers';
 import { OrgSymbol, SymbolAssignment, SymbolLegend } from '../components/UnitSymbol';
 import { flatSource } from '../components/tree/tree';
@@ -176,7 +177,7 @@ export function OrgPage() {
                   className="button compact primary"
                   onClick={() => {
                     setFormError('');
-                    setMembershipForm({ personId: '', roleCode: roles[0]?.code ?? '', positionTitle: '', validFrom: todayDubai(), validTo: '' });
+                    setMembershipForm({ personId: '', roleCode: pickableRoles(roles, { system: true })[0]?.code ?? '', positionTitle: '', validFrom: todayDubai(), validTo: '' });
                   }}
                 >
                   ＋ عضوية
@@ -356,7 +357,7 @@ export function OrgPage() {
               <label className="field">
                 <span>الدور</span>
                 <select value={membershipForm.roleCode} onChange={(e) => setMembershipForm({ ...membershipForm, roleCode: e.target.value })}>
-                  {roles.map((r) => (
+                  {pickableRoles(roles, { system: true }).map((r) => (
                     <option key={r.code} value={r.code}>
                       {r.name}
                     </option>

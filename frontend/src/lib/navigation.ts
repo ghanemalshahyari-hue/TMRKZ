@@ -7,9 +7,11 @@ import { FLOW_STUDIO_UI_ENABLED, NAV, type View } from './app';
  * this only keeps a person from being offered a page they cannot open.
  */
 
-const STATIONING_REQUEST_RIGHTS: Permission[] = ['CREATE_RESTATIONING', 'CREATE_INITIAL_STATIONING', 'CREATE_DEPLOYMENT_REQUEST', 'REQUEST_SITE_REGISTRATION'];
-const STATIONING_RIGHTS: Permission[] = [...STATIONING_REQUEST_RIGHTS, 'VIEW', 'APPROVE', 'APPROVE_HIERARCHY', 'ACTIVATE_STATIONING', 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION', 'DECIDE_PRE_ACTIVATION_CANCELLATION',
-  'ACTIVATE_TEMPORARY_EXTENSION', 'DECIDE_EARLY_RETURN', 'DECIDE_BEFORE_START_CANCELLATION', 'DECIDE_UNIT_OPERATIONS', 'FINAL_APPROVE_STATIONING', 'MANAGE_FYI_DISTRIBUTION'];
+// one right opens re-stationing and deployment-area requests; initial stationing is set up in «تهيئة المواقع» only (ADR-078)
+const STATIONING_REQUEST_RIGHTS: Permission[] = ['CREATE_RESTATIONING', 'REQUEST_SITE_REGISTRATION'];
+// the final approver also decides a request's lifecycle actions and what exceeds the policy (ADR-078): no separate rights
+const STATIONING_RIGHTS: Permission[] = [...STATIONING_REQUEST_RIGHTS, 'VIEW', 'APPROVE', 'APPROVE_HIERARCHY', 'ACTIVATE_STATIONING', 'DECIDE_UNIT_OPERATIONS',
+  'FINAL_APPROVE_STATIONING', 'MANAGE_FYI_DISTRIBUTION'];
 
 let supportSeat: string | null = null;
 /** «لوحة الدعم» opens for a support seat (ADR-053), which is not a permission: the shell tells navigation who holds one. */
@@ -53,7 +55,7 @@ export function restriction(view: View, can: (p: Permission) => boolean, summary
   if (view === 'org') return !(can('VIEW') || can('MANAGE_ACCESS') || can('MANAGE_FACILITIES') || can('CONFIGURE'));
   if (['stationing', 'calendar'].includes(view)) return !(can('VIEW') || can('VIEW_SUMMARY') || can('MANAGE_FACILITIES'));
   if (view === 'stationingPolicy') return !can('CONFIGURE');
-  // the lifecycle rights (ADR-034) open the page too: their holders decide the requests they act on
+  // every stage holder opens it, the final approver too: it decides the lifecycle actions of the requests in its reach (ADR-078)
   if (view === 'restationing')
     // one request sent «للعلم» opens by its address, whatever else the person holds; the server decides whether it is theirs
     return !STATIONING_RIGHTS.some((p) => can(p)) && !(typeof location !== 'undefined' && /^#restationing\/[0-9a-f-]{36}$/.test(location.hash));

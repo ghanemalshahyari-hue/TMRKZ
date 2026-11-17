@@ -902,7 +902,7 @@ export function SiteSetupPage() {
           checked={reviewFresh ? review?.check?.units.find((u) => u.organizationId === activeUnit.id)?.legs.find((l) => l.leg === role) : undefined}
           siteWord="الموقع الجديد"
         >
-          {leg?.status === 'NEEDS_EXCEPTION' && <p className="sw-err">تحتاج استثناء مسافة، والاستثناء لا يُمنح في التهيئة: ضعها ضمن النطاق.</p>}
+          {leg?.status === 'NEEDS_EXCEPTION' && <p className="sw-err">تتجاوز المسافة المسموحة، والتجاوز لا يُقبل في التهيئة (لا معتمد نهائياً فيها): ضعها ضمن النطاق.</p>}
         </AreaControls>
       ))}
       {requirementHint && <p className="sw-hint">{requirementHint}</p>}

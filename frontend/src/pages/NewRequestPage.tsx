@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react';
 import { api, type HubAction, type RequestHub } from '../api/client';
 import { Heading, Icon } from '../components/ui';
 import { useApp } from '../lib/app';
-import { PURPOSE_HINT, PURPOSE_TITLE, UNIT_STATE, isPurpose, newRequestHashFor } from '../lib/requestPurpose';
+import { INITIAL_IN_SETUP, PURPOSE_HINT, PURPOSE_TITLE, UNIT_STATE, isCreatablePurpose, isPurpose, newRequestHashFor } from '../lib/requestPurpose';
 
 const ACCESS = 'ACCESS_REQUEST';
 
 /**
  * «طلب جديد»: one entry for every request (ADR-045). The server answers which cards this person has and, per unit, what may be
- * asked now and why not. A right the person lacks has no card at all; nothing here is decided in the browser.
+ * asked now and why not. A right the person lacks has no card at all; nothing here is decided in the browser. There is no
+ * initial-stationing request (ADR-078): a unit stationed nowhere is set up with its site in «تهيئة المواقع».
  */
 export function NewRequestPage() {
   const app = useApp();
@@ -66,11 +67,12 @@ export function NewRequestPage() {
                   <td>
                     <span className="hub-actions">
                       {u.actions.filter((a) => a.action !== 'SITE_REGISTRATION').map((a) =>
-                        a.allowed && isPurpose(a.action) ? (
+                        a.allowed && isCreatablePurpose(a.action) ? (
                           <a key={a.action} className="button compact" data-go={a.action} href={newRequestHashFor(a.action, u.id, u.site?.id)}>{PURPOSE_TITLE[a.action]}</a>
                         ) : null,
                       )}
                       {u.actions.some((a) => a.openRequest) && <small className="muted">طلب مفتوح: {u.actions.find((a) => a.openRequest)?.openRequest}</small>}
+                      {u.state === 'NO_STATIONING' && <small className="muted" data-testid="hub-initial-in-setup">{INITIAL_IN_SETUP}</small>}
                     </span>
                   </td>
                 </tr>

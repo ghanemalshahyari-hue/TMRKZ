@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Marker, NavigationControl, ScaleControl, type MapLayerMouseEvent, type MapLayerTouchEvent, type Map as MlMap, type MapMouseEvent } from 'maplibre-gl';
-import { api, type HubSite, type HubUnit } from '../api/client';
+import { api, type HubUnit } from '../api/client';
 import type { GeoPolygon, RestationingChecks, RestationingContent, RestationingLeg, RestationingRequest, RestationingUnit, SiteGeometry, StationingPolicyValues } from '../api/types';
 import { DemSampler, SITE_LOOK, SiteEditor, SlopeInside, addOverlayLayer, frame, installedTerrain3d, type MapView, type SiteLive } from '../components/map/maplibre';
 import type { BasemapMode, Terrain3dSource } from '../components/map/maplibre/offlineStyle';
@@ -30,7 +30,7 @@ import { canOpen as flowCanOpen, completed, deriveRequesting, firstOpen, unitsAt
 import { occupiedFeatures, occupiedSites, overlapsOccupied } from '../lib/occupied';
 import type { RefSite } from '../lib/sitesLayer';
 import { DRAW_NEW_BOUNDARY } from '../lib/stationingV3';
-import { PURPOSE_TITLE, PURPOSE_WRITES, newRequestHashFor, type Purpose } from '../lib/requestPurpose';
+import { PURPOSE_TITLE, PURPOSE_WRITES, type Purpose } from '../lib/requestPurpose';
 
 type Placing = 'site' | 'primary' | 'alternative' | 'point' | null;
 
@@ -54,10 +54,10 @@ const ROLE_OF_LEG_KIND = { primary: 'PRIMARY', alternative: 'ALTERNATIVE' } as c
 /** The connectors a moving shape changes: the one ending at it and the one leaving it. */
 const TOUCHES: Record<CardRole, ConnectorKind[]> = { CURRENT: ['move'], SITE: ['move', 'primary'], PRIMARY: ['primary', 'alternative'], ALTERNATIVE: ['alternative'] };
 const dayStart = (d: string) => (d ? new Date(d + 'T00:00:00+04:00').toISOString() : null);
-/** The question of each step of the other requests (ADR-045). */
+/** The question of each step of the other requests (ADR-045); an initial stationing is no longer asked for (ADR-078). */
 const PURPOSE_QUESTION: Record<Purpose, Partial<Record<FlowStep, string>>> = {
   RESTATIONING: {},
-  INITIAL_STATIONING: { 1: 'اختر موقعاً مسجلاً للوحدة', 6: 'الفحص والمراجعة' },
+  INITIAL_STATIONING: { 6: 'طلب تمركز أولي سابق' },
   DEPLOYMENT_AREAS: { 5: 'منطقتا الانتشار: الرئيسية والبديلة', 6: 'الفحص والمراجعة' },
   SITE_REGISTRATION: { 4: 'حدد الموقع على الخريطة وأدخل بياناته', 6: 'الفحص والمراجعة' },
 };
@@ -107,15 +107,16 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
   const [loaded, setLoaded] = useState<RestationingRequest | null>(null);
   const purpose: Purpose = loaded?.purpose ?? purposeProp ?? 'RESTATIONING';
   const plain = purpose === 'RESTATIONING';
-  // where the requesting unit stands, and the registered sites it may be stationed at: the server's answers
+  // a request for an initial stationing made before ADR-078: read here, never changed or sent again — initial stationing is set
+  // up with its site in «تهيئة المواقع»
+  const retired = purpose === 'INITIAL_STATIONING';
+  // where the requesting unit stands: the server's answer
   const [hubUnit, setHubUnit] = useState<HubUnit | null>(null);
-  const [hubSites, setHubSites] = useState<HubSite[] | null>(null);
-  const [hubUnits, setHubUnits] = useState<HubUnit[]>([]);
   const [point, setPoint] = useState<{ lat: number; lng: number } | null>(null);
   const pointMarker = useRef<Marker | null>(null);
   const [content, setContent] = useState<RestationingContent>({ kind: 'PERMANENT', scope: [], site: null, primary: null, alternative: null, reason: '', exceptions: {}, occupants: {} });
   const startPurpose: Purpose = purposeProp ?? 'RESTATIONING';
-  const [step, setStep] = useState<FlowStep>(startPurpose === 'DEPLOYMENT_AREAS' ? 5 : startPurpose === 'SITE_REGISTRATION' ? 4 : startPurpose === 'INITIAL_STATIONING' ? 1 : preselectSite ? 2 : 1);
+  const [step, setStep] = useState<FlowStep>(startPurpose === 'DEPLOYMENT_AREAS' ? 5 : startPurpose === 'SITE_REGISTRATION' ? 4 : preselectSite ? 2 : 1);
   const [currentSite, setCurrentSite] = useState<string | null>(startPurpose === 'RESTATIONING' ? preselectSite : null);
   const [picked, setPicked] = useState<string | null>(null);
   // the sites that share the last clicked point (a main site and its sub-site), when more than one
@@ -202,7 +203,6 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
       const s = firstOpen({ site: true, units: r.content.scope.length, kind: r.content.kind, start: r.content.start, end: r.content.end, proposed: !!r.content.site, primary: !!r.content.primary, alternative: !!r.content.alternative });
       const p = r.purpose ?? 'RESTATIONING';
       setStep(p === 'DEPLOYMENT_AREAS' ? 5 : p === 'SITE_REGISTRATION' ? 4 : p === 'INITIAL_STATIONING' ? 6 : (Math.max(4, s) as FlowStep));
-      if (p === 'INITIAL_STATIONING') api.hubSites(r.requestingUnit.id).then(setHubSites).catch(() => setHubSites([]));
       // a reopened draft is a new editing session from the saved geometry
       editorRef.current?.load(r.content.site?.geometry ?? null);
     });
@@ -220,7 +220,7 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
     setFocus({ siteId: rec.siteId, key: Date.now() });
   }, [registered.loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // a deployment request starts from the unit's authoritative site; an initial stationing from the unit asked for
+  // a deployment request starts from the unit's authoritative site; a site registration from the unit asked for
   const seeded = useRef(false);
   useEffect(() => {
     if (plain || requestId || !preselectUnit || seeded.current) return;
@@ -237,29 +237,7 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
         setContent((c) => ({ ...c, kind: 'PERMANENT', scope: [u.id] }));
       }
     }).catch((e: Error) => app.toast(e.message));
-    if (purpose === 'INITIAL_STATIONING') {
-      api.hubSites(preselectUnit).then(setHubSites).catch(() => setHubSites([]));
-      api.requestHub().then((h) => setHubUnits(h.units)).catch(() => setHubUnits([]));
-    }
   }, [plain, requestId, preselectUnit, purpose]); // eslint-disable-line react-hooks/exhaustive-deps
-  const chosenHubSite = hubSites?.find((s) => s.id === content.existingSite) ?? null;
-  /** A registered site may be outside what the map's reference layer shows this person: the map goes to it all the same. */
-  const frameGeometry = (s: HubSite) => {
-    const m = mapInst.current;
-    const pts = isShape(s.geometry) ? partsOf(s.geometry).flatMap((p) => p[0]) : s.lat != null && s.lng != null ? [{ lat: s.lat, lng: s.lng }] : [];
-    if (m && pts.length) frame(m, pts, viewRef.current, { maxZoom: 14, duration: 500 });
-  };
-  // the units that may join: stationed nowhere, under the unit asked for, each chosen by hand
-  const joinable = useMemo(() => {
-    if (!preselectUnit) return [];
-    const under = new Set([preselectUnit]);
-    const out: HubUnit[] = [];
-    for (const u of hubUnits) {
-      if (u.parentId && under.has(u.parentId)) under.add(u.id);
-      if (under.has(u.id) && u.id !== preselectUnit && u.state === 'NO_STATIONING' && u.actions.some((a) => a.action === 'INITIAL_STATIONING' && a.allowed)) out.push(u);
-    }
-    return out;
-  }, [hubUnits, preselectUnit]);
   const set = (patch: Partial<RestationingContent>) => setContent((c) => ({ ...c, ...patch }));
   const here = useMemo(() => unitsAtSite(registered.current, currentSite, units), [registered.current, currentSite, units]);
   const siteOf = (sid: string | null) => (sid ? registered.all.find((s) => s.siteId === sid) ?? null : null);
@@ -549,7 +527,7 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
         : loaded?.currentSites ?? []
       : loaded?.currentSites ?? (current && shapeOf(current.geometry) ? [{ unit: '', site: { id: current.siteId, name: current.name }, geometry: current.geometry }] : []),
     content,
-    targetSite: purpose === 'INITIAL_STATIONING' && chosenHubSite ? { id: chosenHubSite.id, name: chosenHubSite.name, geometry: chosenHubSite.geometry } : loaded?.targetSite ?? null,
+    targetSite: loaded?.targetSite ?? null,
   };
   const occupied = useMemo(() => occupiedSites(registered.current, registered.all, content.scope), [registered.current, registered.all, content.scope]);
   const occupiedRef = useRef(occupied);
@@ -806,31 +784,9 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
         <h3 className="tz-flow-q" data-testid="flow-question">{plain ? QUESTION[step] : PURPOSE_QUESTION[purpose][step] ?? QUESTION[step]}</h3>
         {plain && summary}
 
-        {purpose === 'INITIAL_STATIONING' && step === 1 && (
-          <div data-testid="initial-sites">
-            {hubSites == null && <p className="tz-muted">جارٍ التحميل…</p>}
-            {hubSites?.length === 0 && (
-              <p className="tz-muted">لا مواقع مسجلة متاحة لهذه الوحدة. <a className="link" href={newRequestHashFor('SITE_REGISTRATION', preselectUnit)}>طلب اعتماد موقع</a></p>
-            )}
-            <div className="rs-list">
-              {hubSites?.map((s) => (
-                <button key={s.id} data-site={s.code} className={'rs-item' + (content.existingSite === s.id ? ' active' : '')} onClick={() => (set({ existingSite: s.id }), setFocus({ siteId: s.id, key: Date.now() }), frameGeometry(s))}>
-                  <span className="rs-item-head"><b>{s.name}</b><small className="tz-code">{s.code}</small></span>
-                  <small>{s.linked ? 'مرتبط بوحدتك أو بجهتها' : 'موقع مسجل'}</small>
-                </button>
-              ))}
-            </div>
-            {joinable.length > 0 && (
-              <fieldset className="tz-flow-units">
-                <legend>وحدات أخرى بلا تمركز (لا تُضاف إلا باختيارك)</legend>
-                {joinable.map((u) => (
-                  <label key={u.id} className="rs-check"><input type="checkbox" data-join={u.id} checked={content.scope.includes(u.id)} onChange={() => toggle(u.id)} /> {u.name}</label>
-                ))}
-              </fieldset>
-            )}
-            <div className="rs-tools">
-              <button className="button primary" data-testid="initial-next" disabled={!content.existingSite || busy} onClick={() => saveAndGo(6)}>التالي: الفحص والمراجعة</button>
-            </div>
+        {retired && (
+          <div className="rs-banner orange" data-testid="initial-retired">
+            <b>طلب تمركز أولي سابق:</b> لا يُعدّل ولا يُرسل. يُسجَّل التمركز الأولي مع موقعه في «تهيئة المواقع».
           </div>
         )}
 
@@ -997,7 +953,7 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
             >
               {leg(deployTarget)?.status === 'NEEDS_EXCEPTION' && (
                 <label>
-                  سبب استثناء مسافة الانتشار — {deployTarget === 'primary' ? 'المنطقة الرئيسية' : 'المنطقة البديلة'}
+                  سبب تجاوز المسافة المسموحة — {deployTarget === 'primary' ? 'المنطقة الرئيسية' : 'المنطقة البديلة'} (يقرره المعتمد النهائي مع الطلب)
                   <input value={content.exceptions?.[deployTarget] ?? ''} onChange={(e) => set({ exceptions: { ...(content.exceptions ?? {}), [deployTarget]: e.target.value } })} />
                 </label>
               )}
@@ -1015,15 +971,15 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
           <div className="tz-flow-review">
             {checks && <div className={'rs-verdict ' + (checks.ok ? 'ok' : 'no')}>{checks.ok ? 'الفحوص مستوفاة — يمكن الإرسال' : 'فحوص غير مستوفاة — راجع اللوحة'}</div>}
             {!plain && <p className="tz-muted micro">{PURPOSE_WRITES[purpose]}</p>}
-            {purpose === 'INITIAL_STATIONING' && <p className="micro">الموقع: <b>{chosenHubSite?.name ?? '—'}</b> · الوحدات: <b>{content.scope.length}</b></p>}
+            {retired && <p className="micro">الموقع: <b>{loaded?.targetSite?.name ?? '—'}</b> · الوحدات: <b>{content.scope.length}</b></p>}
             {checks && !checks.ok && !plain && <ul className="rs-bad" data-testid="review-problems">{checks.problems.map((p) => <li key={p}>{p}</li>)}</ul>}
             <label>
               سبب الطلب
               <textarea value={content.reason} onChange={(e) => set({ reason: e.target.value })} />
             </label>
             <div className="rs-tools">
-              <button className="button" disabled={busy} onClick={save}>حفظ المسودة والفحص</button>
-              <button className="button primary" disabled={busy || !siteOk || (checks != null && !checks.ok)} onClick={submit}>إرسال للاعتماد</button>
+              <button className="button" disabled={busy || retired} onClick={save}>حفظ المسودة والفحص</button>
+              <button className="button primary" disabled={busy || retired || !siteOk || (checks != null && !checks.ok)} onClick={submit}>إرسال للاعتماد</button>
             </div>
           </div>
         )}
@@ -1036,14 +992,7 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
     </aside>
   );
 
-  const context = !plain && step < 4 ? (
-    <aside className="tz-context" aria-label="السياق"><div className="tz-context-body">
-      <section className="tz-card rs-summary" data-testid="initial-context">
-        <h3>{chosenHubSite?.name ?? 'لم يُختر موقع بعد'}</h3>
-        <p className="tz-muted micro">{chosenHubSite ? (chosenHubSite.linked ? 'مرتبط بوحدتك أو بجهتها. ' : '') + 'الموقع الواحد يتسع لأكثر من وحدة، ولا يغيّر ذلك الهيكل التنظيمي.' : 'اختر موقعاً من القائمة أو من الخريطة.'}</p>
-      </section>
-    </div></aside>
-  ) : !plain && step === 6 && !isShape(content.site?.geometry) ? (
+  const context = !plain && step === 6 && !isShape(content.site?.geometry) ? (
     <aside className="tz-context" aria-label="السياق"><div className="tz-context-body">
       <section className="tz-card rs-summary"><p className="tz-muted micro">{PURPOSE_WRITES[purpose]}</p></section>
     </div></aside>
@@ -1098,8 +1047,8 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
             hideSite={step !== 5 || !plain}
             fit={false}
             onMap={onMap}
-            referenceInteractive={(plain && step !== 4 && !placing && !drawingNow) || (purpose === 'INITIAL_STATIONING' && step === 1)}
-            pick={!plain ? (purpose === 'INITIAL_STATIONING' && step === 1 ? { selectedId: content.existingSite ?? null, onPick: (sid) => { const s = hubSites?.find((x) => x.id === sid); if (s) set({ existingSite: s.id }); } } : null) : step === 1 ? { selectedId: picked, onPick: (sid, here) => (setPicked(sid), setStack(here && here.length > 1 ? here : null)) } : step <= 3 ? { selectedId: currentSite, onPick: () => undefined } : null}
+            referenceInteractive={plain && step !== 4 && !placing && !drawingNow}
+            pick={!plain ? null : step === 1 ? { selectedId: picked, onPick: (sid, here) => (setPicked(sid), setStack(here && here.length > 1 ? here : null)) } : step <= 3 ? { selectedId: currentSite, onPick: () => undefined } : null}
             // under the copy the current site is drawn in coral; a marker-only current site stays highlighted
             highlight={step <= 3 || markerOnly ? currentSite : null}
             occupied={step >= 4 ? occupiedFc : null}

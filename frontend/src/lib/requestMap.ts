@@ -41,7 +41,7 @@ export function legText(d: number, l: RestationingLeg | undefined): { text: stri
   if (!l) return { text: kmText(d), tone: 'none' };
   const range = `المسموح ${kmText(l.effectiveMinM).replace(' كم', '')}–${kmText(l.baseMaxM)}` + (l.effectiveMaxM !== l.baseMaxM ? ` (حتى ${kmText(l.effectiveMaxM)} مع طبيعة الأرض)` : '');
   const tone = d >= l.effectiveMinM && d <= l.effectiveMaxM ? 'ok' : l.exceptionMaxM != null && d >= l.effectiveMinM && d <= l.exceptionMaxM ? 'warn' : 'bad';
-  return { text: `${kmText(d)} · ${range} · ${tone === 'ok' ? 'ضمن النطاق' : tone === 'warn' ? 'يحتاج استثناء' : 'خارج النطاق'}`, tone };
+  return { text: `${kmText(d)} · ${range} · ${tone === 'ok' ? 'ضمن النطاق' : tone === 'warn' ? 'يتجاوز المسموح' : 'خارج النطاق'}`, tone };
 }
 
 export function requestFeatures(r: RestationingRequest, checks: RestationingChecks | null, hideSite = false): GeoJSON.FeatureCollection<GeoJSON.Geometry, RequestMapProps> {

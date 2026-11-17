@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Permission, RestationingChecks, RestationingRequest, RestationingStage } from '../api/types';
 import { moreNav, primaryNav, restriction } from './navigation';
-import { deploymentRows, movementInfo, pathOf, routeStrip, treeRows } from './workspace';
+import { HISTORICAL_EXCEPTION_STAGE, decidesExcess, deploymentRows, excessLines, excessText, movementInfo, pathOf, routeStrip, treeRows } from './workspace';
 
 const stage = (key: string, label: string, unit: string, extra: Partial<RestationingStage> = {}): RestationingStage => ({
   key, kind: 'HIERARCHY', label, unit: { id: unit, name: unit }, satisfies: [], final: false, mark: null, current: false, decidedBy: null, decidedAt: null, ...extra,
@@ -68,7 +68,7 @@ describe('deployment check card (§3, §18)', () => {
     expect(rows[0].terrain).toBe('HILLY +1.5 كم');
     expect(rows[0].effectiveMax).toBe('9.5 كم');
     expect(rows[1].range).toBe('3–5 كم');
-    expect(rows[1].verdict).toBe('تحتاج استثناء مسافة الانتشار');
+    expect(rows[1].verdict).toBe('تتجاوز المسموح — يقررها المعتمد النهائي');
     expect(rows[1].exception).toBe(true);
     const out = deploymentRows({ ok: false, problems: [], policyVersion: 1, legs: [{ ...legs[1], status: 'OUT_OF_RANGE', distanceM: 2000 }] } as unknown as RestationingChecks);
     expect(out[0].verdict).toBe('خارج 3–5 كم');
@@ -139,5 +139,36 @@ describe('permission-hidden navigation (§4, §14)', () => {
     // a single-action holder sees no list page it cannot open
     const activator = can('ACTIVATE_STATIONING');
     expect(primaryNav(activator, false).map((l) => l.view)).toEqual(['home']);
+  });
+});
+
+describe('a request beyond the policy (ADR-078): flagged on every stage, decided by the final approver', () => {
+  const flagged = { exceedsPolicy: [{ leg: 'primary', label: 'منطقة الانتشار الرئيسية', distanceM: 8460, allowedMaxM: 8000, excessM: 460, reason: ' طريق الوصول الوحيد ' }] };
+
+  it('words the excess in metres, and in kilometres from one kilometre', () => {
+    expect(excessText(450)).toBe('يتجاوز المسموح بـ 450 م');
+    expect(excessText(1500)).toBe('يتجاوز المسموح بـ 1.5 كم');
+    expect(excessText(-3)).toBe('يتجاوز المسموح بـ 0 م');
+  });
+
+  it('lists each flagged leg with its distance, the limit and the written reason', () => {
+    expect(excessLines(flagged)).toEqual([{ leg: 'primary', label: 'منطقة الانتشار الرئيسية', text: 'يتجاوز المسموح بـ 460 م', detail: '8.5 كم من حد 8 كم', reason: 'طريق الوصول الوحيد' }]);
+    expect(excessLines({ exceedsPolicy: [] })).toEqual([]);
+    expect(excessLines({})).toEqual([]);
+  });
+
+  it('only the final stage decides the excess; earlier stages see the flag and decide their own stage', () => {
+    const can = { edit: false, submit: false, decide: true, activate: false };
+    const atFinal = { ...flagged, can, route: [stage('h', 'اعتماد القسم', 'u8', { mark: 'APPROVED' }), stage('f', 'الاعتماد النهائي', 'u6', { final: true, current: true })] };
+    expect(decidesExcess(atFinal)).toBe(true);
+    const atHierarchy = { ...atFinal, route: [stage('h', 'اعتماد القسم', 'u8', { current: true }), stage('f', 'الاعتماد النهائي', 'u6', { final: true })] };
+    expect(decidesExcess(atHierarchy)).toBe(false);
+    expect(decidesExcess({ ...atFinal, exceedsPolicy: [] })).toBe(false);
+    expect(decidesExcess({ ...atFinal, can: { ...can, decide: false } })).toBe(false);
+  });
+
+  it('a distance-exception stage of an earlier request is shown as history in the strip', () => {
+    const r = req({ route: [stage('x', 'اعتماد استثناء مسافة الانتشار', 'u7', { kind: 'EXCEPTION', unit: null, mark: 'APPROVED' }), stage('f', 'الاعتماد النهائي', 'u6', { final: true, current: true })] });
+    expect(routeStrip(r, null).nodes.find((n) => n.key === 'x')?.note).toBe(HISTORICAL_EXCEPTION_STAGE);
   });
 });

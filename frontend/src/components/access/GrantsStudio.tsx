@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../api/client';
 import type { GrantTargetKind, GrantView, RoleDef, Site } from '../../api/types';
+import { pickableRoles } from '../../lib/rolePicker';
 import { useApp } from '../../lib/app';
 import { dubaiISO, fullDate, todayDubai } from '../../lib/dates';
 import { SCOPES } from '../../lib/labels';
@@ -86,7 +87,7 @@ export function GrantsStudio() {
     setForm({
       personId: '',
       personName: '',
-      roleCode: roles.find((r) => !r.system)?.code ?? '',
+      roleCode: pickableRoles(roles)[0]?.code ?? '',
       positionTitle: '',
       validFrom: todayDubai(),
       validTo: '',
@@ -250,8 +251,8 @@ export function GrantsStudio() {
                 <label className="field">
                   <span>الدور</span>
                   <select value={form.roleCode} onChange={(e) => setForm({ ...form, roleCode: e.target.value })}>
-                    {roles
-                      .filter((r) => !r.system)
+                    {/* a role with no permissions is history, never given (ADR-078) */}
+                    {pickableRoles(roles)
                       .map((r) => (
                         <option key={r.code} value={r.code}>
                           {r.name}

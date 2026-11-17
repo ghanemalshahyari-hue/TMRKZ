@@ -3,8 +3,9 @@ import type { Permission } from '../api/types';
 import { newRequestHref, restriction, setGrantFacts } from './navigation';
 
 // «مدير النظام» sees neither «طلب صلاحية» nor «طلب جديد»; its «طلب إعادة التمركز» starts from «إعادة التمركز» (owner, 17 Nov 2026)
-const ADMIN = { roleCode: 'SYSTEM_ADMIN', permissions: ['CONFIGURE', 'MANAGE_ACCESS', 'MANAGE_FACILITIES', 'VIEW_SOURCE_IDENTIFIERS', 'CREATE_RESTATIONING'] as Permission[] };
-const REQUESTER = { roleCode: 'STATIONING_REQUESTER', permissions: ['VIEW', 'CREATE_INITIAL_STATIONING', 'CREATE_DEPLOYMENT_REQUEST', 'CREATE_RESTATIONING', 'REQUEST_SITE_REGISTRATION'] as Permission[] };
+const ADMIN = { roleCode: 'SYSTEM_ADMIN', permissions: ['CONFIGURE', 'MANAGE_ACCESS', 'MANAGE_FACILITIES', 'VIEW_SOURCE_IDENTIFIERS', 'CREATE_RESTATIONING', 'MANAGE_SITE_LINKS', 'CORRECT_STATIONING', 'REPLAY_STATIONING_EVENTS'] as Permission[] };
+// «إنشاء طلبات التمركز» after ADR-078: one right for re-stationing and deployment areas, and site registration
+const REQUESTER = { roleCode: 'STATIONING_REQUESTER', permissions: ['VIEW', 'CREATE_RESTATIONING', 'REQUEST_SITE_REGISTRATION'] as Permission[] };
 const can = (grants: { permissions: Permission[] }[]) => (p: Permission) => grants.some((g) => g.permissions.includes(p));
 
 describe('system administrator navigation', () => {
@@ -33,5 +34,23 @@ describe('system administrator navigation', () => {
     setGrantFacts([]);
     expect(restriction('requestAccess', can([]), false)).toBe(false);
     expect(restriction('newRequest', can([]), false)).toBe(true);
+  });
+
+  it('ADR-078: site registration alone keeps «طلب جديد»; the final approver, who now decides the lifecycle actions, opens «إعادة التمركز» and requests nothing', () => {
+    const SITES = { roleCode: 'SITE_REGISTRATION_REQUESTER', permissions: ['VIEW', 'REQUEST_SITE_REGISTRATION'] as Permission[] };
+    setGrantFacts([SITES]);
+    expect(restriction('newRequest', can([SITES]), false)).toBe(false);
+    const FINAL = { roleCode: 'FINAL_APPROVER', permissions: ['FINAL_APPROVE_STATIONING'] as Permission[] };
+    setGrantFacts([FINAL]);
+    expect(restriction('restationing', can([FINAL]), false)).toBe(false);
+    expect(restriction('allRequests', can([FINAL]), false)).toBe(false);
+    expect(restriction('newRequest', can([FINAL]), false)).toBe(true);
+  });
+
+  it('ADR-078: «معتمد عمليات الوحدة» manages facilities and site links, so «تهيئة المواقع» opens for it', () => {
+    const OPS = { roleCode: 'UNIT_OPERATIONS_APPROVER', permissions: ['VIEW', 'REVIEW', 'DECIDE_UNIT_OPERATIONS', 'MANAGE_FACILITIES', 'MANAGE_SITE_LINKS'] as Permission[] };
+    setGrantFacts([OPS]);
+    expect(restriction('siteSetup', can([OPS]), false)).toBe(false);
+    expect(restriction('newRequest', can([OPS]), false)).toBe(true);
   });
 });

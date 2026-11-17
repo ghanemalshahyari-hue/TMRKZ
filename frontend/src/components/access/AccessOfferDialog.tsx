@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type AccessOfferRow, type ScopeMode } from '../../api/client';
+import type { RoleDef } from '../../api/types';
+import { withoutEmptyRoles } from '../../lib/rolePicker';
 import { useApp } from '../../lib/app';
 import { SCOPE_MODES } from '../../lib/accessScopes';
 import { ROLE_MEANING } from '../../pages/AccessRequestPage';
@@ -15,7 +17,10 @@ export function AccessOfferDialog({ onClose }: { onClose: () => void }) {
   const [rows, setRows] = useState<AccessOfferRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    api.accessOffer().then(setRows).catch((e: Error) => app.toast(e.message));
+    // a role with no permissions is never offered (ADR-078): the server's list leaves it out, and the catalogue confirms it here
+    Promise.all([api.accessOffer(), api.roles().catch((): RoleDef[] | null => null)])
+      .then(([offer, catalogue]) => setRows(withoutEmptyRoles(offer, catalogue)))
+      .catch((e: Error) => app.toast(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const patch = (code: string, change: Partial<AccessOfferRow>) => setRows((rows ?? []).map((r) => (r.code === code ? { ...r, ...change } : r)));

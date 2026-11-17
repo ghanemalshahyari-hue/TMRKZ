@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, type StationingRouteRow } from '../api/client';
 import { StationingRoutePanel } from '../components/studio/StationingRoutePanel';
-import { PURPOSE_TITLE, type Purpose } from '../lib/requestPurpose';
+import { CREATABLE_PURPOSES, PURPOSE_TITLE, type Purpose } from '../lib/requestPurpose';
 import { STATIONING_V3_ENABLED } from '../lib/stationingV3';
 import type { FlowEdge, FlowGraph, FlowNode, FlowNodeType, FormField, HierarchyLevel, Responsibility, RoleDef, SimulationResult, StudioItem, WfExec, WorkflowVersion } from '../api/types';
 import { NumberField } from '../components/NumberField';
@@ -260,7 +260,8 @@ export function WorkflowStudio() {
           <h1>مسار الموافقات</h1>
           <select aria-label="نوع الطلب" value={routePurpose ? 'route:' + routePurpose : item?.requestType.code ?? ''} onChange={(e) => setTypeCode(e.target.value)}>
             {items.map((i) => <option key={i.requestType.code} value={i.requestType.code}>{i.requestType.name}</option>)}
-            {STATIONING_V3_ENABLED && (['SITE_REGISTRATION', 'INITIAL_STATIONING', 'DEPLOYMENT_AREAS', 'RESTATIONING'] as Purpose[]).map((p) => <option key={p} value={'route:' + p}>{PURPOSE_TITLE[p]}</option>)}
+            {/* the three request types that can be made: initial stationing is set up in «تهيئة المواقع» and has no path (ADR-078) */}
+            {STATIONING_V3_ENABLED && CREATABLE_PURPOSES.map((p) => <option key={p} value={'route:' + p}>{PURPOSE_TITLE[p]}</option>)}
           </select>
           <button className="button compact" data-testid="type-add" onClick={() => setNewType({ name: '', topic: '', kind: '' })}>＋ نوع طلب</button>
           {item && <button className="button compact" data-testid="type-remove" onClick={removeType}>حذف هذا النوع</button>}

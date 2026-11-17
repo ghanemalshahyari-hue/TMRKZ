@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type AccessInboxItem, type AccessScope } from '../api/client';
+import type { RoleDef } from '../api/types';
+import { emptyRoleCodes, withoutEmptyRoles } from '../lib/rolePicker';
 import { Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
@@ -7,9 +9,14 @@ import { ROLE_MEANING, ScopeChoice } from './AccessRequestPage';
 
 const SCOPE_WORD: Record<string, string> = { UNIT: 'وحدتي فقط', UNIT_TREE: 'وحدتي والوحدات التابعة', UNITS: 'وحدات محددة', SITES: 'مواقع محددة', ALL: 'النظام بالكامل' };
 
-function Item({ item, onDone }: { item: AccessInboxItem; onDone: () => void }) {
+function Item({ item, onDone, catalogue }: { item: AccessInboxItem; onDone: () => void; catalogue: RoleDef[] | null }) {
   const app = useApp();
   const [roles, setRoles] = useState<string[]>((item.recommended ?? item.requested).map((r) => r.code));
+  // a role with no permissions is never given (ADR-078): not offered, and not sent even when it was asked for before
+  const offered = withoutEmptyRoles(item.offered, catalogue);
+  const extras = withoutEmptyRoles(item.extras, catalogue);
+  const empty = emptyRoleCodes(catalogue);
+  const chosen = roles.filter((r) => !empty.has(r));
   const [note, setNote] = useState('');
   const [scope, setScope] = useState<AccessScope>(item.proposedScope ?? item.scope ?? { mode: 'UNIT', ids: [] });
   const [advice, setAdvice] = useState<'APPROVE' | 'REJECT'>('APPROVE');
@@ -17,7 +24,7 @@ function Item({ item, onDone }: { item: AccessInboxItem; onDone: () => void }) {
   const act = async (decision: 'APPROVE' | 'REJECT' | 'RETURN') => {
     setBusy(true);
     try {
-      await api.decideAccessRequest(item.requestId, { taskId: item.taskId, decision, roles, note: note || undefined, scope, recommendReject: !item.final && advice === 'REJECT' });
+      await api.decideAccessRequest(item.requestId, { taskId: item.taskId, decision, roles: chosen, note: note || undefined, scope, recommendReject: !item.final && advice === 'REJECT' });
       app.toast(decision === 'REJECT' ? 'رُفض الطلب' : decision === 'RETURN' ? 'أُعيد الطلب للتعديل' : item.final ? 'فُعّلت الصلاحيات' : 'أُرسلت التوصية');
       onDone();
     } catch (e) {
@@ -52,17 +59,17 @@ function Item({ item, onDone }: { item: AccessInboxItem; onDone: () => void }) {
         </fieldset>
       )}
       <h4>{item.final ? 'ما يُفعَّل' : 'ما توصي به'}</h4>
-      {item.offered.map((r) => (
+      {offered.map((r) => (
         <label key={r.code} className="check-label" style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '4px 0' }}>
           <input type="checkbox" data-role={r.code} checked={roles.includes(r.code)} onChange={(e) => setRoles(e.target.checked ? [...roles, r.code] : roles.filter((x) => x !== r.code))} />
           <span><b>{r.name}</b> <small className="muted">{ROLE_MEANING[r.code]}</small></span>
         </label>
       ))}
-      {item.extras.length > 0 && (
+      {extras.length > 0 && (
         <div data-testid="access-extras">
           <h4>صلاحيات إضافية</h4>
           <p className="micro muted">لا تظهر لمقدم الطلب. تضيفها أنت إذا احتاجها عمله.</p>
-          {item.extras.map((r) => (
+          {extras.map((r) => (
             <label key={r.code} className="check-label" style={{ display: 'flex', gap: 8, alignItems: 'baseline', padding: '4px 0' }}>
               <input type="checkbox" data-role={r.code} checked={roles.includes(r.code)} onChange={(e) => setRoles(e.target.checked ? [...roles, r.code] : roles.filter((x) => x !== r.code))} />
               <span><b>{r.name}</b> <small className="muted">{ROLE_MEANING[r.code]}</small></span>
@@ -76,7 +83,7 @@ function Item({ item, onDone }: { item: AccessInboxItem; onDone: () => void }) {
         <textarea aria-label="ملاحظة" value={note} onChange={(e) => setNote(e.target.value)} />
       </label>
       <div className="flex" style={{ gap: 8 }}>
-        <button className="button primary" disabled={busy || (!roles.length && advice === 'APPROVE') || (!item.final && advice === 'REJECT' && note.trim().length < 5)} onClick={() => act('APPROVE')}>{item.final ? 'اعتماد وتفعيل' : 'إرسال التوصية'}</button>
+        <button className="button primary" disabled={busy || (!chosen.length && advice === 'APPROVE') || (!item.final && advice === 'REJECT' && note.trim().length < 5)} onClick={() => act('APPROVE')}>{item.final ? 'اعتماد وتفعيل' : 'إرسال التوصية'}</button>
         <button className="button" disabled={busy || note.trim().length < 5} onClick={() => act('RETURN')}>إرجاع للتعديل</button>
         <button className="button danger" disabled={busy || note.trim().length < 5} onClick={() => act('REJECT')}>رفض</button>
       </div>
@@ -88,16 +95,19 @@ function Item({ item, onDone }: { item: AccessInboxItem; onDone: () => void }) {
 export function AccessInboxPage() {
   const app = useApp();
   const [items, setItems] = useState<AccessInboxItem[] | null>(null);
+  // the role catalogue, to leave out roles with no permissions; a final approver who may not read it relies on the server's lists
+  const [catalogue, setCatalogue] = useState<RoleDef[] | null>(null);
   const load = () => api.accessInbox().then(setItems).catch((e: Error) => (setItems([]), app.toast(e.message)));
   useEffect(() => {
     void load();
+    api.roles().then(setCatalogue).catch(() => setCatalogue(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.revision]);
   return (
     <section data-testid="access-inbox">
       <Heading title="طلبات الصلاحية" description="الطلبات التي تنتظر قرارك. لا يمنح المراجع شيئاً؛ الاعتماد النهائي وحده يفعّل الصلاحية." />
       {items && !items.length && <div className="empty">لا توجد طلبات تنتظرك.</div>}
-      {items?.map((i) => <Item key={i.taskId} item={i} onDone={load} />)}
+      {items?.map((i) => <Item key={i.taskId} item={i} onDone={load} catalogue={catalogue} />)}
     </section>
   );
 }
