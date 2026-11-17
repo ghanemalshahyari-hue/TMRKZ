@@ -90,7 +90,7 @@ export function PosturePage() {
               <div><dt>الموقع الحالي</dt><dd data-testid="posture-site">{unit.site?.name ?? '—'}</dd></div>
               <div><dt>نوع التمركز</dt><dd>{unit.kind === 'TEMPORARY' ? 'مؤقت' : unit.kind ? 'دائم' : '—'}{unit.plannedEnd ? ' · حتى ' + fullDate(unit.plannedEnd) : ''}</dd></div>
               <div><dt>منطقة الانتشار الرئيسية</dt><dd data-testid="posture-primary">{unit.primary ? 'معتمدة' : 'لا توجد'}</dd></div>
-              <div><dt>منطقة الانتشار البديلة</dt><dd data-testid="posture-alternative">{unit.alternative ? 'معتمدة' : 'لا توجد'}</dd></div>
+              <div><dt>منطقة الانتشار الفرعية</dt><dd data-testid="posture-alternative">{unit.alternative ? 'معتمدة' : 'لا توجد'}</dd></div>
               <div><dt>الحالة</dt><dd>{UNIT_STATE[unit.state] ?? unit.state}</dd></div>
               <div><dt>حالة الطلب الجاري</dt><dd data-testid="posture-request">{unit.request ? (isPurpose(unit.request.purpose) ? PURPOSE_TITLE[unit.request.purpose] : '') + ' — ' + unit.request.state : 'لا يوجد'}</dd></div>
               {!!unit.otherUnitsAtSite && <div><dt>جهة أخرى في الموقع</dt><dd data-testid="posture-others">{unit.otherUnitsAtSite}</dd></div>}

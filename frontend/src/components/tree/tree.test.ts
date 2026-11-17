@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { flatSource, normalise, withParents } from './tree';
+import { flatSource, normalise, withParents, searchForest } from './tree';
 
 const UNITS = [
   { id: 'r', name: 'القيادة', parentId: null },
@@ -41,5 +41,23 @@ describe('the one units tree', () => {
       { id: '5', depth: 0 },
     ]);
     expect(rows.map((r) => r.parentId)).toEqual([null, '1', '2', '1', null]);
+  });
+});
+
+describe('a search drawn as a hierarchy (owner, 17 Nov 2026)', () => {
+  const u = (id: string, name: string) => ({ id, name, childCount: 0 });
+  it('puts every result under its whole chain of ancestors, a shared ancestor once', () => {
+    const forest = searchForest([
+      { item: u('c1', 'مركز صحة واحد'), path: 'الإدارة الرئيسية للصحة ‹ إدارة الصحة', trail: ['m', 'h'], chain: [{ id: 'm', name: 'الإدارة الرئيسية للصحة' }, { id: 'h', name: 'إدارة الصحة' }] },
+      { item: u('c2', 'مركز صحة اثنين'), path: 'الإدارة الرئيسية للصحة ‹ إدارة الصحة', trail: ['m', 'h'] },
+      { item: u('h', 'إدارة الصحة'), path: 'الإدارة الرئيسية للصحة', trail: ['m'] },
+    ]);
+    expect(forest.map((n) => n.name)).toEqual(['الإدارة الرئيسية للصحة']);
+    const health = forest[0].kids[0];
+    expect(health.name).toBe('إدارة الصحة');
+    expect(health.item?.id).toBe('h'); // a result and an ancestor at once
+    expect(health.kids.map((k) => k.name)).toEqual(['مركز صحة واحد', 'مركز صحة اثنين']);
+    expect(health.kids[1].trail).toEqual(['m', 'h']);
+    expect(forest[0].item).toBeNull(); // an ancestor only
   });
 });

@@ -44,8 +44,11 @@ function lookFor(m: MlMap, view: MapView, selected: string | null) {
   set('rs-line', 'line-color', on ? byRole3d : byRole2d);
   set('rs-line', 'line-width', on ? ['match', ['get', 'role'], selected ?? '', 4.6, 3.6] : ['match', ['get', 'role'], 'SITE', 3, 2.4]);
   set('occ-line', 'line-color', on ? COLOURS_3D.OCCUPIED : MAP_COLOURS.OCCUPIED);
-  show('rs-hatch', !on);
-  show('rs-area-fill', on);
+  // the deployment areas (owner brief «طلب مناطق الانتشار» §4): a transparent fill in both views, the sub-area lighter
+  show('rs-hatch', false);
+  show('rs-area-fill', true);
+  set('rs-area-fill', 'fill-color', on ? ['match', ['get', 'role'], 'PRIMARY', COLOURS_3D.PRIMARY, COLOURS_3D.ALTERNATIVE] : ['match', ['get', 'role'], 'PRIMARY', MAP_COLOURS.PRIMARY, MAP_COLOURS.ALTERNATIVE]);
+  set('rs-area-fill', 'fill-opacity', ['match', ['get', 'role'], 'PRIMARY', on ? 0.3 : 0.22, on ? 0.18 : 0.12]);
   show('rs-glow', on && !!selected);
   if (m.getLayer('rs-glow')) m.setFilter('rs-glow', ['==', ['get', 'role'], selected ?? '']);
   // names and distances stand on the ground as cards and chips in 3D (TerrainCards); the flat labels stay in 2D
@@ -278,6 +281,7 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
           type: 'fill',
           source: 'rs',
           filter: ['in', ['get', 'role'], ['literal', ['PRIMARY', 'ALTERNATIVE']]],
+          layout: { visibility: 'none' },
           paint: { 'fill-pattern': ['match', ['get', 'role'], 'PRIMARY', 'tz-hatch-primary', 'tz-hatch-alternative'] },
         });
         // 3D only (lookFor): the deployment areas as a translucent fill instead of the hatch, and the selection's halo
@@ -286,8 +290,7 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
           type: 'fill',
           source: 'rs',
           filter: ['in', ['get', 'role'], ['literal', ['PRIMARY', 'ALTERNATIVE']]],
-          layout: { visibility: 'none' },
-          paint: { 'fill-color': ['match', ['get', 'role'], 'PRIMARY', COLOURS_3D.PRIMARY, COLOURS_3D.ALTERNATIVE], 'fill-opacity': 0.3 },
+          paint: { 'fill-color': ['match', ['get', 'role'], 'PRIMARY', MAP_COLOURS.PRIMARY, MAP_COLOURS.ALTERNATIVE], 'fill-opacity': ['match', ['get', 'role'], 'PRIMARY', 0.22, 0.12] },
         });
         addOverlayLayer(m, {
           id: 'rs-glow',
@@ -305,6 +308,8 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
           paint: {
             'line-color': ['match', ['get', 'role'], 'CURRENT', MAP_COLOURS.CURRENT, 'SITE', MAP_COLOURS.SITE, 'PRIMARY', MAP_COLOURS.PRIMARY, MAP_COLOURS.ALTERNATIVE],
             'line-width': ['match', ['get', 'role'], 'SITE', 3, 2.4],
+            // the sub-area's outline is dashed, the main area's solid (owner brief §4)
+            'line-dasharray': ['match', ['get', 'role'], 'ALTERNATIVE', ['literal', [2.6, 1.6]], ['literal', [1, 0]]],
           },
         });
         // the re-stationing move: neutral, information only

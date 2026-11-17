@@ -94,7 +94,7 @@ export const ROLE_TITLE: Record<CardRole, string> = {
   CURRENT: 'الموقع الحالي',
   SITE: 'موقع إعادة التمركز',
   PRIMARY: 'منطقة الانتشار الرئيسية',
-  ALTERNATIVE: 'منطقة الانتشار البديلة',
+  ALTERNATIVE: 'منطقة الانتشار الفرعية',
 };
 
 export function TerrainPanel({ role, roles, onRole, insight, rule, move, connector, kinds, onLeg, profile, demAvailable }: {
@@ -249,7 +249,7 @@ export function TerrainPanel({ role, roles, onRole, insight, rule, move, connect
           <div className="tz-terrain-legs" role="group" aria-label="مقطع المسار">
             {kinds.map((k) => (
               <button key={k} aria-pressed={connector?.kind === k} className={'chip' + (connector?.kind === k ? ' active' : '')} onClick={() => onLeg(k)}>
-                {k === 'move' ? 'الانتقال' : k === 'primary' ? 'الانتشار الرئيسي' : 'الانتشار البديل'}
+                {k === 'move' ? 'الانتقال' : k === 'primary' ? 'الانتشار الرئيسي' : 'الانتشار الفرعي'}
               </button>
             ))}
           </div>

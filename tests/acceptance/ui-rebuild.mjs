@@ -489,7 +489,7 @@ let draftId = null;
   const place = async (k, deg, wantM) => {
     const content = (await api(page, '/restationing-requests/' + draftId)).body.content;
     const from = meanOf(k === 'primary' ? content.site.geometry : content.primary);
-    await page.getByRole('tab', { name: k === 'primary' ? 'منطقة الانتشار الرئيسية' : 'منطقة الانتشار البديلة', exact: true }).click();
+    await page.getByRole('tab', { name: k === 'primary' ? 'منطقة الانتشار الرئيسية' : 'منطقة الانتشار الفرعية', exact: true }).click();
     await page.waitForTimeout(900);
     await page.getByRole('button', { name: 'تحديد المنطقة على الخريطة' }).click();
     await page.waitForTimeout(900);
@@ -545,7 +545,7 @@ for (const name of ['laptop', 'tablet', 'mobile']) {
     await page.getByRole('tab', { name: 'منطقة الانتشار الرئيسية' }).click();
     await page.waitForTimeout(400);
     await page.screenshot({ path: shot(`D-primary-placing-${name}.png`) });
-    await page.getByRole('tab', { name: 'منطقة الانتشار البديلة' }).click();
+    await page.getByRole('tab', { name: 'منطقة الانتشار الفرعية' }).click();
     await page.waitForTimeout(400);
     await page.screenshot({ path: shot(`E-alternative-placing-${name}.png`) });
   }

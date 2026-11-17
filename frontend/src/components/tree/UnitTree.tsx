@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { isAbort } from '../../api/client';
 import { Icon } from '../ui';
-import type { TreeHit, TreeItem, TreeSource } from './tree';
+import { searchForest, type SearchNode, type TreeHit, type TreeItem, type TreeSource } from './tree';
 import './unitTree.css';
 
 type Props<T extends TreeItem> = {
@@ -57,6 +57,8 @@ export function UnitTree<T extends TreeItem>(p: Props<T>) {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<TreeHit<T>[] | null>(null);
+  // a search shows its results as a hierarchy (owner, 17 Nov 2026): a branch the person asks to see whole is drawn as the tree
+  const [whole, setWhole] = useState<Set<string>>(new Set());
   const openRef = useRef(open);
   openRef.current = open;
   const kidsRef = useRef(kids);
@@ -174,6 +176,7 @@ export function UnitTree<T extends TreeItem>(p: Props<T>) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, p.source]);
+  useEffect(() => setWhole(new Set()), [hits]);
   const pickHit = async (h: TreeHit<T>) => {
     if (p.onCheck) return p.onCheck(h.item);
     if (h.trail?.length) await openAll(h.trail);
@@ -247,6 +250,45 @@ export function UnitTree<T extends TreeItem>(p: Props<T>) {
     );
   };
 
+  /**
+   * A search drawn as a hierarchy: every result under its whole chain of ancestors, top first; each row chosen as in the tree;
+   * «+» on any row shows that branch whole (the ordinary tree under it). A result is marked «مطابق».
+   */
+  const foundRow = (n: SearchNode<T>, depth: number): ReactNode => {
+    const item = n.item ?? ({ id: n.id, name: n.name, childCount: 1 } as T);
+    if (whole.has(n.id)) return row(item, depth);
+    const why = p.disabled?.(item) ?? null;
+    const isChecked = !!p.checked?.has(n.id);
+    const on = p.selected === n.id;
+    const showWhole = () => {
+      void load(n.id);
+      setOpen((o) => new Set([...o, n.id]));
+      setWhole((w) => new Set([...w, n.id]));
+    };
+    const choose = () => (p.onCheck ? p.onCheck(item) : pickHit({ item, path: '', trail: n.trail }));
+    return (
+      <li key={n.id} role="treeitem" aria-level={depth + 1} aria-expanded={n.kids.length > 0 || undefined} aria-selected={p.onCheck ? isChecked : on} data-unit={n.id}>
+        <div className={'ut-row tree-row' + (n.item ? ' ut-match' : ' ut-path') + (on ? ' on active' : '') + (why ? ' off' : '')} data-node={n.id} style={{ paddingInlineStart: 4 + depth * 16 }}>
+          <button type="button" className="ut-twist" tabIndex={-1} title="عرض كل فروعها" aria-label={'عرض كل فروع ' + n.name} onClick={showWhole}>+</button>
+          {p.onCheck ? (
+            <label className="ut-check" title={why ?? n.name}>
+              <input type="checkbox" className="ut-focus" checked={isChecked} disabled={!!why && !isChecked} onChange={choose} {...(p.checkData ? { ['data-' + p.checkData]: n.id } : {})} />
+              {n.item && p.icon?.(item)}
+              <span className="ut-name tree-label">{n.name}</span>
+            </label>
+          ) : (
+            <button type="button" className="ut-name ut-focus tree-label" data-found={n.item ? 'match' : 'ancestor'} title={why ?? n.name} disabled={!!why} onClick={choose}>
+              {n.item && p.icon?.(item)}
+              <span>{n.name}</span>
+            </button>
+          )}
+          {n.item && <span className="ut-matchtag">مطابق</span>}
+        </div>
+        {n.kids.length > 0 && <ul role="group">{n.kids.map((k) => foundRow(k, depth + 1))}</ul>}
+      </li>
+    );
+  };
+
   return (
     <div className={'ut' + (p.className ? ' ' + p.className : '')} ref={box} data-testid={p.testId}>
       {p.search !== false && p.source.search && (
@@ -257,26 +299,10 @@ export function UnitTree<T extends TreeItem>(p: Props<T>) {
       )}
       {error && <div className="ut-error" role="alert">{error}</div>}
       {hits ? (
-        <ul className="ut-hits" role="listbox" aria-label={'نتائج البحث — ' + p.label}>
+        <ul className="ut-nodes tree ut-found" role="tree" aria-label={'نتائج البحث — ' + p.label} data-testid="tree-search-results">
           {hits.length === 0 && <li className="ut-note">لا نتائج ضمن نطاقك.</li>}
-          {hits.map((h) => {
-            const why = p.disabled?.(h.item) ?? null;
-            return (
-              <li key={h.item.id} role="option" aria-selected={p.onCheck ? !!p.checked?.has(h.item.id) : p.selected === h.item.id}>
-                {p.onCheck ? (
-                  <label className="ut-hit tree-hit" title={why ?? undefined}>
-                    <input type="checkbox" checked={!!p.checked?.has(h.item.id)} disabled={!!why && !p.checked?.has(h.item.id)} onChange={() => pickHit(h)} />
-                    <span><b>{h.item.name}</b>{h.path && <small>{h.path}</small>}</span>
-                  </label>
-                ) : (
-                  <button type="button" className="ut-hit tree-hit" disabled={!!why} title={why ?? undefined} onClick={() => pickHit(h)}>
-                    {p.icon?.(h.item)}
-                    <span><b>{h.item.name}</b>{h.path && <small>{h.path}</small>}</span>
-                  </button>
-                )}
-              </li>
-            );
-          })}
+          {hits.length > 0 && <li className="ut-note ut-found-note">{hits.length === 1 ? 'نتيجة واحدة' : hits.length + ' نتائج'} في مكانها من الهيكل: اختر الوحدة نفسها، أو أعلى منها، أو افتح فروعها.</li>}
+          {searchForest(hits).map((n) => foundRow(n, 0))}
         </ul>
       ) : (
         <ul className="ut-nodes tree" role="tree" aria-label={p.label}>

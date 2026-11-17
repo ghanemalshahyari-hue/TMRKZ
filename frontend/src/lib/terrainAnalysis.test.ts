@@ -37,7 +37,7 @@ describe('connectors of the 3D view', () => {
     // the alternative is reached from the PRIMARY area, never from the re-stationing site
     expect(c[2].fromLabel).toBe('منطقة الانتشار الرئيسية');
     expect(c[2].from).toEqual(c[1].to);
-    expect(c[2].toLabel).toBe('منطقة الانتشار البديلة');
+    expect(c[2].toLabel).toBe('منطقة الانتشار الفرعية');
   });
 
   it('draw only the legs whose two ends exist, never all to all', () => {

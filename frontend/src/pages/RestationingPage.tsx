@@ -1,6 +1,7 @@
 import { PURPOSE_TITLE, isCreatablePurpose, isPurpose, type Purpose } from '../lib/requestPurpose';
 import { flatSource } from '../components/tree/tree';
 import { UnitTree } from '../components/tree/UnitTree';
+import { DeploymentAreasRequest } from './DeploymentAreasRequest';
 import { ApprovalStamps } from '../components/workspace/ApprovalStamps';
 import type { RestationingUnit } from '../api/types';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -166,6 +167,18 @@ export function RestationingPage() {
     </ActionRail>
   );
 
+  // a new «طلب مناطق انتشار» (owner brief §4, phase 3): its own screen, starting from the unit's current site
+  if (editing && !editing.id && editing.purpose === 'DEPLOYMENT_AREAS') {
+    return (
+      <DeploymentAreasRequest
+        onClose={() => {
+          setEditing(null);
+          if (route().kind === 'new') history.replaceState(null, '', '#restationing');
+          reload();
+        }}
+      />
+    );
+  }
   if (editing) {
     return (
       // the editor brings its own step panel on the left: the request list steps aside until it closes

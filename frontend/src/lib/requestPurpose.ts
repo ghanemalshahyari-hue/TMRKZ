@@ -18,7 +18,7 @@ export const PURPOSE_TITLE: Record<Purpose, string> = {
 export const PURPOSE_HINT: Record<Purpose, string> = {
   RESTATIONING: 'ينطلق من الموقع الحالي للوحدة إلى موقع جديد على الخريطة.',
   INITIAL_STATIONING: 'لم يعد يُطلب: يُسجَّل التمركز الأولي مع موقعه في «تهيئة المواقع».',
-  DEPLOYMENT_AREAS: 'لوحدة متمركزة بلا منطقتي انتشار: الرئيسية والبديلة.',
+  DEPLOYMENT_AREAS: 'لوحدة متمركزة بلا منطقتي انتشار: الرئيسية والفرعية.',
   SITE_REGISTRATION: 'لتسجيل موقع جديد مرة واحدة بعد الاعتماد والتفعيل.',
 };
 

@@ -4,8 +4,43 @@
  * (UnitTree.tsx) draws them the same way on every page.
  */
 export type TreeItem = { id: string; name: string; childCount: number };
-/** A search result: the unit, its path as text, and its ancestors (top first) so the tree can open down to it. */
-export type TreeHit<T> = { item: T; path: string; trail?: string[] };
+/**
+ * A search result: the unit, its path as text, and its ancestors (top first) so the tree can open down to it. `chain` names
+ * the ancestors too, so a search can show its results as a hierarchy (owner, 17 Nov 2026).
+ */
+export type TreeHit<T> = { item: T; path: string; trail?: string[]; chain?: { id: string; name: string }[] };
+
+/** A node of a search drawn as a tree: a unit found, or one of its ancestors; with the ancestors' ids (top first). */
+export type SearchNode<T> = { id: string; name: string; item: T | null; trail: string[]; kids: SearchNode<T>[] };
+
+/** The results of a search as one forest: every result under its whole chain of ancestors, shared ancestors drawn once. */
+export function searchForest<T extends TreeItem>(hits: TreeHit<T>[]): SearchNode<T>[] {
+  const nodes = new Map<string, SearchNode<T>>();
+  const roots: SearchNode<T>[] = [];
+  const node = (id: string, name: string, trail: string[]) => {
+    let n = nodes.get(id);
+    if (!n) nodes.set(id, (n = { id, name, item: null, trail, kids: [] }));
+    return n;
+  };
+  const attach = (parent: SearchNode<T> | null, n: SearchNode<T>) => {
+    const list = parent ? parent.kids : roots;
+    if (!list.includes(n)) list.push(n);
+  };
+  for (const h of hits) {
+    const names = h.path ? h.path.split(' ‹ ') : [];
+    const chain = h.chain ?? (h.trail && h.trail.length === names.length ? h.trail.map((id, i) => ({ id, name: names[i] })) : []);
+    let parent: SearchNode<T> | null = null;
+    chain.forEach((a, i) => {
+      const n = node(a.id, a.name, chain.slice(0, i).map((x) => x.id));
+      attach(parent, n);
+      parent = n;
+    });
+    const leaf = node(h.item.id, h.item.name, chain.map((x) => x.id));
+    leaf.item = h.item;
+    attach(parent, leaf);
+  }
+  return roots;
+}
 export type TreeSource<T extends TreeItem> = {
   roots: () => Promise<T[]>;
   children: (id: string) => Promise<T[]>;

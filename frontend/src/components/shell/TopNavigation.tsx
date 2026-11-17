@@ -35,7 +35,14 @@ export function TopNavigation({ me, view, links, more, onLogout, navOpen, setNav
   setNavOpen: (o: boolean) => void;
 }) {
   const app = useApp();
-  const active = activeEntry(view, links);
+  // the two request ways share a view: the highlight follows the address, which changes without a change of view
+  const [hash, setHash] = useState(typeof location !== 'undefined' ? location.hash : '');
+  useEffect(() => {
+    const on = () => setHash(location.hash);
+    window.addEventListener('hashchange', on);
+    return () => window.removeEventListener('hashchange', on);
+  }, []);
+  const active = activeEntry(view, links, hash);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -63,7 +70,7 @@ export function TopNavigation({ me, view, links, more, onLogout, navOpen, setNav
       </span>
       <nav id="navigation" className={'tz-nav' + (navOpen ? ' open' : '')} aria-label="القائمة الرئيسية">
         {links.map((l) => (
-          <a key={l.view} className={'nav-item tz-nav-item' + (active === l.view ? ' active' : '')} href={'#' + l.view} aria-current={active === l.view ? 'page' : undefined}>
+          <a key={l.id ?? l.view} data-nav={l.id ?? l.view} title={l.title} className={'nav-item tz-nav-item' + (active === (l.id ?? l.view) ? ' active' : '')} href={l.href ?? '#' + l.view} aria-current={active === (l.id ?? l.view) ? 'page' : undefined}>
             <Icon name={l.icon} />
             <span>{l.label}</span>
           </a>

@@ -40,15 +40,23 @@ import ae.mover.system.IdempotencyService;
  * range of the policy in force); the pair rule is the policy's {@code deploymentRequirement} ({@link DeploymentRules#pair}).
  * A stationing is written with origin SETUP and no request, its event is the one a correction writes, and the units at the
  * place are told for information as at an activation. Any refusal rolls back everything: no half site is left behind.
+ *
+ * <p>«تحديد مواقع التمركز المبدئية» (owner brief, phase 2, ADR-081): the setup is the site and its unit's initial stationing.
+ * A unit sent without any area is stationed alone, whatever the policy requires: its areas are asked for afterwards by
+ * «طلب مناطق انتشار», and the hub shows it {@code DEPLOYMENT_MISSING} until then. Areas that are sent are still checked as
+ * above (a complete pair the policy accepts, each leg in range), and only then is a policy in force needed.
  */
 @Service
 public class SiteSetupService {
 
     public static final String AUDIT_ACTION = "SITE_SETUP_BOOTSTRAPPED";
     private static final String PRIMARY_LABEL = "منطقة الانتشار الرئيسية";
-    private static final String ALTERNATIVE_LABEL = "منطقة الانتشار البديلة";
+    private static final String ALTERNATIVE_LABEL = "منطقة الانتشار الفرعية";
 
-    /** One unit stationed by the setup, with its own two areas (GeoJSON polygons in WGS 84, as the request editor sends them). */
+    /**
+     * One unit stationed by the setup, with its own two areas (GeoJSON polygons in WGS 84, as the request editor sends them);
+     * none for the initial stationing alone (ADR-081).
+     */
     public record UnitInput(UUID organizationId, Map<String, Object> primary, Map<String, Object> alternative) {
     }
 
@@ -348,8 +356,10 @@ public class SiteSetupService {
                     : "«" + name + "»: تاريخ بدء التمركز يسبق نهاية تمركزها السابق في «" + r.get("site") + "».");
         }
         Optional<PolicyVersion> pv = policies.inForce(now);
-        if (!ids.isEmpty() && pv.isEmpty()) {
-            problems.add("لا توجد سياسة تمركز نافذة؛ ينشرها مسؤول النظام قبل تهيئة التمركز ومناطق الانتشار.");
+        // the initial stationing alone needs no policy; areas are measured by the one in force (ADR-081)
+        boolean anyArea = given.stream().anyMatch(u -> u != null && (u.primary() != null || u.alternative() != null));
+        if (anyArea && pv.isEmpty()) {
+            problems.add("لا توجد سياسة تمركز نافذة؛ ينشرها مسؤول النظام قبل تهيئة مناطق الانتشار.");
         }
         List<UnitCheck> units = new ArrayList<>();
         if (!ids.isEmpty() && pv.isPresent()) {
@@ -363,6 +373,11 @@ public class SiteSetupService {
                     continue;
                 }
                 UnitInput u = byUnit.get(id);
+                if (u.primary() == null && u.alternative() == null) {
+                    // the initial stationing alone: its areas come by «طلب مناطق انتشار» (owner brief, phase 2, ADR-081)
+                    units.add(new UnitCheck(id, names.get(id), List.of(), List.of()));
+                    continue;
+                }
                 List<String> own = new ArrayList<>(DeploymentRules.pair(policy.deploymentRequirement(), u.primary() != null, u.alternative() != null));
                 String primaryGeo = u.primary() == null ? null : json.write(u.primary());
                 String alternativeGeo = u.alternative() == null ? null : json.write(u.alternative());

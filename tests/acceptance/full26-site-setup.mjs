@@ -123,7 +123,7 @@ try {
   await shot(p, '11-primary-deployment.png');
   await p.getByTestId('wizard-next').click();
   await p.waitForTimeout(1500);
-  await place(A, 'setup-step-5', 'منطقة الانتشار البديلة', 'ALTERNATIVE');
+  await place(A, 'setup-step-5', 'منطقة الانتشار الفرعية', 'ALTERNATIVE');
   await shot(p, '12-alternative-deployment.png');
   await p.getByTestId('wizard-next').click();
 
@@ -166,7 +166,7 @@ ok(resp === 'وحدة إضافية 1', 'SITE-BOOT-02', 'الوحدة المسؤ�
 const st = sql(`select id || '|' || origin || '|' || kind || '|' || coalesce(request_id::text, '-') from org_stationing where organization_id = '${org}' and site_id = '${site}' and valid_to is null`);
 ok(/\|SETUP\|PERMANENT\|-$/.test(st), 'SITE-BOOT-03', 'تمركز ابتدائي معتمد (origin SETUP، دائم، بلا طلب)', st);
 const areas = sql(`select role || ':' || origin || ':' || state from deployment_area where organization_id = '${org}' order by role`);
-ok(areas === 'ALTERNATIVE:SETUP:ACTIVE\nPRIMARY:SETUP:ACTIVE', 'SITE-BOOT-04', 'منطقتا الانتشار الرئيسية والبديلة نافذتان', areas.replace('\n', ' | '));
+ok(areas === 'ALTERNATIVE:SETUP:ACTIVE\nPRIMARY:SETUP:ACTIVE', 'SITE-BOOT-04', 'منطقتا الانتشار الرئيسية والفرعية نافذتان', areas.replace('\n', ' | '));
 ok(sql(`select count(*) from audit_event where action = 'SITE_SETUP_BOOTSTRAPPED' and entity_id = '${site}'`) === '1', 'SITE-BOOT-05', 'حدث تدقيق واحد SITE_SETUP_BOOTSTRAPPED');
 ok(sql(`select count(*) from restationing_request`) === '0', 'SITE-BOOT-06', 'التهيئة لا تنشئ طلب اعتماد');
 const viewer = await session('full26.u10');

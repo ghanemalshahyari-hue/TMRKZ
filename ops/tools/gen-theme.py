@@ -20,6 +20,7 @@ ACCENTS = ("--accent", "--green", "--red", "--orange", "--blue", "--tz-teal", "-
 
 
 WARM = 0.11  # the hue of the sand
+SAND = 0.104  # the hue of the dark theme's sand accent (#d4ab6a)
 BROWN = 0.083  # the hue of its brown button
 
 
@@ -62,14 +63,22 @@ def surface(theme, token, prop):
     a = c[3]
     h, l, s = hls(c)
     if theme == "dark":
+        # graphite and sand (owner, 17 Nov 2026: "too much blue … other than green and dark blue"): the sources' teal accent
+        # becomes the sand, their navy surfaces warm graphite, their cyan-grey lines a warm hairline; status colours stay
+        if is_teal(h, s):
+            return make(SAND, min(max(l, 0.42), 0.72), 0.55, a)
+        if 0.5 <= h <= 0.64 and s > 0.12 and l < 0.36:  # a navy surface
+            return make(WARM, l * 0.9, 0.08, a)
+        if 0.5 <= h <= 0.64 and 0.12 < s < 0.6 and l >= 0.36 and a < 0.6:  # a cyan-grey line or veil
+            return show(214, 200, 172, a)
         if l > 0.82:
             if a < 0.6:  # a light veil: a faint white over a dark surface
                 return show(255, 255, 255, min(a, 0.08))
             if s > 0.25 and l < 0.93:  # a tinted pastel keeps its hue
                 return make(h, 0.17, 0.38, a)
-            return make(0.57, 0.125 + (1 - l) * 0.45, 0.52, a)
+            return make(WARM, 0.125 + (1 - l) * 0.45, 0.08, a)
         if l > 0.55 and s < 0.35:  # a neutral line
-            return make(h, 0.3, 0.2, a)
+            return make(WARM, 0.3, 0.08, a)
         return None
     # light is the sand of the sign-in page: greys warm up, and the teal accent becomes its brown
     if a < 0.6 and l > 0.8:  # a white veil over a dark surface becomes a warm dark one
@@ -94,11 +103,17 @@ def text(theme, token):
     a = c[3]
     h, l, s = hls(c)
     if theme == "dark":
+        if token.lower() == "#04221c":  # the dark ink written on the teal fill, now on the sand
+            return "#241a0b"
+        if is_teal(h, s):  # teal text becomes the sand
+            return make(SAND, max(l, 0.66), 0.55, a)
         if l >= 0.5:
+            if 0.5 <= h <= 0.64 and 0.08 < s < 0.5:  # a bluish grey becomes a warm grey
+                return make(WARM, l, 0.12, a)
             return None
         if s > 0.3:
             return make(h, max(0.68, 1 - l), min(s, 0.65), a)
-        return make(0.55, 1 - l * 0.7, 0.3, a)
+        return make(WARM, 1 - l * 0.7, 0.12, a)
     if is_teal(h, s):
         return make(BROWN, 0.31, 0.55, a)
     if s < 0.35:  # greys and grey-greens warm up, dark enough to read
@@ -115,7 +130,7 @@ def remap(value, theme, prop, on_accent):
         token = m.group(0)
         if prop in TEXT_PROPS:
             if on_accent:
-                return "#04221c" if theme == "dark" else "#ffffff"
+                return "#241a0b" if theme == "dark" else "#ffffff"
             out = text(theme, token)
         else:
             out = surface(theme, token, prop)
@@ -181,7 +196,7 @@ def rules(css, theme):
             prop = prop.strip().lower()
             if prop.startswith("--") or not (prop in TEXT_PROPS or prop.startswith(SURFACE)):
                 continue
-            if filled and not accent and prop in TEXT_PROPS:
+            if filled and not accent and prop in TEXT_PROPS and not (theme == "dark" and "#04221c" in value.lower()):
                 continue
             mapped = remap(value.strip(), theme, prop, accent and prop == "color")
             if mapped != value.strip():

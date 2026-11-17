@@ -377,7 +377,7 @@ try {
   await p05.getByTestId('area-controls').waitFor({ timeout: 20000 });
   await p05.waitForTimeout(2500);
   await placeArea(p05, 56.1195, Y(24.86));
-  await p05.getByRole('tab', { name: 'منطقة الانتشار البديلة' }).click();
+  await p05.getByRole('tab', { name: 'منطقة الانتشار الفرعية' }).click();
   await p05.waitForTimeout(900);
   await placeArea(p05, 56.1195, Y(24.8965));
   // moved on the map with the same editor, and nothing is saved while it moves
@@ -441,7 +441,7 @@ try {
   await p05.getByTestId('area-controls').waitFor({ timeout: 20000 });
   await p05.waitForTimeout(2000);
   await placeArea(p05, 55.945 + 0.0595, Y(24.92));
-  await p05.getByRole('tab', { name: 'منطقة الانتشار البديلة' }).click();
+  await p05.getByRole('tab', { name: 'منطقة الانتشار الفرعية' }).click();
   await p05.waitForTimeout(900);
   await placeArea(p05, 55.945 + 0.0595, Y(24.9565));
   await button(p05, '3D').click();

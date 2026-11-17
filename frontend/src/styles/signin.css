@@ -47,42 +47,43 @@
 }
 
 :root[data-theme='dark'] {
+  /* graphite and sand, as the application's dark theme (owner, 17 Nov 2026) */
   color-scheme: dark;
-  --tm-ground: #08192a;
-  --tm-card: rgba(15, 39, 57, .78);
-  --tm-card-solid: #0f2739;
-  --tm-ink: #f2f8fa;
-  --tm-charcoal: #e7f1f4;
-  --tm-muted: #9db2bb;
-  --tm-gold: #2bc4a8;
-  --tm-sand: #1fb497;
-  --tm-hair: rgba(130, 190, 205, .22);
-  --tm-input: #0b2132;
-  --tm-input-focus: #0b2132;
-  --tm-line: rgba(130, 190, 205, .32);
-  --tm-brown: #2bc4a8;
-  --tm-green: #2bc4a8;
-  --tm-glyph: #9db2bb;
-  --tm-placeholder: #8fa5ae;
+  --tm-ground: #161513;
+  --tm-card: rgba(34, 32, 29, .82);
+  --tm-card-solid: #22201d;
+  --tm-ink: #f3efe7;
+  --tm-charcoal: #efeae1;
+  --tm-muted: #a79e8f;
+  --tm-gold: #d4ab6a;
+  --tm-sand: #c19656;
+  --tm-hair: rgba(214, 200, 172, .2);
+  --tm-input: #1c1b18;
+  --tm-input-focus: #1c1b18;
+  --tm-line: rgba(214, 200, 172, .3);
+  --tm-brown: #d4ab6a;
+  --tm-green: #d4ab6a;
+  --tm-glyph: #a79e8f;
+  --tm-placeholder: #978e80;
   --tm-veil: rgba(255, 255, 255, .05);
   --tm-note: rgba(255, 255, 255, .035);
-  --tm-note-meta: #2bc4a8;
-  --tm-card-shadow: 0 0 0 1px rgba(130, 190, 205, .22), 0 30px 60px -30px rgba(0, 10, 20, .45);
-  --tm-board: linear-gradient(180deg, #0f2739, #0b2132);
-  --tm-shadow: rgba(0, 10, 20, .45);
-  --tm-focus-ring: rgba(43, 196, 168, .22);
-  --tm-focus: #2bc4a8;
-  --tm-submit: linear-gradient(135deg, #2bc4a8 0%, #1fb497 100%);
-  --tm-submit-ink: #04221c;
+  --tm-note-meta: #d4ab6a;
+  --tm-card-shadow: 0 0 0 1px rgba(214, 200, 172, .2), 0 30px 60px -30px rgba(0, 0, 0, .5);
+  --tm-board: linear-gradient(180deg, #22201d, #1c1b18);
+  --tm-shadow: rgba(0, 0, 0, .5);
+  --tm-focus-ring: rgba(212, 171, 106, .24);
+  --tm-focus: #d4ab6a;
+  --tm-submit: linear-gradient(135deg, #d4ab6a 0%, #c19656 100%);
+  --tm-submit-ink: #241a0b;
   --tm-error-bg: #3a1f20; --tm-error: #f7b0a9; --tm-error-line: rgba(239, 125, 116, .4);
   --tm-warning-bg: #3a2c12; --tm-warning: #f0c97c; --tm-warning-line: rgba(233, 176, 79, .4);
-  --tm-info-bg: #123a45; --tm-info: #b7e9de; --tm-info-line: rgba(43, 196, 168, .35);
-  --tm-success-bg: #123a2c; --tm-success: #a8e6c4; --tm-success-line: rgba(76, 201, 138, .35);
+  --tm-info-bg: #2d2922; --tm-info: #e6cfa6; --tm-info-line: rgba(212, 171, 106, .35);
+  --tm-success-bg: #1f2e24; --tm-success: #a8e6c4; --tm-success-line: rgba(76, 201, 138, .35);
   --tm-backdrop:
-    radial-gradient(1200px 600px at 85% -10%, rgba(18, 64, 80, .25), transparent 60%),
-    repeating-linear-gradient(0deg, transparent 0 63px, rgba(130, 190, 205, .03) 63px 64px),
-    repeating-linear-gradient(90deg, transparent 0 63px, rgba(130, 190, 205, .03) 63px 64px),
-    linear-gradient(170deg, #0b2132 0%, #08192a 60%, #071522 100%);
+    radial-gradient(1200px 600px at 85% -10%, rgba(212, 171, 106, .07), transparent 60%),
+    repeating-linear-gradient(0deg, transparent 0 63px, rgba(214, 200, 172, .03) 63px 64px),
+    repeating-linear-gradient(90deg, transparent 0 63px, rgba(214, 200, 172, .03) 63px 64px),
+    linear-gradient(170deg, #1c1b18 0%, #161513 60%, #121110 100%);
 }
 
 * { box-sizing: border-box; }

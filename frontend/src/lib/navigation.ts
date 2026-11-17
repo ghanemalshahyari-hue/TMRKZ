@@ -1,5 +1,6 @@
 import type { Permission } from '../api/types';
 import { FLOW_STUDIO_UI_ENABLED, NAV, type View } from './app';
+import { hubWays } from './stationingHub';
 
 /**
  * Navigation of the operational shell (owner brief «FULL APPLICATION UI REBUILD», §4): the same views and the same
@@ -65,17 +66,18 @@ export function restriction(view: View, can: (p: Permission) => boolean, summary
   return !(can('VIEW') || can('CREATE'));
 }
 
-export type NavLink = { view: View; label: string; icon: string };
+/** A top-bar entry: a view, or (the stationing ways) a view opened at an address of its own, told apart by {@code id}. */
+export type NavLink = { view: View; label: string; icon: string; id?: string; href?: string; title?: string };
 
 /**
  * The five top-bar entries of the reference (الرئيسية، الطلبات، المواقع، الوحدات، التقارير), each an existing view; an
  * entry falls back to the next view of its group the person may open and disappears when there is none.
  */
-const PRIMARY: { label: string; icon: string; views: View[] }[] = [
+const PRIMARY: { label: string; icon: string; views: View[]; ways?: true }[] = [
   { label: 'الرئيسية', icon: 'home', views: ['home'] },
-  // next to «الرئيسية» (owner, 11 Nov 2026), out of «المزيد»
-  { label: 'تهيئة المواقع', icon: 'boundary', views: ['siteSetup'] },
-  { label: 'إعادة التمركز', icon: 'layers', views: ['restationing'] },
+  // the three ways of stationing as tabs, right after «الرئيسية» (owner, 17 Nov 2026): one click opens the work. They take the
+  // place of «تهيئة المواقع» (the first way) and «إعادة التمركز» (its list of requests is in «المزيد»)
+  { label: '', icon: '', views: [], ways: true },
   { label: 'الطلبات', icon: 'file', views: ['allRequests', 'requests'] },
   { label: 'المواقع', icon: 'pin', views: ['stationing'] },
   { label: 'الوحدات', icon: 'tree', views: ['org'] },
@@ -88,6 +90,14 @@ const known = (v: View) => v === 'home' || NAV.some(([id]) => id === v);
 export function primaryNav(can: (p: Permission) => boolean, summaryOnly: boolean): NavLink[] {
   const out: NavLink[] = [];
   for (const p of PRIMARY) {
+    if (p.ways) {
+      for (const w of hubWays(can)) {
+        const view: View = w.key === 'SITE_SETUP' ? 'siteSetup' : 'restationing';
+        if (w.allowed && known(view) && !restriction(view, can, summaryOnly))
+          out.push({ id: w.key, view, label: w.title, icon: w.icon, title: w.description, href: w.key === 'SITE_SETUP' ? undefined : w.href });
+      }
+      continue;
+    }
     const view = p.views.find((v) => known(v) && !restriction(v, can, summaryOnly));
     if (view) out.push({ view, label: p.label, icon: p.icon });
   }
@@ -99,11 +109,18 @@ const MORE_LABEL: Partial<Record<View, string>> = { requests: 'طلبات الم
 
 /** Every other view the person may open, in NAV order, for the «المزيد» menu. */
 export function moreNav(can: (p: Permission) => boolean, summaryOnly: boolean): NavLink[] {
-  const primary = new Set(primaryNav(can, summaryOnly).map((l) => l.view));
+  // a view the bar opens only at a way's own address (the request editor) keeps its own page in «المزيد»
+  const primary = new Set(primaryNav(can, summaryOnly).filter((l) => !l.href).map((l) => l.view));
   return NAV.filter(([id]) => !primary.has(id) && !restriction(id, can, summaryOnly)).map(([view, icon, label]) => ({ view, icon, label: MORE_LABEL[view] ?? label }));
 }
 
-/** The top-bar entry of a view: its own entry, or «المزيد» for a view of that menu. */
-export function activeEntry(view: View, links: NavLink[]): View | 'more' {
-  return links.some((l) => l.view === view) ? view : 'more';
+/**
+ * The top-bar entry to highlight: a way whose address is the current one (the two request ways share a view), else the entry of
+ * the view, else «المزيد».
+ */
+export function activeEntry(view: View, links: NavLink[], hash = ''): string {
+  const byAddress = links.find((l) => l.href && hash.startsWith(l.href));
+  if (byAddress) return byAddress.id ?? byAddress.view;
+  const plain = links.find((l) => !l.href && l.view === view);
+  return plain ? plain.id ?? plain.view : 'more';
 }

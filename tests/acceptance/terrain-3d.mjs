@@ -158,7 +158,7 @@ await page.getByRole('button', { name: 'تحديد المنطقة على الخ�
 await settle(page, 800);
 await clickAt(page, P.primary);
 await settle(page, 900);
-await page.locator('[data-testid=area-controls]').getByRole('tab', { name: 'منطقة الانتشار البديلة' }).click();
+await page.locator('[data-testid=area-controls]').getByRole('tab', { name: 'منطقة الانتشار الفرعية' }).click();
 await settle(page, 1200);
 await page.getByRole('button', { name: 'تحديد المنطقة على الخريطة' }).click();
 await settle(page, 800);
@@ -325,7 +325,7 @@ ok(JSON.stringify(partsAfter) !== JSON.stringify(partsBefore) && after.class !==
 await page.getByRole('button', { name: 'الخطوة 5: الانتشار' }).click();
 await page.waitForSelector('[data-testid=area-controls]', { timeout: 20000 });
 await settle(page, 1500);
-await page.locator('[data-testid=area-controls]').getByRole('tab', { name: 'منطقة الانتشار البديلة' }).click();
+await page.locator('[data-testid=area-controls]').getByRole('tab', { name: 'منطقة الانتشار الفرعية' }).click();
 await settle(page, 1500);
 mark('G', 'start');
 await page.getByRole('button', { name: 'رسم حدود المنطقة' }).click();

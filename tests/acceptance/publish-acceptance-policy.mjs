@@ -61,7 +61,7 @@ try {
 
   await page.locator('input[type=file]').setInputFiles(TEMPLATE);
   await page.waitForSelector('.rs-banner.orange', { timeout: 10000 });
-  await page.locator('label', { hasText: 'مطلوبتان (الموقع والرئيسية والبديلة)' }).locator('input').check();
+  await page.locator('label', { hasText: 'مطلوبتان (الموقع والرئيسية والفرعية)' }).locator('input').check();
   await page.locator('label', { hasText: 'مسموح بمرحلة اعتماد منفصلة' }).locator('input').check();
   await page.locator('label', { hasText: 'أقصى زيادة (م)' }).locator('input').fill('2000');
 

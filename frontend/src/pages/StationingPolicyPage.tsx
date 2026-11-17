@@ -195,7 +195,7 @@ export function StationingPolicyPage() {
           </fieldset>
           <fieldset className="rs-inline">
             <legend>هل منطقتا الانتشار مطلوبتان؟</legend>
-            <label><input type="radio" checked={values.deploymentRequirement === 'REQUIRED'} onChange={() => set({ deploymentRequirement: 'REQUIRED' })} /> مطلوبتان (الموقع والرئيسية والبديلة)</label>
+            <label><input type="radio" checked={values.deploymentRequirement === 'REQUIRED'} onChange={() => set({ deploymentRequirement: 'REQUIRED' })} /> مطلوبتان (الموقع والرئيسية والفرعية)</label>
             <label><input type="radio" checked={values.deploymentRequirement === 'OPTIONAL'} onChange={() => set({ deploymentRequirement: 'OPTIONAL' })} /> اختياريتان (لا شيء أو المنطقتان معاً)</label>
           </fieldset>
           <fieldset className="rs-inline" data-testid="policy-stages">
@@ -206,14 +206,14 @@ export function StationingPolicyPage() {
           </fieldset>
           {(['primary', 'alternative'] as const).map((leg) => (
             <fieldset key={leg} className="rs-inline">
-              <legend>{leg === 'primary' ? 'الموقع ← منطقة الانتشار الرئيسية' : 'الرئيسية ← منطقة الانتشار البديلة'}</legend>
+              <legend>{leg === 'primary' ? 'الموقع ← منطقة الانتشار الرئيسية' : 'الرئيسية ← منطقة الانتشار الفرعية'}</legend>
               <label>من ({distWord}) <NumberField value={toDist(values[leg].minM)} onChange={(v) => set({ [leg]: { ...values[leg], minM: fromDist(v) ?? 0 } })} /></label>
               <label>إلى ({distWord}) <NumberField value={toDist(values[leg].maxM)} onChange={(v) => set({ [leg]: { ...values[leg], maxM: fromDist(v) ?? 0 } })} /></label>
               <TerrainExtraField
                 on={values[leg].terrainApplies}
                 extra={values[leg].terrainExtra ?? null}
                 units={DISTANCE_UNITS}
-                label={leg === 'primary' ? 'الرئيسية' : 'البديلة'}
+                label={leg === 'primary' ? 'الرئيسية' : 'الفرعية'}
                 onChange={(on, terrainExtra) => set({ [leg]: { ...values[leg], terrainApplies: on, terrainExtra } })}
               />
             </fieldset>

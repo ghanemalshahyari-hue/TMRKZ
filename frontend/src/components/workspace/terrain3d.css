@@ -4,7 +4,8 @@
 
 .tz-view-switch { position: absolute; z-index: 6; top: 12px; left: 12px; display: flex; padding: 3px; gap: 3px; border-radius: 11px; background: rgba(9, 27, 40, 0.92); border: 1px solid rgba(160, 196, 214, 0.28); box-shadow: 0 6px 18px #0006; direction: ltr; }
 .tz-view-switch button { min-width: 44px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: #c9d6de; font: 700 13px/1 system-ui, sans-serif; cursor: pointer; }
-.tz-view-switch button.on { background: #2563eb; color: #fff; box-shadow: 0 2px 8px #2563eb66; }
+/* the theme's accent, not a blue (owner, 17 Nov 2026: "too much blue") */
+.tz-view-switch button.on { background: var(--accent); color: var(--tz-panel); box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 40%, transparent); }
 .tz-view-switch button:disabled { opacity: 0.4; cursor: not-allowed; }
 .tz-mapbody .maplibregl-ctrl-top-left { top: 96px; }
 .tz-view-3d .maplibregl-ctrl-group { background: rgba(9, 27, 40, 0.92); border: 1px solid rgba(160, 196, 214, 0.28); }
@@ -50,7 +51,7 @@
 .tz-terrain h4 { margin: 4px 0 2px; font-size: 13px; color: var(--tz-text, #e6eef2); }
 .tz-terrain-roles, .tz-terrain-legs { display: flex; flex-wrap: wrap; gap: 4px; }
 .tz-terrain-roles .chip, .tz-terrain-legs .chip { font-size: 11.5px; padding: 3px 9px; display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; border: 1px solid var(--tz-line-2, #ffffff26); background: rgba(255, 255, 255, 0.05); color: var(--tz-text, #e6eef2); cursor: pointer; }
-.tz-terrain-roles .chip.active, .tz-terrain-legs .chip.active { background: #2563eb; border-color: #3b82f6; color: #fff; }
+.tz-terrain-roles .chip.active, .tz-terrain-legs .chip.active { background: var(--accent); border-color: var(--accent); color: var(--tz-panel); }
 .tz-terrain-facts { display: grid; grid-template-columns: 1fr; gap: 2px; margin: 0; }
 .tz-terrain-facts > div { display: flex; justify-content: space-between; gap: 6px; border-bottom: 1px solid var(--tz-line-2, #ffffff1a); padding: 2px 0; }
 .tz-terrain-facts dt { color: var(--tz-text-2, #a9bcc7); font-size: 12px; }

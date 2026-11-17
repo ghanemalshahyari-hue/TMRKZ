@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import type { Integration, OrgImportPreview, PolicyVersion, Settings, SystemInfo } from '../api/types';
 import { Heading, KeyValue } from '../components/ui';
 import { HrSourcePanel } from '../components/HrSourcePanel';
+import { SignInNotesSettings } from '../components/SignInNotesSettings';
 import { useApp } from '../lib/app';
 import { formatBytes, fullTime } from '../lib/dates';
 import { INTEGRATION_STATUS } from '../lib/labels';
@@ -82,6 +83,7 @@ export function SettingsPage() {
         actions={<span className="pill">إصدار السياسة الحالي {policy?.version ?? '—'}</span>}
       />
       <div className="settings-grid">
+        <SignInNotesSettings />
         <section className="card padding">
           <h2>سياسات الطلب</h2>
           {TOGGLES.map(([key, title, desc]) => (

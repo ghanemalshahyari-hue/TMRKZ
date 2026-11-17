@@ -36,6 +36,24 @@ export function stepProblem(s: WizardState, to: Step): string {
   return '';
 }
 
+/**
+ * «تحديد مواقع التمركز المبدئية» (owner brief, phase 2, 17 Nov 2026): not a request but the unit's first stationing — the unit
+ * first, then the site's data and symbol, its place and boundary, review and save. No «which units are stationed here»: the
+ * unit was chosen first. Deployment areas are their own request.
+ */
+export const INITIAL_STEPS = ['بيانات الموقع', 'تحديد الموقع والحدود', 'مراجعة وحفظ'] as const;
+
+export type InitialState = WizardState & { unit: { id: string; name: string } | null; unitBlock: string };
+
+/** Why the initial-site wizard may not go on to `to` yet: the unit first (one stationed already changes by request), then the site. */
+export function initialProblem(s: InitialState, to: Step): string {
+  if (to >= 2) {
+    if (!s.unit) return 'اختر الوحدة أولاً: هي التي تتمركز في هذا الموقع.';
+    if (s.unitBlock) return `«${s.unit.name}» ${s.unitBlock}: تمركزها المعتمد يتغير بطلب إعادة تمركز، لا بالتهيئة.`;
+  }
+  return stepProblem(s, to);
+}
+
 /** «الشكل» in the review: a point, an area of n corners, or n parts. */
 export function shapeText(shape: 'POLYGON' | 'POINT', geometry: SiteGeometry | null): string {
   if (shape === 'POINT') return 'نقطة واحدة';

@@ -52,3 +52,15 @@
 .stw-dist.w span { background: #b7791f; }
 /* «تحديد الموقع على الخريطة» / «تحديد المنطقة على الخريطة»: the next click places the shape */
 .stw-picking .maplibregl-canvas { cursor: crosshair !important; }
+/* «أدوات الرسم والتحكم (مثل Word)»: the frame's handles — corners scale, sides change width or length, the round one turns */
+.stw-hdl-wrap { z-index: 4; }
+/* the handle centred on its point (the marker itself has no size) */
+.stw-hdl-wrap .stw-hdl, .stw-hdl-wrap .stw-rot { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); }
+.stw-hdl { display: block; width: 11px; height: 11px; background: #fff; border: 2px solid #1f3b57; border-radius: 2px; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
+.stw-hdl-wrap.corner { cursor: nwse-resize; }
+.stw-hdl-wrap.side .stw-hdl { border-radius: 50%; }
+.stw-hdl-wrap.side { cursor: ew-resize; }
+.stw-hdl-wrap.side[data-handle="1"], .stw-hdl-wrap.side[data-handle="5"] { cursor: ns-resize; }
+.stw-hdl-wrap.rot { cursor: grab; }
+.stw-rot { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #fff; border: 2px solid #1f3b57; color: #1f3b57; font-size: 13px; font-weight: 900; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
+

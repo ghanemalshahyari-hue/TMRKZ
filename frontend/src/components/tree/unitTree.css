@@ -49,3 +49,9 @@
 .ut .unit-symbol { flex: none; }
 .ut .unit-symbol-img { max-height: 18px; }
 
+/* a search drawn as a hierarchy (owner, 17 Nov 2026): ancestors quiet, the units found marked */
+.ut-found-note { padding: 4px 8px 8px; }
+.ut-row.ut-path .ut-name { color: var(--tz-text-2, inherit); }
+.ut-row.ut-match .ut-name { font-weight: 800; }
+.ut-matchtag { flex: none; margin-inline-start: 6px; padding: 0 7px; border-radius: 99px; font-size: 10.5px; line-height: 18px; color: var(--tz-text, inherit);
+  background: color-mix(in srgb, var(--accent, #8b5a2b) 18%, transparent); border: 1px solid color-mix(in srgb, var(--accent, #8b5a2b) 45%, transparent); }

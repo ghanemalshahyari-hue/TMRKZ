@@ -158,7 +158,7 @@ await session(req.state, 'R1-deployment-mountain-to-plain', async (page, mark) =
   await settle(page, 800);
   await clickAt(page, P.primary);
   await settle(page, 900);
-  await page.locator('[data-testid=area-controls]').getByRole('tab', { name: 'منطقة الانتشار البديلة' }).click();
+  await page.locator('[data-testid=area-controls]').getByRole('tab', { name: 'منطقة الانتشار الفرعية' }).click();
   await settle(page, 1200);
   await page.getByRole('button', { name: 'تحديد المنطقة على الخريطة' }).click();
   await settle(page, 800);

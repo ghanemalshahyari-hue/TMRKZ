@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent } from 'maplibre-gl';
-import { Marker } from 'maplibre-gl';
+import { Marker, NavigationControl, ScaleControl } from 'maplibre-gl';
 import { api, newIdempotencyKey, type SiteOccupants, type SiteSetupBody, type SiteSetupCheck } from '../api/client';
-import type { GeoPolygon, OrgBranch, RestationingLeg, RestationingRequest, SiteDetail, SiteGeometry, StationingPolicyValues } from '../api/types';
+import type { GeoPolygon, RestationingLeg, RestationingRequest, SiteDetail, SiteGeometry, StationingPolicyValues } from '../api/types';
 import { PITCH_3D, SITE_LOOK, SiteEditor, addOverlayLayer, frame, installedTerrain3d, type MapView, type SiteLive } from '../components/map/maplibre';
 import type { BasemapMode, Terrain3dSource } from '../components/map/maplibre/offlineStyle';
 import { OrgTree } from '../components/map/BrowseTrees';
-import { AREA_LOOK, AreaControls } from '../components/stationing/AreaControls';
+import { AREA_LOOK } from '../components/stationing/AreaControls';
 import { PointsTable } from '../components/stationing/PointsTable';
 import { SiteSymbolPicker, SymbolArt } from '../components/stationing/SiteSymbolPicker';
-import type { TreeSource } from '../components/tree/tree';
-import { UnitTree } from '../components/tree/UnitTree';
 import { Icon } from '../components/ui';
-import { DeploymentCheckCard } from '../components/workspace/DeploymentCheckCard';
 import { MapFrame, MapLegend } from '../components/workspace/MapFrame';
 import { OperationalWorkspace } from '../components/workspace/OperationalWorkspace';
 import { RequestMap } from '../components/workspace/RequestMap';
@@ -25,9 +22,10 @@ import { formatArea } from '../lib/footprint';
 import { distanceM } from '../lib/geo';
 import { legText } from '../lib/requestMap';
 import { anchorOf, partsOf, siteArea } from '../lib/siteGeometry';
-import { isSetupAdmin, lastStep, nextStep, policyLeg, prevStep, setupBody, setupProblem, stepsFor, toggleUnit, unitBlock, unitLines, withArea, withResponsible, type SetupStep, type UnitPlan } from '../lib/siteSetupFlow';
-import { symbolEntry } from '../lib/siteSymbols';
-import { MAIN_KINDS, cornersOf, outlineOf, rowsOf, shapeText, stepProblem, type PointRow } from '../lib/siteWizard';
+import { isSetupAdmin, policyLeg, setupBody, unitBlock, withArea, withResponsible, type SetupStep, type UnitPlan } from '../lib/siteSetupFlow';
+import { rendererStandard, symbolEntry } from '../lib/siteSymbols';
+import { renderSymbol } from '../lib/unitSymbols';
+import { INITIAL_STEPS, MAIN_KINDS, cornersOf, initialProblem, outlineOf, rowsOf, shapeText, type PointRow } from '../lib/siteWizard';
 import { previewLeg } from '../lib/terrainAnalysis';
 
 const EMPTY_MAP = {
@@ -79,6 +77,15 @@ export function SiteSetupPage() {
   const [detail, setDetail] = useState<SiteDetail | null>(null);
   const [edit, setEdit] = useState<Form>(BLANK);
   const [editingShape, setEditingShape] = useState(false);
+  // the site's card (owner, 17 Nov 2026): its facts first, one «تعديل» for all of them, and the deletion — the administrator
+  // deletes, everyone else asks the administrator (interface first: deleting and asking are connected after the review)
+  const [cardEdit, setCardEdit] = useState(false);
+  const [delOpen, setDelOpen] = useState(false);
+  const [delReason, setDelReason] = useState('');
+  const [delDone, setDelDone] = useState<'' | 'deleted' | 'requested'>('');
+  const [delAck, setDelAck] = useState(false);
+  // the site list as a tree (owner, 17 Nov 2026): a camp's inside sites behind its arrow
+  const [openSites, setOpenSites] = useState<Set<string>>(new Set());
   const [vertexMode, setVertexMode] = useState(false);
   // the «موقع جديد» wizard: three steps, or six for the setup administrator (ADR-067)
   const [step, setStep] = useState<SetupStep>(1);
@@ -88,7 +95,7 @@ export function SiteSetupPage() {
   const [owner, setOwner] = useState<{ id: string; name: string } | null>(null);
   const [ownerOpen, setOwnerOpen] = useState(false);
   const [wizErr, setWizErr] = useState('');
-  const [made, setMade] = useState<{ id: string; name: string; code: string; units?: number } | null>(null);
+  const [made, setMade] = useState<{ id: string; name: string; code: string; units?: number; unit?: string } | null>(null);
   // «جدول الإحداثيات»: shown on «اكتب الإحداثيات»; it follows the map and the map follows it
   const [typing, setTyping] = useState(false);
   const [rows, setRows] = useState<PointRow[]>([]);
@@ -100,16 +107,16 @@ export function SiteSetupPage() {
   // the site's map symbol (V32): chosen in «موقع جديد», changed later from the site's card with a reason
   const [symbol, setSymbol] = useState<string | null>(null);
   const [symEdit, setSymEdit] = useState<string | null | undefined>(undefined);
-  const [symReason, setSymReason] = useState('');
   const [fromCoords, setFromCoords] = useState(false);
+  // «حفظ الموقع والتمركز المبدئي»: the server's refusal, said on the review step itself (ADR-081)
+  const [saveError, setSaveError] = useState('');
   // «تهيئة المواقع والتمركز» (ADR-067): who holds facilities and corrections everywhere also stations units there and places
   // their areas, in the same wizard and one save; the server checks the right again (SiteSetupService.admin)
   const admin = isSetupAdmin(app.me.grants);
-  const steps = stepsFor(admin);
-  const last = lastStep(admin);
   const [plan, setPlan] = useState<UnitPlan[]>([]);
   // the responsible unit is the stationed unit (owner, 17 Nov 2026, ADR-076): it heads the setup's plan while responsible
-  const ownerBlock = admin && owner ? unitBlock(owner.id, registered.current) : '';
+  // «تحديد مواقع التمركز المبدئية» (owner brief, phase 2): the unit chosen first is the one stationed; one stationed already is not
+  const ownerBlock = owner ? unitBlock(owner.id, registered.current) : '';
   const previousOwner = useRef<string | null>(null);
   useEffect(() => {
     if (!admin) return;
@@ -118,9 +125,8 @@ export function SiteSetupPage() {
   }, [admin, owner?.id, ownerBlock]); // eslint-disable-line react-hooks/exhaustive-deps
   const [active, setActive] = useState<string | null>(null);
   const [placingArea, setPlacingArea] = useState(false);
-  const [areaVertices, setAreaVertices] = useState(4);
   const [policy, setPolicy] = useState<{ version: number; reference: string | null; values: StationingPolicyValues } | null | undefined>(undefined);
-  const [review, setReview] = useState<{ key: string; check: SiteSetupCheck | null; error: string } | null>(null);
+  const [, setReview] = useState<{ key: string; check: SiteSetupCheck | null; error: string } | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const listeners = useRef(new Set<(l: SiteLive) => void>());
   const targetRef = useRef<EditTarget>('site');
@@ -129,6 +135,7 @@ export function SiteSetupPage() {
   placingAreaRef.current = placingArea;
   const idemKey = useRef('');
   const mapRef = useRef<MlMap | null>(null);
+  const scaleRef = useRef<ScaleControl | null>(null);
   const editor = useRef<SiteEditor | null>(null);
   const marker = useRef<Marker | null>(null);
   const parts = useRef<SiteGeometry | null>(null);
@@ -147,9 +154,20 @@ export function SiteSetupPage() {
   // 3D looks from the side, 2D from above — also on an empty installation, where there is no site to frame (as on «الموقف»)
   useEffect(() => {
     mapRef.current?.easeTo({ pitch: view === '3d' ? PITCH_3D : 0, duration: 500 });
+    // the scale is for the flat map: tilted, the ground's scale changes across the screen, and it is recalculated on every frame
+    const m = mapRef.current;
+    const sc = scaleRef.current;
+    if (m && sc) {
+      if (view === '3d' && m.hasControl(sc)) m.removeControl(sc);
+      if (view !== '3d' && !m.hasControl(sc)) m.addControl(sc, 'bottom-right');
+    }
   }, [view]);
   const onMap = (m: MlMap) => {
     mapRef.current = m;
+    // as in the owner's reference: a north arrow and a scale on the map
+    m.addControl(new NavigationControl({ showZoom: false, visualizePitch: true }), 'bottom-right');
+    scaleRef.current = new ScaleControl({ unit: 'metric', maxWidth: 120 });
+    m.addControl(scaleRef.current, 'bottom-right');
     m.addSource('setup-earlier', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     addOverlayLayer(m, { id: 'setup-earlier-fill', type: 'fill', source: 'setup-earlier', paint: { 'fill-color': '#2f9e6e', 'fill-opacity': 0.25 } }, 'top');
     addOverlayLayer(m, { id: 'setup-earlier-line', type: 'line', source: 'setup-earlier', paint: { 'line-color': '#2f9e6e', 'line-width': 2, 'line-dasharray': [2, 1.6] } }, 'top');
@@ -256,8 +274,8 @@ export function SiteSetupPage() {
     pickRef.current = null;
     setFromCoords(false);
     setSymbol(null);
-    // as in MOVER, the symbol card starts folded: it is optional
-    setFolded(new Set(['s2-2']));
+    setSaveError('');
+    setFolded(new Set());
     parts.current = null;
     showEarlier(null);
     marker.current?.remove();
@@ -270,6 +288,47 @@ export function SiteSetupPage() {
     // one key per new site: a save sent twice (a double click, a retry after a lost answer) registers it once
     idemKey.current = newIdempotencyKey();
   };
+  // the tab «تحديد مواقع التمركز المبدئية» opens on the work (owner, 17 Nov 2026: "you can click, that's it"): the steps start at once
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || !mapReady || !canSites || selected || adding) return;
+    opened.current = true;
+    startAdd();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady]);
+  // the new site's name and symbol on the map, on its boundary or its point (owner's reference): it follows the shape and the data
+  const labelRef = useRef<Marker | null>(null);
+  const labelAt = adding && !made ? (shape === 'POINT' ? point : geometry ? anchorOf(partsOf(geometry)) : null) : null;
+  useEffect(() => {
+    const m = mapRef.current;
+    if (!m || !labelAt) {
+      labelRef.current?.remove();
+      labelRef.current = null;
+      return;
+    }
+    const el = labelRef.current?.getElement() ?? document.createElement('div');
+    el.className = 'sw-maplabel';
+    el.dataset.testid = 'site-map-label';
+    el.replaceChildren();
+    const name = document.createElement('span');
+    name.textContent = form.name.trim() || 'موقع جديد';
+    el.append(name);
+    let live = true;
+    if (symbol) {
+      renderSymbol(symbol, rendererStandard(symbol), 28).then((r) => {
+        if (!live || !r.valid) return;
+        const img = new Image();
+        img.src = r.url;
+        img.alt = '';
+        el.prepend(img);
+      }).catch(() => undefined);
+    }
+    if (!labelRef.current) labelRef.current = new Marker({ element: el, anchor: 'bottom', offset: [0, -34] }).setLngLat([labelAt.lng, labelAt.lat]).addTo(m);
+    else labelRef.current.setLngLat([labelAt.lng, labelAt.lat]);
+    return () => {
+      live = false;
+    };
+  }, [labelAt?.lat, labelAt?.lng, form.name, symbol, mapReady]); // eslint-disable-line react-hooks/exhaustive-deps
   const stopAdd = () => {
     if (drawing) editor.current?.cancelDrawing();
     setAdding(false);
@@ -294,9 +353,9 @@ export function SiteSetupPage() {
   /** «التالي» / «السابق»: forward only once the step is complete; the reason stays in the card where the person is looking. */
   const goStep = (to: SetupStep) => {
     const forward = to > step;
-    const siteProblem = forward && step <= 2 ? stepProblem({ name: form.name, kind: form.kind, inside, parentId: form.parentId, shape, point, geometry, drawing }, Math.min(to, 3) as 1 | 2 | 3) : '';
-    const waiting = forward && admin && to >= 4 && plan.length > 0 && policy === undefined ? 'جارٍ قراءة سياسة التمركز السارية… أعد المحاولة بعد لحظة.' : '';
-    const problem = siteProblem || waiting || (forward && admin ? setupProblem({ units: plan, requirement: policy?.values.deploymentRequirement ?? null, policyInForce: !!policy, drawing }, step, to) : '');
+    const problem = forward
+      ? initialProblem({ name: form.name, kind: form.kind, inside, parentId: form.parentId, shape, point, geometry, drawing, unit: owner, unitBlock: ownerBlock }, Math.min(to, 3) as 1 | 2 | 3)
+      : '';
     setWizErr(problem);
     if (problem) return;
     if (drawing) editor.current?.cancelDrawing();
@@ -323,7 +382,6 @@ export function SiteSetupPage() {
   const areaDefault = resolveAreaDefault((policy?.values as { deploymentAreaDefault?: AreaDefault | null } | undefined)?.deploymentAreaDefault ?? null);
   const areaDefaultRef = useRef(areaDefault);
   areaDefaultRef.current = areaDefault;
-  const requirement = policy?.values.deploymentRequirement ?? null;
   // what the editor holds: the site, or at steps 4 and 5 the area of the unit chosen there
   const areaRole: 'primary' | 'alternative' | null = adding && admin && !made ? (step === 4 ? 'primary' : step === 5 ? 'alternative' : null) : null;
   const activeUnit = plan.find((u) => u.id === active) ?? plan[0] ?? null;
@@ -409,8 +467,6 @@ export function SiteSetupPage() {
   };
   /** What a check was made of: the body without its reasons (the reason is typed after the check, on the same card). */
   const keyOf = (b: SiteSetupBody | null) => (b ? JSON.stringify({ ...b, reason: '', site: { ...b.site, reason: '' }, boundary: b.boundary && { ...b.boundary, reason: '' } }) : '');
-  // the review stands only for what it checked: a shape moved since then is checked again before it is trusted
-  const reviewFresh = !!review && review.key === keyOf(bodyOf(''));
   const runCheck = () => {
     // the reason is asked on this same card and the save waits for it; the review is about the place, the units and the areas
     const body = bodyOf(form.reason.trim().length >= 5 ? form.reason : 'مراجعة قبل الحفظ');
@@ -583,51 +639,76 @@ export function SiteSetupPage() {
       setBusy(false);
     }
   };
-  const save = () => {
-    let saved: { id: string; name: string; code: string; units?: number } | null = null;
-    if (admin) {
-      // the setup administrator: the site, its initial stationing and the areas, in one audited save (ADR-067)
-      return act(async () => {
-        const body = bodyOf(form.reason);
-        if (!body) throw new Error('حدد الموقع على الخريطة أولاً.');
-        const r = await api.siteSetup(body, idemKey.current);
-        saved = { id: r.site.id, name: r.site.name, code: r.site.code, units: r.units.length };
-      }, plan.length ? 'سُجل الموقع وتمركزه ومناطق الانتشار' : 'سُجل الموقع', () => {
-        setMade(saved);
-        editor.current?.load(null, false);
-        marker.current?.remove();
-        showEarlier(null);
-      });
-    }
-    return act(async () => {
-      const at = shape === 'POINT' ? point : geometry ? anchorOf(partsOf(geometry)) : null;
-      if (!at) throw new Error('حدد الموقع على الخريطة أولاً.');
-      // no code is asked: the server gives the next one (S-0001, …), ADR-048
-      const site = { code: '', name: form.name.trim(), kind: form.kind.trim(), parentId: (inside && form.parentId) || null, responsibleOrgId: owner?.id ?? null, capacity: null, location: at, notes: form.notes || null, reason: form.reason, symbol };
-      // one act on the server: a boundary it refuses leaves no site behind
-      const s = shape === 'POLYGON' && geometry
-        ? await api.createSiteWithBoundary({ site, boundary: { geometry, crs: 'EPSG:4326', expectedVersion: 0, reason: form.reason, method: fromCoords ? 'COORDINATES' : 'DRAWN' } })
-        : await api.createSite(site);
-      saved = { id: s.id, name: s.name, code: s.code };
-    }, 'سُجل الموقع', () => {
-      setMade(saved);
+  /**
+   * «حفظ الموقع والتمركز المبدئي» (owner brief, phase 2, accepted 17 Nov 2026; ADR-081): the site, its boundary and the chosen
+   * unit's initial stationing in one audited save, without deployment areas («طلب مناطق انتشار» asks for them afterwards).
+   * The server checks the right again (SiteSetupService.admin), the unit's current stationing and the site's own rules.
+   */
+  const saveInitial = async () => {
+    const at = shape === 'POINT' ? point : geometry ? anchorOf(partsOf(geometry)) : null;
+    if (!owner) return setSaveError('اختر الوحدة أولاً: هي التي تتمركز في هذا الموقع.');
+    if (!at) return setSaveError('حدد الموقع على الخريطة أولاً.');
+    if (form.reason.trim().length < 5) return setSaveError('اكتب سبب التسجيل (5 أحرف على الأقل): يُحفظ في سجل التدقيق باسمك.');
+    const reason = form.reason.trim();
+    const site = { code: '', name: form.name.trim(), kind: form.kind.trim(), parentId: (inside && form.parentId) || null, responsibleOrgId: owner.id, capacity: null, location: at, notes: form.notes || null, reason, symbol };
+    const boundary = shape === 'POLYGON' && geometry ? { geometry, crs: 'EPSG:4326', expectedVersion: 0, reason, method: fromCoords ? 'COORDINATES' : 'DRAWN' } : null;
+    const body: SiteSetupBody = { site, boundary, units: [{ organizationId: owner.id, primary: null, alternative: null }], reason };
+    setSaveError('');
+    setBusy(true);
+    try {
+      const r = await api.siteSetup(body, idemKey.current);
+      app.toast('سُجل الموقع والتمركز المبدئي');
+      app.bump();
+      setMade({ id: r.site.id, name: r.site.name, code: r.site.code, units: r.units.length, unit: r.units[0]?.name ?? owner.name });
       editor.current?.load(null, false);
       marker.current?.remove();
       showEarlier(null);
-    });
+      reload();
+    } catch (e) {
+      setSaveError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
   const legend = <MapLegend stage="sites" fold={view === '3d'} />;
-  const tree = (parent: string, depth: number): React.ReactNode =>
-    (byParent.get(parent) ?? []).map((s) => (
-      <div key={s.siteId}>
-        <button className={'rs-item' + (s.siteId === selected ? ' active' : '')} data-site={s.code} style={{ paddingInlineStart: 10 + depth * 16 }} onClick={() => (setAdding(false), setSelected(s.siteId))}>
-          <span className="rs-item-head"><b>{s.name}</b><small className="tz-code">{s.code}</small></span>
-          <small>{depth === 0 ? 'موقع رئيسي' : 'موقع فرعي'} · {s.boundary ? 'حدود مسجلة' : 'علامة'}</small>
-        </button>
-        {tree(s.siteId, depth + 1)}
-      </div>
-    ));
   const roots = sites.filter((s) => !s.parentId || !sites.some((x) => x.siteId === s.parentId));
+  const nameOf = (id: string | null | undefined) => sites.find((x) => x.siteId === id)?.name ?? '';
+  const toggleSite = (id: string) => setOpenSites((o) => { const n = new Set(o); if (!n.delete(id)) n.add(id); return n; });
+  // a site chosen on the map or in the search opens the branches above it
+  useEffect(() => {
+    if (!selected) return;
+    const ups: string[] = [];
+    let up = sites.find((x) => x.siteId === selected)?.parentId ?? null;
+    while (up && !ups.includes(up)) {
+      ups.push(up);
+      const id: string = up;
+      up = sites.find((x) => x.siteId === id)?.parentId ?? null;
+    }
+    if (ups.length) setOpenSites((o) => (ups.every((u) => o.has(u)) ? o : new Set([...o, ...ups])));
+  }, [selected, sites]);
+  /** One site of the list with its inside sites under its arrow, at any depth. */
+  const siteRow = (s: (typeof sites)[number], depth: number): React.ReactNode => {
+    const kids = byParent.get(s.siteId) ?? [];
+    const open = openSites.has(s.siteId);
+    return (
+      <div key={s.siteId} className={'rs-node' + (depth ? ' is-inside' : '')} data-depth={depth}>
+        <div className="rs-noderow">
+          {kids.length > 0 ? (
+            <button type="button" className={'rs-twisty' + (open ? ' open' : '')} aria-expanded={open} data-twisty={s.code}
+              aria-label={(open ? 'إخفاء' : 'عرض') + ' المواقع الداخلية لـ«' + s.name + '»'} title={(open ? 'إخفاء' : 'عرض') + ' المواقع الداخلية'} onClick={() => toggleSite(s.siteId)}>{open ? '▾' : '◂'}</button>
+          ) : <span className="rs-twisty-gap" aria-hidden="true" />}
+          <button className={'rs-item' + (s.siteId === selected ? ' active' : '')} data-site={s.code} onClick={() => (setAdding(false), setSelected(s.siteId))}>
+            <span className="rs-item-head"><b>{s.name}</b><small className="tz-code">{s.code}</small></span>
+            <small>{depth === 0 ? 'موقع رئيسي' : 'موقع داخلي'} · {s.boundary ? 'حدود مسجلة' : 'علامة'}{kids.length > 0 && <span className="rs-kids"> · {kids.length === 1 ? 'موقع داخلي واحد' : kids.length + ' مواقع داخلية'}</span>}</small>
+          </button>
+        </div>
+        {canSites && s.siteId === selected && (
+          <button className="tz-add-inside-row" data-testid="add-inside-row" onClick={() => startAdd({ siteId: s.siteId, name: s.name })}>＋ موقع داخل «{s.name}»</button>
+        )}
+        {open && kids.length > 0 && <div className="rs-children" data-testid={'inside-of-' + s.code}>{kids.map((k) => siteRow(k, depth + 1))}</div>}
+      </div>
+    );
+  };
   // the data on the left, the work on the right (owner, 10 Nov 2026): the site list, and the steps or the chosen site's card
   const listPanel = () => (
     <div className="tz-rail">
@@ -645,38 +726,27 @@ export function SiteSetupPage() {
           {railQ.trim() && sites.filter((s) => s.name.includes(railQ.trim()) || s.code.toLowerCase().includes(railQ.trim().toLowerCase())).map((s) => (
             <button key={s.siteId} className={'rs-item' + (s.siteId === selected ? ' active' : '')} data-site={s.code} onClick={() => (setAdding(false), setSelected(s.siteId))}>
               <span className="rs-item-head"><b>{s.name}</b><small className="tz-code">{s.code}</small></span>
-              <small>{s.parentId ? 'موقع فرعي' : 'موقع رئيسي'} · {s.boundary ? 'حدود مسجلة' : 'علامة'}</small>
+              <small>{s.parentId ? `داخل «${nameOf(s.parentId)}»` : 'موقع رئيسي'} · {s.boundary ? 'حدود مسجلة' : 'علامة'}</small>
             </button>
           ))}
-          {!railQ.trim() && roots.map((s) => (
-            <div key={s.siteId}>
-              <button className={'rs-item' + (s.siteId === selected ? ' active' : '')} data-site={s.code} onClick={() => (setAdding(false), setSelected(s.siteId))}>
-                <span className="rs-item-head"><b>{s.name}</b><small className="tz-code">{s.code}</small></span>
-                <small>موقع رئيسي · {s.boundary ? 'حدود مسجلة' : 'علامة'}</small>
-              </button>
-              {canSites && s.siteId === selected && (
-                <button className="tz-add-inside-row" data-testid="add-inside-row" onClick={() => startAdd({ siteId: s.siteId, name: s.name })}>＋ موقع داخل «{s.name}»</button>
-              )}
-              {tree(s.siteId, 1)}
-            </div>
-          ))}
+          {!railQ.trim() && roots.map((s) => siteRow(s, 0))}
         </div>
       </section>
     </div>
   );
   const workPanel = () => (
     <div className="tz-rail">
-      <section className="tz-drawer open tz-site-work" aria-label="تهيئة الموقع">
+      <section className="tz-drawer open tz-site-work" aria-label="موقع تمركز مبدئي">
         <div className="tz-drawer-head">
-          <span className="tz-drawer-toggle"><Icon name="boundary" /><span>تهيئة الموقع</span></span>
-          {canSites && <button className="button primary compact tz-new" data-testid="add-site" aria-pressed={adding && !made} disabled={adding && !made} onClick={() => startAdd()}>＋ إضافة موقع</button>}
+          <span className="tz-drawer-toggle"><Icon name="tent" /><span>موقع تمركز مبدئي</span></span>
+          {canSites && <button className="button primary compact tz-new" data-testid="add-site" aria-pressed={adding && !made} disabled={adding && !made} onClick={() => startAdd()}>＋ موقع جديد</button>}
         </div>
         {/* «موقع جديد» right under its button, the whole height of the panel (owner, 10 Nov 2026) */}
         <div className="sw-fill" data-testid="setup-context">
           {adding ? addPanel : sitePanel ?? (
             <section className="tz-card">
-              <h3>تهيئة المواقع والتمركز</h3>
-              <p className="tz-muted">هذه مساحة التهيئة الأولى والتصحيح، وكل خطوة فيها تُسجَّل بسببها. اختر موقعاً من قائمة «المواقع»، أو اضغط «＋ إضافة موقع».</p>
+              <h3>تحديد مواقع التمركز المبدئية</h3>
+              <p className="tz-muted">اختر الوحدة، ثم أنشئ موقعها وارسم حدوده: يصبح تمركزها المبدئي. اختر موقعاً من قائمة «المواقع»، أو اضغط «＋ موقع جديد».</p>
             </section>
           )}
         </div>
@@ -697,65 +767,6 @@ export function SiteSetupPage() {
   );
   const parentSite = sites.find((s) => s.siteId === form.parentId) ?? null;
   const parentHits = sites.filter((s) => !parentQ.trim() || s.name.includes(parentQ.trim()) || s.code.toLowerCase().includes(parentQ.trim().toLowerCase())).slice(0, 30);
-  const step1 = (
-    <div className="sw-body">
-      {card(1, 'ما اسم الموقع؟', (
-        <>
-          <input className="sw-input" aria-label="اسم الموقع" placeholder="مثال: المجمع الإداري الأول" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <p className="sw-hint">رمز الموقع يُعطى تلقائياً عند الحفظ.</p>
-        </>
-      ))}
-      {card(2, 'ما نوعه؟', (
-        <>
-          <div className="sw-choices">
-            {MAIN_KINDS.map((k) => (
-              <button key={k} type="button" className={'sw-choice' + (!otherKind && form.kind === k ? ' on' : '')} aria-pressed={!otherKind && form.kind === k} data-kind={k} onClick={() => { setOtherKind(false); setForm({ ...form, kind: k }); }}>{k}</button>
-            ))}
-            <button type="button" className={'sw-choice' + (otherKind ? ' on' : '')} aria-pressed={otherKind} data-kind="other" onClick={() => { setOtherKind(true); setForm({ ...form, kind: MAIN_KINDS.includes(form.kind) ? '' : form.kind }); }}>نوع آخر…</button>
-          </div>
-          {otherKind && <input className="sw-input" aria-label="تصنيف الموقع" placeholder="اكتب النوع" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} />}
-        </>
-      ))}
-      {card(3, 'أين يقع؟', (
-        <>
-          <div className="sw-choices">
-            <button type="button" className={'sw-choice' + (!inside ? ' on' : '')} aria-pressed={!inside} data-testid="where-main" onClick={() => { setInside(false); setForm({ ...form, parentId: '' }); }}>موقع رئيسي</button>
-            <button type="button" className={'sw-choice' + (inside ? ' on' : '')} aria-pressed={inside} data-testid="where-inside" disabled={sites.length === 0} onClick={() => setInside(true)}>داخل موقع آخر</button>
-          </div>
-          {sites.length === 0 && <p className="sw-hint">لا توجد مواقع مسجلة بعد، فهذا موقع رئيسي.</p>}
-          {inside && (parentSite ? (
-            <div className="sw-picked" data-testid="parent-picked"><span className="sw-ok">✓</span><div><b>يقع داخل «{parentSite.name}»</b><small>{parentSite.code}</small></div>
-              <button type="button" className="sw-link" onClick={() => setForm({ ...form, parentId: '' })}>تغيير</button></div>
-          ) : (
-            <div className="sw-sub">
-              <input className="sw-input" type="search" aria-label="بحث عن الموقع الأعلى" placeholder="ابحث باسم الموقع أو رمزه" value={parentQ} onChange={(e) => setParentQ(e.target.value)} />
-              <ul className="sw-list">
-                {parentHits.map((s) => <li key={s.siteId}><button type="button" className="sw-row" data-parent-pick={s.code} onClick={() => setForm({ ...form, parentId: s.siteId })}><b>{s.name}</b><small>{s.code}</small></button></li>)}
-                {parentHits.length === 0 && <li className="sw-hint">لا نتائج.</li>}
-              </ul>
-            </div>
-          ))}
-        </>
-      ))}
-      {card(4, 'أي وحدة مسؤولة عنه؟', (
-        owner && !ownerOpen ? (
-          <div className="sw-picked" data-testid="owner-picked"><span className="sw-ok">✓</span><div><b>{owner.name}</b><small>{admin ? (ownerBlock ? `تدير الموقع، وهي ${ownerBlock}.` : 'الجهة المسؤولة هي الوحدة المتمركزة في هذا الموقع.') : 'تدير الموقع، ولا يعني ذلك أنها متمركزة فيه.'}</small></div>
-            <button type="button" className="sw-link" onClick={() => setOwnerOpen(true)}>تغيير</button></div>
-        ) : (
-          // the units as their hierarchy, loaded one level at a time, with a search across every branch the person may see
-          <div className="sw-sub sw-tree" data-testid="owner-tree">
-            <OrgTree selectedId={owner?.id ?? null} includeSub={false} onIncludeSub={() => undefined} subOption={false} revision={app.revision}
-              onSelect={(o) => { setOwner(o); setOwnerOpen(false); }} />
-            <p className="sw-hint">اختياري. {owner ? <button type="button" className="sw-link" onClick={() => { setOwner(null); setOwnerOpen(false); }}>بلا وحدة مسؤولة</button> : 'بلا وحدة مسؤولة، لا يسجله إلا من يدير المرافق في كل الجهات.'}</p>
-          </div>
-        )
-      ))}
-      <details className="sw-more">
-        <summary>خيارات إضافية (اختياري)</summary>
-        <label className="field"><span>ملاحظات</span><textarea aria-label="ملاحظات الموقع" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
-      </details>
-    </div>
-  );
   const poly = shape === 'POLYGON';
   const step2 = (
     <div className="sw-body">
@@ -768,7 +779,7 @@ export function SiteSetupPage() {
           <div className="sw-ways">
             {poly ? (
               <button type="button" className={'sw-way' + (drawing ? ' on' : '')} data-testid="draw-site" onClick={draw}>
-                <Icon name="boundary" /><b>{geometry ? 'ارسمها من جديد' : 'ارسم على الخريطة'}</b><small>انقر عند كل زاوية، ثم على أول نقطة</small>
+                <Icon name="boundary" /><b>{geometry ? 'ارسمها من جديد' : 'ارسم على الخريطة'}</b><small>انقر عند كل زاوية، وانقر مرتين للإنهاء</small>
               </button>
             ) : (
               <button type="button" className={'sw-way' + (placing ? ' on' : '')} data-testid="place-point" onClick={() => { setTyping(false); setWizErr(''); setPlacing(!placing); }}>
@@ -794,172 +805,95 @@ export function SiteSetupPage() {
           {poly && <button type="button" className="sw-link" disabled={!geometry || drawing} data-testid="add-part" onClick={addPart}>＋ جزء آخر لهذا الموقع (يتحرك معه)</button>}
         </>
       ))}
-      {card(2, 'رمز يظهر على الخريطة (اختياري)', <SiteSymbolPicker value={symbol} onChange={setSymbol} />, 'symbol-card')}
     </div>
   );
-  const summary: [string, string][] = [
-    ['الاسم', form.name.trim()],
-    ['الرمز', 'يُعطى تلقائياً عند الحفظ'],
-    ['النوع', form.kind.trim()],
-    ['يقع', inside && parentSite ? `داخل «${parentSite.name}»` : 'موقع رئيسي'],
-    ['الوحدة المسؤولة', owner?.name ?? 'بلا وحدة مسؤولة'],
-    ['الشكل', shapeText(shape, geometry)],
-    ['الرمز على الخريطة', symbol ? symbolEntry(symbol)?.label ?? symbol : 'بدون رمز'],
-    ...(poly && geometry ? [['المساحة', formatArea(siteArea(partsOf(geometry)))] as [string, string]] : []),
-  ];
-  const step3 = (
-    <div className="sw-body">
-      {card(1, 'راجع ثم احفظ', (
-        <dl className="sw-sum" data-testid="site-summary">{summary.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
-      ))}
-      {card(2, 'لماذا تسجّل هذا الموقع؟', (
-        <>
-          <textarea className="sw-input" rows={3} aria-label="سبب تسجيل الموقع" placeholder="السبب يُحفظ في سجل التدقيق باسمك" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
-          <p className="sw-hint">يُحفظ مباشرة ويظهر في قائمة المواقع وعلى الخريطة.</p>
-        </>
-      ))}
-      <button type="button" className="sw-go" data-testid="save-site" disabled={busy || drawing || form.reason.trim().length < 5} onClick={save}>{busy ? 'جارٍ الحفظ…' : 'حفظ الموقع'}</button>
-    </div>
-  );
-  // ---- the setup administrator: «التمركز الابتدائي», «منطقة الانتشار الرئيسية», «منطقة الانتشار البديلة», «مراجعة وحفظ» ----------
-  const chosen = useMemo(() => new Set(plan.map((u) => u.id)), [plan]);
-  // the one units tree of the application (ADR-063), loaded one level at a time with a search across every branch
-  const unitSource = useMemo<TreeSource<OrgBranch>>(
-    () => ({
-      roots: () => api.orgRoots(),
-      children: (id) => api.orgChildren(id),
-      search: (q, signal) => api.orgSearch(q, signal).then((r) => r.map((o) => ({ item: o, path: (o.path ?? []).map((x) => x.name).join(' ‹ '), trail: (o.path ?? []).map((x) => x.id) }))),
-    }),
-    [],
-  );
-  const requirementHint = requirement === 'REQUIRED'
-    ? 'تشترط سياسة التمركز السارية منطقتي الانتشار لكل وحدة تُثبَّت هنا.'
-    : requirement === 'OPTIONAL' ? 'منطقتا الانتشار اختياريتان في سياسة التمركز السارية: الاثنتان معاً، أو لا شيء.' : policy === null ? 'لا توجد سياسة تمركز نافذة: لا تُثبَّت وحدة قبل نشرها.' : '';
-  const setupStep3 = (
-    <div className="sw-body" data-testid="setup-step-3">
-      {card(1, 'أي الوحدات تتمركز في هذا الموقع؟', (
-        <>
-          <div className="sw-sub sw-tree" data-testid="setup-units">
-            <UnitTree source={unitSource} label="وحدات التمركز الابتدائي" search="ابحث عن وحدة في كل الفروع…" searchLabel="بحث عن وحدة للتمركز" revision={app.revision}
-              checked={chosen} checkData="setup-unit" onCheck={(o) => { if (o.id !== owner?.id) setPlan((p) => toggleUnit(p, o)); }}
-              disabled={(o) => (o.id === owner?.id && !ownerBlock ? 'الجهة المسؤولة' : chosen.has(o.id) ? null : unitBlock(o.id, registered.current) || null)} />
+  // ---- «تحديد مواقع التمركز المبدئية» (owner brief and reference, phase 2): three steps, the unit first --------------------------
+  const initialStep1 = (
+    <div className="sw-body sw-form" data-testid="initial-step-1">
+      <div className="sw-f">
+        <span className="sw-l">الجهة / الوحدة</span>
+        {owner && !ownerOpen ? (
+          <div className={'sw-picked' + (ownerBlock ? ' is-blocked' : '')} data-testid="unit-picked"><span className="sw-ok">{ownerBlock ? '!' : '✓'}</span><div><b>{owner.name}</b>
+            <small>{ownerBlock ? `${ownerBlock}: تمركزها المعتمد يتغير بطلب إعادة تمركز.` : 'تتمركز في هذا الموقع عند الحفظ — تمركزها المبدئي.'}</small></div>
+            <button type="button" className="sw-link" onClick={() => setOwnerOpen(true)}>تغيير</button></div>
+        ) : (
+          <div className="sw-sub sw-tree" data-testid="unit-tree">
+            <OrgTree selectedId={owner?.id ?? null} includeSub={false} onIncludeSub={() => undefined} subOption={false} revision={app.revision}
+              onSelect={(o) => { setOwner(o); setOwnerOpen(false); }} />
           </div>
-          {owner && ownerBlock && <p className="sw-hint" data-testid="owner-blocked">الجهة المسؤولة «{owner.name}» {ownerBlock}؛ لا تتمركز هنا مرة ثانية.</p>}
-          <p className="sw-hint">{owner && !ownerBlock ? `«${owner.name}» الجهة المسؤولة، فهي متمركزة في هذا الموقع. ` : ''}تُضاف وحدات أخرى إن وُجدت، التي لا تمركز لها فقط، كل وحدة بنفسها: لا ينتقل معها من يتبعها، ولا يتغير الهيكل التنظيمي.</p>
-        </>
-      ))}
-      {card(2, plan.length ? `المختارة (${plan.length})` : 'المختارة', plan.length ? (
-        <ul className="sw-list" data-testid="setup-chosen">
-          {plan.map((u) => <li key={u.id} className="sw-row"><b>{u.name}</b>{u.id === owner?.id ? <span className="pill" data-testid="setup-responsible">الجهة المسؤولة</span> : <button type="button" className="sw-link" onClick={() => setPlan((p) => toggleUnit(p, u))}>إزالة</button>}</li>)}
-        </ul>
-      ) : <p className="sw-hint">لم تُختر وحدة: يُسجَّل الموقع وحده.</p>)}
-      {requirementHint && <p className="sw-hint" data-testid="setup-requirement">{requirementHint}</p>}
-    </div>
-  );
-  const areaStep = (role: 'primary' | 'alternative') => (
-    <div className="sw-body" data-testid={role === 'primary' ? 'setup-step-4' : 'setup-step-5'}>
-      {card(1, 'لأي وحدة؟', (
-        <div className="sw-choices" role="tablist" aria-label="الوحدات">
-          {plan.map((u) => (
-            <button key={u.id} type="button" role="tab" aria-selected={u.id === activeUnit?.id} className={'sw-choice' + (u.id === activeUnit?.id ? ' on' : '')} data-unit={u.id} onClick={() => setActive(u.id)}>
-              {u[role] ? '✓ ' : ''}{u.name}
-            </button>
-          ))}
+        )}
+      </div>
+      <label className="sw-f"><span className="sw-l">اسم الموقع</span>
+        <input className="sw-input" aria-label="اسم الموقع" placeholder="مثال: معسكر صحة 1أ" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+      </label>
+      <label className="sw-f"><span className="sw-l">نوع الموقع</span>
+        <select className="sw-input" aria-label="نوع الموقع" value={otherKind ? '__other' : form.kind} onChange={(e) => {
+          if (e.target.value === '__other') { setOtherKind(true); setForm({ ...form, kind: '' }); } else { setOtherKind(false); setForm({ ...form, kind: e.target.value }); }
+        }}>
+          {MAIN_KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+          <option value="__other">نوع آخر…</option>
+        </select>
+        {otherKind && <input className="sw-input" aria-label="تصنيف الموقع" placeholder="اكتب النوع" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })} />}
+      </label>
+      <div className="sw-f"><span className="sw-l">موقع رئيسي أو داخلي</span>
+        <div className="sw-choices">
+          <button type="button" className={'sw-choice' + (!inside ? ' on' : '')} aria-pressed={!inside} data-testid="where-main" onClick={() => { setInside(false); setForm({ ...form, parentId: '' }); }}>موقع رئيسي</button>
+          <button type="button" className={'sw-choice' + (inside ? ' on' : '')} aria-pressed={inside} data-testid="where-inside" disabled={sites.length === 0} onClick={() => setInside(true)}>موقع داخلي</button>
         </div>
-      ))}
-      {activeUnit && card(2, (role === 'primary' ? 'منطقة الانتشار الرئيسية' : 'منطقة الانتشار البديلة') + ' — ' + activeUnit.name, role === 'alternative' && !activeUnit.primary ? (
-        <p className="sw-hint">لهذه الوحدة لا منطقة رئيسية بعد؛ منها تُقاس البديلة. ضعها في الخطوة السابقة، أو اتركهما معاً إن كانت السياسة لا تشترطهما.</p>
-      ) : (
-        <AreaControls
-          tabs={false}
-          editor={editor}
-          listeners={listeners}
-          area={role}
-          onArea={() => undefined}
-          hasPrimary={!!activeUnit.primary}
-          placing={placingArea}
-          areaDefault={areaDefault}
-          policyVersion={policy ? { version: policy.version, reference: policy.reference } : null}
-          onPlace={() => {
-            editor.current?.cancelDrawing();
-            const on = !placingArea;
-            setPlacingArea(on);
-            if (on) frameArea(role, null, areaOrigin);
-          }}
-          onDraw={() => {
-            setPlacingArea(false);
-            editor.current?.load(null, false);
-            frameArea(role, null, areaOrigin);
-            editor.current?.startDrawing(null, areaVertices);
-          }}
-          target={areaVertices}
-          setTarget={(n) => {
-            setAreaVertices(n);
-            editor.current?.setTarget(n);
-          }}
-          origin={areaOrigin}
-          leg={leg}
-          checked={reviewFresh ? review?.check?.units.find((u) => u.organizationId === activeUnit.id)?.legs.find((l) => l.leg === role) : undefined}
-          siteWord="الموقع الجديد"
-        >
-          {leg?.status === 'NEEDS_EXCEPTION' && <p className="sw-err">تتجاوز المسافة المسموحة، والتجاوز لا يُقبل في التهيئة (لا معتمد نهائياً فيها): ضعها ضمن النطاق.</p>}
-        </AreaControls>
-      ))}
-      {requirementHint && <p className="sw-hint">{requirementHint}</p>}
+        {inside && (parentSite ? (
+          <div className="sw-picked" data-testid="parent-picked"><span className="sw-ok">✓</span><div><b>داخل «{parentSite.name}»</b><small>{parentSite.code}</small></div>
+            <button type="button" className="sw-link" onClick={() => setForm({ ...form, parentId: '' })}>تغيير</button></div>
+        ) : (
+          <div className="sw-sub">
+            <input className="sw-input" type="search" aria-label="بحث عن الموقع الأعلى" placeholder="ابحث عن الموقع الرئيسي باسمه أو رمزه" value={parentQ} onChange={(e) => setParentQ(e.target.value)} />
+            <ul className="sw-list">
+              {parentHits.map((s) => <li key={s.siteId}><button type="button" className="sw-row" data-parent-pick={s.code} onClick={() => setForm({ ...form, parentId: s.siteId })}><b>{s.name}</b><small>{s.code}</small></button></li>)}
+              {parentHits.length === 0 && <li className="sw-hint">لا نتائج.</li>}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div className="sw-f" data-testid="symbol-card"><span className="sw-l">رمز الموقع على الخريطة</span><SiteSymbolPicker value={symbol} onChange={setSymbol} /></div>
+      <label className="sw-f"><span className="sw-l">الملاحظات</span>
+        <textarea className="sw-input" rows={2} aria-label="ملاحظات الموقع" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      </label>
     </div>
   );
-  const unitProblems = new Set((review?.check?.units ?? []).flatMap((u) => u.problems.map((p) => `«${u.name}»: ${p}`)));
-  const setupStep6 = (
-    <div className="sw-body" data-testid="setup-step-6">
-      {card(1, 'الموقع', <dl className="sw-sum" data-testid="site-summary">{summary.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>)}
-      {card(2, 'التمركز الابتدائي ومناطق الانتشار', plan.length ? (
-        <dl className="sw-sum" data-testid="units-summary">{unitLines(plan).map(([k, v], i) => <div key={plan[i].id}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
-      ) : <p className="sw-hint">لا وحدات: يُسجَّل الموقع وحده.</p>)}
-      {card(3, 'فحص الخادم', (
-        <div className="sw-sub" data-testid="setup-review">
-          {review != null && !reviewFresh && <p className="sw-hint" data-testid="review-stale">تغيّر شيء منذ الفحص: أعد الفحص قبل الحفظ.</p>}
-          {review == null || (review.check == null && !review.error) ? <p className="sw-hint">جارٍ الفحص…</p> : review.error ? <p className="sw-err">{review.error}</p> : (
-            <>
-              <p className={review.check!.ok ? 'sw-done' : 'sw-err'}>{review.check!.ok ? '✓ الفحوص مستوفاة — يمكن الحفظ' : 'فحوص غير مستوفاة'}</p>
-              {review.check!.problems.filter((p) => !unitProblems.has(p)).length > 0 && (
-                <ul className="rs-problems">{review.check!.problems.filter((p) => !unitProblems.has(p)).map((p) => <li key={p}>{p}</li>)}</ul>
-              )}
-              {review.check!.units.map((u) => (
-                <div key={u.organizationId} data-unit-check={u.organizationId}>
-                  <p className="sw-hint"><b>{u.name}</b></p>
-                  <DeploymentCheckCard compact request={EMPTY_MAP} checks={{ ok: u.ok, problems: u.problems, policyVersion: review.check!.policyVersion, legs: u.legs }} />
-                </div>
-              ))}
-            </>
-          )}
-          <button type="button" className="sw-link" onClick={runCheck}>إعادة الفحص</button>
-        </div>
-      ))}
-      {card(4, 'لماذا تسجّل هذا الموقع وتمركزه؟', (
-        <>
-          <textarea className="sw-input" rows={3} aria-label="سبب تسجيل الموقع" placeholder="السبب يُحفظ في سجل التدقيق باسمك" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
-          <p className="sw-hint">يُحفظ كل شيء مرة واحدة: الموقع، وتمركز الوحدات، ومناطق انتشارها. وإن رُفض شيء لم يُحفظ شيء.</p>
-        </>
-      ))}
-      <button type="button" className="sw-go" data-testid="setup-save" disabled={busy || drawing || form.reason.trim().length < 5} onClick={save}>
-        {busy ? 'جارٍ الحفظ…' : plan.length ? 'حفظ الموقع والتمركز' : 'حفظ الموقع'}
-      </button>
+  const initialSummary: [string, string][] = [
+    ['الوحدة', owner ? `${owner.name} — التمركز المبدئي` : '—'],
+    ['اسم الموقع', form.name.trim()],
+    ['نوع الموقع', form.kind.trim()],
+    ['الموقع', inside && parentSite ? `داخلي — داخل «${parentSite.name}»` : 'موقع رئيسي'],
+    ['الرمز', symbol ? symbolEntry(symbol)?.label ?? symbol : 'بدون رمز'],
+    ['الحدود', shapeText(shape, geometry)],
+    ...(poly && geometry ? [['المساحة', formatArea(siteArea(partsOf(geometry)))] as [string, string]] : []),
+    ['الملاحظات', form.notes.trim() || '—'],
+    ['رمز الموقع', 'يُعطى تلقائياً عند الحفظ'],
+  ];
+  const initialStep3 = (
+    <div className="sw-body" data-testid="initial-step-3">
+      <dl className="sw-sum" data-testid="site-summary">{initialSummary.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+      <p className="sw-done" data-testid="initial-note">بعد الحفظ يصبح هذا الموقع التمركز المبدئي المعتمد لـ«{owner?.name ?? 'الوحدة'}». ومناطق الانتشار تُطلب بعده من «طلب مناطق انتشار».</p>
+      <label className="sw-f"><span className="sw-l">سبب التسجيل</span>
+        <textarea className="sw-input" rows={2} aria-label="سبب تسجيل الموقع" placeholder="يُحفظ في سجل التدقيق باسمك" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+      </label>
+      {!admin && <p className="sw-err" role="note" data-testid="save-needs-right">حفظ الموقع مع تمركزه المبدئي يحتاج صلاحية «تهيئة المواقع والتمركز». اطلبها من مدير النظام.</p>}
+      <button type="button" className="sw-go" data-testid="save-initial" disabled={drawing || busy || !admin} onClick={() => void saveInitial()}>{busy ? 'جارٍ الحفظ…' : 'حفظ الموقع والتمركز المبدئي'}</button>
+      {saveError && <p className="sw-err" role="alert" data-testid="save-error">{saveError}</p>}
     </div>
   );
-  const stepBody = !admin
-    ? (step === 1 ? step1 : step === 2 ? step2 : step3)
-    : step === 1 ? step1 : step === 2 ? step2 : step === 3 ? setupStep3 : step === 4 ? areaStep('primary') : step === 5 ? areaStep('alternative') : setupStep6;
+  const stepBody = step === 1 ? initialStep1 : step === 2 ? step2 : initialStep3;
   const addPanel = (
     <section className="sw-wizard" data-testid="add-site-form" data-step={made ? 'done' : step}>
       <div className="sw-top">
         <button type="button" className="sw-back" onClick={stopAdd}>→ رجوع</button>
-        <h3 className="sw-title">موقع جديد</h3>
+        <h3 className="sw-title">موقع تمركز مبدئي جديد</h3>
       </div>
       {made ? (
         <div className="sw-body" data-testid="site-made">
           <p className="sw-done">✓ سُجل «{made.name}» برمز <bdi data-testid="made-code">{made.code}</bdi></p>
-          {!!made.units && <p className="sw-done" data-testid="made-units">✓ وتمركزت فيه {made.units === 1 ? 'وحدة واحدة' : made.units + ' وحدات'} بمناطق انتشارها، في حفظ واحد مُدقَّق.</p>}
-          <p className="sw-hint">ظهر في قائمة المواقع وعلى الخريطة. من بطاقته تُثبَّت الوحدات المتمركزة فيه وتُربط به الوحدات.</p>
+          {!!made.units && <p className="sw-done" data-testid="made-units">✓ «{made.unit}» متمركزة فيه: هذا تمركزها المبدئي المعتمد، في حفظ واحد مُدقَّق.</p>}
+          <p className="sw-hint">ظهر في قائمة المواقع وعلى الخريطة. مناطق انتشار الوحدة تُطلب من «طلب مناطق انتشار»، ويبدأ الطلب من هذا الموقع.</p>
           <button type="button" className="sw-go" onClick={() => { const id = made.id; stopAdd(); setSelected(id); }}>فتح بطاقة الموقع</button>
           <div className="sw-nav2">
             <button type="button" className="sw-link" onClick={() => startAdd()}>إضافة موقع آخر</button>
@@ -969,17 +903,17 @@ export function SiteSetupPage() {
       ) : (
         <>
           {/* six steps keep the strip on one line: the current step is named, the others show their number (named on hover) */}
-          <ol className={'sw-steps' + (steps.length > 3 ? ' many' : '')} aria-label={`الخطوة ${step} من ${steps.length}`}>
-            {steps.map((t, i) => (
+          <ol className="sw-steps" aria-label={`الخطوة ${step} من ${INITIAL_STEPS.length}`}>
+            {INITIAL_STEPS.map((t, i) => (
               <li key={t} className={'sw-step' + (i + 1 === step ? ' on' : i + 1 < step ? ' done' : '')} aria-current={i + 1 === step ? 'step' : undefined} title={t}><b>{i + 1 < step ? '✓' : i + 1}</b><span>{t}</span></li>
             ))}
           </ol>
           {wizErr && <p className="sw-err" role="alert">{wizErr}</p>}
           {stepBody}
           <div className="sw-nav">
-            {step < last && <button type="button" className="sw-go" data-testid="wizard-next" onClick={() => goStep(nextStep(step, admin, plan.length))}>التالي ←</button>}
+            {step < 3 && <button type="button" className="sw-go" data-testid="wizard-next" onClick={() => goStep((step + 1) as SetupStep)}>التالي ←</button>}
             <div className="sw-nav2">
-              {step > 1 ? <button type="button" className="sw-link" data-testid="wizard-back" onClick={() => goStep(prevStep(step, admin, plan.length))}>→ السابق</button> : <span />}
+              {step > 1 ? <button type="button" className="sw-link" data-testid="wizard-back" onClick={() => goStep((step - 1) as SetupStep)}>→ السابق</button> : <span />}
               <button type="button" className="sw-link sw-cancel" onClick={stopAdd}>إلغاء</button>
             </div>
           </div>
@@ -987,93 +921,159 @@ export function SiteSetupPage() {
       )}
     </section>
   );
+  const siteGeo = detail?.geometry?.geojson as unknown as SiteGeometry | undefined;
+  const siteKids = site ? byParent.get(site.siteId) ?? [] : [];
+  const mayManage = canSites && !!detail?.canManage;
+  const dataChanged = !!detail && (edit.name.trim() !== detail.name || edit.kind.trim() !== detail.kind || (edit.parentId || '') !== (detail.parentId ?? '') || !!edit.notes.trim());
+  const symbolChanged = symEdit !== undefined && symEdit !== (detail?.symbol?.sidc ?? null);
+  const openEdit = () => {
+    if (!detail) return;
+    setEdit({ name: detail.name, code: detail.code, kind: detail.kind, parentId: detail.parentId ?? '', notes: '', reason: '' });
+    setSymEdit(detail.symbol?.sidc ?? null);
+    setCardEdit(true);
+    setDelOpen(false);
+  };
+  const closeEdit = () => {
+    setCardEdit(false);
+    setSymEdit(undefined);
+    if (editingShape) {
+      setEditingShape(false);
+      editor.current?.load(null, false);
+    }
+  };
+  // one «حفظ التعديلات» with one reason: the data, the symbol and the boundary, each only when it changed
+  const saveCard = () => {
+    if (!site || !detail) return;
+    const reason = edit.reason.trim();
+    return act(async () => {
+      if (dataChanged) await api.updateSite(site.siteId, { code: edit.code, name: edit.name.trim(), kind: edit.kind.trim(), parentId: edit.parentId || null, capacity: detail.capacity, location: detail.location, notes: edit.notes.trim() || null, reason });
+      if (symbolChanged) await api.setSiteSymbol(site.siteId, { symbol: symEdit ?? null, reason });
+      if (editingShape && geometry) await api.saveSiteGeometry(site.siteId, { geometry, crs: 'EPSG:4326', expectedVersion: detail.geometryVersion ?? 0, reason, method: 'DRAWN' });
+    }, 'حُفظت التعديلات', closeEdit);
+  };
+  useEffect(() => {
+    setCardEdit(false);
+    setDelOpen(false);
+    setDelReason('');
+    setDelDone('');
+    setDelAck(false);
+  }, [selected]);
+  const facts: [string, React.ReactNode][] = site ? [
+    ['النوع', detail?.kind || '—'],
+    ['المكان', detail?.parentId ? `داخل «${nameOf(detail.parentId)}»` : 'موقع رئيسي'],
+    ['الوحدة المتمركزة', occ ? (occ.stationed.length ? occ.stationed.map((u) => u.orgName).join('، ') + ' — التمركز المبدئي' : 'لا تمركز') + (occ.otherStationed ? ` · وجهة أخرى: ${occ.otherStationed}` : '') : '…'],
+    ['الحدود', siteGeo && (siteGeo.type === 'Polygon' || siteGeo.type === 'MultiPolygon') ? `منطقة مسجلة · ${formatArea(siteArea(partsOf(siteGeo)))}` : 'علامة على الخريطة'],
+    ['المواقع الداخلية', siteKids.length ? siteKids.map((k) => k.name).join('، ') : '—'],
+    ['الوحدات المرتبطة', occ?.linked.length ? occ.linked.map((l) => l.orgName).join('، ') + ' (الربط ليس تمركزاً)' : '—'],
+  ] : [];
+  // the owner's rules (17 Nov 2026): erased completely; a unit stationed there loses that initial stationing and its areas;
+  // the inside sites go with it, each named in a warning first
+  const subtree = (id: string): typeof sites => (byParent.get(id) ?? []).flatMap((k) => [k, ...subtree(k.siteId)]);
+  const related = site ? subtree(site.siteId) : [];
+  const unitsAt = (id: string) => registered.current.filter((r) => r.siteId === id).map((r) => `«${r.orgName}»`);
+  const deletePanel = site && (
+    <section className="tz-card sc-delete" data-testid="delete-panel">
+      <h4>{admin ? `حذف «${site.name}» نهائياً؟` : `طلب حذف «${site.name}»`}</h4>
+      <ul className="sc-impact">
+        <li>يُحذف الموقع نهائياً من النظام: بياناته وحدوده ورمزه. لا يمكن التراجع عن الحذف.</li>
+        {!!occ?.stationed.length && <li>يُحذف تمركز {occ.stationed.map((u) => `«${u.orgName}»`).join('، ')} المبدئي فيه ومناطق انتشاره، وتعود الوحدة بلا تمركز.</li>}
+        <li>يبقى في سجل التدقيق سطر واحد: من حذف الموقع ومتى ولماذا.</li>
+        {!admin && <li>يصل الطلب إلى مدير النظام، فيعتمد الحذف أو يرفضه، ويصلك قراره.</li>}
+      </ul>
+      {related.length > 0 && (
+        <div className="sc-warn" role="alert" data-testid="delete-related">
+          <b>⚠ يُحذف معه {related.length === 1 ? 'موقع داخلي واحد' : related.length + ' مواقع داخلية'} وكل ما فيها:</b>
+          <ul>
+            {related.map((k) => {
+              const u = unitsAt(k.siteId);
+              return <li key={k.siteId}>«{k.name}» <small className="tz-code">{k.code}</small>{u.length ? ` — ويُحذف تمركز ${u.join('، ')} فيه` : ''}</li>;
+            })}
+          </ul>
+        </div>
+      )}
+      <label className="sc-ack"><input type="checkbox" data-testid="delete-ack" checked={delAck} onChange={(e) => setDelAck(e.target.checked)} />
+        <span>{related.length ? 'أفهم أن الحذف نهائي ويشمل المواقع الداخلية أعلاه.' : 'أفهم أن الحذف نهائي.'}</span></label>
+      <label className="sw-f"><span className="sw-l">{admin ? 'سبب الحذف' : 'سبب طلب الحذف'}</span>
+        <textarea className="sw-input" rows={2} aria-label={admin ? 'سبب الحذف' : 'سبب طلب الحذف'} value={delReason} onChange={(e) => setDelReason(e.target.value)} />
+      </label>
+      <div className="sc-actions">
+        <button type="button" className="button sc-danger" data-testid={admin ? 'confirm-delete' : 'send-delete-request'} disabled={delReason.trim().length < 5 || !delAck}
+          onClick={() => setDelDone(admin ? 'deleted' : 'requested')}>{admin ? (related.length ? `حذف الموقع و${related.length === 1 ? 'موقعه الداخلي' : 'مواقعه الداخلية'}` : 'حذف الموقع') : 'إرسال طلب الحذف'}</button>
+        <button type="button" className="button" onClick={() => { setDelOpen(false); setDelDone(''); setDelAck(false); }}>إلغاء</button>
+      </div>
+      {delDone && <p className="sw-hint" role="status" data-testid="delete-pending">نسخة الشاشة للمراجعة: لم {delDone === 'deleted' ? 'يُحذف' : 'يُرسل'} شيء. يُربط {delDone === 'deleted' ? 'الحذف' : 'طلب الحذف واعتماده'} بالخادم بعد موافقة المالك على الشاشة.</p>}
+    </section>
+  );
   const sitePanel = site && (
     <>
-      <section className="tz-card rs-summary">
-        <h2 className="tz-site-title">{site.name}</h2>
-        <p className="tz-muted micro">{site.code} · موقع واحد على الخريطة، مهما تعددت الوحدات التي تستخدمه.</p>
-        {canSites && (
-          <button className="button compact tz-add-inside" data-testid="add-inside" onClick={() => startAdd({ siteId: site.siteId, name: site.name })}>
-            ＋ إضافة موقع داخل «{site.name}»
-          </button>
-        )}
-      </section>
-      {canSites && detail?.canManage && (
-        <section className={'tz-card sw-fcard' + (folded.has('edit-site') ? ' folded' : '')} data-testid="edit-site">
-          <h4 className="sw-fhead">تعديل بيانات الموقع{foldBtn('edit-site', 'تعديل بيانات الموقع')}</h4>
-          <label className="field"><span>الاسم</span><input aria-label="اسم الموقع" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
-          <label className="field"><span>التصنيف</span><input aria-label="تصنيف الموقع" value={edit.kind} onChange={(e) => setEdit({ ...edit, kind: e.target.value })} /></label>
-          <label className="field"><span>الموقع الرئيسي</span>
-            <select aria-label="الموقع الرئيسي" value={edit.parentId} onChange={(e) => setEdit({ ...edit, parentId: e.target.value })}>
-              <option value="">— موقع رئيسي —</option>
-              {sites.filter((s) => s.siteId !== site.siteId).map((s) => <option key={s.siteId} value={s.siteId}>{s.name}</option>)}
-            </select>
-          </label>
-          <label className="field"><span>ملاحظات (تبقى كما هي إن تُركت فارغة)</span><input aria-label="ملاحظات الموقع" value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></label>
-          <label className="field"><span>السبب (مطلوب)</span><textarea aria-label="سبب التعديل" value={edit.reason} onChange={(e) => setEdit({ ...edit, reason: e.target.value })} /></label>
-          <div className="rs-tools">
-            <button className="button" data-testid="save-edit" disabled={busy || editingShape || edit.reason.trim().length < 5 || !edit.name.trim()} onClick={() => act(() => api.updateSite(site.siteId, { code: edit.code, name: edit.name.trim(), kind: edit.kind.trim(), parentId: edit.parentId || null, capacity: detail.capacity, location: detail.location, notes: edit.notes.trim() || null, reason: edit.reason }), 'حُفظت بيانات الموقع', () => setEdit({ ...edit, reason: '', notes: '' }))}>حفظ البيانات</button>
-            {!editingShape && <button className="button" data-testid="edit-shape" onClick={startShape}>تعديل الحدود</button>}
-            {editingShape && (
-              <>
-                <button className="button primary" data-testid="save-shape" disabled={busy || drawing || !geometry || edit.reason.trim().length < 5} onClick={() => act(() => api.saveSiteGeometry(site.siteId, { geometry: geometry!, crs: 'EPSG:4326', expectedVersion: detail.geometryVersion ?? 0, reason: edit.reason, method: 'DRAWN' }), 'حُفظت الحدود', () => { setEditingShape(false); editor.current?.load(null, false); setEdit({ ...edit, reason: '' }); })}>حفظ الحدود</button>
-                <button className="button" onClick={() => { setEditingShape(false); editor.current?.load(null, false); }}>إلغاء</button>
-              </>
-            )}
+      <section className="tz-card sc-card" data-testid="site-card">
+        <div className="sc-head">
+          <span className="sc-sym" data-symbol={detail?.symbol?.sidc ?? ''}>{detail?.symbol ? <SymbolArt sidc={detail.symbol.sidc} size={44} /> : <Icon name="pin" />}</span>
+          <div>
+            <h2 className="tz-site-title">{site.name}</h2>
+            <p className="tz-muted micro">{site.code}{detail?.symbol ? ` · ${symbolEntry(detail.symbol.sidc)?.label ?? 'رمز مخصص'}` : ''}</p>
           </div>
-          {editingShape && shapeTools}
-          {editingShape && <p className="micro tz-muted">اسحب الحدود لنقلها كاملة. تُحفظ نسخة جديدة بسببها، ولا يُكتب شيء قبل الحفظ.</p>}
-        </section>
-      )}
-      <section className={'tz-card sw-fcard' + (folded.has('site-symbol') ? ' folded' : '')} data-testid="site-symbol">
-        <h4 className="sw-fhead">رمز الموقع على الخريطة{foldBtn('site-symbol', 'رمز الموقع على الخريطة')}</h4>
-        <div className={'sw-symnow' + (detail?.symbol ? '' : ' none')} data-symbol={detail?.symbol?.sidc ?? ''}>
-          {detail?.symbol ? <SymbolArt sidc={detail.symbol.sidc} size={40} /> : <span className="sw-symart none" aria-hidden="true">●</span>}
-          <span><b>{detail?.symbol ? symbolEntry(detail.symbol.sidc)?.label ?? 'رمز مخصص' : 'بدون رمز'}</b><small>للعرض على الخريطة فقط.</small></span>
-          {canSites && detail?.canManage && symEdit === undefined && <button type="button" className="sw-link" data-act="symbol-change" onClick={() => { setSymEdit(detail?.symbol?.sidc ?? null); setSymReason(''); }}>تغيير الرمز</button>}
         </div>
-        {symEdit !== undefined && (
-          <div className="sw-wizard">
-            <SiteSymbolPicker value={symEdit} onChange={setSymEdit} />
-            <label className="field"><span>السبب (مطلوب)</span><textarea aria-label="سبب تغيير الرمز" value={symReason} onChange={(e) => setSymReason(e.target.value)} /></label>
-            <div className="rs-tools">
-              <button className="button primary" data-testid="save-symbol" disabled={busy || symReason.trim().length < 5 || symEdit === (detail?.symbol?.sidc ?? null)} onClick={() => act(() => api.setSiteSymbol(site.siteId, { symbol: symEdit ?? null, reason: symReason }), 'حُفظ رمز الموقع', () => { setSymEdit(undefined); setSymReason(''); })}>حفظ الرمز</button>
-              <button className="button" onClick={() => setSymEdit(undefined)}>إلغاء</button>
+        {!cardEdit && <dl className="sw-sum sc-facts" data-testid="site-facts">{facts.map(([k, v]) => <div key={k}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>}
+        {!cardEdit && (
+          <div className="sc-actions" data-testid="site-actions">
+            {mayManage && <button type="button" className="button primary" data-testid="edit-site" onClick={openEdit}>تعديل</button>}
+            {canSites && <button type="button" className="button" data-testid="add-inside" onClick={() => startAdd({ siteId: site.siteId, name: site.name })}>＋ موقع داخل</button>}
+            {mayManage && <button type="button" className="button sc-danger-link" data-testid={admin ? 'delete-site' : 'request-delete'} aria-pressed={delOpen} onClick={() => { setDelOpen(!delOpen); setDelDone(''); }}>{admin ? 'حذف الموقع' : 'طلب حذف'}</button>}
+          </div>
+        )}
+        {cardEdit && detail && (
+          <div className="sw-form sc-edit" data-testid="site-edit">
+            <label className="sw-f"><span className="sw-l">اسم الموقع</span><input className="sw-input" aria-label="اسم الموقع" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+            <label className="sw-f"><span className="sw-l">نوع الموقع</span><input className="sw-input" aria-label="تصنيف الموقع" value={edit.kind} onChange={(e) => setEdit({ ...edit, kind: e.target.value })} /></label>
+            <label className="sw-f"><span className="sw-l">يقع داخل</span>
+              <select className="sw-input" aria-label="الموقع الرئيسي" value={edit.parentId} onChange={(e) => setEdit({ ...edit, parentId: e.target.value })}>
+                <option value="">— موقع رئيسي —</option>
+                {sites.filter((x) => x.siteId !== site.siteId).map((x) => <option key={x.siteId} value={x.siteId}>{x.name}</option>)}
+              </select>
+            </label>
+            <div className="sw-f"><span className="sw-l">رمز الموقع على الخريطة</span><SiteSymbolPicker value={symEdit ?? null} onChange={setSymEdit} /></div>
+            <div className="sw-f"><span className="sw-l">الحدود</span>
+              {!editingShape ? <button type="button" className="button" data-testid="edit-shape" onClick={startShape}>تعديل الحدود على الخريطة</button>
+                : <><p className="micro tz-muted">اسحب الحدود لنقلها كاملة، أو عدّل رؤوسها. لا يُكتب شيء قبل الحفظ.</p>{shapeTools}</>}
+            </div>
+            <label className="sw-f"><span className="sw-l">ملاحظات (تبقى كما هي إن تُركت فارغة)</span><input className="sw-input" aria-label="ملاحظات الموقع" value={edit.notes} onChange={(e) => setEdit({ ...edit, notes: e.target.value })} /></label>
+            <label className="sw-f"><span className="sw-l">سبب التعديل</span><textarea className="sw-input" rows={2} aria-label="سبب التعديل" placeholder="يُحفظ في سجل التدقيق باسمك" value={edit.reason} onChange={(e) => setEdit({ ...edit, reason: e.target.value })} /></label>
+            <div className="sc-actions">
+              <button type="button" className="button primary" data-testid="save-edit" disabled={busy || drawing || edit.reason.trim().length < 5 || !edit.name.trim() || !(dataChanged || symbolChanged || (editingShape && !!geometry))} onClick={() => void saveCard()}>حفظ التعديلات</button>
+              <button type="button" className="button" onClick={closeEdit}>إلغاء</button>
             </div>
           </div>
         )}
       </section>
-      <section className={'tz-card sw-fcard' + (folded.has('stationed-here') ? ' folded' : '')} data-testid="stationed-here">
-        <h4 className="sw-fhead">الوحدات المتمركزة حالياً{foldBtn('stationed-here', 'الوحدات المتمركزة حالياً')}</h4>
-        {occ?.stationed.length === 0 && !occ?.otherStationed && <p className="tz-muted">لا تمركز حالي.</p>}
-        <ul className="tz-sites">{occ?.stationed.map((u) => <li key={u.orgId}><b>{u.orgName}</b></li>)}</ul>
-        {!!occ?.otherStationed && <p className="tz-muted" data-testid="others-here">جهة أخرى في الموقع: {occ.otherStationed}</p>}
-        {canCorrect && (
-          <>
-            <h4 style={{ marginTop: 10 }}>تثبيت التمركز (تصحيح مُدقَّق)</h4>
-            <p className="micro tz-muted">للتهيئة الأولى والتصحيح فقط: كل وحدة تُختار بنفسها، ولا ينتقل معها من يتبعها. أما الطلب العادي فيمر بالاعتمادات.</p>
-            <OrgSelect q={q} setQ={setQ} orgs={orgs} value={stOrg} onChange={setStOrg} label="وحدة التمركز" />
-            <label className="field"><span>السبب</span><textarea aria-label="سبب التمركز" value={stReason} onChange={(e) => setStReason(e.target.value)} /></label>
-            <button className="button" data-testid="correct-stationing" disabled={busy || !stOrg || stReason.trim().length < 5} onClick={() => act(() => api.correctStationing({ organizationId: stOrg, siteId: site.siteId, reason: stReason }), 'سُجل التمركز', () => (setStOrg(''), setStReason('')))}>تثبيت</button>
-          </>
-        )}
-      </section>
-      <section className={'tz-card sw-fcard' + (folded.has('linked-here') ? ' folded' : '')} data-testid="linked-here">
-        <h4 className="sw-fhead">الوحدات المرتبطة <small>(الربط ليس تمركزاً)</small>{foldBtn('linked-here', 'الوحدات المرتبطة')}</h4>
-        {occ?.linked.length === 0 && <p className="tz-muted">لا ارتباطات.</p>}
-        <ul className="tz-sites">
-          {occ?.linked.map((l) => (
-            <li key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><b>{l.orgName}</b>{canLinks && <button className="button compact" style={{ width: 'auto', flex: 'none' }} onClick={() => { const why = window.prompt('سبب إنهاء الربط'); if (why && why.trim().length >= 5) void act(() => api.endSiteLink(l.id, why), 'أُنهي الربط'); }}> إنهاء</button>}</li>
-          ))}
-        </ul>
-        {canLinks && (
-          <>
-            <OrgSelect q={q} setQ={setQ} orgs={orgs} value={linkOrg} onChange={setLinkOrg} label="وحدة الربط" />
-            <label className="field"><span>السبب</span><textarea aria-label="سبب الربط" value={linkReason} onChange={(e) => setLinkReason(e.target.value)} /></label>
-            <button className="button" data-testid="add-link" disabled={busy || !linkOrg || linkReason.trim().length < 5} onClick={() => act(() => api.createSiteLink({ siteId: site.siteId, organizationId: linkOrg, reason: linkReason }), 'أُضيف الربط', () => (setLinkOrg(''), setLinkReason('')))}>إضافة ربط</button>
-          </>
-        )}
-      </section>
+      {delOpen && !cardEdit && deletePanel}
+      {!cardEdit && (canCorrect || canLinks) && (
+        <details className="tz-card sc-more" data-testid="site-more">
+          <summary>إجراءات أخرى</summary>
+          {canCorrect && (
+            <>
+              <h4>تثبيت تمركز (تصحيح مُدقَّق)</h4>
+              <p className="micro tz-muted">للتصحيح فقط: كل وحدة تُختار بنفسها، ولا ينتقل معها من يتبعها. أما الطلب العادي فيمر بالاعتمادات.</p>
+              <OrgSelect q={q} setQ={setQ} orgs={orgs} value={stOrg} onChange={setStOrg} label="وحدة التمركز" />
+              <label className="field"><span>السبب</span><textarea aria-label="سبب التمركز" value={stReason} onChange={(e) => setStReason(e.target.value)} /></label>
+              <button className="button" data-testid="correct-stationing" disabled={busy || !stOrg || stReason.trim().length < 5} onClick={() => act(() => api.correctStationing({ organizationId: stOrg, siteId: site.siteId, reason: stReason }), 'سُجل التمركز', () => (setStOrg(''), setStReason('')))}>تثبيت</button>
+            </>
+          )}
+          {canLinks && (
+            <>
+              <h4>ربط وحدة بالموقع <small>(الربط ليس تمركزاً)</small></h4>
+              <ul className="tz-sites">
+                {occ?.linked.map((l) => (
+                  <li key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}><b>{l.orgName}</b><button className="button compact" style={{ width: 'auto', flex: 'none' }} onClick={() => { const why = window.prompt('سبب إنهاء الربط'); if (why && why.trim().length >= 5) void act(() => api.endSiteLink(l.id, why), 'أُنهي الربط'); }}> إنهاء</button></li>
+                ))}
+              </ul>
+              <OrgSelect q={q} setQ={setQ} orgs={orgs} value={linkOrg} onChange={setLinkOrg} label="وحدة الربط" />
+              <label className="field"><span>السبب</span><textarea aria-label="سبب الربط" value={linkReason} onChange={(e) => setLinkReason(e.target.value)} /></label>
+              <button className="button" data-testid="add-link" disabled={busy || !linkOrg || linkReason.trim().length < 5} onClick={() => act(() => api.createSiteLink({ siteId: site.siteId, organizationId: linkOrg, reason: linkReason }), 'أُضيف الربط', () => (setLinkOrg(''), setLinkReason('')))}>إضافة ربط</button>
+            </>
+          )}
+        </details>
+      )}
     </>
   );
   return (
@@ -1081,13 +1081,13 @@ export function SiteSetupPage() {
       listRail
       swapSides
       panels="siteSetup"
-      railLabel="تهيئة الموقع"
+      railLabel="موقع تمركز مبدئي"
       contextLabel="المواقع"
       sheetKey={(adding ? 'add' : '') + (selected ?? '')}
       rail={workPanel()}
       context={listPanel()}
       centre={
-        <MapFrame title={<span className="tz-mapstep"><Icon name="map" /><b>تهيئة المواقع والتمركز</b></span>} mode={mode} setMode={setMode} view={view} setView={setView} has3d={!!terrain3d} placing={placing || drawing || placingArea} legend={legend}>
+        <MapFrame title={<span className="tz-mapstep"><Icon name="tent" /><b>تحديد مواقع التمركز المبدئية</b></span>} mode={mode} setMode={setMode} view={view} setView={setView} has3d={!!terrain3d} placing={placing || drawing || placingArea} legend={legend}>
           {terrain3d !== undefined && <RequestMap view={view} terrain3d={terrain3d} request={EMPTY_MAP} checks={null} mode={mode} fitMaxZoom={13} hideSite fit={false} onMap={onMap} referenceInteractive={!adding && !editingShape} fitSites pick={adding || editingShape ? null : { selectedId: selected, onPick: (id) => setSelected(id) }} focus={selected ? { siteId: selected, key: selected.length } : adding && form.parentId ? { siteId: form.parentId, key: form.parentId.length + 1 } : null} />}
         </MapFrame>
       }

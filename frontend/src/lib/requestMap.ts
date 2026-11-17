@@ -25,7 +25,7 @@ export const LABELS = {
   CURRENT: 'الموقع الحالي',
   SITE: 'موقع إعادة التمركز',
   PRIMARY: 'منطقة الانتشار الرئيسية',
-  ALTERNATIVE: 'منطقة الانتشار البديلة',
+  ALTERNATIVE: 'منطقة الانتشار الفرعية',
 } as const;
 
 /** The centre a site or an area is measured from: the shared anchor of every part (a MultiPolygon included). */

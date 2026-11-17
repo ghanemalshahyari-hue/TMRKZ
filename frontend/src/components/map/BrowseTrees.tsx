@@ -64,7 +64,7 @@ export function OrgTree({
       roots: () => api.orgRoots(),
       children: (id) => api.orgChildren(id),
       search: (q, signal) =>
-        api.orgSearch(q, signal).then((r) => r.map((o) => ({ item: o, path: (o.path ?? []).map((x) => x.name).join(' ‹ '), trail: (o.path ?? []).map((x) => x.id) }))),
+        api.orgSearch(q, signal).then((r) => r.map((o) => ({ item: o, path: (o.path ?? []).map((x) => x.name).join(' ‹ '), trail: (o.path ?? []).map((x) => x.id), chain: o.path ?? [] }))),
     }),
     [],
   );

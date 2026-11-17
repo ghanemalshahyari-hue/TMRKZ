@@ -313,38 +313,51 @@ class SiteSetupIT extends RestationingTestBase {
     }
 
     @Test
-    @DisplayName("SETUP-06 the policy decides whether areas are required: REQUIRED refuses a unit without them; OPTIONAL accepts none, never one alone")
+    @DisplayName("SETUP-06 the setup is the site and its unit's initial stationing (ADR-081): no area is required whatever the policy; areas that are sent are still a complete pair the policy accepts")
     void requirementFromPolicy() {
+        // REQUIRED in force: a unit without areas is stationed alone; its areas are asked for afterwards («طلب مناطق انتشار»)
         Res none = login("setup").post("/site-setup", body("H", List.of(bare(fresh))));
-        assertThat(none.status()).as(none.toString()).isEqualTo(400);
-        assertThat(String.join(" ", problems(none))).contains("منطقتا الانتشار الرئيسية والبديلة مطلوبتان");
-        assertThat(sitesNamed("H")).isZero();
-        assertThat(stationings(fresh)).isZero();
+        assertThat(none.status()).as(none.toString()).isEqualTo(200);
+        assertThat(sitesNamed("H")).isEqualTo(1);
+        assertThat(setupAudits("H")).isEqualTo(1);
+        assertThat(jdbc.sql("select origin from org_stationing where organization_id = :o").param("o", fresh).query(String.class).single()).isEqualTo("SETUP");
+        assertThat(areas(fresh)).isZero();
+        assertThat(none.body().path("units").get(0).path("areas").path("PRIMARY").isNull()).isTrue();
+        assertThat(none.body().path("units").get(0).path("areas").path("ALTERNATIVE").isNull()).isTrue();
+        assertThat(login("rqOnly").get("/request-hub/units/" + fresh).body().path("state").asText()).isEqualTo("DEPLOYMENT_MISSING");
 
-        // OPTIONAL in force (a test value, published as the base publishes its own)
+        // one area alone under REQUIRED: refused, nothing written
+        Map<String, Object> half = new LinkedHashMap<>(bare(fresh2));
+        half.put("primary", unit(fresh2, 0).get("primary"));
+        Res alone = login("setup").post("/site-setup", body("J", List.of(half)));
+        assertThat(alone.status()).isEqualTo(400);
+        assertThat(String.join(" ", problems(alone))).contains("منطقتا الانتشار الرئيسية والفرعية مطلوبتان");
+        assertThat(sitesNamed("J")).isZero();
+        assertThat(stationings(fresh2)).isZero();
+
+        // OPTIONAL in force (a test value, published as the base publishes its own): one area alone is still refused
         Res policy = login("sysadmin").get("/stationing/policy");
         Map<String, Object> values = new LinkedHashMap<>(JSON.convertValue(policy.body().path("inForce").path("values"), Map.class));
         values.put("deploymentRequirement", "OPTIONAL");
         Res published = login("sysadmin").post("/stationing/policy/versions", Map.of("values", values, "reason", "مناطق اختيارية للاختبار", "reference", "اختبار التهيئة"));
         assertThat(published.status()).as(published.toString()).isEqualTo(200);
+        Res alone2 = login("setup").post("/site-setup", body("K", List.of(half)));
+        assertThat(alone2.status()).isEqualTo(400);
+        assertThat(String.join(" ", problems(alone2))).contains("زوج كامل");
+        assertThat(sitesNamed("K")).isZero();
 
-        Map<String, Object> half = new LinkedHashMap<>(bare(fresh));
-        half.put("primary", unit(fresh, 0).get("primary"));
-        Res alone = login("setup").post("/site-setup", body("H", List.of(half)));
-        assertThat(alone.status()).isEqualTo(400);
-        assertThat(String.join(" ", problems(alone))).contains("زوج كامل");
-        assertThat(sitesNamed("H")).isZero();
-
-        // a site that is one point, with a unit and no areas
-        Map<String, Object> point = body("I", List.of(bare(fresh)));
+        // a site that is one point (3 km further north), with a unit and no areas
+        Map<String, Object> point = body("I", List.of(bare(fresh2)));
         point.remove("boundary");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> site = (Map<String, Object>) point.get("site");
+        site.put("location", Map.of("lat", siteLat + offsetLat(3_000), "lng", lng0));
         Res ok = login("setup").post("/site-setup", point);
         assertThat(ok.status()).as(ok.toString()).isEqualTo(200);
-        UUID site = UUID.fromString(ok.body().path("site").path("id").asText());
-        assertThat(jdbc.sql("select geometry_version from site where id = :s").param("s", site).query().singleRow().get("geometry_version")).isNull();
-        assertThat(jdbc.sql("select origin from org_stationing where organization_id = :o").param("o", fresh).query(String.class).single()).isEqualTo("SETUP");
-        assertThat(areas(fresh)).isZero();
-        assertThat(login("rqOnly").get("/request-hub/units/" + fresh).body().path("state").asText()).isEqualTo("DEPLOYMENT_MISSING");
+        UUID pointSite = UUID.fromString(ok.body().path("site").path("id").asText());
+        assertThat(jdbc.sql("select geometry_version from site where id = :s").param("s", pointSite).query().singleRow().get("geometry_version")).isNull();
+        assertThat(jdbc.sql("select origin from org_stationing where organization_id = :o").param("o", fresh2).query(String.class).single()).isEqualTo("SETUP");
+        assertThat(areas(fresh2)).isZero();
     }
 
     private static JsonNode readTree(String s) {

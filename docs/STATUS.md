@@ -859,3 +859,134 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Migration V49** (not yet applied anywhere): the roles, the grants ended with a reason, the offers, a new published policy version (an open draft carried after it), undecided exception stages of old requests taken off their route, one audit event `ACCESS_ROLES_SIMPLIFIED`. Nothing to run by hand after deploy.
 - **Checks:** full backend suite 357/357 (from a clean build); frontend type check clean, 316/316 (43 files); OpenAPI 260 operations / 238 paths.
 - **Not verified here:** a browser run of the changed pages; `tests/acceptance/restationing-acceptance.mjs` (distance exception and lifecycle sections), `full26-verify-grants.mjs` and `main-8088-extra.mjs` still describe the rules before ADR-078.
+
+## TMRKZ with MOVER's identity and HR settings; the specification re-run on V49 (17 Nov 2026; ADR-079)
+
+- **This PC's :8088:** pulled to `a2bb677` and moved from V32 to **V49** in isolated mode (`TMRKZ_OFFLINE=1 TMRKZ_BUILD=1 sh ops/local/up.sh`) after the verified backup `backups/tmrkz-mover-20261117T121633Z` (V32). Network trap on the first isolated start: existing `db` and `openfga` containers lost their DNS names, fixed by recreating them (data in volumes).
+- **MOVER's settings (owner):**
+  - Directory: `mover-ldap` (StartTLS, «MOVER Dev LDAP CA», base `DC=mover,DC=local`, self-bind `{username}@mover.local`, MOVER's attribute names), in `.env`, Keycloak's federation (`set-directory.sh`, read-only `svc_tmrkz_ro`) and the employment mappers.
+  - Oracle: `mover-oracle-hr`/FREEPDB1, read-only `TMRKZ_HR` on the synthetic `HR_AI` views, MOVER's mapping; first sync 74 units, 0 people.
+  - Role policy version 3: `ops/policy` roles, nothing granted.
+  - Repeatable with `ops/local/use-mover-sources.sh` + `ops/local/mover-settings.mjs`.
+  - Table and server values: `docs/MOVER_SETTINGS_PARITY_AR.md`.
+- **Code:**
+  - The live lookup and «إضافة مستخدم» accept the earlier military number, as MOVER.
+  - Directory search from an AD domain root no longer fails on continuation references (every manual sign-in against MOVER's AD answered `DIRECTORY_UNAVAILABLE` before).
+- **Checks:**
+  - Backend: `HrLinkedPeopleIT`, `UnitMemberIT`, `HrSyncAcceptanceIT`, `DirectorySignInIT`, `EmploymentContextIT` 30/30; the four sign-in classes 21/21; the spec's eight classes 89/89 at `a2bb677`; full suite with both changes 356/357 — `AuthorizationIT.explicitOrganisationSet` 403 for 200 when it ran first, then 10/10 alone (no code it reaches changed).
+  - Browser: `tests/acceptance/acc79-mover-settings.mjs` 71/71 on :8088 with synthetic people — `docs/evidence/mover-settings/SUMMARY_AR.md`.
+  - The backend image on :8088 carries both changes; the web image is unchanged.
+- **Not verified / open:**
+  - The real enterprise AD attribute for the Unit ID and MOVER's `Mil*` attributes (absent from the dev schema).
+  - MOVER's `LIKE '%-n'` number fallback (not built).
+  - JDBC thin against the server's Oracle (MOVER uses thick).
+  - The TMRKZ client in the enterprise Keycloak (ADR-071).
+  - The preview screen and per-role levels at the final access approval are absent by ADR-074 (server API checked; levels set through «تعيين»).
+  - The run's fictional data remains on :8088 (policy `ACCEPTANCE / FICTIONAL`, site `ACC79-SITE-01`, RS-2026-0001, synthetic people); the clean configured state is `backups/tmrkz-mover-20261117T152956Z` (verified, V49) — restoring it removes the database volume, the owner's call.
+  - Attaching MOVER's two containers to TMRKZ's network is lost if the network is recreated (rerun `use-mover-sources.sh`).
+
+## «إعادة تنظيم التمركز والمواقع ومناطق الانتشار» — phase 1 of 8, OWNER REVIEW REQUIRED (17 Nov 2026; ADR-080)
+
+- **Owner rule:** one screen at a time; the interface first, shown on :8088, and nothing further (no backend, no next phase) until the owner accepts it.
+- **Phase 1, second version (after the owner's review of the first):**
+  - The three ways are tabs of the top bar right after «الرئيسية», with their symbols: «تحديد مواقع التمركز المبدئية», «طلب مناطق انتشار», «طلب إعادة تمركز». One click opens the work.
+  - A tab shows only with its right, and the highlight follows the address.
+  - They replace «تهيئة المواقع» and «إعادة التمركز»; the requests list is in «المزيد».
+  - The page of cards from the first version is removed.
+  - The dark theme is graphite and sand instead of navy and teal (app and sign-in page).
+- **Not changed:** the backend, the screens the tabs open (phases 2–4), the light theme, status colours and map symbols.
+- **Checks:**
+  - Frontend: type check clean, 318 tests (44 files).
+  - Browser: `tests/acceptance/stationing-hub-phase1.mjs` 6/6 on :8088 (web image only rebuilt); screens in `docs/evidence/stationing-redesign/phase1/`.
+  - Not yet run: `theme-contrast.mjs` on the new dark theme.
+
+## Phase 2 of 8 — «تحديد مواقع التمركز المبدئية», accepted and connected (17 Nov 2026)
+
+- **Interface only:** `SiteSetupPage` «موقع تمركز مبدئي جديد» in three steps (`INITIAL_STEPS`, `initialProblem` in `lib/siteWizard.ts`):
+  - **«بيانات الموقع»:** the unit first; a unit already stationed is stopped («يتغير بطلب إعادة تمركز»); name, type, main or inside, the symbol as one row, notes.
+  - **«تحديد الموقع والحدود»:** the map tools, 2D/3D.
+  - **«مراجعة وحفظ»:** the summary, «حفظ الموقع والتمركز المبدئي».
+- **Opening:** the tab opens on the steps at once.
+- **Gone from the setup:** «أي الوحدات تتمركز في هذا الموقع؟» and both deployment-area steps.
+- **Not connected yet (owner rule: the screen first):** the save says nothing was saved. The server's setup still requires the policy's area pair (`DeploymentRules.pair`), so the backend step changes the setup to the site and its unit's initial stationing, the areas moving to «طلب مناطق انتشار». The previous save path is kept in the page for that step (`void save`).
+- **Second version (after the owner's review of the first, 17 Nov 2026; ADR-081):**
+  - **The symbol:** a field «رمز الموقع على الخريطة» with a large preview and «اختيار رمز» opens a picker window: search by name, «الكل / الأكثر استخداماً / المفضلة / الأخيرة», ten categories, 88 standard symbols (MIL-STD-2525C, each checked by milsymbol). A typed code only for whoever may configure.
+  - **Search by name, not code (`lib/symbolSearch.ts`):** Arabic normalisation (hamza forms, ة/ه, ى/ي, diacritics, Indic digits), the article and joined prefixes, light endings, a synonym dictionary (طبي → طبابة، مستشفى، إسعاف، مركز صحي …), words matched from their start, one typo forgiven only when nothing matches as typed. Measured in Edge: «طبي» → 8 medical symbols; «دروع» → armour only; «مستشقى» → «مستشفى ميداني»; «معسكر» → the camp first.
+  - **The unit search as a hierarchy:** each unit found shown under its whole chain of parents from the top, marked «مطابق»; any row (a parent or a child) can be chosen, «+» opens a branch (`UnitTree`, `searchForest` in `tree.ts`).
+  - **The map:** the new site's name and symbol stand on its boundary or point; a north arrow; a scale in 2D.
+  - **A double click finishes the drawing:** on an empty spot it places the last corner and closes the shape; on the last corner it closes without adding one. Cause of the fault: a corner marker took the second click and the double click, which never reached the map; the corner now finishes the drawing itself (`SiteEditor`).
+  - **3D speed:** fewer and coarser tiles towards the horizon in the tilted view everywhere; on a machine without a usable GPU, a lighter 3D (no colour tint, sky or fog; 0.7 resolution; the heights and the shade kept). Software rendering: average frame 155 → 110 ms, p95 326 → 215 ms; GPU unchanged at the screen's refresh rate (`docs/evidence/stationing-redesign/phase2/map3d-perf.md`).
+- **Checks:**
+  - Frontend: type check clean, 331 tests (45 files), incl. `symbolSearch.test.ts`, `tree.test.ts` (`searchForest`) and `siteWizard.test.ts`.
+  - Browser: `tests/acceptance/initial-site-phase2.mjs` 15/15 on :8088 in both themes (nothing saved, nothing outside localhost); screens in `docs/evidence/stationing-redesign/phase2/`.
+  - Only the web image was rebuilt; the backend is unchanged by this phase.
+- **Limits (when shown):** the save was not connected then. The 3D figures are from one machine; a virtual machine without a GPU was emulated with SwiftShader, not measured on a real one. `theme-contrast.mjs` not run on these screens.
+- **Accepted by the owner («next», 17 Nov 2026) and connected (ADR-081 addendum):**
+  - «حفظ الموقع والتمركز المبدئي» sends the site, its boundary and the chosen unit to `POST /site-setup` with no areas: one audited save (`SITE_SETUP_BOOTSTRAPPED`), the stationing with origin SETUP, no request. A refusal (no reason, a unit already stationed, the site's own rules) is said on the review step.
+  - Server: a unit sent without areas is stationed alone whatever the policy requires (`SiteSetupService.evaluate`); the hub then shows it `DEPLOYMENT_MISSING`. Areas that are sent are checked as before; a policy in force is needed only for them. `SiteSetupIT` SETUP-06 rewritten (REQUIRED accepts a unit without areas, refuses one area alone).
+  - Who saves: still «تهيئة المواقع والتمركز» (facilities and corrections everywhere, `SiteSetupService.admin`); everyone else sees why the button is off. Who may set up sites is phase 7.
+  - Checks: `sh ops/test-backend.sh SiteSetupIT` 7/7; `tests/acceptance/initial-site-phase2.mjs` 18/18 on :8088 — it SAVED one fictional site, S-0002 «موقع تمركز مبدئي — وهمي c4k7», with the synthetic unit «مركز صحة اثنين» stationed there (data left on :8088). The later check «the new site appears in the site list» was added after that run and has not run yet (each run stations another synthetic unit).
+
+## Phase 2 additions after its acceptance — site list as a tree, the site's card, deletion; OWNER REVIEW REQUIRED (17 Nov 2026)
+
+- **The list (owner: "if I already add a camp inside the camp, it should show me a hierarchy view … if I click on this arrow, it will show who's related to this camp"):** inside sites are no longer rows of their own; each camp with inside sites has an arrow and «N مواقع داخلية»; the arrow opens them under it, indented, at any depth; a site chosen on the map opens the branches above it. Search results say «داخل «…»».
+- **The card (owner: "redesign this information … he will go and edit"):** the four folded sections are replaced by the facts at a glance (type, where, stationed unit, boundary and area, inside sites, linked units) and three actions: «تعديل» (one form: name, type, «يقع داخل», symbol, boundary on the map, notes, ONE reason; only what changed is saved, through the existing endpoints), «＋ موقع داخل», «حذف الموقع». Correction of a stationing and unit links move under «إجراءات أخرى».
+- **Deletion — first version (superseded below):** the administrator («تهيئة المواقع والتمركز») gets «حذف الموقع» with what ends with it (the site leaves the list and map and stays in the audit; the unit's initial stationing and its areas end) and a reason; a camp with inside sites cannot be deleted before them. Whoever else manages the site gets «طلب حذف» with a reason, sent to the system administrator. Neither is connected: the server today has only `POST /sites/{id}/retire` (any facility manager, no reason, stationing untouched); the rules above are a proposal for the owner.
+- **Deletion — the owner's rules (17 Nov 2026), interface only:** «erased completely»: the site, its boundary and symbol are removed from the system, with no undo; a unit stationed there loses that initial stationing and its areas and is back to no stationing; the inside sites are deleted together, after a red warning naming each one and the units stationed in it; the administrator confirms with a reason and «أفهم أن الحذف نهائي ويشمل المواقع الداخلية». One audit line (who, when, why) is kept — the owner was told and may say otherwise. Others send «طلب حذف» with the same warning to the system administrator. Not connected: the server's `retire` keeps the row and checks none of this.
+- **Checks:** `tests/acceptance/site-card-review.mjs` 20/20 on :8088 (after the rules; 19/19 before) (administrator, and a synthetic requester given «معتمد عمليات الوحدة» on its unit for the run, then ended); nothing deleted; screens in `docs/evidence/site-card-review/`.
+
+## Phase 3 of 8 — «طلب مناطق انتشار», accepted («next») and connected (17 Nov 2026; ADR-082)
+
+- **Interface only:** a new request for deployment areas opens its own screen (`DeploymentAreasRequest`, `lib/deploymentAreasFlow.ts`); an existing request of that purpose still opens in the request editor.
+  - It starts by itself from the unit's current approved site (no starting point to choose); with several eligible units the unit is chosen first; units without a stationing or with an area request pending are shown with the reason.
+  - Steps «الوحدة → الرئيسية → الفرعية → مراجعة وإرسال». Each area is placed with the policy's initial shape by one click or drawn (a double click finishes), then dragged; «تعديل الرؤوس», ↶ ↷, «حذف المنطقة».
+  - Small chips: distance, area, «✓ ضمن المسموح» (or «✗ أقرب/أبعد من المسموح», «! أبعد من الحد الأساسي» when terrain may allow it), and «ⓘ» with distance, area, terrain, minimum, maximum, reason of the excess, policy version.
+  - The main area: solid outline, transparent fill in its colour; the sub-area: dashed outline, lighter fill, its own colour — on this screen, the request editor and every request map (`RequestMap`, `SiteEditor` look `dashed`).
+  - «منطقة الانتشار الفرعية» replaces «البديلة» everywhere in the interface; ALTERNATIVE stays the internal name. Server messages still say «البديلة» until the backend step; eight older acceptance scripts that match the old word are updated then.
+  - «إرسال للاعتماد» says nothing was sent. The backend step creates the draft (`purpose DEPLOYMENT_AREAS`), checks it and submits it through the existing route.
+- **Second version (owner, 17 Nov 2026):** the steps on the right and «ما يطلبه هذا الطلب» on the left (as «تحديد مواقع التمركز المبدئية»); step «الموقع» lists the person's units by camp — the camp's name first, inside camps under their main camp with arrows, each camp's units under it in the organisation's order — and a camp is chosen in the list or on the map (its one unit starts the request); units stationed nowhere are folded into «وحدات بلا تمركز معتمد (N)»; the header names the camp first (`campTree`).
+- **Third version (owner, 17 Nov 2026, while using it):**
+  - Camps and units are folded at first; every list of units is the organisation's tree (`unitForest`), the units stationed nowhere too.
+  - One choice: a camp clicked in the list or on the map is marked «المختار» and highlighted on the map at every step; its one unit is chosen with it; nothing moves on until «التالي», which waits, saying why, until the step is done. A camp clicked on the map after step 1 takes the request back to «الموقع» with it.
+  - The map stays where the person put it: it flies only to a camp chosen from the list; no step change and no finished drawing moves it (`SiteEditor` `flyOnFinish`).
+  - While an area is placed or drawn, an arrow from where it is measured to the pointer, and a chip with the distance and the verdict, in the verdict's colour.
+  - Shapes like Word's: «مربع», «دائرة», «رسم حر»; for the sub-area first «بنفس شكل الرئيسية» (a copy of the main area moved to the click); a square or circle of the sub-area takes the main area's size. Resizing, rotating and width/height handles stay phase 5.
+  - The slope inside each area (the request editor's «الانحدار» colours and shares) and both arrows on the map — camp → main area, main → sub-area — with the policy range's verdict.
+  - The send says plainly, before it is pressed, that it is not connected until the owner accepts the screen.
+- **Checks:** frontend 342 tests (47 files) incl. `deploymentAreasFlow.test.ts` (`campTree`, `unitForest`); `tests/acceptance/deployment-areas-phase3.mjs` 18/18 after the third version (12/12 after the second, 10/10 first). Not covered by the script: choosing a camp by clicking it on the map. on :8088 in both themes as the synthetic requester `juma.ghfly4` («مقدم الطلب» on «مركز صحة اثنين»); nothing sent; screens in `docs/evidence/stationing-redesign/phase3/`.
+- **Test account:** `juma.ghfly4` (synthetic HR_AI person) exists in MOVER's local directory for the phase 3 runs; the acc79 accounts could not be reused (a recreated directory account is refused as `ALREADY_LINKED` and TMRKZ has no way to end an identity link). Remove with the scratch helper or `samba-tool user delete` after phase 3 is connected.
+
+## «إرشادات صفحة الدخول» in the settings, OWNER REVIEW REQUIRED (17 Nov 2026; ADR-083)
+
+- **Interface only (owner: "I can modify it on the setting … add more or [remove]"):** «إعدادات النظام» has a section for the sign-in page's board: its heading, the line under it, the notes (guidance or «تنبيه مهم», optional dates, hide/show, up/down, ✕) up to eight, the last line, and a preview of the board as it shows today. «حفظ» says nothing was saved; the sign-in page still shows its fixed three notes (`lib/signInNotes.ts`, `SignInNotesSettings`).
+- **Checks:** `signInNotes.test.ts`; `tests/acceptance/site-card-review.mjs` (the settings part) on :8088; screens `docs/evidence/site-card-review/08-*`, `09-*`.
+- **Connected (owner «next», 17 Nov 2026):** «حفظ كمسودة» creates the request (`purpose DEPLOYMENT_AREAS`, scope the unit, both areas) and keeps it current; «إرسال للاعتماد» submits it through the existing route; the server's refusals are said on the review step. The server's messages say «الفرعية» too (`DeploymentRules`, `RestationingChecks`, `SiteSetupService`; the V19 migration text is left as recorded); eight older acceptance scripts follow the word. Checks: `SiteSetupIT` 7/7; `tests/acceptance/deployment-areas-phase3.mjs` 25/25 — it SAVED and SENT RS-2026-0002 for «مركز صحة اثنين» (now under review on :8088; the script needs another eligible unit to run again).
+
+## Phase 5 of 8 — «أدوات الرسم والتحكم (مثل Word)», in use (17 Nov 2026; ADR-084)
+
+- **Owner:** "you can control the width and length … where is that one?" and the reference image's panel 5. Built ahead of phase 4 at the owner's request.
+- **The toolbar** (`ToolGlyph`, «طلب مناطق انتشار» areas and «طلب إعادة تمركز» site step): «تحديد، تحريك» | «دائرة، بيضاوي، مربع، مستطيل، رسم حر» (+ «نسخة الرئيسية» / «نسخة الحالي», «نقل بنقرة») | «الرؤوس، تراجع، إعادة، إعادة الضبط، حذف».
+- **The frame** (`SiteEditor.setShapeHandles`, `lib/shapeTransform.ts`): corners scale evenly, side handles change width or length alone (square → rectangle, circle → ellipse), ↻ turns the shape; each drag is one undoable change; a chip «العرض × الطول». Re-stationing areas get the frame and handles; their own toolbar is not yet replaced.
+- **Checks:** `shapeTransform.test.ts` (4); in Edge, `deployment-areas-phase3.mjs`: 300×300 → 453×300 m by a side handle, ↻ keeps the sizes, circle → ellipse 340×469 m, undo restores.
+
+## Phase 4 of 8 — «طلب إعادة تمركز», started (17 Nov 2026)
+
+- Steps on the right, context on the left (owner); the site step uses the panel-5 toolbar and ready shapes sized as the current site within the maximum; «ضبط المساحة على المسموح» scales an oversized site down evenly (one undoable change); the arrow and the distance under the pointer while the site or an area is placed or drawn (`PointerGuide`).
+- **Not yet:** the simplified map-first flow of the brief §5 (units by camp → the current site by itself → new site → main → sub → review; one progress strip, no stacked cards); the areas' own toolbar; sending with an oversized site so that the final approver decides or returns it (owner, 17 Nov 2026 — a server rule change: today the maximum blocks submission).
+
+## Fluid responsive layout pass, approved by the owner (18 Nov 2026; ADR-085)
+
+- **Owner brief «PROFESSIONAL FLUID RESPONSIVE LAYOUT PASS»** (feature phases paused; layout only, no business change).
+- **Home:** the 1700 px cap is gone; gutters `clamp(12px, 1.2vw, 28px)`; on a desktop the dashboard is exactly the window's height — the map and the requests list take the full height, «العودات القادمة» is as tall as its content, the notes take the rest; the lists scroll inside their cards and load more rows (requests 24, returns 12, audit 16, notes 10) so a taller window shows more; «ما ينتظرك» and the indicators share one even row (compact on a laptop: no second line, smaller icon and number); three columns from 1600 px (the map 1.55fr, 2fr from 2200 px), two from 1180 px, one below.
+- **Maps:** every MapLibre map follows its container with a `ResizeObserver` (`OfflineMapLibre`): one `resize()` per frame, the view kept, no refit, no new map.
+- **Work screens:** side panels grow a little with the window (`clamp`), the map keeps the rest; on a laptop the new-request steps column keeps 265–290 px and the step strip/header shrink or wrap, so no panel spills over the map.
+- **Checks:** `tests/acceptance/responsive-layout.mjs` 16/16 in Edge — the home page at 1280×720, 1366×768, 1440×900, 1920×1080, 2560×1440, 3440×1440, 3840×2160 resized LIVE in one page (full width, grid down to the window's bottom, map canvas = its card, no horizontal scroll), back and forth again, and the deployment-areas request, re-stationing and site setup screens narrow and maximised (workspace fills the window, canvas fills its frame, no panel wider than its column). Screens and `home-side-by-side.png` in `docs/evidence/responsive-layout/`. Frontend 344 tests (2 skipped).
+- **Not done:** a visual polish of every card style (spacing scale, radii) beyond the dashboard and the work-screen columns; tablet and phone widths were left as they were and not re-measured; a real second monitor and OS fullscreen were not tried (the live resize in one page stands for them).
+
+## Visual polish gate, OWNER VISUAL REVIEW REQUIRED (18 Nov 2026; ADR-085 addendum)
+
+- **Owner:** "a professionally designed enterprise product, not an AI-generated dashboard"; the responsive behaviour approved and kept.
+- **One system** (last section of `shell.css`): spacing 4/8/12/16/24/32; radii 10px panels, 8px controls, round chips; flat surfaces from the theme's own colours (no gradients), borders for separation, shadows only for floating layers; every top-bar control 36px; colour only for state, selection and action.
+- **Home:** the indicators are one metric strip divided into equal parts (zero values neutral, `data-zero`); the panels are flat with one title line; the map runs edge to edge under its title; list rows sit on hairlines and light on hover instead of being boxed; empty lists say so in one line (`tz-empty-line`); while the request list is short (≤ 6 rows, or none to show) the grid uses two columns from 1181 px — the map larger, the three panels stacked at their content's height, the activity taking the rest — so no column is kept empty for rows that do not exist.
+- **Work screens:** the same surfaces, radii and button heights; a context panel is as tall as its content.
+- **Checks:** `tests/acceptance/responsive-layout.mjs` 16/16 after the polish; frontend 344 tests. Fixed on the way: the indicator strip squeezed at 1366×768, «المزيد» overlapping the search at 1366 (a base rule overrode the bar's width steps), the laptop indicator size, an existing `.tz-empty` class used by other screens.

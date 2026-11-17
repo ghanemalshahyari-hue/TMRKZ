@@ -104,7 +104,7 @@
 .tz-identity-pop > small { font-size: 11.5px; color: var(--tz-text-2); }
 
 /* ---- the console grid ---------------------------------------------------------------------------------------------- */
-.tz-console { position: relative; display: grid; grid-template-columns: minmax(300px, 350px) minmax(0, 1fr) minmax(260px, 300px); grid-template-rows: minmax(0, 1fr); gap: 12px; height: 100%; padding: 12px; }
+.tz-console { position: relative; display: grid; grid-template-columns: minmax(300px, clamp(350px, 17vw, 460px)) minmax(0, 1fr) minmax(260px, clamp(300px, 15vw, 420px)); grid-template-rows: minmax(0, 1fr); gap: 12px; height: 100%; padding: 12px; }
 .tz-console.context-closed { grid-template-columns: minmax(0, 1fr) minmax(260px, 300px); }
 .tz-console.context-closed .tz-col-context { display: none; }
 /* side columns traded (rail right, context left): the grid flows left to right, so every column template above and below
@@ -338,13 +338,24 @@
 .tz-app.is-console .rs-editor-checks .tz-checks { background: none; border: 0; padding: 0; }
 
 /* ---- home dashboard ------------------------------------------------------------------------------------------------ */
-.tz-home { max-width: 1700px; margin: 0 auto; padding: 18px 22px 30px; display: flex; flex-direction: column; gap: 16px; }
+/* the whole window, its height too (owner, 18 Nov 2026): no width cap, deliberate gutters, the grid takes what is left */
+.tz-home { width: 100%; max-width: none; margin: 0; box-sizing: border-box; min-height: 100%; padding: clamp(12px, 1.1vw, 28px) clamp(12px, 1.2vw, 28px); display: flex; flex-direction: column; gap: clamp(12px, 0.85vw, 20px); }
 .tz-home-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .tz-home-title { display: flex; align-items: center; gap: 14px; }
 .tz-home-title h1 { margin: 0; font-size: 22px; letter-spacing: -0.4px; color: #f2f8fa; }
 .tz-home-title p { margin: 2px 0 0; color: var(--tz-muted); font-size: 12.5px; }
-.tz-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
-.tz-tile { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--tz-line); border-radius: var(--tz-radius); background: linear-gradient(180deg, rgba(20, 53, 75, 0.85), rgba(13, 37, 54, 0.9)); color: var(--tz-text); box-shadow: var(--tz-shadow); }
+/* the indicators: one even row on a desktop whatever their number, wrapping evenly below */
+.tz-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: clamp(8px, 0.6vw, 14px); }
+/* «ما ينتظرك» and the live indicators share one even row on a desktop */
+.tz-home-kpis { display: flex; flex-direction: column; gap: clamp(8px, 0.6vw, 14px); }
+@media (min-width: 1181px) {
+  .tz-home-kpis { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: clamp(8px, 0.6vw, 14px); }
+  .tz-home-kpis > .tz-tiles { display: contents; }
+  /* a desktop dashboard is exactly the window's height: the map and the lists take what the header and indicators leave */
+  .tz-home { height: 100%; min-height: 0; }
+  .tz-home-grid { flex: 1 1 0; min-height: 360px; }
+}
+.tz-tile { display: flex; align-items: center; gap: 12px; min-height: 74px; box-sizing: border-box; padding: 12px 14px; border: 1px solid var(--tz-line); border-radius: var(--tz-radius); background: linear-gradient(180deg, rgba(20, 53, 75, 0.85), rgba(13, 37, 54, 0.9)); color: var(--tz-text); box-shadow: var(--tz-shadow); }
 a.tz-tile:hover { border-color: rgba(43, 196, 168, 0.6); }
 .tz-tile-icon { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); color: var(--tz-text-2); }
 .tz-tile-icon .icon { width: 22px; height: 22px; }
@@ -357,14 +368,18 @@ a.tz-tile:hover { border-color: rgba(43, 196, 168, 0.6); }
 .tz-tile-text b { font: 700 24px/1.15 Arial, sans-serif; color: #f2f8fa; }
 .tz-tile-text span { font-size: 12.5px; color: var(--tz-text-2); }
 .tz-tile-text small { font-size: 11px; color: var(--tz-muted); }
-.tz-home-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: 'map requests returns' 'map requests notes'; gap: 12px; }
+/* the map and the requests take the full height; «العودات القادمة» is as tall as its content, the notes take the rest */
+.tz-home-grid { flex: 1 1 auto; min-height: 0; display: grid; gap: clamp(10px, 0.8vw, 16px); grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: 'map requests returns' 'map requests notes'; }
+@media (min-width: 2200px) { .tz-home-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr); } }
 .tz-home-map { grid-area: map; }
 .tz-home-requests { grid-area: requests; }
 .tz-home-returns { grid-area: returns; }
 .tz-home-notes { grid-area: notes; }
-.tz-home-grid > .tz-card { background: linear-gradient(180deg, rgba(19, 49, 72, 0.85), rgba(13, 35, 52, 0.9)); box-shadow: var(--tz-shadow); min-width: 0; }
-.tz-home-map { display: flex; flex-direction: column; }
-.tz-home-mapbox { position: relative; flex: 1; min-height: 420px; border-radius: 10px; overflow: hidden; border: 1px solid var(--tz-line); }
+.tz-home-grid > .tz-card { background: linear-gradient(180deg, rgba(19, 49, 72, 0.85), rgba(13, 35, 52, 0.9)); box-shadow: var(--tz-shadow); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+/* the lists show as many rows as their card has room for, and scroll inside it */
+.tz-home-grid > .tz-card > .tz-list { flex: 1 1 auto; min-height: 0; overflow: auto; padding-inline-end: 2px; }
+.tz-home-returns > .tz-list { max-height: 30vh; }
+.tz-home-mapbox { position: relative; flex: 1; min-height: 320px; border-radius: 10px; overflow: hidden; border: 1px solid var(--tz-line); }
 .tz-home-mapbox .ml-offline { position: absolute; inset: 0; }
 .tz-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
 .tz-list li > a, .tz-list li > span { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding: 7px 9px; border: 1px solid var(--tz-line); border-radius: 9px; background: rgba(255, 255, 255, 0.025); color: var(--tz-text); }
@@ -399,7 +414,16 @@ a.tz-tile:hover { border-color: rgba(43, 196, 168, 0.6); }
   .tz-action-text small { display: none; }
   .tz-identity-text small { display: none; }
   .tz-step { flex-basis: 112px; }
-  .tz-home-grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); grid-template-areas: 'map requests' 'map returns' 'map notes'; }
+}
+@media (max-width: 1599px) {
+  /* the indicators stay one compact row on a laptop: the second line goes, the icon and the number get smaller */
+  .tz-tile { min-height: 64px; padding: 10px 12px; gap: 10px; }
+  .tz-tile-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .tz-tile-icon .icon { width: 19px; height: 19px; }
+  .tz-tile-text b { font-size: 20px; }
+  .tz-tile-text span { font-size: 12px; }
+  .tz-tile-text small { display: none; }
+  .tz-home-grid { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: 'map requests' 'map returns' 'map notes'; }
 }
 /* tablet: the context panel collapses on demand, the actions become a compact rail, the drawer slides over the map */
 @media (max-width: 1180px) {
@@ -430,7 +454,9 @@ a.tz-tile:hover { border-color: rgba(43, 196, 168, 0.6); }
   .tz-drawer.open .tz-filters { top: 0; border-radius: 12px 12px 0 0; padding: 8px; border-bottom: 0; }
   .tz-drawer.open .rs-list { top: 44px; max-height: calc(100% - 52px); border-radius: 0 0 12px 12px; padding: 8px; border-top: 0; }
   .tz-drawer.open { flex: 0 0 auto; }
-  .tz-home-grid { grid-template-columns: 1fr; grid-template-areas: 'map' 'requests' 'returns' 'notes'; }
+  .tz-home-grid { grid-template-columns: 1fr; grid-template-rows: none; grid-template-areas: 'map' 'requests' 'returns' 'notes'; min-height: 0; }
+  .tz-home-mapbox { min-height: 52vh; }
+  .tz-home-grid > .tz-card > .tz-list { max-height: 48vh; }
   .tz-step { flex-basis: 104px; }
 }
 @media (max-width: 900px) {
@@ -576,13 +602,14 @@ a.tz-tile:hover { border-color: rgba(43, 196, 168, 0.6); }
 }
 
 /* ---- new request (map first, owner review of 5 Nov 2026): the map dominates at every width ---------------------- */
-.tz-console.create { grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(240px, 270px); }
+.tz-console.create { grid-template-columns: minmax(240px, clamp(280px, 15vw, 400px)) minmax(0, 1fr) minmax(240px, clamp(300px, 17vw, 440px)); }
 .tz-console.create .tz-context-toggle { display: none; }
 @media (max-width: 1400px) {
-  .tz-console.create { grid-template-columns: minmax(205px, 225px) minmax(0, 1fr) minmax(205px, 225px); gap: 10px; }
+  /* the steps (third column) keep room for their strip and tools; the context gives way */
+  .tz-console.create { grid-template-columns: minmax(190px, 220px) minmax(0, 1fr) minmax(265px, 290px); gap: 10px; }
 }
 @media (max-width: 1180px) {
-  .tz-console.create { grid-template-columns: 200px minmax(0, 1fr) 200px; gap: 8px; padding: 8px; }
+  .tz-console.create { grid-template-columns: 190px minmax(0, 1fr) 240px; gap: 8px; padding: 8px; }
   .tz-console.create .tz-maptools { padding-inline-start: 12px; }
 }
 /* the step tracker: dots only (later steps are not described before they come); the panel says «الخطوة n من 6» */
@@ -678,7 +705,11 @@ a.tz-tile:hover { border-color: rgba(43, 196, 168, 0.6); }
 .sw-top { display: flex; align-items: center; gap: 10px; }
 .sw-title { margin: 0; font-size: 14.5px; font-weight: 800; color: var(--tz-text); }
 .sw-back { border: 1px solid var(--tz-line-2); background: transparent; color: var(--tz-text); border-radius: 9px; padding: 3px 9px; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-.sw-steps { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.sw-steps { display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; min-width: 0; }
+/* a narrow panel never spills over the map: the steps shrink, the header wraps */
+.sw-step { min-width: 0; }
+.sw-step span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sw-top { flex-wrap: wrap; row-gap: 4px; min-width: 0; }
 .sw-step { flex: 1 1 0; display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 9px; border: 1px solid var(--tz-line); color: var(--tz-muted); font-weight: 700; font-size: 12px; }
 .sw-step b { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--tz-line); color: var(--tz-text); font-size: 11px; flex: none; }
 .sw-step.on { border-color: var(--sw-on); color: var(--tz-text); }
@@ -735,7 +766,7 @@ textarea.sw-input { resize: vertical; min-height: 56px; }
 /* ---- movable, widenable, foldable side panels (owner, 10 Nov 2026, after MOVER's card chrome) ------------------------------
    The grid takes its two side widths from variables; «تكبير» and «تصغير» change only the variable, the map takes the rest.
    Column 1 is always the context panel and column 3 the rail; «⇄» flips the flow (.swapped), so each keeps its own width. */
-.tz-console.chrome { --tz-ctx-w: minmax(280px, 320px); --tz-rail-w: minmax(320px, 360px); --tz-max-w: min(640px, 46vw); --tz-min-w: 46px;
+.tz-console.chrome { --tz-ctx-w: minmax(280px, clamp(320px, 15vw, 420px)); --tz-rail-w: minmax(320px, clamp(360px, 18vw, 480px)); --tz-max-w: min(640px, 46vw); --tz-min-w: 46px;
   grid-template-columns: var(--tz-ctx-w) minmax(0, 1fr) var(--tz-rail-w); }
 @media (max-width: 1400px) { .tz-console.chrome { --tz-ctx-w: minmax(250px, 290px); --tz-rail-w: minmax(290px, 330px); } }
 @media (max-width: 1180px) and (min-width: 761px) { .tz-console.chrome { --tz-ctx-w: minmax(220px, 250px); --tz-rail-w: minmax(260px, 290px); --tz-max-w: min(500px, 56vw); } }
@@ -859,3 +890,99 @@ textarea.sw-input { resize: vertical; min-height: 56px; }
 .sw-wizard .stw-proposal-panel .button { font-size: 11.5px; padding: 3px 7px; min-height: 26px; }
 .sw-wizard .tz-checks.compact { padding: 6px 8px; }
 .sw-wizard [data-unit-check] > .sw-hint { margin-top: 2px; }
+
+/* ==== visual polish (owner, 18 Nov 2026: "a professionally designed enterprise product, not an AI-generated dashboard") ====
+   One spacing scale 4 / 8 / 12 / 16 / 24 / 32. Three radii: panels 10px, controls 8px, chips round. Flat surfaces from the
+   theme's own colours, borders for separation, shadows only for what floats (menus, pop-ups, map overlays). Colour only for
+   state, selection and action. The responsive layout (ADR-085) is unchanged: these rules change looks, not structure. */
+:root { --tz-r-panel: 10px; --tz-r-ctl: 8px; }
+
+/* -- the top bar: one quiet strip, every control 36px high -- */
+.tz-top { gap: 12px; padding: 0 16px; background: var(--tz-bg-2); border-bottom: 1px solid var(--tz-line); }
+.tz-brand { gap: 8px; padding-inline-end: 12px; border-inline-end-color: var(--tz-line); }
+.tz-nav { gap: 4px; }
+/* height and shape only: the width steps of the bar (1800 / 1500 / 1320 px) keep their own padding and gaps */
+.tz-nav-item { height: 36px; border: 0; border-radius: var(--tz-r-ctl); color: var(--tz-text-2); }
+.tz-nav-item:hover { background: var(--tz-raise); }
+.tz-nav-item.active { background: var(--tz-teal-soft); color: var(--tz-text); box-shadow: inset 0 -2px 0 var(--tz-teal); }
+.tz-top-tools { gap: 8px; }
+.tz-search { height: 36px; border-radius: var(--tz-r-ctl); border-color: var(--tz-line); background: var(--tz-raise); }
+.tz-icon-btn { width: 36px; height: 36px; border-radius: var(--tz-r-ctl); border-color: var(--tz-line); background: none; }
+.tz-workspace { border-radius: var(--tz-r-ctl); border-color: var(--tz-line); background: none; }
+
+/* -- the home page -- */
+.tz-home { gap: 16px; padding: 16px 24px; }
+.tz-home-grid { gap: 16px; }
+@media (max-width: 1599px) { .tz-home { gap: 12px; padding: 12px 16px; } .tz-home-grid { gap: 12px; } }
+@media (min-width: 2200px) { .tz-home { padding: 24px 32px; } }
+.tz-home-head { gap: 16px; }
+.tz-home-title { gap: 12px; }
+.tz-home-title h1 { font-size: 20px; font-weight: 700; letter-spacing: 0; line-height: 1.35; color: var(--tz-text); }
+.tz-home-title p { margin: 4px 0 0; font-size: 12px; color: var(--tz-muted); }
+.tz-home-actions { display: flex; gap: 8px; }
+.tz-home-actions .button { height: 36px; min-height: 36px; padding: 0 16px; border-radius: var(--tz-r-ctl); box-shadow: none; }
+
+/* the indicators: one metric strip divided into equal parts, not seven floating boxes */
+.tz-tile { gap: 12px; min-height: 72px; padding: 12px 16px; border: 1px solid var(--tz-line); border-radius: var(--tz-r-panel); background: var(--tz-panel); box-shadow: none; color: var(--tz-text); }
+a.tz-tile:hover { background: var(--tz-raise); border-color: var(--tz-line); }
+.tz-tile-icon { width: 36px; height: 36px; border-radius: var(--tz-r-ctl); }
+.tz-tile-icon .icon { width: 18px; height: 18px; }
+.tz-tile-text { gap: 0; line-height: 1.4; }
+.tz-tile-text b { font-family: inherit; font-size: 22px; font-weight: 700; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--tz-text); }
+.tz-tile-text span { font-size: 12px; color: var(--tz-text-2); }
+.tz-tile-text small { font-size: 11px; color: var(--tz-muted); }
+.tz-tile[data-zero] .tz-tile-icon { background: var(--tz-raise); color: var(--tz-muted); }
+/* a laptop keeps the compact strip (one line per metric) */
+@media (max-width: 1599px) {
+  .tz-tile { min-height: 64px; padding: 8px 12px; gap: 8px; }
+  .tz-tile-icon { width: 32px; height: 32px; }
+  .tz-tile-icon .icon { width: 16px; height: 16px; }
+  .tz-tile-text b { font-size: 20px; }
+}
+.tz-tile[data-zero] .tz-tile-text b { color: var(--tz-muted); font-weight: 600; }
+/* the header and the strip keep their height; only the panels below give way */
+.tz-home-head, .tz-home-kpis { flex-shrink: 0; }
+@media (min-width: 1181px) {
+  .tz-home-kpis { gap: 0; border: 1px solid var(--tz-line); border-radius: var(--tz-r-panel); background: var(--tz-panel); overflow: hidden; }
+  .tz-home-kpis .tz-tile { border: 0; border-radius: 0; background: none; border-inline-start: 1px solid var(--tz-line); }
+  .tz-home-kpis > .tz-tiles:first-child > .tz-tile:first-child { border-inline-start: 0; }
+  .tz-home-kpis a.tz-tile:hover { background: var(--tz-raise); }
+}
+
+/* the panels: flat, one border, the same padding and title line */
+.tz-home-grid > .tz-card { padding: 12px 16px 16px; border: 1px solid var(--tz-line); border-radius: var(--tz-r-panel); background: var(--tz-panel); box-shadow: none; }
+.tz-home-grid .tz-card-head { min-height: 28px; margin-bottom: 8px; }
+.tz-home-grid .tz-card-head h3 { font-size: 14px; font-weight: 700; }
+.tz-home-grid .tz-card-head > small, .tz-home-grid .tz-link { font-size: 12px; }
+/* the map is the main object: edge to edge under its title, no second frame */
+.tz-home-grid > .tz-home-map { padding: 0; overflow: hidden; }
+.tz-home-map .tz-card-head { margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--tz-line); }
+.tz-home-mapbox { border: 0; border-radius: 0; }
+/* the lists: rows on hairlines, scanned top to bottom; a row is lit on hover, not boxed */
+.tz-home-grid .tz-list { gap: 0; }
+.tz-home-grid .tz-list li > a, .tz-home-grid .tz-list li > span { gap: 4px 8px; padding: 8px; border: 0; border-bottom: 1px solid var(--tz-line); border-radius: 0; background: none; }
+.tz-home-grid .tz-list li:last-child > a, .tz-home-grid .tz-list li:last-child > span { border-bottom: 0; }
+.tz-home-grid .tz-list li > a:hover { background: var(--tz-raise); border-color: var(--tz-line); }
+.tz-home-grid .tz-list b { font-size: 13px; font-weight: 700; }
+.tz-home-grid .tz-list small { font-size: 12px; color: var(--tz-muted); }
+/* an empty list says so in one line */
+.tz-empty-line { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 8px; margin: 0; padding: 4px 0; font-size: 12px; text-align: start; color: var(--tz-muted); }
+.tz-empty-line::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--tz-line-2); }
+
+/* -- the work screens: the same surfaces, radii and buttons -- */
+.tz-console { gap: 12px; padding: 12px; }
+.tz-mapframe { border: 1px solid var(--tz-line); border-radius: var(--tz-r-panel); box-shadow: none; }
+.tz-flow, .tz-context, .tz-drawer { border: 1px solid var(--tz-line); border-radius: var(--tz-r-panel); background: var(--tz-panel); box-shadow: none; }
+.tz-col .tz-card { border-radius: var(--tz-r-panel); }
+.tz-legend, .tz-placing, .tz-site-card { border-radius: var(--tz-r-ctl); }
+.sw-step, .sw-way, .sw-choice, .sw-back, .sw-picked, .da-unit, .da-campname, .da-toolbar, .sym-field, .sg-item { border-radius: var(--tz-r-ctl); }
+.sw-go { min-height: 36px; border-radius: var(--tz-r-ctl); box-shadow: none; }
+/* a short request list: two columns from 1181 px, the map larger, the three panels stacked at their content's height and
+   the activity taking what is left (no column kept empty for rows that do not exist) */
+@media (min-width: 1181px) {
+  .tz-home-grid.is-compact { grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: 'map requests' 'map returns' 'map notes'; }
+}
+@media (min-width: 2200px) { .tz-home-grid.is-compact { grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr); } }
+/* a work screen's context panel is as tall as what it holds (it scrolls when long), not a full-height empty box */
+.tz-col-context > .tz-context { height: auto; max-height: 100%; }
+

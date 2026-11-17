@@ -29,7 +29,10 @@ import { renderSymbol } from '../lib/unitSymbols';
 import { canOpen as flowCanOpen, completed, deriveRequesting, firstOpen, unitsAtSite, type FlowInput, type FlowStep } from '../lib/newRequestFlow';
 import { occupiedFeatures, occupiedSites, overlapsOccupied } from '../lib/occupied';
 import type { RefSite } from '../lib/sitesLayer';
-import { DRAW_NEW_BOUNDARY } from '../lib/stationingV3';
+import { readyShape, type ShapeKind } from '../lib/shapeTransform';
+import { ToolGlyph } from '../components/stationing/ToolGlyph';
+import { PointerGuide } from '../components/map/maplibre/PointerGuide';
+import { kmChip, verdictOf } from '../lib/deploymentAreasFlow';
 import { PURPOSE_TITLE, PURPOSE_WRITES, type Purpose } from '../lib/requestPurpose';
 
 type Placing = 'site' | 'primary' | 'alternative' | 'point' | null;
@@ -58,7 +61,7 @@ const dayStart = (d: string) => (d ? new Date(d + 'T00:00:00+04:00').toISOString
 const PURPOSE_QUESTION: Record<Purpose, Partial<Record<FlowStep, string>>> = {
   RESTATIONING: {},
   INITIAL_STATIONING: { 6: 'طلب تمركز أولي سابق' },
-  DEPLOYMENT_AREAS: { 5: 'منطقتا الانتشار: الرئيسية والبديلة', 6: 'الفحص والمراجعة' },
+  DEPLOYMENT_AREAS: { 5: 'منطقتا الانتشار: الرئيسية والفرعية', 6: 'الفحص والمراجعة' },
   SITE_REGISTRATION: { 4: 'حدد الموقع على الخريطة وأدخل بياناته', 6: 'الفحص والمراجعة' },
 };
 /** The question of each step, in the left panel. */
@@ -297,6 +300,9 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
     // a metric scale bar, as on the accepted Stationing map
     m.addControl(new ScaleControl({ unit: 'metric', maxWidth: 110 }), 'bottom-right');
     m.on('click', (e) => clickRef.current(e));
+    // the arrow and the distance under the pointer while the site or an area is placed or drawn (owner, 17 Nov 2026)
+    guideRef.current = new PointerGuide(m);
+    m.on('mousemove', (e) => moveRef.current(e));
     // the maximum footprint is the site's rule; a deployment area has none
     editorRef.current = new SiteEditor(m, { onChange: (l, f) => onSiteRef.current(l, f), maxAreaM2: () => (editTargetRef.current === 'site' ? maxAreaRef.current : null), onDrawShape: (shape) => slopeInsideRef.current?.update(editTargetRef.current, shape ? [[shape]] : null, true) });
     editorRef.current.load(contentRef.current.site?.geometry ?? null);
@@ -374,6 +380,8 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
     ed.setConflict(false);
     ed.setLook(editTarget === 'site' ? SITE_LOOK : AREA_LOOK[editTarget]);
     ed.setMode('move');
+    // a deployment area with the Word-like frame and handles (the site's own toolbar decides for the site)
+    ed.setShapeHandles(editTarget !== 'site');
     const c = contentRef.current;
     const g = editTarget === 'site' ? c.site?.geometry ?? null : ((c[editTarget] as SiteGeometry | null) ?? null);
     ed.load(g, editTarget === 'site');
@@ -458,7 +466,20 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
     if (!p) return;
     const { lng, lat } = e.lngLat;
     setPlacing(null);
-    if (p === 'site') return editorRef.current?.moveTo({ lat, lng });
+    if (p === 'site') {
+      // a ready shape from the toolbar (owner, 17 Nov 2026: «مثل Word»): the current site's area, within the maximum
+      const k = shapingRef.current;
+      if (k) {
+        shapingRef.current = null;
+        setShaping(null);
+        const size = Math.min(currentArea ?? 250_000, maxAreaRef.current ?? Infinity);
+        const ring = readyShape({ lat, lng }, k, size);
+        editorRef.current?.load({ type: 'Polygon', coordinates: [[...ring, ring[0]].map((q) => [q.lng, q.lat])] } as unknown as SiteGeometry, false);
+        setContent((c) => (c.site ? { ...c, site: { ...c.site, shape: 'DRAWN', copiedFrom: null } } : c));
+        return;
+      }
+      return editorRef.current?.moveTo({ lat, lng });
+    }
     if (p === 'point') {
       editorRef.current?.load(null, false);
       setPoint({ lat, lng });
@@ -497,6 +518,38 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
   };
   const currentShape = shapeOf(current?.geometry ?? null) ?? shapeOf((loaded?.currentSites[0]?.geometry as RefSite['geometry']) ?? null);
   const currentArea = useMemo(() => (currentShape ? validateSite(partsOf(currentShape)).areaM2 : null), [currentShape]);
+  const guideRef = useRef<PointerGuide | null>(null);
+  const moveRef = useRef<(e: MapMouseEvent) => void>(() => undefined);
+  useEffect(() => () => guideRef.current?.destroy(), []);
+  const centreOfGeo = (g: unknown): LatLng | null => {
+    if (isShape(g)) return anchorOf(partsOf(g));
+    const pt = g as { type?: string; coordinates?: [number, number] } | null;
+    return pt?.type === 'Point' && pt.coordinates ? { lat: pt.coordinates[1], lng: pt.coordinates[0] } : null;
+  };
+  moveRef.current = (e: MapMouseEvent) => {
+    const g = guideRef.current;
+    if (!g) return;
+    const at = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+    const areaRole = placing === 'primary' || placing === 'alternative' ? placing : step === 5 && drawingNow ? deployTarget : null;
+    if (areaRole) {
+      // the main area from the new site (or, for a request of areas only, the current one); the sub-area from the main area
+      const from = areaRole === 'primary' ? centreOfGeo(content.site?.geometry) ?? origin : centreOfGeo(content.primary);
+      if (!from) return g.hide();
+      const d = distanceM(from, at);
+      const v = verdictOf(d, policyValues?.[areaRole] ?? null);
+      return g.show(e, from, `${kmChip(d)} ${areaRole === 'primary' ? 'من مركز الموقع' : 'من مركز منطقة الانتشار الرئيسية'}${v ? ' · ' + v.text : ''}`, v?.tone ?? 'none');
+    }
+    if ((placing === 'site' || (step === 4 && drawingNow)) && origin) {
+      return g.show(e, origin, `${kmChip(distanceM(origin, at))} من الموقع الحالي — للعلم فقط`, 'none');
+    }
+    g.hide();
+  };
+  useEffect(() => {
+    if (!placing && !drawingNow) guideRef.current?.hide();
+  }, [placing, drawingNow]);
+  // the ready shape the next map click places as the new site (circle, ellipse, square, rectangle)
+  const [shaping, setShaping] = useState<ShapeKind | null>(null);
+  const shapingRef = useRef<ShapeKind | null>(null);
   const origin: LatLng | null = currentShape ? anchorOf(partsOf(currentShape)) : current?.lat != null && current.lng != null ? { lat: current.lat, lng: current.lng } : null;
 
   // entering the new-site step: the current footprint appears as the proposed site, ready to drag; a marker-only
@@ -736,7 +789,7 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
       demAvailable={!!sampler}
     />
   );
-  const PLACING: Record<Exclude<Placing, null>, string> = { point: 'الموقع', site: 'موقع إعادة التمركز', primary: 'منطقة الانتشار الرئيسية', alternative: 'منطقة الانتشار البديلة' };
+  const PLACING: Record<Exclude<Placing, null>, string> = { point: 'الموقع', site: 'موقع إعادة التمركز', primary: 'منطقة الانتشار الرئيسية', alternative: 'منطقة الانتشار الفرعية' };
   const KIND = content.kind === 'TEMPORARY' ? 'مؤقت' : 'دائم';
 
   /** What the earlier steps settled, one line each, with a way back to change it. */
@@ -813,8 +866,10 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
               }}
               onMoveTab={moveTab}
               onDrawTab={() => (pointMarker.current?.remove(), setPoint(null), redraw())}
-              picking={placing === 'site'}
-              onPick={() => setPlacing(placing === 'site' ? null : 'site')}
+              picking={placing === 'site' && !shaping}
+              onPick={() => { shapingRef.current = null; setShaping(null); setPlacing(placing === 'site' && !shaping ? null : 'site'); }}
+              shaping={shaping}
+              onShape={(k) => { const on = shaping !== k; shapingRef.current = on ? k : null; setShaping(on ? k : null); setPlacing(on ? 'site' : null); }}
             />
             {point && !isShape(content.site?.geometry) && <p className="tz-muted micro">نقطة: {point.lat.toFixed(5)}، {point.lng.toFixed(5)}</p>}
             {!!occupiedHits.length && <p className="rs-bad" data-testid="reg-overlap">يتداخل مع: {occupiedHits.join('، ')} — استخدم الموقع المسجل بدل تسجيله مرة أخرى.</p>}
@@ -905,8 +960,10 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
               }}
               onMoveTab={moveTab}
               onDrawTab={redraw}
-              picking={placing === 'site'}
-              onPick={() => setPlacing(placing === 'site' ? null : 'site')}
+              picking={placing === 'site' && !shaping}
+              onPick={() => { shapingRef.current = null; setShaping(null); setPlacing(placing === 'site' && !shaping ? null : 'site'); }}
+              shaping={shaping}
+              onShape={(k) => { const on = shaping !== k; shapingRef.current = on ? k : null; setShaping(on ? k : null); setPlacing(on ? 'site' : null); }}
             />
             <div className="rs-tools">
               <button className="button" disabled={busy || !content.site || drawingNow} onClick={save}>حفظ المسودة والفحص</button>
@@ -953,7 +1010,7 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
             >
               {leg(deployTarget)?.status === 'NEEDS_EXCEPTION' && (
                 <label>
-                  سبب تجاوز المسافة المسموحة — {deployTarget === 'primary' ? 'المنطقة الرئيسية' : 'المنطقة البديلة'} (يقرره المعتمد النهائي مع الطلب)
+                  سبب تجاوز المسافة المسموحة — {deployTarget === 'primary' ? 'المنطقة الرئيسية' : 'المنطقة الفرعية'} (يقرره المعتمد النهائي مع الطلب)
                   <input value={content.exceptions?.[deployTarget] ?? ''} onChange={(e) => set({ exceptions: { ...(content.exceptions ?? {}), [deployTarget]: e.target.value } })} />
                 </label>
               )}
@@ -1008,6 +1065,7 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
   return (
     <OperationalWorkspace
       create
+      swapSides
       sheetKey={id ?? 'new'}
       rail={panel}
       railLabel="الخطوات"
@@ -1083,7 +1141,9 @@ export function RestationingEditor({ requestId, purpose: purposeProp = null, pre
  * ground, the vertex coordinates (optional), and ↶ تراجع · ↷ إعادة · إعادة الضبط · تعديل الرؤوس · ◎ المقترح ·
  * ⇆ مقارنة الموقعين. Updated on every frame of a drag from the editor, without re-rendering the map. Nothing is saved.
  */
-function PlaceControls({ editor, listeners, setMode, maxAreaM2, occupiedHits, shape, markerOnly, canCopy, currentArea, origin, target, setTarget, onMoveTab, onDrawTab, picking, onPick }: {
+function PlaceControls({ editor, listeners, setMode, maxAreaM2, occupiedHits, shape, markerOnly, canCopy, currentArea, origin, target, setTarget, onMoveTab, onDrawTab, picking, onPick, shaping, onShape }: {
+  shaping: ShapeKind | null;
+  onShape: (k: ShapeKind) => void;
   editor: React.RefObject<SiteEditor | null>;
   listeners: React.RefObject<Set<(l: SiteLive) => void>>;
   setMode: (m: 'move' | 'vertices') => void;
@@ -1125,26 +1185,39 @@ function PlaceControls({ editor, listeners, setMode, maxAreaM2, occupiedHits, sh
   const problems = open ? d?.problems ?? [] : live?.problems ?? [];
   const vertexMode = live?.mode === 'vertices';
   const ring = !open && live?.geometry && live.activePart != null ? partsOf(live.geometry)[live.activePart]?.[0] ?? null : null;
+  // «تحديد» shows the Word-like frame and its handles, «تحريك» drags the whole shape, «الرؤوس» edits its vertices
+  const [tool, setTool] = useState<'select' | 'move' | 'vertices'>('select');
+  useEffect(() => {
+    if (!ed || open) return;
+    setMode(tool === 'vertices' ? 'vertices' : 'move');
+    ed.setShapeHandles(tool === 'select');
+    return () => ed.setShapeHandles(false);
+  }, [tool, ed, open, !!live?.geometry]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="rs-site-controls tz-place stw-proposal-panel" data-testid={open ? 'draw-readout' : undefined} data-count={d?.count}>
-      {/* two methods (owner, 5 Nov 2026): edit on the map, or pick the destination and the same shape moves there */}
-      <div className="stw-tools two" role="group" aria-label="طريقة تحديد الموقع">
-        <button className={'button' + (!picking ? ' on' : '')} aria-pressed={!picking} onClick={() => picking && onPick()}>
-          اسحب/عدّل الحدود
-        </button>
-        <button className={'button' + (picking ? ' on' : '')} aria-pressed={picking} disabled={!live?.geometry || open} title={!live?.geometry ? 'ارسم الحدود أولاً' : undefined} onClick={onPick}>
-          تحديد الموقع على الخريطة
-        </button>
+      {/* «أدوات الرسم والتحكم (مثل Word)» (owner brief §7, reference panel 5; owner, 17 Nov 2026: "use number 5 here too") */}
+      <div className="da-toolbar" role="toolbar" aria-label="أدوات الرسم والتحكم" data-testid="tools-site">
+        <div className="da-tgroup">
+          <button type="button" className={'da-tool' + (tool === 'select' && !picking && !open && !shaping ? ' on' : '')} data-tool="select" disabled={!live?.geometry || open} title="تحديد: الإطار ومقابضه — الزوايا تكبّر وتصغّر، الجوانب تغيّر العرض أو الطول، ↻ يدوّر" onClick={() => setTool('select')}><ToolGlyph k="select" /><span>تحديد</span></button>
+          <button type="button" className={'da-tool' + (tool === 'move' && !picking && !open && !shaping ? ' on' : '')} data-tool="move" disabled={!live?.geometry || open} title="تحريك: اسحب الشكل كاملاً" onClick={() => setTool('move')}><ToolGlyph k="move" /><span>تحريك</span></button>
+          <button type="button" className={'da-tool' + (picking ? ' on' : '')} data-tool="pick" disabled={!live?.geometry || open} title="انقر على المكان المطلوب: ينتقل الشكل نفسه ويقع مركزه عليه" onClick={onPick}><ToolGlyph k="pick" /><span>نقل بنقرة</span></button>
+        </div>
+        <div className="da-tgroup">
+          <button type="button" className={'da-tool' + (!drawing && !shaping ? ' on' : '')} data-tool="copy-current" disabled={!canCopy} title={canCopy ? 'نسخة من حدود الموقع الحالي، ثم اسحبها إلى الموقع الجديد' : 'الموقع الحالي علامة فقط بلا حدود مسجلة'} onClick={onMoveTab}><ToolGlyph k="COPY" /><span>نسخة الحالي</span></button>
+          {([['CIRCLE', 'دائرة'], ['ELLIPSE', 'بيضاوي'], ['SQUARE', 'مربع'], ['RECTANGLE', 'مستطيل']] as const).map(([k, label]) => (
+            <button key={k} type="button" className={'da-tool' + (shaping === k ? ' on' : '')} data-tool={k} disabled={open} title={`${label}${currentArea ? ' بمساحة الموقع الحالي' : ''}، بنقرة على الخريطة`} onClick={() => onShape(k)}><ToolGlyph k={k} /><span>{label}</span></button>
+          ))}
+          <button type="button" className={'da-tool' + (open ? ' on' : '')} data-tool="draw" title="رسم حر: انقر عند كل زاوية" onClick={onDrawTab}><ToolGlyph k="draw" /><span>رسم حر</span></button>
+        </div>
+        <div className="da-tgroup">
+          <button type="button" className={'da-tool' + (vertexMode ? ' on' : '')} data-tool="vertices" disabled={!live?.geometry || open} onClick={() => setTool(vertexMode ? 'select' : 'vertices')}><ToolGlyph k="vertices" /><span>الرؤوس</span></button>
+          <button type="button" className="da-tool" data-tool="undo" disabled={open ? !d?.count : !live?.canUndo} onClick={() => (open ? ed?.undoVertex() : ed?.undo())}><ToolGlyph k="undo" /><span>تراجع</span></button>
+          <button type="button" className="da-tool" data-tool="redo" disabled={open ? !live?.canRedoDraw : !live?.canRedo} onClick={() => (open ? ed?.redoVertex() : ed?.redo())}><ToolGlyph k="redo" /><span>إعادة</span></button>
+          <button type="button" className="da-tool" data-tool="reset" onClick={() => (open ? ed?.restartDrawing() : ed?.reset())}><ToolGlyph k="reset" /><span>إعادة الضبط</span></button>
+        </div>
       </div>
       {picking && <p className="stw-hint" data-testid="pick-hint">انقر على المكان المطلوب: ينتقل الشكل نفسه ويقع مركزه على النقطة — المسافة للعلم فقط.</p>}
-      <div className="stw-tabs" role="tablist" aria-label="طريقة الاقتراح">
-        <button role="tab" aria-selected={!drawing} className={!drawing ? 'on' : ''} disabled={!canCopy} title={canCopy ? undefined : 'الموقع الحالي علامة فقط بلا حدود مسجلة'} onClick={onMoveTab}>
-          أ · نقل الحدود الحالية
-        </button>
-        <button role="tab" aria-selected={drawing} className={drawing ? 'on' : ''} onClick={onDrawTab}>
-          ب · {DRAW_NEW_BOUNDARY}
-        </button>
-      </div>
+      {shaping && <p className="stw-hint" data-testid="shape-hint">انقر على الخريطة في مكان الموقع الجديد: يوضع الشكل بمساحة الموقع الحالي (ضمن الحد الأقصى)، ثم اسحب مقابضه.</p>}
       <p className="stw-hint" data-testid={!drawing ? 'drag-instruction' : markerOnly ? 'marker-only' : undefined}>
         {open
           ? markerOnly
@@ -1224,6 +1297,13 @@ function PlaceControls({ editor, listeners, setMode, maxAreaM2, occupiedHits, sh
           {occupiedHits.length ? '✕ يتداخل مع أرض مشغولة: ' + occupiedHits.join('، ') : '✓ لا تداخل'}
         </dd>
       </dl>
+      {/* the area over the maximum: one click brings the shape within it (owner, 17 Nov 2026) */}
+      {!open && area != null && maxAreaM2 != null && area > maxAreaM2 && (
+        <div className="stw-fit" data-testid="fit-area">
+          <button type="button" className="button primary" onClick={() => editor.current?.scaleToArea(maxAreaM2)}>ضبط المساحة على المسموح ({formatArea(maxAreaM2)})</button>
+          <small>يُصغَّر الشكل كله بالنسبة نفسها حول مركزه حتى الحد الأقصى، ويبقى في مكانه. «تراجع» يعيده.</small>
+        </div>
+      )}
 
       {vertexMode && ring && (
         <details className="stw-coords-box">
@@ -1247,20 +1327,6 @@ function PlaceControls({ editor, listeners, setMode, maxAreaM2, occupiedHits, sh
       )}
 
       <div className="stw-tools">
-        <button className="button" disabled={open ? !d?.count : !live?.canUndo} onClick={() => (open ? ed?.undoVertex() : ed?.undo())} title="تراجع">
-          ↶ تراجع
-        </button>
-        <button className="button" disabled={open ? !live?.canRedoDraw : !live?.canRedo} onClick={() => (open ? ed?.redoVertex() : ed?.redo())} title="إعادة">
-          ↷ إعادة
-        </button>
-        <button className="button" onClick={() => (open ? ed?.restartDrawing() : ed?.reset())}>
-          إعادة الضبط
-        </button>
-        {!open && live?.geometry && (
-          <button className={'button' + (vertexMode ? ' on' : '')} aria-pressed={vertexMode} onClick={() => setMode(vertexMode ? 'move' : 'vertices')}>
-            تعديل الرؤوس
-          </button>
-        )}
         <button className="button" disabled={!live?.geometry && !d?.count} onClick={() => ed?.focus()}>
           ◎ المقترح
         </button>

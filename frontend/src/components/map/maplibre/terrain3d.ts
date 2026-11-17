@@ -28,6 +28,34 @@ const SKY = {
   'atmosphere-blend': 0,
 };
 
+/**
+ * Speed of the 3D view (owner, 17 Nov 2026: "fix the rendering slowness for the 3D map"). Measured on :8088 with software WebGL
+ * (a machine without a usable GPU — a virtual machine, a remote desktop): about 6 frames a second while panning. Two answers:
+ * - everywhere, fewer and coarser tiles towards the horizon in the tilted view (MapLibre keeps up to 9.3 zoom levels on screen
+ *   by default; 4 here, and at most twice the flat view's tile count);
+ * - when the browser draws WebGL in software, a lighter 3D: the real heights, the shade of the relief and everything draped
+ *   on the ground stay; the colour tint and the sky and fog passes are left out, and the canvas is drawn at a lower pixel
+ *   ratio. Without the shade the tilted map read as a flat one, so it stays (screens in docs/evidence/stationing-redesign/phase2/).
+ * Leaving 3D restores MapLibre's defaults and the full resolution.
+ */
+const LOD_3D = { zoomLevels: 4, ratio: 2 };
+const LOD_DEFAULT = { zoomLevels: 9.314, ratio: 3 };
+const LIGHT_PIXEL_RATIO = 0.7;
+const SOFTWARE = /swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic|virtualbox|svga3d|vmware|parallels/i;
+
+/** Whether this browser draws WebGL in software (no GPU): the 3D view is then drawn lighter. */
+export function softwareRendering(map: MlMap): boolean {
+  try {
+    const gl = (map.getCanvas().getContext('webgl2') ?? map.getCanvas().getContext('webgl')) as WebGL2RenderingContext | null;
+    if (!gl) return false;
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const renderer = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER) ?? '');
+    return SOFTWARE.test(renderer);
+  } catch {
+    return false;
+  }
+}
+
 /** The first layer the 3D tint and shade must stay below in each background mode (roads, water lines, labels above). */
 const BELOW: Record<BasemapMode, string> = { street: 'road-minor_road-casing', terrain: 'terrain-water' };
 
@@ -41,11 +69,16 @@ export const has3d = (map: MlMap) => !!map.getSource(TERRAIN_3D_SOURCE);
 export function setView3d(map: MlMap, view: MapView, mode: BasemapMode): void {
   if (!has3d(map)) return;
   if (view === '3d') {
+    const light = softwareRendering(map);
+    map.setSourceTileLodParams(LOD_3D.zoomLevels, LOD_3D.ratio);
+    if (light) map.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1) * LIGHT_PIXEL_RATIO);
     if (!map.getTerrain()) map.setTerrain({ source: TERRAIN_3D_SOURCE, exaggeration: EXAGGERATION });
-    map.setSky(SKY);
-    place3dLayers(map, mode, true);
+    if (!light) map.setSky(SKY);
+    place3dLayers(map, mode, true, light);
   } else {
     if (map.getTerrain()) map.setTerrain(null);
+    map.setSourceTileLodParams(LOD_DEFAULT.zoomLevels, LOD_DEFAULT.ratio);
+    if (map.getPixelRatio() !== (window.devicePixelRatio || 1)) map.setPixelRatio(window.devicePixelRatio || 1);
     place3dLayers(map, mode, false);
   }
 }
@@ -55,12 +88,13 @@ export function setView3d(map: MlMap, view: MapView, mode: BasemapMode): void {
  * every road, water body and label. In the terrain background the pre-rendered hillshade is faded out while 3D is on
  * (the live shade of the elevation tiles replaces it) and comes back unchanged in 2D.
  */
-export function place3dLayers(map: MlMap, mode: BasemapMode, on: boolean): void {
+export function place3dLayers(map: MlMap, mode: BasemapMode, on: boolean, light = false): void {
   const before = map.getLayer(BELOW[mode]) ? BELOW[mode] : undefined;
   for (const id of [RELIEF_3D, SHADE_3D]) {
     if (!map.getLayer(id)) continue;
     if (on && before) map.moveLayer(id, before);
-    map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
+    // the lighter 3D leaves the colour tint out; the shade stays, it is what shows the relief
+    map.setLayoutProperty(id, 'visibility', on && !(light && id === RELIEF_3D) ? 'visible' : 'none');
   }
   if (map.getLayer('terrain-hillshade')) map.setPaintProperty('terrain-hillshade', 'raster-opacity', on ? 0 : 0.85);
 }

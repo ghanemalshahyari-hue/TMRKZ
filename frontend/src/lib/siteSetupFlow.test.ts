@@ -21,7 +21,7 @@ describe('who sees the six steps (ADR-067)', () => {
     expect(isSetupAdmin(null)).toBe(false);
   });
   it('the administrator has six steps with the owner\'s labels; everyone else keeps the three steps of the site alone', () => {
-    expect(stepsFor(true)).toEqual(['البيانات', 'الرسم', 'التمركز الابتدائي', 'منطقة الانتشار الرئيسية', 'منطقة الانتشار البديلة', 'مراجعة وحفظ']);
+    expect(stepsFor(true)).toEqual(['البيانات', 'الرسم', 'التمركز الابتدائي', 'منطقة الانتشار الرئيسية', 'منطقة الانتشار الفرعية', 'مراجعة وحفظ']);
     expect(stepsFor(false)).toEqual(['البيانات', 'الرسم', 'الحفظ']);
     expect(SETUP_STEPS).toHaveLength(6);
     expect(SITE_STEPS).toHaveLength(3);
@@ -97,8 +97,8 @@ describe('the units and their areas', () => {
 describe('«مراجعة وحفظ»', () => {
   it('one line per unit saying which areas are placed', () => {
     expect(unitLines([unit('a', sq, sq), unit('b', sq), unit('c')])).toEqual([
-      ['وحدة a', 'الرئيسية ✓ · البديلة ✓'],
-      ['وحدة b', 'الرئيسية ✓ · البديلة —'],
+      ['وحدة a', 'الرئيسية ✓ · الفرعية ✓'],
+      ['وحدة b', 'الرئيسية ✓ · الفرعية —'],
       ['وحدة c', 'بلا مناطق انتشار'],
     ]);
   });

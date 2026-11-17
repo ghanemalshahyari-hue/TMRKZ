@@ -162,7 +162,7 @@ export function deploymentRows(checks: RestationingChecks | null): DeploymentRow
     const [verdict, tone] = VERDICT[l.status];
     return {
       leg: l.leg,
-      title: l.leg === 'primary' ? 'منطقة الانتشار الرئيسية' : 'منطقة الانتشار البديلة',
+      title: l.leg === 'primary' ? 'منطقة الانتشار الرئيسية' : 'منطقة الانتشار الفرعية',
       from: l.leg === 'primary' ? 'من مركز موقع التمركز' : 'من مركز منطقة الانتشار الرئيسية',
       distance: l.distanceM == null ? '—' : `${km(l.distanceM)} كم`,
       range: `${km(l.baseMinM)}–${km(l.baseMaxM)} كم`,

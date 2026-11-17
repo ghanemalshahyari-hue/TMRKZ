@@ -37,6 +37,9 @@ export const ICONS: Record<string, string> = {
   "target": "<circle cx=\"12\" cy=\"12\" r=\"8\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2v3M12 19v3M2 12h3M19 12h3\"/>",
   "lock": "<rect x=\"5\" y=\"11\" width=\"14\" height=\"10\" rx=\"2\"/><path d=\"M8 11V8a4 4 0 0 1 8 0v3\"/>",
   "folder": "<path d=\"M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z\"/>",
+  // «إدارة التمركز والمواقع» (owner reference, 17 Nov 2026): a camp and an exchange, in the same stroke style
+  "tent": "<path d=\"M12 4 3 20h18L12 4Z\"/><path d=\"m12 12-3.5 8M12 12l3.5 8M10.5 7 12 4l1.5 3\"/>",
+  "swap": "<path d=\"M4 8h15m-4-4 4 4-4 4M20 16H5m4-4-4 4 4 4\"/>",
   // «مركز الدعم» (ADR-053): drawn for TMRKZ in the same stroke style
   "help": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14\"/><path d=\"M12 17.2v.1\"/>",
   "robot": "<rect x=\"4\" y=\"8\" width=\"16\" height=\"12\" rx=\"3\"/><path d=\"M12 4v4M9 13v1M15 13v1M9 17h6M2 13v3M22 13v3\"/><circle cx=\"12\" cy=\"3.5\" r=\"1\"/>",

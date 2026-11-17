@@ -43,24 +43,42 @@
   --tz-shadow: 0 12px 30px rgba(74, 59, 34, .1);
 }
 
+/* Dark is graphite and sand (owner, 17 Nov 2026: "the dark theme is too much blue … other than green and dark blue"): warm
+   neutral surfaces, the light theme's sand as the accent; status colours keep their meaning. Before: navy and teal. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --ink: #e7f1f4;
-  --muted: #9db2bb;
-  --line: #28455a;
-  --paper: #0f2739;
-  --canvas: #08192a;
-  --nav: #0b2132;
-  --accent: #2bc4a8;
-  --soft: #123a45;
+  --ink: #efeae1;
+  --muted: #a79e8f;
+  --line: #3a3630;
+  --paper: #22201d;
+  --canvas: #161513;
+  --nav: #1c1b18;
+  --accent: #d4ab6a;
+  --soft: #2d2922;
   --green: #4cc98a;
   --orange: #e9b04f;
   --red: #ef7d74;
   --blue: #7fb0e6;
-  --shadow: 0 14px 34px rgba(0, 10, 20, 0.35);
-  --tz-mark-1: #2bc4a8;
-  --tz-mark-2: #c9a76b;
-  --tz-mark-3: #1d8f7c;
+  --shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+  --tz-mark-1: #d4ab6a;
+  --tz-mark-2: #b58a4f;
+  --tz-mark-3: #8a6a3e;
+
+  --tz-bg: #161513;
+  --tz-bg-2: #1c1b18;
+  --tz-panel: #22201d;
+  --tz-panel-2: #2a2824;
+  --tz-raise: rgba(255, 255, 255, 0.035);
+  --tz-line: rgba(214, 200, 172, 0.14);
+  --tz-line-2: rgba(214, 200, 172, 0.28);
+  --tz-text: #efeae1;
+  --tz-text-2: #d2cabd;
+  --tz-muted: #a79e8f;
+  --tz-teal: #d4ab6a;
+  --tz-teal-2: #c19656;
+  --tz-teal-soft: rgba(212, 171, 106, 0.14);
+  --tz-cyan: #7fb0e6;
+  --tz-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
 }
 
 body { transition: background-color 0.15s; }

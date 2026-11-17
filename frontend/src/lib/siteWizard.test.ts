@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SiteGeometry } from '../api/types';
-import { cornersOf, outlineOf, readRow, reformat, rowsOf, shapeText, stepProblem, type WizardState } from './siteWizard';
+import { INITIAL_STEPS, cornersOf, initialProblem, outlineOf, readRow, reformat, rowsOf, shapeText, stepProblem, type WizardState } from './siteWizard';
 
 const base: WizardState = { name: 'المجمع', kind: 'معسكر', inside: false, parentId: '', shape: 'POLYGON', point: null, geometry: null, drawing: false };
 const square = { type: 'Polygon', coordinates: [[[54, 24], [54.01, 24], [54.01, 24.01], [54, 24.01], [54, 24]]] } as unknown as SiteGeometry;
@@ -87,5 +87,18 @@ describe('site symbols (V32): the same rule as the server', () => {
     expect(symbolProblem('10032500001211000000')).toMatch('الرسوم التكتيكية');
     expect(symbolProblem('hello')).toMatch('رمز غير صالح');
     expect(SITE_SYMBOLS.some((s) => s.sidc.startsWith('G'))).toBe(false);
+  });
+});
+
+describe('«تحديد مواقع التمركز المبدئية» (owner brief, phase 2)', () => {
+  const base = { name: 'معسكر صحة 1أ', kind: 'معسكر', inside: false, parentId: '', shape: 'POLYGON' as const, point: null, geometry: null, drawing: false };
+  it('three steps: the data of the site with its unit, its place and boundary, review and save', () => {
+    expect([...INITIAL_STEPS]).toEqual(['بيانات الموقع', 'تحديد الموقع والحدود', 'مراجعة وحفظ']);
+  });
+  it('the unit comes first, and a unit already stationed is not stationed again by the setup', () => {
+    expect(initialProblem({ ...base, unit: null, unitBlock: '' }, 2)).toContain('اختر الوحدة');
+    expect(initialProblem({ ...base, unit: { id: 'u', name: 'قسم صحة 1أ' }, unitBlock: 'متمركزة في «معسكر أ»' }, 2)).toContain('طلب إعادة تمركز');
+    expect(initialProblem({ ...base, unit: { id: 'u', name: 'قسم صحة 1أ' }, unitBlock: '' }, 2)).toBe('');
+    expect(initialProblem({ ...base, unit: { id: 'u', name: 'قسم صحة 1أ' }, unitBlock: '' }, 3)).toContain('ارسم حدود الموقع');
   });
 });

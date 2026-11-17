@@ -257,7 +257,7 @@ try {
     await page.waitForTimeout(3000);
     await page.screenshot({ path: shot('MAP-street.png') });
     const streetColours = await mapCentreColours(page, 'MAP-street-centre.png');
-    ok(['الموقع الحالي', 'الموقع المقترح', 'الانتشار الرئيسية', 'الانتشار البديلة', 'النطاق المسموح'].every((t) => legend.includes(t)) && streetColours >= 20, 'MAP1',
+    ok(['الموقع الحالي', 'الموقع المقترح', 'الانتشار الرئيسية', 'الانتشار الفرعية', 'النطاق المسموح'].every((t) => legend.includes(t)) && streetColours >= 20, 'MAP1',
       'the map draws (basemap, current site, proposed site, both deployment areas, guidance rings) and the legend names them', `${streetColours} colours in the middle of the map; legend: ${legend.replace(/\s+/g, ' ').trim()}`);
     await page.getByRole('button', { name: 'طبيعة الأرض' }).click();
     await page.waitForTimeout(3500);
@@ -411,10 +411,10 @@ try {
     ok(v.state === 'UNDER_REVIEW', 'E3', 'submitted', `${v.route?.length} stages: ${routeText(v.route)}`);
     // every stage but the final approves; the final returns it for a change of the alternative area
     for (const s of v.route.filter((x) => !x.final)) await (await as(deciderFor(s))).post(`/restationing-requests/${r.id}/decision`, { decision: 'APPROVE' });
-    const ret = await (await as('t.approver')).post(`/restationing-requests/${r.id}/decision`, { decision: 'RETURN', reason: 'انقل منطقة الانتشار البديلة قليلاً' });
+    const ret = await (await as('t.approver')).post(`/restationing-requests/${r.id}/decision`, { decision: 'RETURN', reason: 'انقل منطقة الانتشار الفرعية قليلاً' });
     ok(ret.body.state === 'RETURNED_FOR_CHANGES', 'F1', 'returned for changes at the final stage', routeText(ret.body.route));
     await (await as('t.requester')).put(`/restationing-requests/${r.id}/content`, content([SS, PM], { ...l, alternative: layout(at, 6000, 4300).alternative }, reason, { occupants }));
-    const re = await (await as('t.requester')).post(`/restationing-requests/${r.id}/submit`, { reason: 'نقلت منطقة الانتشار البديلة كما طُلب' });
+    const re = await (await as('t.requester')).post(`/restationing-requests/${r.id}/submit`, { reason: 'نقلت منطقة الانتشار الفرعية كما طُلب' });
     const rev = re.body.revisions?.at(-1);
     ok(re.status === 200 && rev?.changed?.length === 1 && rev.changed[0] === 'DEPLOYMENT', 'F2', 'resubmitted: only the deployment changed', `changed ${rev?.changed}`);
     const levels = pv.routing.levels;

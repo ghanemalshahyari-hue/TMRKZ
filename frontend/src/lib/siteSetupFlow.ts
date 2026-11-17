@@ -11,7 +11,7 @@ export type SetupStep = 1 | 2 | 3 | 4 | 5 | 6;
 /** The three steps of the site alone (ADR-048). */
 export const SITE_STEPS = ['البيانات', 'الرسم', 'الحفظ'] as const;
 /** The six steps of the setup administrator. */
-export const SETUP_STEPS = ['البيانات', 'الرسم', 'التمركز الابتدائي', 'منطقة الانتشار الرئيسية', 'منطقة الانتشار البديلة', 'مراجعة وحفظ'] as const;
+export const SETUP_STEPS = ['البيانات', 'الرسم', 'التمركز الابتدائي', 'منطقة الانتشار الرئيسية', 'منطقة الانتشار الفرعية', 'مراجعة وحفظ'] as const;
 
 /**
  * Whether the page offers the six steps: facilities and stationing corrections each through an ALL-scope grant — the
@@ -63,7 +63,7 @@ export function setupProblem(s: SetupState, from: SetupStep, to: SetupStep): str
   if (to >= 6) {
     for (const u of s.units) {
       if (s.requirement === 'REQUIRED' && (!u.primary || !u.alternative)) return `ضع منطقتي الانتشار لـ«${u.name}»: تشترطهما سياسة التمركز السارية.`;
-      if (!!u.primary !== !!u.alternative) return `«${u.name}»: الانتشار زوج كامل — الرئيسية والبديلة معاً، أو لا شيء.`;
+      if (!!u.primary !== !!u.alternative) return `«${u.name}»: الانتشار زوج كامل — الرئيسية والفرعية معاً، أو لا شيء.`;
     }
   }
   return '';
@@ -114,7 +114,7 @@ export function policyLeg(kind: 'primary' | 'alternative', distance: number | nu
           : 'OUT_OF_RANGE';
   return {
     leg: kind,
-    label: kind === 'primary' ? 'منطقة الانتشار الرئيسية' : 'منطقة الانتشار البديلة',
+    label: kind === 'primary' ? 'منطقة الانتشار الرئيسية' : 'منطقة الانتشار الفرعية',
     status,
     distanceM: distance,
     baseMinM: r.minM,
@@ -129,7 +129,7 @@ export function policyLeg(kind: 'primary' | 'alternative', distance: number | nu
 
 /** «مراجعة وحفظ»: one line per unit — its name, and which of its areas are placed. */
 export function unitLines(units: readonly UnitPlan[]): [string, string][] {
-  return units.map((u) => [u.name, u.primary && u.alternative ? 'الرئيسية ✓ · البديلة ✓' : u.primary ? 'الرئيسية ✓ · البديلة —' : 'بلا مناطق انتشار']);
+  return units.map((u) => [u.name, u.primary && u.alternative ? 'الرئيسية ✓ · الفرعية ✓' : u.primary ? 'الرئيسية ✓ · الفرعية —' : 'بلا مناطق انتشار']);
 }
 
 /** The body of the one save (`POST /site-setup`): the site and its boundary as «/sites/with-boundary» takes them, then the units. */

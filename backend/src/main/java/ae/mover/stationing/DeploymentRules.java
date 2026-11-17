@@ -53,10 +53,10 @@ public final class DeploymentRules {
     public static List<String> pair(DeploymentRequirement requirement, boolean primary, boolean alternative) {
         List<String> out = new ArrayList<>();
         if (requirement == DeploymentRequirement.REQUIRED && !(primary && alternative)) {
-            out.add("منطقتا الانتشار الرئيسية والبديلة مطلوبتان في السياسة السارية");
+            out.add("منطقتا الانتشار الرئيسية والفرعية مطلوبتان في السياسة السارية");
         }
         if (requirement == DeploymentRequirement.OPTIONAL && primary != alternative) {
-            out.add("الانتشار زوج كامل: الرئيسية والبديلة معاً، أو لا شيء");
+            out.add("الانتشار زوج كامل: الرئيسية والفرعية معاً، أو لا شيء");
         }
         return out;
     }

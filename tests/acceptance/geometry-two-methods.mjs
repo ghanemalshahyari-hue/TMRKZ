@@ -204,7 +204,7 @@ await recording('site-B-pick-destination', async (page) => {
 async function placeByClick(page, name, k, fromOf, deg, dist) {
   const r = await toDeployment(page);
   if (k === 'alternative') {
-    await page.getByRole('tab', { name: 'منطقة الانتشار البديلة' }).click();
+    await page.getByRole('tab', { name: 'منطقة الانتشار الفرعية' }).click();
     await page.waitForTimeout(1500);
   }
   const from = meanOf(coordsOf(fromOf(r.content)));
@@ -232,14 +232,14 @@ async function placeByClick(page, name, k, fromOf, deg, dist) {
   const shown = parseFloat((t2 ?? '').replace(/[^\d.]/g, ' ').trim().split(/\s+/)[0]);
   ok(placed.length === 1 && placed[0][0].length === 5 && metres(meanOf(placed), target) < 60 && t1 !== t2 && /المسموح/.test(t2 ?? '') && /(ضمن النطاق|خارج النطاق|يحتاج استثناء)/.test(t2 ?? '') && panel === t2
     && Math.abs(shown * 1000 - d) < 120 && (await bands(page)) === '0' && range.ok && placedArea(placed) > 89_000 && placedArea(placed) < 91_000,
-    name.toUpperCase(), `«تحديد المنطقة على الخريطة» (${k === 'primary' ? 'الرئيسية' : 'البديلة'}): one click places the initial area there, it is dragged like the site, and the connector from ${k === 'primary' ? 'the re-stationing site' : 'the primary area'} updates — distance, allowed range, verdict; no ring`,
+    name.toUpperCase(), `«تحديد المنطقة على الخريطة» (${k === 'primary' ? 'الرئيسية' : 'الفرعية'}): one click places the initial area there, it is dragged like the site, and the connector from ${k === 'primary' ? 'the re-stationing site' : 'the primary area'} updates — distance, allowed range, verdict; no ring`,
     `«${t1}» → «${t2}» · ${area.trim()} · range from the server: «${range.want}» · ${defaultText?.trim()}`);
 }
 
 async function placeByDrawing(page, name, k, fromOf, deg, dist) {
   const r = await toDeployment(page);
   if (k === 'alternative') {
-    await page.getByRole('tab', { name: 'منطقة الانتشار البديلة' }).click();
+    await page.getByRole('tab', { name: 'منطقة الانتشار الفرعية' }).click();
     await page.waitForTimeout(1500);
   }
   const from = meanOf(coordsOf(fromOf(r.content)));
@@ -259,7 +259,7 @@ async function placeByDrawing(page, name, k, fromOf, deg, dist) {
   const range = await rangeMatches(page, k, t);
   await shot(page, `${name}-final.png`);
   ok(drawn.length === 1 && drawn[0][0].length === 6 && (await page.locator('.stw-vtx').count()) === 5 && (await page.locator('.stw-edge').count()) === 5 && range.ok && (await bands(page)) === '0',
-    name.toUpperCase(), `«رسم حدود المنطقة» (${k === 'primary' ? 'الرئيسية' : 'البديلة'}): five clicks with «عدد الرؤوس» 5 close the area — numbered vertices, side lengths — and the connector shows distance, range (terrain allowance as the server's leg), verdict`, `«${t}» · server range «${range.want}»`);
+    name.toUpperCase(), `«رسم حدود المنطقة» (${k === 'primary' ? 'الرئيسية' : 'الفرعية'}): five clicks with «عدد الرؤوس» 5 close the area — numbered vertices, side lengths — and the connector shows distance, range (terrain allowance as the server's leg), verdict`, `«${t}» · server range «${range.want}»`);
 }
 
 await recording('primary-A-click', (page) => placeByClick(page, 'primary-A-click', 'primary', (c) => c.site.geometry, 100, 6300));

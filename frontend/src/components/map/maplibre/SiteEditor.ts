@@ -16,6 +16,7 @@ import {
   vertexConflicts,
   type Part,
 } from '../../../lib/siteGeometry';
+import { angleFrom, frameOf, frameSize, fromXY, handleAt, resizeBy, rot, rotateBy, toXY } from '../../../lib/shapeTransform';
 import { OverlayPool, overlay, ownPointer } from './footprintMarkers';
 import { addOverlayLayer } from './OfflineMapLibre';
 import './footprintEditor.css';
@@ -56,7 +57,8 @@ const RED_FILL = '#e74c3c';
 const NAVY = '#16324f';
 
 /** How the edited shape is drawn and named on the map. */
-export type EditorLook = { tag: string; stroke: string; fill: string; symbol: boolean };
+/** {@code dashed}: the outline dashed and the fill lighter (the deployment sub-area, owner brief §4). */
+export type EditorLook = { tag: string; stroke: string; fill: string; symbol: boolean; dashed?: boolean };
 export const SITE_LOOK: EditorLook = { tag: 'مقترح', stroke: GREEN, fill: GREEN_FILL, symbol: true };
 
 /** The connector's arrowhead, pointing north before rotation (drawn here, no sprite file), at device pixel ratio 2. */
@@ -123,12 +125,19 @@ export class SiteEditor {
   private readonly shown = { prop: false, dist: false, orig: false };
   private readonly vertices: OverlayPool;
   private readonly edges: OverlayPool;
+  // «أدوات الرسم والتحكم (مثل Word)» (owner brief §7): the frame around the shape, its eight handles and the round one
+  private boxOn = false;
+  private boxAngle = 0;
+  private readonly boxHandles: OverlayPool;
   /** The (ring, index) of each vertex handle shown in vertex mode, by handle number. */
   private handles: { ring: number; index: number }[] = [];
+  /** False: a closed drawing leaves the view where it is («طلب مناطق انتشار», owner: the view moves only when a camp is chosen). */
+  private readonly flyOnFinish: boolean;
 
   /** {@code onDrawShape}: the boundary being drawn on every pointer move, closed through the pointer once it encloses ground (null: not yet). */
-  constructor(map: MlMap, options: { onChange: (live: SiteLive, final: boolean) => void; maxAreaM2: () => number | null; onDrawShape?: (shape: LatLng[] | null) => void }) {
+  constructor(map: MlMap, options: { onChange: (live: SiteLive, final: boolean) => void; maxAreaM2: () => number | null; onDrawShape?: (shape: LatLng[] | null) => void; flyOnFinish?: boolean }) {
     this.map = map;
+    this.flyOnFinish = options.flyOnFinish ?? true;
     this.onChange = options.onChange;
     this.maxAreaM2 = options.maxAreaM2;
     this.onDrawShape = options.onDrawShape ?? null;
@@ -138,7 +147,7 @@ export class SiteEditor {
       id: 'rs-edit-fill',
       type: 'fill',
       source: 'rs-edit',
-      paint: { 'fill-color': ['case', ['get', 'bad'], RED_FILL, ['get', 'fill']], 'fill-opacity': 0.32 },
+      paint: { 'fill-color': ['case', ['get', 'bad'], RED_FILL, ['get', 'fill']], 'fill-opacity': ['case', ['get', 'dashed'], 0.16, 0.32] },
     }, 'top');
     // the selection's halo over 3D terrain (shown only by the 3D look of the request map)
     addOverlayLayer(map, {
@@ -156,9 +165,11 @@ export class SiteEditor {
       paint: {
         'line-color': ['case', ['get', 'bad'], RED, ['get', 'stroke']],
         'line-width': ['case', ['get', 'active'], 3.2, 2.5],
-        'line-dasharray': ['case', ['get', 'bad'], ['literal', [2.8, 2]], ['literal', [1, 0]]],
+        'line-dasharray': ['case', ['get', 'bad'], ['literal', [2.8, 2]], ['get', 'dashed'], ['literal', [2.6, 1.6]], ['literal', [1, 0]]],
       },
     }, 'top');
+    map.addSource('rs-edit-box', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    addOverlayLayer(map, { id: 'rs-edit-box', type: 'line', source: 'rs-edit-box', paint: { 'line-color': NAVY, 'line-width': 1.2, 'line-dasharray': [2, 2] } }, 'top');
     // the move from the current site, for information: a dashed connector (the distance sits on it)
     addOverlayLayer(map, { id: 'rs-edit-link', type: 'line', source: 'rs-edit-link', paint: { 'line-color': NAVY, 'line-width': 2, 'line-dasharray': [3, 3] } }, 'top');
     // its direction (owner brief «TRUE OFFLINE 3D TERRAIN», §9): an arrowhead short of the edited shape's centre
@@ -200,9 +211,26 @@ export class SiteEditor {
           e.stopPropagation();
           if (!dragged && this.drawing && n === 0 && this.drawing.vertices.length >= 3) this.finishDrawing();
         });
+        // a double click finishes the drawing (owner, 17 Nov 2026). Its first click places a corner right under the pointer,
+        // so the second click and the double click land on that corner, whose events never reach the map: it finishes here
+        el.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          if (this.drawing && this.drawing.vertices.length >= 3) this.finishDrawing();
+        });
       },
     }));
     this.edges = new OverlayPool(map, () => ({ html: '<span class="stw-edge"></span>', className: 'stw-edge-wrap' }));
+    const HANDLE_TITLE = ['تكبير وتصغير', 'الطول', 'تكبير وتصغير', 'العرض', 'تكبير وتصغير', 'الطول', 'تكبير وتصغير', 'العرض', 'تدوير الشكل'];
+    this.boxHandles = new OverlayPool(map, (i) => ({
+      html: i === 8 ? '<span class="stw-rot">↻</span>' : '<span class="stw-hdl"></span>',
+      className: 'stw-hdl-wrap ' + (i === 8 ? 'rot' : i % 2 === 0 ? 'corner' : 'side'),
+      setup: (el, n) => {
+        el.title = HANDLE_TITLE[n];
+        el.dataset.handle = String(n);
+        ownPointer(el, (e) => (n === 8 ? this.startRotate(this.eventLngLat(e)) : this.startResize(n)));
+      },
+    }));
 
     map.on('mousedown', 'rs-edit-fill', this.onBodyDown);
     map.on('touchstart', 'rs-edit-fill', this.onBodyDown);
@@ -222,10 +250,11 @@ export class SiteEditor {
     this.map.off('zoomend', this.onZoomEnd);
     this.vertices.destroy();
     this.edges.destroy();
+    this.boxHandles.destroy();
     for (const o of [this.prop, this.dist, this.orig]) o.marker.remove();
-    for (const id of ['rs-draw-rubber', 'rs-draw-line', 'rs-draw-fill', 'rs-edit-head', 'rs-edit-link', 'rs-edit-line', 'rs-edit-glow', 'rs-edit-fill'])
+    for (const id of ['rs-edit-box', 'rs-draw-rubber', 'rs-draw-line', 'rs-draw-fill', 'rs-edit-head', 'rs-edit-link', 'rs-edit-line', 'rs-edit-glow', 'rs-edit-fill'])
       if (this.map.getLayer(id)) this.map.removeLayer(id);
-    for (const id of ['rs-draw', 'rs-edit-head', 'rs-edit-link', 'rs-edit']) if (this.map.getSource(id)) this.map.removeSource(id);
+    for (const id of ['rs-edit-box', 'rs-draw', 'rs-edit-head', 'rs-edit-link', 'rs-edit']) if (this.map.getSource(id)) this.map.removeSource(id);
   }
 
   // ---- what is shown around the site -----------------------------------------------------------------------------
@@ -411,6 +440,7 @@ export class SiteEditor {
     this.endDrawing();
     this.type = 'Polygon';
     this.parts = [[ring]];
+    this.boxAngle = 0;
     // a finished drawing keeps its numbered vertices on, as the retired editor's draw mode did
     this.mode = 'vertices';
     this.activePart = 0;
@@ -419,7 +449,7 @@ export class SiteEditor {
     this.history.begin(this.copy(this.parts));
     this.render(true);
     // the closed shape in view, as the retired editor flew to it once its last vertex was placed
-    this.focus();
+    if (this.flyOnFinish) this.focus();
   }
 
   /** Esc: the drawing is dropped; the site stays as it was before the drawing started. */
@@ -536,6 +566,7 @@ export class SiteEditor {
   load(geometry: SiteGeometry | null, fly = true) {
     this.type = geometry?.type ?? 'Polygon';
     this.parts = geometry ? partsOf(geometry) : [];
+    this.boxAngle = 0;
     this.activePart = this.parts.length ? 0 : null;
     this.activeVertex = null;
     this.vertexEdited = false;
@@ -582,6 +613,94 @@ export class SiteEditor {
     this.vertexEdited = true;
     this.activeVertex = ring === 0 ? index : null;
     this.render(true);
+  }
+
+  /**
+   * «ضبط المساحة على المسموح» (owner, 17 Nov 2026): the whole shape scaled evenly around its centre down to {@code areaM2};
+   * its form and place are kept. One undoable change; nothing happens when it is already within.
+   */
+  scaleToArea(areaM2: number) {
+    if (!this.parts.length || this.drawing) return;
+    const now = this.parts.reduce((s, p) => s + partArea(p), 0);
+    if (!now || now <= areaM2) return;
+    const k = Math.sqrt(areaM2 / now) * 0.999;
+    const c = anchorOf(this.parts);
+    this.history.push(this.copy(this.parts));
+    this.parts = this.parts.map((part) => part.map((ring) => ring.map((v) => {
+      const q = toXY(v, c);
+      return fromXY({ x: q.x * k, y: q.y * k }, c);
+    })));
+    this.render(true);
+  }
+
+  /** The Word-like frame and handles around the shape (move mode, not while drawing). */
+  setShapeHandles(on: boolean) {
+    this.boxOn = on;
+    this.renderOverlays();
+  }
+
+  /** The shape's width and length in metres along its frame (null without a shape). */
+  get shapeSize(): { width: number; length: number } | null {
+    const f = this.parts.length ? frameOf(this.parts.flat(2), this.boxAngle) : null;
+    return f ? frameSize(f) : null;
+  }
+
+  private renderBox() {
+    const src = this.map.getSource('rs-edit-box') as GeoJSONSource | undefined;
+    const f = this.boxOn && !this.drawing && this.mode === 'move' && this.parts.length ? frameOf(this.parts.flat(2), this.boxAngle) : null;
+    if (!f) {
+      this.boxHandles.clear();
+      src?.setData({ type: 'FeatureCollection', features: [] });
+      return;
+    }
+    const corners = [0, 2, 4, 6].map((i) => handleAt(f, i));
+    src?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [...corners, corners[0]].map((q) => [q.lng, q.lat]) }, properties: {} });
+    // the round handle a little beyond the top side, about 28 px away whatever the zoom
+    const mpp = (40_075_016.686 * Math.cos((f.c.lat * Math.PI) / 180)) / (512 * 2 ** this.map.getZoom());
+    const rotAt = fromXY(rot({ x: 0, y: f.maxV + 28 * mpp }, f.angle), f.c);
+    this.boxHandles.sync(9, (i) => (i === 8 ? rotAt : handleAt(f, i)));
+  }
+
+  /** A corner scales the shape evenly from the opposite corner; a side changes its width or its length alone. One undoable change. */
+  private startResize(i: number) {
+    const f = this.parts.length ? frameOf(this.parts.flat(2), this.boxAngle) : null;
+    if (!f) return;
+    const before = this.copy(this.parts);
+    let moved = false;
+    this.drag(
+      (p) => {
+        if (!moved) {
+          this.history.push(before);
+          moved = true;
+        }
+        this.parts = before.map((part) => part.map((ring) => resizeBy(ring, f, i, p)));
+        this.render(false, true);
+      },
+      () => this.render(true),
+    );
+  }
+
+  /** The round handle turns the shape around its frame's centre. One undoable change. */
+  private startRotate(grab: LatLng) {
+    const f = this.parts.length ? frameOf(this.parts.flat(2), this.boxAngle) : null;
+    if (!f) return;
+    const before = this.copy(this.parts);
+    const a0 = this.boxAngle;
+    const start = angleFrom(f.c, grab);
+    let moved = false;
+    this.drag(
+      (p) => {
+        if (!moved) {
+          this.history.push(before);
+          moved = true;
+        }
+        const by = angleFrom(f.c, p) - start;
+        this.boxAngle = a0 + by;
+        this.parts = before.map((part) => part.map((ring) => rotateBy(ring, f.c, by)));
+        this.render(false, false);
+      },
+      () => this.render(true),
+    );
   }
 
   undo() {
@@ -717,6 +836,7 @@ export class SiteEditor {
 
   private restore(s: Snapshot) {
     this.parts = this.copy(s);
+    this.boxAngle = 0;
     if (this.activePart != null && this.activePart >= this.parts.length) this.activePart = this.parts.length ? 0 : null;
     this.activeVertex = null;
     this.render(true);
@@ -735,7 +855,7 @@ export class SiteEditor {
       features: this.parts.map((p, i) => ({
         type: 'Feature',
         geometry: { type: 'Polygon', coordinates: p.map((r) => [...r, r[0]].map((v) => [v.lng, v.lat])) },
-        properties: { part: i, active: this.mode === 'vertices' && i === this.activePart, bad, stroke: this.look.stroke, fill: this.look.fill },
+        properties: { part: i, active: this.mode === 'vertices' && i === this.activePart, bad, stroke: this.look.stroke, fill: this.look.fill, dashed: !!this.look.dashed },
       })),
     });
     this.renderOverlays();
@@ -781,6 +901,7 @@ export class SiteEditor {
       head?.setData({ type: 'FeatureCollection', features: [] });
       show('dist', this.dist, null);
     }
+    this.renderBox();
     if (this.drawing) return;
     const part = this.mode === 'vertices' && this.activePart != null ? this.parts[this.activePart] : null;
     if (!part) {

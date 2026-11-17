@@ -86,6 +86,17 @@ export function OfflineMapLibre({
     });
     drawGlyphsLeftToRight(map);
     mapRef.current = map;
+    // the canvas follows its container whenever the layout changes it (window, fullscreen, panels, breakpoints, cards), not
+    // only on a window resize; one resize per frame, the view kept as it is (no refit)
+    let resizeFrame = 0;
+    const resizes = new ResizeObserver(() => {
+      if (resizeFrame) return;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = 0;
+        map.resize();
+      });
+    });
+    resizes.observe(host.current);
     map.on('load', () => {
       const shield = routeShield();
       if (!map.hasImage(ROUTE_SHIELD)) map.addImage(ROUTE_SHIELD, shield.image, shield.options);
@@ -93,6 +104,8 @@ export function OfflineMapLibre({
       onReady?.(map);
     });
     return () => {
+      resizes.disconnect();
+      if (resizeFrame) cancelAnimationFrame(resizeFrame);
       mapRef.current = null;
       setReady(false);
       map.remove();

@@ -163,7 +163,7 @@ public class RestationingChecks {
         List<Leg> legs = new ArrayList<>();
         String primaryGeo = c.primary() == null ? null : json.write(c.primary());
         legs.add(leg("primary", "منطقة الانتشار الرئيسية", policy.primary(), siteGeo, primaryGeo, c, policy, policyVersion, now, problems));
-        legs.add(leg("alternative", "منطقة الانتشار البديلة", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
+        legs.add(leg("alternative", "منطقة الانتشار الفرعية", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
         boolean exception = legs.stream().anyMatch(l -> l.check().status() == LegStatus.NEEDS_EXCEPTION);
         List<RouteStage> route = routeOf(path, policy, rule);
         routeAndReason(route, c, problems);
@@ -196,12 +196,12 @@ public class RestationingChecks {
             }
         }
         if (c.primary() == null || c.alternative() == null) {
-            problems.add("منطقتا الانتشار الرئيسية والبديلة مطلوبتان في هذا الطلب.");
+            problems.add("منطقتا الانتشار الرئيسية والفرعية مطلوبتان في هذا الطلب.");
         }
         List<Leg> legs = new ArrayList<>();
         String primaryGeo = c.primary() == null ? null : json.write(c.primary());
         legs.add(leg("primary", "منطقة الانتشار الرئيسية", policy.primary(), siteGeo, primaryGeo, c, policy, policyVersion, now, problems));
-        legs.add(leg("alternative", "منطقة الانتشار البديلة", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
+        legs.add(leg("alternative", "منطقة الانتشار الفرعية", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
         boolean exception = legs.stream().anyMatch(l -> l.check().status() == LegStatus.NEEDS_EXCEPTION);
         List<RouteStage> route = routeOf(path, policy, rule);
         routeAndReason(route, c, problems);
@@ -363,7 +363,7 @@ public class RestationingChecks {
         String primaryGeo = c.primary() == null ? null : json.write(c.primary());
         String alternativeGeo = c.alternative() == null ? null : json.write(c.alternative());
         legs.add(leg("primary", "منطقة الانتشار الرئيسية", policy.primary(), siteGeo, primaryGeo, c, policy, policyVersion, now, problems));
-        legs.add(leg("alternative", "منطقة الانتشار البديلة", policy.alternative(), primaryGeo, alternativeGeo, c, policy, policyVersion, now,
+        legs.add(leg("alternative", "منطقة الانتشار الفرعية", policy.alternative(), primaryGeo, alternativeGeo, c, policy, policyVersion, now,
                 problems));
         boolean exception = legs.stream().anyMatch(l -> l.check().status() == LegStatus.NEEDS_EXCEPTION);
         // units of another branch at the affected sites (O-03): an explicit decision where the requester's branch is

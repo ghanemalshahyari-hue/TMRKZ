@@ -14,12 +14,12 @@ import { anchorOf, partsOf } from '../../lib/siteGeometry';
  */
 export const AREA_LOOK: Record<'primary' | 'alternative', EditorLook> = {
   primary: { tag: 'الانتشار الرئيسي', stroke: '#d9822b', fill: '#e8963a', symbol: false },
-  alternative: { tag: 'الانتشار البديل', stroke: '#7b4fc0', fill: '#7b4fc0', symbol: false },
+  alternative: { tag: 'الانتشار الفرعي', stroke: '#7b4fc0', fill: '#7b4fc0', symbol: false, dashed: true },
 };
 
 /**
  * A deployment area on the map, edited exactly as the re-stationing site (owner, 5 Nov 2026): «منطقة الانتشار
- * الرئيسية» / «البديلة», each placed by one click with the policy's initial footprint («تحديد المنطقة على الخريطة»)
+ * الرئيسية» / «الفرعية», each placed by one click with the policy's initial footprint («تحديد المنطقة على الخريطة»)
  * or drawn vertex by vertex with «عدد الرؤوس» («رسم حدود المنطقة»); either way it is then dragged by its body or its
  * tag, its numbered vertices edited, ↶ ↷ إعادة الضبط, ◎ and ⇆. Its distance is measured centre to centre — the primary
  * from the new site, the alternative from the primary — with the leg's allowed range and a verdict from the server's
@@ -73,7 +73,7 @@ export function AreaControls({ editor, listeners, area, onArea, hasPrimary, plac
             منطقة الانتشار الرئيسية
           </button>
           <button role="tab" aria-selected={area === 'alternative'} className={area === 'alternative' ? 'on' : ''} disabled={!hasPrimary} title={hasPrimary ? undefined : 'ضع منطقة الانتشار الرئيسية أولاً'} onClick={() => onArea('alternative')}>
-            منطقة الانتشار البديلة
+            منطقة الانتشار الفرعية
           </button>
         </div>
       )}

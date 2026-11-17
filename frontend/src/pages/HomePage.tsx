@@ -29,12 +29,14 @@ function Tile({ icon, value, label, sub, tone = '', href }: { icon: string; valu
       </span>
     </>
   );
+  // a zero needs no colour (owner, 18 Nov 2026: colour communicates, it does not decorate)
+  const zero = typeof value === 'string' && /^[0٠]$/.test(value.trim()) ? true : undefined;
   return href ? (
-    <a className={'tz-tile ' + tone} href={href}>
+    <a className={'tz-tile ' + tone} href={href} data-zero={zero}>
       {body}
     </a>
   ) : (
-    <div className={'tz-tile ' + tone}>{body}</div>
+    <div className={'tz-tile ' + tone} data-zero={zero}>{body}</div>
   );
 }
 
@@ -63,7 +65,7 @@ export function HomePage() {
     if (STATIONING_V3_ENABLED && (app.can('VIEW') || app.can('VIEW_SUMMARY') || app.can('AUDIT'))) api.stationingCurrent().then(setCurrent).catch(() => setCurrent([]));
     else setCurrent([]);
     api.notifications().then(setNotes).catch(() => setNotes([]));
-    if (canAudit) api.auditEvents(0, 6).then((p) => setAudit(p.items)).catch(() => setAudit([]));
+    if (canAudit) api.auditEvents(0, 16).then((p) => setAudit(p.items)).catch(() => setAudit([]));
   }, [app.revision, canRs, canAudit]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const count = (states: RestationingState[]) => requests?.filter((r) => states.includes(r.state)).length;
@@ -73,7 +75,7 @@ export function HomePage() {
     [temporary],
   );
   const units = new Set(current?.map((c) => c.orgId) ?? []);
-  const recent = (requests ?? []).slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 6);
+  const recent = (requests ?? []).slice().sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 24);
   const dash = (v: number | undefined | null) => (v == null ? '…' : v.toLocaleString('ar-AE'));
 
   return (
@@ -99,6 +101,7 @@ export function HomePage() {
         </div>
       </header>
 
+      <div className="tz-home-kpis">
       {cards.length > 0 && (
         <section className="tz-tiles" aria-label="ما ينتظرك" data-testid="home-cards">
           {cards.map((c) => <Tile key={c.key} icon="clock" value={c.value.toLocaleString('ar-AE')} label={c.label} tone={c.value ? 'amber' : ''} href={c.href} />)}
@@ -114,7 +117,10 @@ export function HomePage() {
         {canRs && <Tile icon="shield" value={dash(count(BLOCKED))} label="موقوفة أو معادة أو مرفوضة" tone="red" href="#restationing" />}
       </section>
 
-      <div className="tz-home-grid">
+      </div>
+
+      {/* a short request list (or none to show) does not keep a whole column empty: the panels stack beside a larger map */}
+      <div className={'tz-home-grid' + (!canRs || (requests != null && recent.length <= 6) ? ' is-compact' : '')}>
         <section className="tz-card tz-home-map" aria-label="نظرة على الخريطة">
           <div className="tz-card-head">
             <h3>نظرة على المواقع</h3>
@@ -136,9 +142,9 @@ export function HomePage() {
             <h3>آخر طلبات إعادة التمركز</h3>
             {canRs && <a className="tz-link" href="#restationing">الكل ←</a>}
           </div>
-          {!canRs && <p className="tz-muted">لا تملك عرض طلبات إعادة التمركز.</p>}
+          {!canRs && <p className="tz-muted tz-empty-line">لا تملك عرض طلبات إعادة التمركز.</p>}
           {canRs && requests == null && <p className="tz-muted">جارٍ التحميل…</p>}
-          {canRs && requests?.length === 0 && <p className="tz-muted">لا طلبات ضمن نطاقك.</p>}
+          {canRs && requests?.length === 0 && <p className="tz-muted tz-empty-line">لا طلبات ضمن نطاقك.</p>}
           <ul className="tz-list">
             {recent.map((r) => (
               <li key={r.id}>
@@ -160,9 +166,9 @@ export function HomePage() {
             <h3>العودات القادمة</h3>
             <small className="tz-muted">نهاية التمركز المؤقت المسجّلة</small>
           </div>
-          {returns.length === 0 && <p className="tz-muted">لا عودات خلال 30 يوماً ضمن ما تراه.</p>}
+          {returns.length === 0 && <p className="tz-muted tz-empty-line">لا عودات خلال 30 يوماً ضمن ما تراه.</p>}
           <ul className="tz-list">
-            {returns.slice(0, 6).map((c) => (
+            {returns.slice(0, 12).map((c) => (
               <li key={c.id}>
                 <span>
                   <b>{c.orgName}</b>
@@ -191,7 +197,7 @@ export function HomePage() {
                 </span>
               </li>
             ))}
-            {(notes ?? []).slice(0, 5).map((n) => (
+            {(notes ?? []).slice(0, 10).map((n) => (
               <li key={n.id}>
                 <span>
                   <b>{n.title}</b>
