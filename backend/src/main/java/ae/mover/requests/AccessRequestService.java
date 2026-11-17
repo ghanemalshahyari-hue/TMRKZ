@@ -45,7 +45,9 @@ import ae.mover.workflow.WorkflowService;
 public class AccessRequestService {
 
     /** What can ever be offered: applies at the person's unit, and hands out no administration. A request never makes a system role. */
-    private static final String OFFERABLE = "r.scope <> 'ALL' and not (r.permissions && cast(array['CONFIGURE','MANAGE_ACCESS'] as text[]))";
+    /** A role offered for request: not over everything, managing nothing, and giving something — an emptied role never (ADR-078). */
+    private static final String OFFERABLE = "r.scope <> 'ALL' and not (r.permissions && cast(array['CONFIGURE','MANAGE_ACCESS'] as text[]))"
+            + " and cardinality(r.permissions) > 0";
     private static final String EVERYONE = "EVERYONE";
     private static final String MANAGER = "MANAGER";
     /** Shown to the person asking, not requestable by them (V45, owner §36): the reviewer or the final approver may add it. */

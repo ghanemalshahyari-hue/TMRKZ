@@ -42,16 +42,27 @@ public class AccessWorkspaceService {
     public static final int PAGE = 25;
     public static final int MAX_BATCH = 60;
 
-    /** The roles of a request's journey come first, in its order (as in the matrix of the movement programme). */
-    private static final List<String> FIRST = List.of("REQUESTER", "CHAIN_APPROVER", "UNIT_OPERATIONS_APPROVER", "FINAL_APPROVER", "FYI_RECEIVER");
+    /**
+     * The roles of a request's journey come first, in its order (as in the matrix of the movement programme), then who acts after
+     * the approval and who manages access (owner, 17 Nov 2026; ADR-078). Any other unit role follows.
+     */
+    private static final List<String> FIRST = List.of("STATIONING_REQUESTER", "CHAIN_APPROVER", "UNIT_OPERATIONS_APPROVER", "FINAL_APPROVER",
+            "FYI_DISTRIBUTOR", "FYI_RECEIVER", "STATIONING_ACTIVATOR", "POSTURE_VIEWER", "UNIT_ACCESS_MANAGER", "ACCESS_FINAL_APPROVER");
+
+    /**
+     * Actions that are only ever exercised over the whole system — configuration, audit, source identifiers, stationing
+     * corrections and event replay: a role holding one over everything («مدقق السجلات», «تهيئة المواقع والتمركز») is a whole-system
+     * role, never a column of a unit's matrix (owner, 17 Nov 2026; ADR-078). Derived from the role's actions, never its name.
+     */
+    private static final Set<Permission> WHOLE_SYSTEM = EnumSet.of(Permission.CONFIGURE, Permission.AUDIT, Permission.VIEW_SOURCE_IDENTIFIERS,
+            Permission.CORRECT_STATIONING, Permission.REPLAY_STATIONING_EVENTS);
 
     /**
      * What a role given to a whole unit may contain: requesting, reading and the requester's own steps on a request (EXECUTE:
      * confirming receipt; CLOSE), never deciding or managing (ADR-058).
      */
     private static final Set<Permission> UNIT_SAFE = EnumSet.of(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.CREATE, Permission.EDIT,
-            Permission.EXECUTE, Permission.CLOSE, Permission.CREATE_RESTATIONING, Permission.CREATE_DEPLOYMENT_REQUEST, Permission.REQUEST_SITE_REGISTRATION,
-            Permission.CREATE_INITIAL_STATIONING);
+            Permission.EXECUTE, Permission.CLOSE, Permission.CREATE_RESTATIONING, Permission.REQUEST_SITE_REGISTRATION);
 
     public record Op(String personId, String roleCode, String action) {
     }
@@ -86,7 +97,16 @@ public class AccessWorkspaceService {
         }
 
         boolean unitGrantable() {
-            return !system && "CHECK".equals(mode()) && !"CHAIN_APPROVER".equals(code) && UNIT_SAFE.containsAll(permissions);
+            return !system && !permissions.isEmpty() && "CHECK".equals(mode()) && !"CHAIN_APPROVER".equals(code) && UNIT_SAFE.containsAll(permissions);
+        }
+
+        /**
+         * A column of a unit's matrix: a role that gives something and is held at a unit — not the system role, not an emptied
+         * one, not a whole-system role (owner, 17 Nov 2026; ADR-078).
+         */
+        boolean column() {
+            return !system && !permissions.isEmpty()
+                    && !("ALL".equals(scope) && permissions.stream().anyMatch(WHOLE_SYSTEM::contains));
         }
     }
 
@@ -362,6 +382,7 @@ public class AccessWorkspaceService {
         UUID current = jdbc.sql("select id from unit_grant where organization_id = :o and role_code = :r and valid_to is null for update")
                 .param("o", org).param("r", role.code()).query(UUID.class).optional().orElse(null);
         if (Boolean.TRUE.equals(in.on())) {
+            GrantAdminService.requireGivable(role.permissions());
             if (current == null) {
                 UUID id = UUID.randomUUID();
                 jdbc.sql("insert into unit_grant(id, organization_id, role_code, valid_from, granted_by) values (:id, :o, :r, :f, :by)")
@@ -414,7 +435,7 @@ public class AccessWorkspaceService {
                        exists (select 1 from identity_link l where l.person_id = p.id and l.method = 'PLATFORM') as platform
                 """ + people + " order by p.display_name limit " + PAGE + " offset :from")
                 .param("o", org).param("q", like).param("role", role).param("from", pageNo * PAGE).query().listOfRows();
-        List<Role> roles = roles().stream().filter(r -> !r.system()).toList();
+        List<Role> roles = roles().stream().filter(Role::column).toList();
         List<Map<String, Object>> columns = new ArrayList<>();
         for (Role r : roles) {
             Map<String, Object> c = new LinkedHashMap<>();

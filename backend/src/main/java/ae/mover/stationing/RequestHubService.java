@@ -27,8 +27,11 @@ import ae.mover.requests.AccessRequestService;
 @Service
 public class RequestHubService {
 
-    private static final List<Permission> CREATE = List.of(Permission.CREATE_INITIAL_STATIONING, Permission.CREATE_DEPLOYMENT_REQUEST,
-            Permission.CREATE_RESTATIONING, Permission.REQUEST_SITE_REGISTRATION);
+    /** The rights that open a stationing request (ADR-078: re-stationing and deployment areas are one right; initial stationing is site setup). */
+    private static final List<Permission> CREATE = List.of(Permission.CREATE_RESTATIONING, Permission.REQUEST_SITE_REGISTRATION);
+
+    /** A unit stationed nowhere: its initial stationing is recorded with its site in «تهيئة المواقع» (ADR-076, ADR-078). */
+    static final String NOT_STATIONED = "لا تمركز حالي للوحدة؛ يُسجَّل تمركزها الأولي من «تهيئة المواقع».";
 
     private final JdbcClient jdbc;
     private final Json json;
@@ -72,23 +75,16 @@ public class RequestHubService {
     /** What this person may ask for one unit now, each with its reason when not. A right the person lacks reads NOT_AUTHORISED. */
     private List<Map<String, Object>> unitActions(AccessContext ctx, UUID unit, String state, Instant now) {
         List<Map<String, Object>> out = new ArrayList<>();
-        if (ctx.canFor(Permission.CREATE_INITIAL_STATIONING, unit)) {
-            String open = requests.openRequest(RestationingChecks.INITIAL_STATIONING, unit, null);
-            boolean stationed = !"NO_STATIONING".equals(state);
-            out.add(action("INITIAL_STATIONING", !stationed && open == null,
-                    stationed ? "للوحدة تمركز حالي؛ يبدأ طلبها بإعادة التمركز." : "يوجد طلب تمركز أولي مفتوح لهذه الوحدة.", open));
-        }
-        if (ctx.canFor(Permission.CREATE_DEPLOYMENT_REQUEST, unit)) {
+        // «طلب إعادة التمركز ومناطق الانتشار» opens both (ADR-078)
+        if (ctx.canFor(Permission.CREATE_RESTATIONING, unit)) {
             String open = requests.openRequest(RestationingChecks.DEPLOYMENT_AREAS, unit, null);
             String why = switch (state) {
-                case "NO_STATIONING" -> "لا تمركز حالي للوحدة؛ يبدأ بطلب تمركز أولي.";
+                case "NO_STATIONING" -> NOT_STATIONED;
                 case "DEPLOYMENT_COMPLETE" -> "للوحدة منطقتا انتشار نافذتان.";
                 default -> "يوجد طلب منطقة انتشار مفتوح لهذه الوحدة.";
             };
             out.add(action("DEPLOYMENT_AREAS", "DEPLOYMENT_MISSING".equals(state), why, open));
-        }
-        if (ctx.canFor(Permission.CREATE_RESTATIONING, unit)) {
-            out.add(action("RESTATIONING", !"NO_STATIONING".equals(state), "لا تمركز حالي للوحدة؛ يبدأ بطلب تمركز أولي.", null));
+            out.add(action("RESTATIONING", !"NO_STATIONING".equals(state), NOT_STATIONED, null));
         }
         if (ctx.canFor(Permission.REQUEST_SITE_REGISTRATION, unit)) {
             out.add(action("SITE_REGISTRATION", true, null, null));
@@ -120,7 +116,7 @@ public class RequestHubService {
         boolean accessReady = Boolean.TRUE.equals(mine.get("available"));
         cards.add(action("ACCESS_REQUEST", accessReady && !accessOpen,
                 !accessReady ? "لم يُفعَّل بعد مسار طلب الصلاحيات؛ راجع مدير النظام." : "لديك طلب صلاحية مفتوح.", null));
-        for (String kind : List.of("SITE_REGISTRATION", "INITIAL_STATIONING", "DEPLOYMENT_AREAS", "RESTATIONING")) {
+        for (String kind : List.of("SITE_REGISTRATION", "DEPLOYMENT_AREAS", "RESTATIONING")) {
             List<Map<String, Object>> offered = units.stream().flatMap(u -> ((List<?>) u.get("actions")).stream()).map(x -> (Map<String, Object>) cast(x))
                     .filter(x -> kind.equals(x.get("action"))).toList();
             if (offered.isEmpty()) {
@@ -192,32 +188,6 @@ public class RequestHubService {
     private Map<String, Object> currentSite(UUID unit, Instant now) {
         UUID site = checks.currentSites(List.of(unit), now).get(unit);
         return site == null ? null : siteRef(site);
-    }
-
-    /** The registered sites a unit may be stationed at: those linked to it or its parents, and those this person sees. */
-    public List<Map<String, Object>> selectableSites(AccessContext ctx, UUID unit) {
-        if (!ctx.canFor(Permission.CREATE_INITIAL_STATIONING, unit)) {
-            throw ApiException.forbidden("هذا الطلب يحتاج صلاحيته للوحدة.");
-        }
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> row : jdbc.sql("""
-                with recursive up(id, parent_id) as (
-                  select id, parent_id from organization where id = :u union all select o.id, o.parent_id from organization o join up on o.id = up.parent_id)
-                select s.id, r.organization_id as responsible,
-                       exists (select 1 from site_link l where l.site_id = s.id and l.valid_to is null and l.organization_id in (select id from up)) as linked
-                  from site s left join site_responsibility r on r.site_id = s.id and r.valid_to is null
-                 where s.status = 'ACTIVE' order by s.name""").param("u", unit).query().listOfRows()) {
-            UUID id = (UUID) row.get("id");
-            boolean linked = Boolean.TRUE.equals(row.get("linked"));
-            if (linked || ctx.siteView(id, Set.of(), (UUID) row.get("responsible")) != ae.mover.access.ViewLevel.NONE) {
-                Map<String, Object> m = siteRef(id);
-                if (m != null) {
-                    m.put("linked", linked);
-                    out.add(m);
-                }
-            }
-        }
-        return out;
     }
 
     // ---- a physical site: one object, its occupants told apart -------------------------------------------------
@@ -378,9 +348,12 @@ public class RequestHubService {
         if (fyi > 0) {
             card(out, "FYI", "طلبات للعلم", fyi, "#allRequests");
         }
+        // what the posture follows, and the units whose deployment areas this person may ask for — a grant over everything aside
+        // (the system administrator's own request right, ADR-073, is not a duty to follow every unit)
         Set<UUID> reach = new HashSet<>(requests.reach(ctx, Permission.VIEW_OPERATIONAL_POSTURE));
-        reach.addAll(requests.reach(ctx, Permission.CREATE_INITIAL_STATIONING));
-        reach.addAll(requests.reach(ctx, Permission.CREATE_DEPLOYMENT_REQUEST));
+        if (!ctx.canEverywhere(Permission.CREATE_RESTATIONING)) {
+            reach.addAll(requests.reach(ctx, Permission.CREATE_RESTATIONING));
+        }
         if (!reach.isEmpty()) {
             Map<String, Object> c = jdbc.sql("""
                     with u as (select unnest(string_to_array(:ids, ',')::uuid[]) as id),

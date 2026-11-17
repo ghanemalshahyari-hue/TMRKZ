@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.annotation.Order;
@@ -38,9 +39,12 @@ public class Bootstrap implements ApplicationRunner {
     private final WorkflowService workflows;
     private final MapPackageService maps;
     private final AccessPolicyService accessPolicies;
+    private final boolean legacyFacilityRoles;
 
     public Bootstrap(JdbcClient jdbc, Json json, TransactionTemplate tx, PolicyService policies,
-                     FormService forms, WorkflowService workflows, MapPackageService maps, AccessPolicyService accessPolicies) {
+                     FormService forms, WorkflowService workflows, MapPackageService maps, AccessPolicyService accessPolicies,
+                     @Value("${tmrkz.access.legacy-facility-roles:false}") boolean legacyFacilityRoles) {
+        this.legacyFacilityRoles = legacyFacilityRoles;
         this.jdbc = jdbc;
         this.json = json;
         this.tx = tx;
@@ -67,23 +71,49 @@ public class Bootstrap implements ApplicationRunner {
     private void seedRoles() {
         Object[][] roles = {
                 // Configuration rights never imply reading request content or deciding (owner decision 2026-10-29); the one
-                // operational right is «طلب إعادة التمركز» for any unit, which goes through the approvals like anyone's
-                // (owner decision 17 Nov 2026, ADR-073; V46 adds it to an existing installation); and «تهيئة المواقع» with the
-                // stationing it records — site links and stationing corrections over everything (owner, 17 Nov 2026, ADR-076; V48).
-                {"SYSTEM_ADMIN", "مدير النظام", "CONFIGURE,MANAGE_ACCESS,MANAGE_FACILITIES,VIEW_SOURCE_IDENTIFIERS,CREATE_RESTATIONING,MANAGE_SITE_LINKS,CORRECT_STATIONING", "ALL", false, true, 1},
-                {"REQUESTER", "مقدم الطلب", "VIEW,CREATE,EDIT,EXECUTE", "ORGANIZATION", false, false, 2},
-                {"FACILITIES_REVIEWER", "مراجع المرافق", "VIEW,REVIEW,EXPORT,EXECUTE,CLOSE", "ALL", false, false, 3},
-                {"ORG_MANAGER", "مدير الجهة", "VIEW,CREATE,EDIT,REVIEW,EXPORT", "ORGANIZATION", false, false, 4},
-                {"APPROVER", "صاحب الاعتماد", "VIEW,REVIEW,APPROVE,EXPORT", "ALL", false, false, 5},
-                {"LIMITED_VIEWER", "اطلاع محدود", "VIEW_SUMMARY", "SITE", true, false, 6},
+                // operational right is «طلب إعادة التمركز ومناطق الانتشار» for any unit, which goes through the approvals like
+                // anyone's (owner decision 17 Nov 2026, ADR-073; V46 adds it to an existing installation); «تهيئة المواقع» with
+                // the stationing it records — site links and stationing corrections over everything (owner, 17 Nov 2026,
+                // ADR-076; V48); and re-sending failed stationing events (ADR-078; V49).
+                {"SYSTEM_ADMIN", "مدير النظام", "CONFIGURE,MANAGE_ACCESS,MANAGE_FACILITIES,VIEW_SOURCE_IDENTIFIERS,CREATE_RESTATIONING,MANAGE_SITE_LINKS,CORRECT_STATIONING,REPLAY_STATIONING_EVENTS", "ALL", false, true, 1},
                 {"AUDITOR", "مدقق السجلات", "VIEW,AUDIT", "ALL", false, false, 7}};
         for (Object[] r : roles) {
-            jdbc.sql("""
-                    insert into role_def(code, name, permissions, scope, summary_only, system, sort_order)
-                    values (:c, :n, string_to_array(:p, ','), :s, :so, :sys, :o) on conflict (code) do nothing""")
-                    .param("c", r[0]).param("n", r[1]).param("p", r[2]).param("s", r[3]).param("so", r[4])
-                    .param("sys", r[5]).param("o", r[6]).update();
+            insertRole(r);
         }
+        for (Object[] r : legacyFacilityRoles ? LEGACY_FACILITY_ROLES : RETIRED_FACILITY_ROLES) {
+            insertRole(r);
+        }
+    }
+
+    /**
+     * MOVER's facilities roles as they were seeded until ADR-078. Only where {@code tmrkz.access.legacy-facility-roles} is set:
+     * the backend tests and the fictional acceptance environment, which still exercise MOVER's facilities reservation engine.
+     */
+    private static final Object[][] LEGACY_FACILITY_ROLES = {
+            {"REQUESTER", "مقدم الطلب", "VIEW,CREATE,EDIT,EXECUTE", "ORGANIZATION", false, false, 2},
+            {"FACILITIES_REVIEWER", "مراجع المرافق", "VIEW,REVIEW,EXPORT,EXECUTE,CLOSE", "ALL", false, false, 3},
+            {"ORG_MANAGER", "مدير الجهة", "VIEW,CREATE,EDIT,REVIEW,EXPORT", "ORGANIZATION", false, false, 4},
+            {"APPROVER", "صاحب الاعتماد", "VIEW,REVIEW,APPROVE,EXPORT", "ALL", false, false, 5},
+            {"LIMITED_VIEWER", "اطلاع محدود", "VIEW_SUMMARY", "SITE", true, false, 6}};
+
+    /**
+     * The same roles on every other installation (owner, 17 Nov 2026; ADR-078): emptied and named so they are not mistaken for
+     * the roles in use — «مقدم الطلب» is the stationing requester. V49 does the same on an installation that already had them.
+     */
+    private static final Object[][] RETIRED_FACILITY_ROLES = {
+            {"REQUESTER", "مقدم الطلب (مرافق — غير مستخدم)", "", "ORGANIZATION", false, false, 2},
+            {"FACILITIES_REVIEWER", "مراجع المرافق (مرافق — غير مستخدم)", "", "ALL", false, false, 3},
+            {"ORG_MANAGER", "مدير الجهة (مرافق — غير مستخدم)", "", "ORGANIZATION", false, false, 4},
+            {"APPROVER", "صاحب الاعتماد (مرافق — غير مستخدم)", "", "ALL", false, false, 5},
+            {"LIMITED_VIEWER", "اطلاع محدود (مرافق — غير مستخدم)", "", "SITE", true, false, 6}};
+
+    private void insertRole(Object[] r) {
+        jdbc.sql("""
+                insert into role_def(code, name, permissions, scope, summary_only, system, sort_order)
+                values (:c, :n, case when :p = '' then '{}'::text[] else string_to_array(:p, ',') end, :s, :so, :sys, :o)
+                on conflict (code) do nothing""")
+                .param("c", r[0]).param("n", r[1]).param("p", r[2]).param("s", r[3]).param("so", r[4])
+                .param("sys", r[5]).param("o", r[6]).update();
     }
 
     private void seedRequestTypes() {

@@ -59,7 +59,6 @@ abstract class RestationingTestBase extends IntegrationTest {
         person("apTop", seat, top);
         person("apOther", seat, other);
         person("activator", role("RSACT", "ORGANIZATION", "ACTIVATE_STATIONING", "VIEW"), top);
-        person("exc", role("RSEXC", "ALL", "APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION", "VIEW"), top);
         person("sysadmin", role("RSPOL", "ALL", "CONFIGURE"), top);
         person("stranger", role("RSVIEW", "ORGANIZATION", "VIEW"), other);
         stationed(sec, sSec);

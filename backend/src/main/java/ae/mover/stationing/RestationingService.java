@@ -37,9 +37,11 @@ import ae.mover.stationing.StationingPolicyStore.PolicyVersion;
  * <ul>
  *   <li>a draft belongs to its requester and its requesting unit; submission pins the policy version in force, takes
  *       the requesting unit's hierarchy snapshot and derives the route from that unit upward (O-07, O-09, O-03b);</li>
- *   <li>a stage is decided through APPROVE held in the stage unit's own approver seat (the distance exception through
- *       its permission), confirmed by OpenFGA, never by the requester or on the requester's delegation, and one human
- *       decides at most one stage of a request;</li>
+ *   <li>a stage is decided through the permission of its kind — a hierarchy level through APPROVE_HIERARCHY held in the
+ *       stage unit's own approver seat, unit operations and the final approval by the nearest holder — confirmed by OpenFGA,
+ *       never by the requester or on the requester's delegation, and one human decides at most one stage of a request; a
+ *       request whose deployment areas lie beyond the policy's range is flagged on every stage and its final stage decides
+ *       the excess with the request (ADR-078, no exception stage of its own);</li>
  *   <li>a return for changes keeps the request; resubmission takes again only the decisions resting on a changed fact
  *       (V2 D18); a hierarchy change pauses the request, and confirmation rebuilds the route from the same unit with
  *       every stage decided again, the earlier route kept with its decisions (O-10, O-10b);</li>
@@ -55,9 +57,6 @@ import ae.mover.stationing.StationingPolicyStore.PolicyVersion;
 public class RestationingService {
 
     public static final Set<String> EDITABLE = Set.of("DRAFT", "RETURNED_FOR_CHANGES", "PAUSED_HIERARCHY_CHANGED");
-    /** The lifecycle rights (ADR-034): their holders over a moving unit see the request they act on. */
-    static final Set<Permission> LIFECYCLE_ACTORS = Set.of(Permission.DECIDE_PRE_ACTIVATION_CANCELLATION, Permission.ACTIVATE_TEMPORARY_EXTENSION,
-            Permission.DECIDE_EARLY_RETURN, Permission.DECIDE_BEFORE_START_CANCELLATION);
 
     public record SiteInput(Map<String, Object> geometry, UUID copiedFrom, String shape) {
     }
@@ -180,6 +179,9 @@ public class RestationingService {
             throw ApiException.validation("حدد الوحدة الطالبة ومحتوى الطلب.");
         }
         String purpose = in.purpose() == null || in.purpose().isBlank() ? RestationingChecks.RESTATIONING : in.purpose();
+        if (RestationingChecks.INITIAL_STATIONING.equals(purpose)) {
+            throw ApiException.validation(INITIAL_IN_SETUP);
+        }
         Permission create = createPermission(purpose);
         if (!ctx.canFor(create, in.requestingUnitId())) {
             throw ApiException.forbidden(RestationingChecks.RESTATIONING.equals(purpose)
@@ -207,16 +209,22 @@ public class RestationingService {
         });
     }
 
-    /** Which right opens a request of this purpose. */
+    /**
+     * Which right opens a request of this purpose — and so whose request it is, for the requesting unit (RULE A, ADR-069):
+     * «طلب إعادة التمركز ومناطق الانتشار» for a re-stationing and a deployment-area request (one right since ADR-078), «طلب
+     * اعتماد موقع» for a site. An initial stationing can no longer be asked for; an old one belongs to the same requesters as a
+     * re-stationing, who may follow it and cancel it.
+     */
     static Permission createPermission(String purpose) {
         return switch (purpose) {
-            case RestationingChecks.RESTATIONING -> Permission.CREATE_RESTATIONING;
-            case RestationingChecks.INITIAL_STATIONING -> Permission.CREATE_INITIAL_STATIONING;
-            case RestationingChecks.DEPLOYMENT_AREAS -> Permission.CREATE_DEPLOYMENT_REQUEST;
+            case RestationingChecks.RESTATIONING, RestationingChecks.DEPLOYMENT_AREAS, RestationingChecks.INITIAL_STATIONING -> Permission.CREATE_RESTATIONING;
             case RestationingChecks.SITE_REGISTRATION -> Permission.REQUEST_SITE_REGISTRATION;
             default -> throw ApiException.validation("نوع طلب غير معروف.");
         };
     }
+
+    /** Initial stationing is recorded with its site in «تهيئة المواقع» (ADR-067, ADR-076), never asked for (ADR-078). */
+    static final String INITIAL_IN_SETUP = "طلب التمركز الأولي أُلغي بقرار المالك: يُسجَّل التمركز الأولي للوحدة مع موقعها من «تهيئة المواقع».";
 
     /**
      * The path a request follows (ADR-046): the version it was pinned to when first sent; a draft takes the one in force now. A
@@ -342,7 +350,7 @@ public class RestationingService {
             for (StageRow st : next) {
                 StageRow x = st;
                 if ("HIERARCHY".equals(st.kind()) && (st.mark() == null || SKIPPED.equals(st.mark()))) {
-                    boolean nobody = stations.byPermission(Permission.valueOf(st.permission()), st.unit()).empty();
+                    boolean nobody = stations.byPermission(Permission.parse(st.permission()).orElse(Permission.APPROVE_HIERARCHY), st.unit()).empty();
                     x = st.withMark(nobody ? SKIPPED : null);
                     if (nobody) {
                         skippedNow.add(x);
@@ -386,8 +394,10 @@ public class RestationingService {
             detail.put("terrain", view.get("terrain"));
             detail.put("site", siteFacts(r.content()));
             if (res.needsDistanceException()) {
-                // O-17: the written reason of every distance exception, with the submission it belongs to
+                // O-17: the written reason of every distance exception, with the submission it belongs to; the final approver
+                // decides the excess with the request (ADR-078)
                 detail.put("distanceExceptions", r.content().exceptions());
+                detail.put("exceedsPolicy", exceeds(view, r.content()));
             }
             audit.recordAs(ctx.actor(), first ? "RESTATIONING_SUBMITTED" : wasPaused ? "RESTATIONING_RECONFIRMED" : "RESTATIONING_RESUBMITTED",
                     "RESTATIONING_REQUEST", id.toString(), r.number(), detail, first ? null : reason);
@@ -460,6 +470,11 @@ public class RestationingService {
             detail.put("stageKind", stage.kind());
             detail.put("purpose", r.purpose());
             detail.put("route", r.routeNo());
+            List<Map<String, Object>> excess = exceeds(r);
+            if (stage.finalStage() && !excess.isEmpty()) {
+                // the final approver decides the excess with the request (ADR-078): the decision records what it covered
+                detail.put("exceedsPolicy", excess);
+            }
             switch (decision) {
                 case "APPROVE" -> {
                     jdbc.sql("""
@@ -520,7 +535,9 @@ public class RestationingService {
         Set<UUID> excluded = new HashSet<>(requester);
         excluded.addAll(others);
         Map<UUID, UUID> delegators = delegators(ctx);
-        Permission p = Permission.valueOf(stage.permission());
+        // a stage of an old request routed to an action removed since (an undecided distance-exception stage, ADR-078) has nobody
+        Permission p = Permission.parse(stage.permission()).orElseThrow(() -> ApiException.forbidden(
+                "مرحلة «" + stage.label() + "» من مسار قديم لم تعد تُقرر؛ يقرر المعتمد النهائي الطلب، أو أعد إرساله."));
         ae.mover.access.Stations.Station station = stage.unit() == null ? null : stations.byPermission(p, stage.unit());
         // unit operations and the final approval: the nearest scope covering the requesting unit decides (owner, 16 Nov 2026)
         Set<UUID> nearest = NEAREST_SCOPE.contains(stage.kind()) ? stations.nearestGrants(p, r.unit(), excluded) : null;
@@ -561,7 +578,7 @@ public class RestationingService {
         if (!"HIERARCHY".equals(earlier.kind()) || !"HIERARCHY".equals(stage.kind()) || earlier.unit() == null || stage.unit() == null) {
             return false;
         }
-        var st = stations.byPermission(Permission.valueOf(earlier.permission()), earlier.unit());
+        var st = stations.byPermission(Permission.parse(earlier.permission()).orElse(Permission.APPROVE_HIERARCHY), earlier.unit());
         return st.via() == ae.mover.access.Stations.Via.INHERITED && stage.unit().equals(st.from());
     }
 
@@ -984,7 +1001,8 @@ public class RestationingService {
     /**
      * D10: an approved extension opens the following validity period of its temporary stationing. The open temporary
      * record ends at the current effective end (SUPERSEDED) and a following record runs to the new end; no earlier date
-     * is edited. Activated apart, by ACTIVATE_TEMPORARY_EXTENSION, never by the extension's requester or final approver.
+     * is edited. Activated apart, with the activation right (ACTIVATE_STATIONING, ADR-078), never by the extension's requester or
+     * final approver.
      */
     private void activateExtension(AccessContext ctx, UUID id, ReasonInput in, Instant now) {
         tx.executeWithoutResult(s -> {
@@ -1001,7 +1019,7 @@ public class RestationingService {
             if (!e.content().end().isAfter(end)) {
                 throw ApiException.validation("نهاية التمديد ليست بعد النهاية الفعالة الحالية.");
             }
-            requireActivator(ctx, e, Permission.ACTIVATE_TEMPORARY_EXTENSION, "تفعيل التمديد يحتاج صلاحية «تفعيل تمديد التمركز المؤقت» على كل الوحدات.");
+            requireActivator(ctx, e, Permission.ACTIVATE_STATIONING, "تفعيل التمديد يحتاج صلاحية «تفعيل التمركز» على كل الوحدات.");
             String ref = "restationing:" + e.number();
             List<Map<String, Object>> open = jdbc.sql("""
                     update org_stationing set valid_to = planned_end, end_reason = 'SUPERSEDED', ended_by = :by, ended_at = :now
@@ -1388,6 +1406,7 @@ public class RestationingService {
             m.put("fyi", fyiReader(ctx, r.id()));
             m.put("fyiPending", fyiPending(r) && ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit()));
             m.put("activatable", "APPROVED_NOT_ACTIVATED".equals(r.state()) && !fyiPending(r) && mayActivate(ctx, r));
+            m.put("exceedsPolicy", !exceeds(r).isEmpty());
             out.add(m);
         }
         return out;
@@ -1491,6 +1510,8 @@ public class RestationingService {
                     v.put("policyVersion", rs.getInt("policy_version"));
                     return v;
                 }).list());
+        // beyond the policy's range: shown on every stage; the final approver decides it with the request (ADR-078)
+        m.put("exceedsPolicy", exceeds(r));
         m.put("returned", r.returned());
         m.put("paused", r.paused());
         m.put("finalApprover", r.finalApprover() == null ? null : person(r.finalApprover()));
@@ -1504,8 +1525,9 @@ public class RestationingService {
         Map<String, Object> can = new LinkedHashMap<>();
         // the request belongs to the requesting unit: whoever may make this request for it edits and sends it (owner, 16 Nov 2026)
         boolean owner = ctx.canFor(createPermission(r.purpose()), r.unit());
-        can.put("edit", owner && EDITABLE.contains(r.state()));
-        can.put("submit", owner && EDITABLE.contains(r.state()));
+        boolean askable = !RestationingChecks.INITIAL_STATIONING.equals(r.purpose());
+        can.put("edit", owner && askable && EDITABLE.contains(r.state()));
+        can.put("submit", owner && askable && EDITABLE.contains(r.state()));
         can.put("decide", current != null && mayDecide(ctx, r, current, route));
         can.put("decideAs", current == null ? null : decisionLabel(current));
         can.put("activate", "APPROVED_NOT_ACTIVATED".equals(r.state()) && !fyiPending(r) && mayActivate(ctx, r));
@@ -1560,8 +1582,7 @@ public class RestationingService {
         if (intersects(actor, requesters(r)) || r.finalApprover() != null && intersects(actor, humans(r.finalApprover()))) {
             return false;
         }
-        Permission p = r.extension() ? Permission.ACTIVATE_TEMPORARY_EXTENSION : Permission.ACTIVATE_STATIONING;
-        return r.content().scope().stream().allMatch(u -> ctx.canFor(p, u));
+        return r.content().scope().stream().allMatch(u -> ctx.canFor(Permission.ACTIVATE_STATIONING, u));
     }
 
     private Map<String, Object> stageView(StageRow x, StageRow current) {
@@ -1589,9 +1610,9 @@ public class RestationingService {
         if (r.requester().equals(ctx.personId())) {
             return true;
         }
+        // the final approver of the requesting unit also decides its excess and its lifecycle actions (ADR-078)
         if (ctx.canFor(Permission.VIEW, r.unit()) || ctx.canFor(Permission.CREATE_RESTATIONING, r.unit())
                 || ctx.canFor(createPermission(r.purpose()), r.unit())
-                || ctx.canFor(Permission.APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION, r.unit())
                 || ctx.canFor(Permission.DECIDE_UNIT_OPERATIONS, r.unit()) || ctx.canFor(Permission.FINAL_APPROVE_STATIONING, r.unit())
                 || ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit())) {
             return true;
@@ -1600,13 +1621,13 @@ public class RestationingService {
             return true;
         }
         for (UUID u : r.content().scope()) {
-            if (ctx.canFor(Permission.VIEW, u) || ctx.canFor(Permission.ACTIVATE_STATIONING, u)
-                    || LIFECYCLE_ACTORS.stream().anyMatch(p -> ctx.canFor(p, u))) {
+            if (ctx.canFor(Permission.VIEW, u) || ctx.canFor(Permission.ACTIVATE_STATIONING, u)) {
                 return true;
             }
         }
         for (StageRow s : stages(r.id(), r.routeNo())) {
-            if (s.unit() != null && ctx.grants().stream().anyMatch(g -> g.has(Permission.valueOf(s.permission())) && !g.isAll() && s.unit().equals(g.orgId()))) {
+            Optional<Permission> sp = Permission.parse(s.permission());
+            if (s.unit() != null && sp.isPresent() && ctx.grants().stream().anyMatch(g -> g.has(sp.get()) && !g.isAll() && s.unit().equals(g.orgId()))) {
                 return true;
             }
         }
@@ -1627,6 +1648,10 @@ public class RestationingService {
     private void requireOwnerEditable(AccessContext ctx, Req r) {
         if (!ctx.canFor(createPermission(r.purpose()), r.unit())) {
             throw ApiException.forbidden("يحتاج صلاحية هذا الطلب للوحدة الطالبة.");
+        }
+        if (RestationingChecks.INITIAL_STATIONING.equals(r.purpose())) {
+            // an old initial-stationing request is neither edited nor sent again; it may still be cancelled (ADR-078)
+            throw ApiException.validation(INITIAL_IN_SETUP);
         }
         if (!EDITABLE.contains(r.state())) {
             throw ApiException.validation("لا يُعدّل الطلب في حالته الحالية؛ الحركة اللاحقة تحتاج طلباً جديداً.");
@@ -1703,7 +1728,6 @@ public class RestationingService {
             return m;
         }).toList();
         String perm = switch (s.kind()) {
-            case EXCEPTION -> Permission.APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION.name();
             case UNIT_OPERATIONS -> Permission.DECIDE_UNIT_OPERATIONS.name();
             case FINAL -> Permission.FINAL_APPROVE_STATIONING.name();
             // a level of the climb, or a unit added from another branch: its hierarchy approver (ADR-063), never APPROVE alone
@@ -1782,6 +1806,41 @@ public class RestationingService {
         }
         if (c.alternative() != null) {
             out.add(c.alternative());
+        }
+        return out;
+    }
+
+    /**
+     * The deployment legs a request asks beyond the policy's range (within the exception margin), as checked when it was last
+     * sent: leg, label, distance, the allowed maximum, the excess and the written reason. Empty for a draft and for a request
+     * within the range. Shown on every stage; the final approver decides it with the request (owner, 17 Nov 2026; ADR-078).
+     */
+    List<Map<String, Object>> exceeds(Req r) {
+        String checksText = jdbc.sql("select checks::text from restationing_revision where request_id = :id order by n desc limit 1")
+                .param("id", r.id()).query(String.class).optional().orElse(null);
+        return checksText == null ? List.of() : exceeds(json.map(checksText), r.content());
+    }
+
+    private static List<Map<String, Object>> exceeds(Map<String, Object> checks, RestationingContent c) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (!(checks.get("legs") instanceof List<?> legs)) {
+            return out;
+        }
+        for (Object o : legs) {
+            if (!(o instanceof Map<?, ?> l) || !DeploymentRules.LegStatus.NEEDS_EXCEPTION.name().equals(l.get("status"))
+                    || !(l.get("distanceM") instanceof Number d) || !(l.get("effectiveMaxM") instanceof Number max)) {
+                continue;
+            }
+            Map<String, Object> m = new LinkedHashMap<>();
+            String leg = String.valueOf(l.get("leg"));
+            m.put("leg", leg);
+            m.put("label", l.get("label"));
+            m.put("distanceM", Math.round(d.doubleValue()));
+            m.put("allowedMaxM", Math.round(max.doubleValue()));
+            m.put("excessM", Math.round(d.doubleValue() - max.doubleValue()));
+            String why = c == null ? "" : c.exception(leg);
+            m.put("reason", why.isEmpty() ? null : why);
+            out.add(m);
         }
         return out;
     }

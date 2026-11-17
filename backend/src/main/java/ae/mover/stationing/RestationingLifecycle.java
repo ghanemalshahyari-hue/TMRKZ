@@ -25,9 +25,11 @@ import ae.mover.stationing.RestationingService.Req;
 
 /**
  * The lifecycle around a re-stationing request (ADR-034; owner-approved model D9, D10, D12, D16, A4, A6): cancellation
- * before activation, cancellation of an activated temporary before its start, early return, and extensions. Each is
- * asked by the requester (the same human) or a holder of «طلب إعادة التمركز» for the requesting unit, and decided by
- * another human holding the action's own right over every moving unit; delegations count for the delegator.
+ * before activation, cancellation of an activated temporary before its start, early return, and extensions. Since ADR-078
+ * (owner, 17 Nov 2026) none of them is a permission of its own: each is started by a requester of the requesting unit — a
+ * holder of the request's right for that unit (the request belongs to the unit, ADR-066/069) — and decided by the request's
+ * final approver, the nearest holder of «الاعتماد النهائي» for the requesting unit, never by the human who started it (nor on
+ * that human's delegation). An extension is its own request: its route decides it, and «تفعيل التمركز» activates it.
  */
 @Service
 public class RestationingLifecycle {
@@ -58,9 +60,11 @@ public class RestationingLifecycle {
     private final StationingOutbox outbox;
     private final RestationingService service;
     private final TransactionTemplate tx;
+    private final ae.mover.access.Stations stations;
 
     public RestationingLifecycle(JdbcClient jdbc, Json json, AuditService audit, StationingOutbox outbox, RestationingService service,
-                                 TransactionTemplate tx) {
+                                 TransactionTemplate tx, ae.mover.access.Stations stations) {
+        this.stations = stations;
         this.jdbc = jdbc;
         this.json = json;
         this.audit = audit;
@@ -365,9 +369,9 @@ public class RestationingLifecycle {
 
     // ---- rules ------------------------------------------------------------------------------------------------
 
+    /** A requester of the requesting unit: whoever holds this request's right for it now (RULE A, ADR-069; ADR-078). */
     private boolean mayAsk(AccessContext ctx, Req r) {
-        return RestationingService.intersects(service.humans(ctx.personId()), service.humans(r.requester()))
-                || ctx.canFor(Permission.CREATE_RESTATIONING, r.unit());
+        return ctx.canFor(RestationingService.createPermission(r.purpose()), r.unit());
     }
 
     private Req askable(AccessContext ctx, UUID id) {
@@ -375,21 +379,13 @@ public class RestationingLifecycle {
         Req r = service.lock(id);
         service.requireVisible(ctx, r);
         if (!mayAsk(ctx, r)) {
-            throw ApiException.forbidden("يطلبه مقدم الطلب أو صاحب «طلب إعادة التمركز» للوحدة الطالبة.");
+            throw ApiException.forbidden("يبدؤه مقدم الطلب: من يملك صلاحية هذا الطلب للوحدة الطالبة.");
         }
         if (jdbc.sql("select count(*) from restationing_action where request_id = :id and state = 'REQUESTED'").param("id", id)
                 .query(Integer.class).single() > 0) {
             throw ApiException.validation("يوجد إجراء قائم على هذا الطلب بانتظار قراره.");
         }
         return r;
-    }
-
-    static Permission permission(Kind k) {
-        return switch (k) {
-            case PRE_ACTIVATION_CANCELLATION -> Permission.DECIDE_PRE_ACTIVATION_CANCELLATION;
-            case BEFORE_START_CANCELLATION -> Permission.DECIDE_BEFORE_START_CANCELLATION;
-            case EARLY_RETURN -> Permission.DECIDE_EARLY_RETURN;
-        };
     }
 
     private static String label(Kind k) {
@@ -400,27 +396,25 @@ public class RestationingLifecycle {
         };
     }
 
-    /** Another human than the one who asked, holding the action's right over every moving unit (not delegated by the asker). */
+    /**
+     * The request's final approver (ADR-078): the nearest holder of «الاعتماد النهائي» covering the requesting unit, as the final
+     * stage itself is decided (ADR-066) — never the human who started the action, nor someone acting on that human's delegation;
+     * the asker is left out first, so the next nearest decides rather than nobody.
+     */
     private Grant requireDecider(AccessContext ctx, Req r, Action a) {
         Set<UUID> asker = service.humans(a.requestedBy());
         if (RestationingService.intersects(service.humans(ctx.personId()), asker)) {
-            throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES, "من طلب الإجراء لا يقرره.", Map.of());
+            throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES, "من بدأ الإجراء لا يقرره.", Map.of());
         }
-        Permission p = permission(a.kind());
+        Permission p = Permission.FINAL_APPROVE_STATIONING;
         Map<UUID, UUID> delegators = service.delegators(ctx);
-        Grant used = null;
-        for (UUID unit : r.content().scope()) {
-            Optional<Grant> g = ctx.grants().stream().filter(x -> x.has(p) && x.actsFor(unit)
-                    && (x.delegationId() == null || !asker.contains(delegators.get(x.delegationId())))).findFirst();
-            if (g.isEmpty() || !ctx.canFor(p, unit)) {
-                throw ApiException.forbidden("يحتاج صلاحية «" + label(a.kind()) + "» على كل الوحدات المنتقلة.");
-            }
-            used = used == null ? g.get() : used;
+        Set<UUID> nearest = stations.nearestGrants(p, r.unit(), asker);
+        Optional<Grant> g = ctx.grants().stream().filter(x -> x.has(p) && x.actsFor(r.unit()) && nearest.contains(x.grantId())
+                && (x.delegationId() == null || !asker.contains(delegators.get(x.delegationId())))).findFirst();
+        if (g.isEmpty() || !ctx.canFor(p, r.unit())) {
+            throw ApiException.forbidden("«" + label(a.kind()) + "» يقرره المعتمد النهائي للوحدة الطالبة.");
         }
-        if (used == null) {
-            throw ApiException.forbidden("يحتاج صلاحية «" + label(a.kind()) + "».");
-        }
-        return used;
+        return g.get();
     }
 
     private boolean mayDecide(AccessContext ctx, Req r, Action a) {

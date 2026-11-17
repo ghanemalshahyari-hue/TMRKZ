@@ -86,7 +86,7 @@ public class RestationingChecks {
                     yield r;
                 }
                 List<String> problems = new ArrayList<>(r.problems());
-                problems.add("لا تمركز حالي للوحدات: " + join(nowhere, names(nowhere)) + " — ابدأ بطلب تمركز أولي.");
+                problems.add("لا تمركز حالي للوحدات: " + join(nowhere, names(nowhere)) + " — يُسجَّل تمركزها الأولي من «تهيئة المواقع».");
                 yield new Result(problems, r.siteAreaM2(), r.maxFootprintAreaM2(), r.siteConflicts(), r.legs(), r.otherBranch(), r.route(),
                         r.needsDistanceException(), r.currentSites());
             }
@@ -98,8 +98,8 @@ public class RestationingChecks {
     public static final String DEPLOYMENT_AREAS = "DEPLOYMENT_AREAS";
     public static final String SITE_REGISTRATION = "SITE_REGISTRATION";
 
-    private List<RouteStage> routeOf(List<OrgUnit> path, StationingPolicy policy, boolean exception, StationingRoutes.RouteRule rule) {
-        return RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, rule.routing(), policy.crossBranch(), List.of(), exception), rule.stages());
+    private List<RouteStage> routeOf(List<OrgUnit> path, StationingPolicy policy, StationingRoutes.RouteRule rule) {
+        return RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, rule.routing(), policy.crossBranch(), List.of()), rule.stages());
     }
 
     private void routeAndReason(List<RouteStage> route, RestationingContent c, List<String> problems) {
@@ -135,7 +135,10 @@ public class RestationingChecks {
                  where s.id = :id and s.status = 'ACTIVE'""").param("id", site).query(String.class).optional().orElse(null);
     }
 
-    /** طلب تمركز أولي: units stationed nowhere, on an existing site. The shared site's own ground is not a conflict. */
+    /**
+     * طلب تمركز أولي, as requests of this kind were checked until ADR-078 (initial stationing is site setup now): kept so an old
+     * request still shows its checks. Units stationed nowhere, on an existing site; the shared site's own ground is no conflict.
+     */
     private Result evaluateInitial(UUID requestingUnit, RestationingContent c, StationingPolicy policy, int policyVersion, Instant now, StationingRoutes.RouteRule rule) {
         List<String> problems = new ArrayList<>();
         List<OrgUnit> path = hierarchy.path(requestingUnit);
@@ -162,7 +165,7 @@ public class RestationingChecks {
         legs.add(leg("primary", "منطقة الانتشار الرئيسية", policy.primary(), siteGeo, primaryGeo, c, policy, policyVersion, now, problems));
         legs.add(leg("alternative", "منطقة الانتشار البديلة", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
         boolean exception = legs.stream().anyMatch(l -> l.check().status() == LegStatus.NEEDS_EXCEPTION);
-        List<RouteStage> route = routeOf(path, policy, exception, rule);
+        List<RouteStage> route = routeOf(path, policy, rule);
         routeAndReason(route, c, problems);
         return new Result(problems, null, policy.maxFootprintAreaM2(), List.of(), legs, List.of(), route, exception, current);
     }
@@ -184,7 +187,7 @@ public class RestationingChecks {
             UUID unit = c.scope().get(0);
             UUID at = current.get(unit);
             if (at == null) {
-                problems.add("لا تمركز حالي للوحدة؛ يبدأ بطلب تمركز أولي.");
+                problems.add("لا تمركز حالي للوحدة؛ يُسجَّل تمركزها الأولي من «تهيئة المواقع».");
             } else {
                 siteGeo = siteGeoJson(at);
                 if (activeAreas(unit, now) >= 2) {
@@ -200,7 +203,7 @@ public class RestationingChecks {
         legs.add(leg("primary", "منطقة الانتشار الرئيسية", policy.primary(), siteGeo, primaryGeo, c, policy, policyVersion, now, problems));
         legs.add(leg("alternative", "منطقة الانتشار البديلة", policy.alternative(), primaryGeo, c.alternative() == null ? null : json.write(c.alternative()), c, policy, policyVersion, now, problems));
         boolean exception = legs.stream().anyMatch(l -> l.check().status() == LegStatus.NEEDS_EXCEPTION);
-        List<RouteStage> route = routeOf(path, policy, exception, rule);
+        List<RouteStage> route = routeOf(path, policy, rule);
         routeAndReason(route, c, problems);
         return new Result(problems, null, policy.maxFootprintAreaM2(), List.of(), legs, List.of(), route, exception, current);
     }
@@ -233,7 +236,7 @@ public class RestationingChecks {
                 }
             }
         }
-        List<RouteStage> route = routeOf(path, policy, false, rule);
+        List<RouteStage> route = routeOf(path, policy, rule);
         routeAndReason(route, c, problems);
         return new Result(problems, null, policy.maxFootprintAreaM2(), duplicates, List.of(), List.of(), route, false, Map.of());
     }
@@ -376,7 +379,7 @@ public class RestationingChecks {
         }
         // the route from the requesting unit (O-07, O-09) must reach the configured final stage
         List<CrossBranchInclusion> inclusions = included.stream().map(u -> inclusion(u, names.get(u), current.get(u), now)).toList();
-        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, rule.routing(), policy.crossBranch(), inclusions, exception), rule.stages());
+        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, rule.routing(), policy.crossBranch(), inclusions), rule.stages());
         if (!RouteDerivation.complete(route)) {
             problems.add("لم يُشتق مسار اعتماد كامل من هيكل الوحدة الطالبة والإعداد (لا مرحلة نهائية).");
         }
@@ -408,7 +411,7 @@ public class RestationingChecks {
         if (c.reason().trim().length() < 5) {
             problems.add("سبب التمديد مطلوب (5 أحرف على الأقل).");
         }
-        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, rule.routing(), policy.crossBranch(), List.of(), false), rule.stages());
+        List<RouteStage> route = RouteDerivation.withConfiguredStages(RouteDerivation.derive(path, rule.routing(), policy.crossBranch(), List.of()), rule.stages());
         if (!RouteDerivation.complete(route)) {
             problems.add("لم يُشتق مسار اعتماد كامل من هيكل الوحدة الطالبة والإعداد (لا مرحلة نهائية).");
         }
@@ -562,7 +565,8 @@ public class RestationingChecks {
                             + Math.round(check.effectiveMinM()) + "–" + Math.round(check.effectiveMaxM())
                             + " م) وتحتاج استثناء مسافة، والاستثناء لا يُمنح في التهيئة — ضعها ضمن النطاق، أو اطلبها لاحقاً بطلب منطقة انتشار.");
                 } else if (exceptionReason.trim().length() < 5) {
-                    problems.add(label + " تحتاج استثناء مسافة بسبب مكتوب.");
+                    problems.add(label + " تتجاوز المسموح (" + Math.round(check.distanceM() - check.effectiveMaxM())
+                            + " م): اكتب سبب التجاوز، ويقرره المعتمد النهائي مع الطلب.");
                 }
             }
             case TERRAIN_TIE_UNRESOLVED -> problems.add(label + ": تعادل بين فئات أرض (" + String.join("، ", t.tied())

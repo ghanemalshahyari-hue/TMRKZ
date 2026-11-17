@@ -155,6 +155,10 @@ tmrkz:
     initial-delay-seconds: ${TMRKZ_HR_INITIAL_DELAY_SECONDS:60}
     max-run-seconds: ${TMRKZ_HR_MAX_RUN_SECONDS:1800}
     scheduler-enabled: ${TMRKZ_HR_SCHEDULER_ENABLED:true}
+  access:
+    # MOVER's facilities roles with their permissions on a NEW database (ADR-078): only the backend tests and the fictional
+    # acceptance environment, which still exercise the facilities reservation engine. Everywhere else they are seeded empty.
+    legacy-facility-roles: ${TMRKZ_LEGACY_FACILITY_ROLES:false}
   authz:
     # TMRKZ's own OpenFGA (never another application's store). The preshared key comes from the environment.
     api-url: ${TMRKZ_OPENFGA_API_URL:}

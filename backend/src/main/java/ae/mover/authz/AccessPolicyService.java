@@ -225,9 +225,10 @@ public class AccessPolicyService {
             out.add(new Problem("ERROR", r.code(), "نطاق الدور الافتراضي غير معروف."));
         }
         for (String p : r.permissions()) {
-            try {
-                Permission.valueOf(p);
-            } catch (IllegalArgumentException e) {
+            if (Permission.RETIRED.containsKey(p)) {
+                out.add(new Problem("ERROR", r.code(), "صلاحية أُلغيت بقرار المالك (ADR-078): " + p
+                        + Permission.RETIRED.get(p).map(x -> "؛ استخدم " + x.name()).orElse("")));
+            } else if (Permission.parse(p).isEmpty()) {
                 out.add(new Problem("ERROR", r.code(), "صلاحية غير معروفة: " + p));
             }
         }
@@ -361,7 +362,17 @@ public class AccessPolicyService {
         if ("PUBLISHED".equals(src.get("status"))) {
             throw ApiException.validation("هذا الإصدار هو المنشور حالياً.");
         }
-        List<RoleSpec> roles = parse((String) src.get("roles_text"));
+        // an earlier version may name actions removed since (ADR-078): each becomes what replaced it, or nothing, so the
+        // restored roles hold only today's actions; what was translated is recorded with the restoration
+        List<RoleSpec> roles = new ArrayList<>();
+        List<String> translated = new ArrayList<>();
+        for (RoleSpec r : parse((String) src.get("roles_text"))) {
+            List<String> now = Permission.current(r.permissions());
+            if (!now.equals(r.permissions())) {
+                translated.add(r.code() + ": " + r.permissions().stream().filter(p -> !now.contains(p)).toList() + " → " + now);
+            }
+            roles.add(new RoleSpec(r.code(), r.name(), now, r.scope(), r.summaryOnly(), r.system(), r.grantableRoles(), r.sortOrder()));
+        }
         // roles created after the restored version stay defined (memberships may use them) but lose every action
         Set<String> listed = new java.util.HashSet<>();
         roles.forEach(r -> listed.add(r.code()));
@@ -379,10 +390,15 @@ public class AccessPolicyService {
                 values (:id, (select coalesce(max(version), 0) + 1 from access_policy_version), 'DRAFT', cast(:r as jsonb), :n, :b, :src, :by)""")
                 .param("id", newId).param("r", json.write(merged)).param("n", note).param("b", base).param("src", id)
                 .param("by", ctx.personId()).update();
-        return install(ctx, newId, merged, note, ((Number) src.get("version")).intValue(), null);
+        return install(ctx, newId, merged, note, ((Number) src.get("version")).intValue(), null, translated);
     }
 
     private VersionView install(AccessContext ctx, UUID id, List<RoleSpec> roles, String note, Integer restoredFrom, Impact impact) {
+        return install(ctx, id, roles, note, restoredFrom, impact, List.of());
+    }
+
+    private VersionView install(AccessContext ctx, UUID id, List<RoleSpec> roles, String note, Integer restoredFrom, Impact impact,
+                                List<String> translated) {
         String modelId;
         try {
             modelId = sync.ready().modelId();
@@ -417,6 +433,9 @@ public class AccessPolicyService {
         detail.put("fgaModelId", modelId);
         if (restoredFrom != null) {
             detail.put("restoredFromVersion", restoredFrom);
+        }
+        if (!translated.isEmpty()) {
+            detail.put("retiredPermissionsTranslated", translated);
         }
         if (impact != null) {
             detail.put("changedRoles", impact.roles().stream().filter(r -> !"UNCHANGED".equals(r.change()))
@@ -477,7 +496,7 @@ public class AccessPolicyService {
             Map<String, GrantSource.RoleOverride> overrides = new HashMap<>();
             for (RoleSpec r : parse((String) draftRow.get("roles_text"))) {
                 EnumSet<Permission> ps = EnumSet.noneOf(Permission.class);
-                r.permissions().forEach(p -> ps.add(Permission.valueOf(p)));
+                r.permissions().forEach(p -> Permission.parse(p).ifPresent(ps::add));
                 overrides.put(r.code(), new GrantSource.RoleOverride(r.name(), ps, r.scope(), r.summaryOnly()));
             }
             draft = access.load(subject, now, overrides);

@@ -1,7 +1,8 @@
 -- FICTIONAL ACCEPTANCE DATA for the Stationing V3 lifecycle (owner, 4 Nov 2026; ADR-034): four fictional people in the
--- fictional HR mirror (the same shape as ops/test-env/seed.sql), each holding exactly one of the four lifecycle rights
--- over the whole fictional organisation, so that every lifecycle decision is taken by another human than the one who
--- asked. Run only through ops/test-env/provision-acceptance-v3-lifecycle.sh. Idempotent. Nothing else changes.
+-- fictional HR mirror (the same shape as ops/test-env/seed.sql). Since ADR-078 (owner, 17 Nov 2026) the lifecycle decisions
+-- are no rights of their own: three of them are final approvers over the whole fictional organisation (they decide a
+-- cancellation, a cancellation before start, an early return — never the one they asked for), the fourth activates an
+-- approved extension with «تفعيل التمركز». Run only through ops/test-env/provision-acceptance-v3-lifecycle.sh. Idempotent. Nothing else changes.
 \set ON_ERROR_STOP on
 begin;
 
@@ -17,23 +18,21 @@ end $$;
 
 create temp table provisioned(item text primary key, n integer) on commit drop;
 
--- one single-action role per lifecycle right (no VIEW, nothing else)
+-- the lifecycle is decided by the final approver and an extension activated with «تفعيل التمركز» (ADR-078; no VIEW, nothing else)
 with ins as (
   insert into role_def(code, name, permissions, scope, summary_only, sort_order) values
-    ('ACC_V3_DECIDE_PRE_ACTIVATION_CANCELLATION', 'قرار الإلغاء قبل التفعيل (بيانات قبول وهمية)', '{DECIDE_PRE_ACTIVATION_CANCELLATION}', 'ORGANIZATION', false, 964),
-    ('ACC_V3_DECIDE_BEFORE_START_CANCELLATION', 'قرار إلغاء المؤقت قبل بدء نفاذه (بيانات قبول وهمية)', '{DECIDE_BEFORE_START_CANCELLATION}', 'ORGANIZATION', false, 965),
-    ('ACC_V3_DECIDE_EARLY_RETURN', 'قرار العودة المبكرة (بيانات قبول وهمية)', '{DECIDE_EARLY_RETURN}', 'ORGANIZATION', false, 966),
-    ('ACC_V3_ACTIVATE_TEMPORARY_EXTENSION', 'تفعيل تمديد التمركز المؤقت (بيانات قبول وهمية)', '{ACTIVATE_TEMPORARY_EXTENSION}', 'ORGANIZATION', false, 967)
+    ('ACC_V3_LIFECYCLE_FINAL', 'المعتمد النهائي لقرارات دورة الطلب (بيانات قبول وهمية)', '{FINAL_APPROVE_STATIONING}', 'ORGANIZATION', false, 964),
+    ('ACC_V3_EXTENSION_ACTIVATOR', 'تفعيل التمركز للتمديد (بيانات قبول وهمية)', '{ACTIVATE_STATIONING}', 'ORGANIZATION', false, 967)
   on conflict (code) do nothing
   returning 1)
 insert into provisioned select 'roles_created', count(*) from ins;
 
 create temp table t_lc(uid text, emp text, name text, role text) on commit drop;
 insert into t_lc values
-  ('t.lc.cancel', 'T-0016', 'صاحب قرار الإلغاء قبل التفعيل (بيانات قبول وهمية)', 'ACC_V3_DECIDE_PRE_ACTIVATION_CANCELLATION'),
-  ('t.lc.start', 'T-0017', 'صاحب قرار الإلغاء قبل بدء النفاذ (بيانات قبول وهمية)', 'ACC_V3_DECIDE_BEFORE_START_CANCELLATION'),
-  ('t.lc.return', 'T-0018', 'صاحب قرار العودة المبكرة (بيانات قبول وهمية)', 'ACC_V3_DECIDE_EARLY_RETURN'),
-  ('t.lc.ext', 'T-0019', 'مفعّل تمديد التمركز المؤقت (بيانات قبول وهمية)', 'ACC_V3_ACTIVATE_TEMPORARY_EXTENSION');
+  ('t.lc.cancel', 'T-0016', 'صاحب قرار الإلغاء قبل التفعيل (بيانات قبول وهمية)', 'ACC_V3_LIFECYCLE_FINAL'),
+  ('t.lc.start', 'T-0017', 'صاحب قرار الإلغاء قبل بدء النفاذ (بيانات قبول وهمية)', 'ACC_V3_LIFECYCLE_FINAL'),
+  ('t.lc.return', 'T-0018', 'صاحب قرار العودة المبكرة (بيانات قبول وهمية)', 'ACC_V3_LIFECYCLE_FINAL'),
+  ('t.lc.ext', 'T-0019', 'مفعّل تمديد التمركز المؤقت (بيانات قبول وهمية)', 'ACC_V3_EXTENSION_ACTIVATOR');
 
 with snap as (select id from hr_snapshot where status = 'PUBLISHED' order by published_at desc limit 1),
      ins as (

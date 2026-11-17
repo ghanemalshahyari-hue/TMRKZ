@@ -39,11 +39,6 @@ public class RequestHubController {
         return hub.unit(access.context(actor), id, clock.instant());
     }
 
-    @GetMapping("/request-hub/units/{id}/sites")
-    public List<Map<String, Object>> sites(Actor actor, @PathVariable UUID id) {
-        return hub.selectableSites(access.context(actor), id);
-    }
-
     @GetMapping("/request-hub/overview")
     public List<Map<String, Object>> overview(Actor actor, @RequestParam(required = false) String filter) {
         return hub.overview(access.context(actor), filter);

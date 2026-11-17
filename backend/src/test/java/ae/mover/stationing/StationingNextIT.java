@@ -34,7 +34,8 @@ class StationingNextIT extends RestationingTestBase {
         fresh = hrOrg("FRESH", sec, 10, snapshot);
         fresh2 = hrOrg("FRESH2", sec, 10, snapshot);
         shared = siteWithBoundary("SHARED", lat0 + 0.05, lng0, top);
-        person("rq", role("NXREQ", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING", "CREATE_INITIAL_STATIONING", "CREATE_DEPLOYMENT_REQUEST", "REQUEST_SITE_REGISTRATION"), sec);
+        // «مقدم الطلب» (ADR-078): one right for re-stationing and deployment areas, and site registration
+        person("rq", role("NXREQ", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING", "REQUEST_SITE_REGISTRATION"), sec);
         person("ops", role("NXOPS", "ORGANIZATION", "VIEW", "DECIDE_UNIT_OPERATIONS"), top);
         person("fin", role("NXFIN", "ORGANIZATION", "VIEW", "FINAL_APPROVE_STATIONING"), top);
         person("fyi", role("NXFYI", "ORGANIZATION", "VIEW", "MANAGE_FYI_DISTRIBUTION"), top);
@@ -115,26 +116,59 @@ class StationingNextIT extends RestationingTestBase {
     }
 
     @Test
-    @DisplayName("Initial stationing: offered only to a unit stationed nowhere; the whole configured route, each stage only to its holder; FYI opens one request and grants nothing")
-    void initialStationing() {
+    @DisplayName("ADR-078: initial stationing is site setup only — no request, no card; once set up, the unit's deployment request takes the whole configured route, each stage only to its holder; FYI opens one request and grants nothing")
+    void initialStationingIsSiteSetup() {
         JsonNode u = hubUnit("rq", fresh);
         assertThat(u.path("state").asText()).isEqualTo("NO_STATIONING");
-        assertThat(allowed(u, "INITIAL_STATIONING")).isTrue();
+        assertThat(allowed(u, "INITIAL_STATIONING")).as("no initial-stationing request any more").isFalse();
+        assertThat(u.path("actions").toString()).doesNotContain("INITIAL_STATIONING");
         assertThat(allowed(u, "RESTATIONING")).as("a unit stationed nowhere has nothing to re-station").isFalse();
         assertThat(allowed(u, "DEPLOYMENT_AREAS")).isFalse();
-        assertThat(allowed(hubUnit("rq", sec), "INITIAL_STATIONING")).as("a stationed unit does not start again").isFalse();
+        for (JsonNode a : u.path("actions")) {
+            if (!a.path("allowed").asBoolean()) {
+                assertThat(a.path("reason").asText()).as("the reason points to site setup").contains("تهيئة المواقع");
+            }
+        }
+        for (JsonNode card : login("rq").get("/request-hub").body().path("actions")) {
+            assertThat(card.path("action").asText()).as("no card for it").isNotEqualTo("INITIAL_STATIONING");
+        }
         assertThat(login("stranger").get("/request-hub").body().path("units")).as("no right, no unit").isEmpty();
 
         // a forged re-stationing for a unit stationed nowhere is refused by the server's checks
         Map<String, Object> forged = permanent(List.of(fresh));
         Res rs = login("rq").post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "content", forged));
-        assertThat(login("rq").post("/restationing-requests/" + rs.body().path("id").asText() + "/submit", Map.of()).status()).isEqualTo(400);
+        Res forgedSent = login("rq").post("/restationing-requests/" + rs.body().path("id").asText() + "/submit", Map.of());
+        assertThat(forgedSent.status()).isEqualTo(400);
+        assertThat(forgedSent.body().toString()).contains("تهيئة المواقع");
 
-        assertThat(login("apSec").post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "purpose", "INITIAL_STATIONING", "content", initial(List.of(fresh)))).status())
-                .as("its own right").isEqualTo(403);
-        String id = request("INITIAL_STATIONING", initial(List.of(fresh)), sec);
-        assertThat(login("rq").post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "purpose", "INITIAL_STATIONING", "content", initial(List.of(fresh)))).status())
-                .as("one open request per unit").isEqualTo(400);
+        // the purpose can no longer be created, by anyone
+        person("platformAdminInit", "SYSTEM_ADMIN", top);
+        for (String who : List.of("rq", "apSec", "platformAdminInit")) {
+            Res refused = login(who).post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "purpose", "INITIAL_STATIONING",
+                    "content", initial(List.of(fresh))));
+            assertThat(refused.status()).as(who + " " + refused).isEqualTo(400);
+            assertThat(refused.body().path("message").asText()).contains("تهيئة المواقع");
+        }
+        assertThat(jdbc.sql("select count(*) from restationing_request where purpose = 'INITIAL_STATIONING' and jsonb_exists(content->'scope', :u)")
+                .param("u", fresh.toString()).query(Long.class).single()).isZero();
+
+        // initial stationing is recorded by site setup («تثبيت» on the site's card, ADR-076)
+        person("setupAdmin", role("NXSETUP", "ALL", "MANAGE_FACILITIES", "MANAGE_SITE_LINKS", "CORRECT_STATIONING"), top);
+        assertThat(login("rq").post("/stationing/corrections", Map.of("organizationId", fresh.toString(), "siteId", shared.toString(),
+                "reason", "تمركز أولي من التهيئة")).status()).as("never a requester's").isEqualTo(403);
+        Res setUp = login("setupAdmin").post("/stationing/corrections", Map.of("organizationId", fresh.toString(), "siteId", shared.toString(),
+                "reason", "تمركز أولي من التهيئة"));
+        assertThat(setUp.status()).as(setUp.toString()).isEqualTo(200);
+        JsonNode stationed = hubUnit("rq", fresh);
+        assertThat(stationed.path("state").asText()).isEqualTo("DEPLOYMENT_MISSING");
+        assertThat(allowed(stationed, "DEPLOYMENT_AREAS")).as("«طلب إعادة التمركز ومناطق الانتشار» opens it").isTrue();
+        assertThat(allowed(stationed, "RESTATIONING")).isTrue();
+
+        assertThat(login("apSec").post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "purpose", "DEPLOYMENT_AREAS",
+                "content", deployment(fresh, 0))).status()).as("its own right").isEqualTo(403);
+        String id = request("DEPLOYMENT_AREAS", deployment(fresh, 0), sec);
+        assertThat(login("rq").post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "purpose", "DEPLOYMENT_AREAS",
+                "content", deployment(fresh, 0.1))).status()).as("one open request per unit").isEqualTo(400);
         Res s = login("rq").post("/restationing-requests/" + id + "/submit", Map.of());
         assertThat(s.status()).as(s.toString()).isEqualTo(200);
         assertThat(keys(s.body().path("route"))).containsExactly("H:" + sec, "H:" + dept, "H:" + top, "O:operations", "F:final");
@@ -194,17 +228,41 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(act.status()).as(act.toString()).isEqualTo(200);
         assertThat(act.body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
         assertThat(jdbc.sql("select site_id from org_stationing where organization_id = :o and valid_to is null").param("o", fresh).query(UUID.class).single()).isEqualTo(shared);
+        assertThat(jdbc.sql("select count(*) from deployment_area where organization_id = :o and state = 'ACTIVE'").param("o", fresh).query(Long.class).single()).isEqualTo(2);
         assertThat(jdbc.sql("select parent_id from organization where id = :o").param("o", fresh).query(UUID.class).single()).as("Oracle's hierarchy is untouched").isEqualTo(parentBefore);
         assertThat(jdbc.sql("select count(*) from org_stationing where organization_id = :o").param("o", fresh2).query(Long.class).single()).as("nobody else moves").isZero();
-        assertThat(jdbc.sql("select count(*) from site where id = :s").param("s", shared).query(Long.class).single()).isEqualTo(1);
-        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'INITIAL_STATIONING_ACTIVATED'").param("id", id).query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'DEPLOYMENT_AREAS_ACTIVATED'").param("id", id).query(Long.class).single()).isEqualTo(1);
         assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'RESTATIONING_FYI_DISTRIBUTED'").param("id", id).query(Long.class).single()).isEqualTo(1);
 
         JsonNode after = hubUnit("rq", fresh);
-        assertThat(after.path("state").asText()).isEqualTo("DEPLOYMENT_MISSING");
+        assertThat(after.path("state").asText()).isEqualTo("DEPLOYMENT_COMPLETE");
         assertThat(allowed(after, "RESTATIONING")).isTrue();
-        assertThat(allowed(after, "DEPLOYMENT_AREAS")).isTrue();
-        assertThat(allowed(after, "INITIAL_STATIONING")).isFalse();
+        assertThat(allowed(after, "DEPLOYMENT_AREAS")).isFalse();
+    }
+
+    @Test
+    @DisplayName("ADR-078: an initial-stationing request from before the decision can still be read and cancelled, never edited or sent again")
+    void oldInitialStationingRequestStaysReadable() {
+        // as written before ADR-078: a draft for a unit stationed nowhere, inserted directly (it can no longer be created)
+        UUID old = UUID.randomUUID();
+        jdbc.sql("""
+                insert into restationing_request(id, number, requester_id, requesting_unit_id, state, kind, start_at, reason, content, created_at, updated_at, purpose)
+                values (:id, :n, :by, :unit, 'DRAFT', 'PERMANENT', now(), 'تمركز أولي قديم', cast(:c as jsonb), now(), now(), 'INITIAL_STATIONING')""")
+                .param("id", old).param("n", "RS-OLD-" + sfx).param("by", personId("rq")).param("unit", sec)
+                .param("c", write(Map.of("kind", "PERMANENT", "scope", List.of(fresh.toString()), "existingSite", shared.toString(),
+                        "reason", "تمركز أولي قديم", "occupants", Map.of(), "exceptions", Map.of())))
+                .update();
+        Res seen = login("rq").get("/restationing-requests/" + old);
+        assertThat(seen.status()).as(seen.toString()).isEqualTo(200);
+        assertThat(seen.body().path("purpose").asText()).isEqualTo("INITIAL_STATIONING");
+        assertThat(seen.body().path("can").path("edit").asBoolean()).isFalse();
+        assertThat(seen.body().path("can").path("submit").asBoolean()).isFalse();
+        assertThat(login("rq").get("/restationing-requests/" + old + "/checks").status()).as("its checks still read").isEqualTo(200);
+        Res sent = login("rq").post("/restationing-requests/" + old + "/submit", Map.of());
+        assertThat(sent.status()).isEqualTo(400);
+        assertThat(sent.body().path("message").asText()).contains("تهيئة المواقع");
+        assertThat(login("rq").put("/restationing-requests/" + old + "/content", initial(List.of(fresh))).status()).isEqualTo(400);
+        assertThat(login("rq").get("/restationing-requests").body().findValuesAsText("id")).contains(old.toString());
     }
 
     @Test
@@ -214,7 +272,8 @@ class StationingNextIT extends RestationingTestBase {
         for (String who : List.of("apDept", "apTop")) {
             jdbc.sql("update membership set valid_to = now() where person_id = (select id from person where username = :u)").param("u", who + "-" + sfx).update();
         }
-        String id = request("INITIAL_STATIONING", initial(List.of(fresh)), sec);
+        stationed(fresh, shared);
+        String id = request("DEPLOYMENT_AREAS", deployment(fresh, 0), sec);
         Res s = login("rq").post("/restationing-requests/" + id + "/submit", Map.of());
         assertThat(s.status()).as(s.toString()).isEqualTo(200);
         JsonNode route = s.body().path("route");
@@ -283,50 +342,53 @@ class StationingNextIT extends RestationingTestBase {
         Api admin = login("sysadmin");
         assertThat(login("rq").put("/stationing/routes/SITE_REGISTRATION/draft", onlyDept).status()).as("an administrator's").isEqualTo(403);
         assertThat(admin.put("/stationing/routes/NOT_A_TYPE/draft", onlyDept).status()).isEqualTo(400);
-        assertThat(admin.put("/stationing/routes/INITIAL_STATIONING/draft", Map.of("routing", Map.of("startAt", "SELF", "levels", List.of(level(8, true, "القسم", false))), "stages", Map.of("unitOperations", false, "finalByPermission", false, "fyiBeforeActivation", false))).status())
+        assertThat(admin.put("/stationing/routes/INITIAL_STATIONING/draft", onlyDept).status()).as("no longer a request type (ADR-078)").isEqualTo(400);
+        assertThat(admin.put("/stationing/routes/DEPLOYMENT_AREAS/draft", Map.of("routing", Map.of("startAt", "SELF", "levels", List.of(level(8, true, "القسم", false))), "stages", Map.of("unitOperations", false, "finalByPermission", false, "fyiBeforeActivation", false))).status())
                 .as("a path needs a last level").isEqualTo(400);
-        assertThat(admin.post("/stationing/routes/INITIAL_STATIONING/publish", Map.of("reason", "لا مسودة له")).status()).as("nothing saved").isEqualTo(400);
-        assertThat(admin.put("/stationing/routes/INITIAL_STATIONING/draft", onlyDept).status()).isEqualTo(200);
+        assertThat(admin.post("/stationing/routes/DEPLOYMENT_AREAS/publish", Map.of("reason", "لا مسودة له")).status()).as("nothing saved").isEqualTo(400);
+        assertThat(admin.put("/stationing/routes/DEPLOYMENT_AREAS/draft", onlyDept).status()).isEqualTo(200);
 
         // a draft decides nothing
-        String sentBefore = request("INITIAL_STATIONING", initial(List.of(fresh)), sec);
+        stationed(fresh, shared);
+        stationed(fresh2, shared);
+        String sentBefore = request("DEPLOYMENT_AREAS", deployment(fresh, 0), sec);
         Res s1 = login("rq").post("/restationing-requests/" + sentBefore + "/submit", Map.of());
         assertThat(keys(s1.body().path("route"))).as("the policy's route").contains("O:operations", "F:final");
 
         // it tries, writes nothing, and says who holds what
-        JsonNode tried = admin.post("/stationing/routes/INITIAL_STATIONING/simulate", new java.util.LinkedHashMap<>(Map.of("routing", onlyDept.get("routing"), "stages", onlyDept.get("stages"), "orgId", sec.toString()))).body();
+        JsonNode tried = admin.post("/stationing/routes/DEPLOYMENT_AREAS/simulate", new java.util.LinkedHashMap<>(Map.of("routing", onlyDept.get("routing"), "stages", onlyDept.get("stages"), "orgId", sec.toString()))).body();
         assertThat(tried.path("complete").asBoolean()).isTrue();
         assertThat(tried.path("stages")).hasSize(1);
         assertThat(tried.path("stages").get(0).path("unit").asText()).isEqualTo("وحدة DEPT");
         assertThat(tried.path("stages").get(0).path("holders").asLong()).isPositive();
 
-        assertThat(admin.post("/stationing/routes/INITIAL_STATIONING/publish", Map.of("reason", "x")).status()).as("a reason").isEqualTo(400);
-        assertThat(admin.post("/stationing/routes/INITIAL_STATIONING/publish", Map.of("reason", "مسار للاختبار")).status()).isEqualTo(200);
-        assertThat(jdbc.sql("select count(*) from audit_event where action = 'STATIONING_ROUTE_PUBLISHED' and entity_id = 'INITIAL_STATIONING'").query(Long.class).single()).isPositive();
+        assertThat(admin.post("/stationing/routes/DEPLOYMENT_AREAS/publish", Map.of("reason", "x")).status()).as("a reason").isEqualTo(400);
+        assertThat(admin.post("/stationing/routes/DEPLOYMENT_AREAS/publish", Map.of("reason", "مسار للاختبار")).status()).isEqualTo(200);
+        assertThat(jdbc.sql("select count(*) from audit_event where action = 'STATIONING_ROUTE_PUBLISHED' and entity_id = 'DEPLOYMENT_AREAS'").query(Long.class).single()).isPositive();
 
         // activated: this type follows it, another type does not, and the request already sent keeps its route
-        String after = request("INITIAL_STATIONING", initial(List.of(fresh2)), sec);
+        String after = request("DEPLOYMENT_AREAS", deployment(fresh2, 0.01), sec);
         Res s2 = login("rq").post("/restationing-requests/" + after + "/submit", Map.of());
         assertThat(s2.status()).as(s2.toString()).isEqualTo(200);
         assertThat(keys(s2.body().path("route"))).containsExactly("H:" + dept);
         assertThat(s2.body().path("route").get(0).path("final").asBoolean()).isTrue();
         assertThat(keys(login("rq").get("/restationing-requests/" + sentBefore).body().path("route"))).contains("O:operations", "F:final");
-        stationed(team, shared, true);
-        String other = request("DEPLOYMENT_AREAS", deployment(team, 0), sec);
+        String other = create("rq", permanent(List.of(team)));
         assertThat(keys(login("rq").post("/restationing-requests/" + other + "/submit", Map.of()).body().path("route"))).as("another type").contains("O:operations", "F:final");
 
         // a later version leaves a sent request on the one it started with, even when it is returned and sent again
         Map<String, Object> onlyTop = Map.of("routing", Map.of("startAt", "SELF", "levels", List.of(level(8, false, "القسم", false), level(7, false, "الإدارة", false), level(6, true, "اعتماد الأعلى", true))),
                 "stages", Map.of("unitOperations", false, "finalByPermission", false, "fyiBeforeActivation", false));
-        assertThat(admin.put("/stationing/routes/INITIAL_STATIONING/draft", onlyTop).status()).isEqualTo(200);
-        assertThat(admin.post("/stationing/routes/INITIAL_STATIONING/publish", Map.of("reason", "مسار ثان للاختبار")).status()).isEqualTo(200);
+        assertThat(admin.put("/stationing/routes/DEPLOYMENT_AREAS/draft", onlyTop).status()).isEqualTo(200);
+        assertThat(admin.post("/stationing/routes/DEPLOYMENT_AREAS/publish", Map.of("reason", "مسار ثان للاختبار")).status()).isEqualTo(200);
         assertThat(login("apDept").post("/restationing-requests/" + after + "/decision", Map.of("decision", "RETURN", "reason", "عدّل السبب")).status()).isEqualTo(200);
         Res again = login("rq").post("/restationing-requests/" + after + "/submit", Map.of("reason", "عدلت الطلب"));
         assertThat(again.status()).as(again.toString()).isEqualTo(200);
         assertThat(keys(again.body().path("route"))).as("the version it was sent on").containsExactly("H:" + dept);
         assertThat(decide("apDept", after, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
         JsonNode listed = admin.get("/stationing/routes").body();
-        assertThat(listed.path("routes")).hasSize(4);
+        assertThat(listed.path("routes")).as("the three types that can be asked for").hasSize(3);
+        assertThat(listed.path("routes").toString()).doesNotContain("INITIAL_STATIONING");
         assertThat(listed.path("policyInForce").asBoolean()).isTrue();
     }
 
@@ -394,7 +456,7 @@ class StationingNextIT extends RestationingTestBase {
     void requestBelongsToTheUnit() {
         stationed(fresh, shared);
         String id = request("DEPLOYMENT_AREAS", deployment(fresh, 0), sec);
-        person("rq2", role("NXREQ2", "ORGANIZATION", "VIEW", "CREATE_DEPLOYMENT_REQUEST", "APPROVE_HIERARCHY"), sec);
+        person("rq2", role("NXREQ2", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING", "APPROVE_HIERARCHY"), sec);
         Api rq2 = login("rq2");
         assertThat(rq2.get("/restationing-requests/" + id).body().path("can").path("submit").asBoolean()).as("another requester of the unit").isTrue();
         Res edited = rq2.put("/restationing-requests/" + id + "/content", deployment(fresh, 0));
@@ -409,12 +471,13 @@ class StationingNextIT extends RestationingTestBase {
     }
 
     @Test
-    @DisplayName("ADR-073: «مدير النظام» submits «طلب إعادة تمركز» for any unit; the request is that unit's, goes through the approvals and is never decided by the administrator; the other request types stay with their own roles")
+    @DisplayName("ADR-073/078: «مدير النظام» submits «طلب إعادة تمركز» (and so a deployment-area request) for any unit; the request is that unit's, goes through the approvals and is never decided by the administrator; initial stationing is site setup, site registration stays with its role")
     void systemAdministratorRequestsRestationing() {
         UUID adminId = person("platformAdmin", "SYSTEM_ADMIN", top);
         Api admin = login("platformAdmin");
         String perms = admin.get("/me").body().path("permissions").toString();
-        assertThat(perms).as("one operational right, no reading or deciding").contains("CREATE_RESTATIONING", "CONFIGURE", "MANAGE_ACCESS")
+        assertThat(perms).as("one request right, no reading or deciding; re-sending failed events (ADR-078)")
+                .contains("CREATE_RESTATIONING", "CONFIGURE", "MANAGE_ACCESS", "REPLAY_STATIONING_EVENTS")
                 .doesNotContain("\"VIEW\"", "APPROVE", "CREATE_INITIAL_STATIONING", "CREATE_DEPLOYMENT_REQUEST", "REQUEST_SITE_REGISTRATION");
         Res units = admin.get("/restationing-requests/units");
         assertThat(units.status()).as(units.toString()).isEqualTo(200);
@@ -446,10 +509,13 @@ class StationingNextIT extends RestationingTestBase {
 
         Res initialByAdmin = admin.post("/restationing-requests", Map.of("requestingUnitId", fresh.toString(), "purpose", "INITIAL_STATIONING",
                 "content", initial(List.of(fresh))));
-        assertThat(initialByAdmin.status()).as("initial stationing stays with its own role: " + initialByAdmin).isEqualTo(403);
+        assertThat(initialByAdmin.status()).as("initial stationing is site setup, never a request: " + initialByAdmin).isEqualTo(400);
         Res areasByAdmin = admin.post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "purpose", "DEPLOYMENT_AREAS",
                 "content", deployment(sec, 0)));
-        assertThat(areasByAdmin.status()).as("deployment areas stay with their own role: " + areasByAdmin).isEqualTo(403);
+        assertThat(areasByAdmin.status()).as("one right with re-stationing (ADR-078): " + areasByAdmin).isEqualTo(200);
+        Res siteByAdmin = admin.post("/restationing-requests", Map.of("requestingUnitId", sec.toString(), "purpose", "SITE_REGISTRATION",
+                "content", Map.of("kind", "PERMANENT", "scope", List.of(sec.toString()), "reason", "تسجيل موقع")));
+        assertThat(siteByAdmin.status()).as("site registration stays with its own role: " + siteByAdmin).isEqualTo(403);
     }
 
     @Test

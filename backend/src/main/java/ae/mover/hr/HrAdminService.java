@@ -487,6 +487,8 @@ public class HrAdminService {
         UUID siteScope = in.siteScopeId() == null || in.siteScopeId().isBlank() ? null : UUID.fromString(in.siteScopeId());
         // a seat hands the role to whoever holds the position: the same authority as granting it (audit P0-1) ...
         grants.requireAuthorityForRole(ctx, org, in.roleCode(), siteScope);
+        ae.mover.authz.GrantAdminService.requireGivable(ae.mover.authz.GrantAdminService.permissions(
+                jdbc.sql("select permissions from role_def where code = :c").param("c", in.roleCode()).query().singleRow().get("permissions")));
         // ... and a seat for a position the actor holds would be a grant to themselves
         if (holdsPosition(ctx.personId(), org, in.positionId().trim())) {
             throw ApiException.forbidden("لا يجوز إنشاء مقعد لمنصب تشغله أنت؛ ينشئه مدير صلاحيات آخر.");

@@ -36,7 +36,7 @@ class SiteSetupIT extends RestationingTestBase {
         person("setup", role("SUADM", "ALL", "VIEW", "MANAGE_FACILITIES", "MANAGE_SITE_LINKS", "CORRECT_STATIONING"), top);
         person("facOnly", role("SUFAC", "ALL", "VIEW", "MANAGE_FACILITIES"), top);
         person("unitSetup", role("SUORG", "ORGANIZATION", "VIEW", "MANAGE_FACILITIES", "CORRECT_STATIONING"), top);
-        person("rqOnly", role("SUREQ", "ORGANIZATION", "VIEW", "CREATE_INITIAL_STATIONING", "CREATE_DEPLOYMENT_REQUEST", "REQUEST_SITE_REGISTRATION"), sec);
+        person("rqOnly", role("SUREQ", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING", "REQUEST_SITE_REGISTRATION"), sec);
         person("postureViewer", role("SUPOST", "ORGANIZATION", "VIEW_OPERATIONAL_POSTURE"), sec);
     }
 

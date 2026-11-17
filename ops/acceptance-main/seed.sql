@@ -65,7 +65,7 @@ select md5('__NS__:aff:' || uid)::uuid, md5('__NS__:person:' || uid)::uuid, md5(
 
 -- ---- offers: the four shown to new people are the owner's and stay as they are. Manager extras are added for this run only. ---
 insert into access_request_offer(role_code, audience) values
-  ('POSTURE_VIEWER', 'MANAGER'), ('STATIONING_UNIT_APPROVER', 'MANAGER'), ('SITE_LINK_MANAGER', 'MANAGER') on conflict do nothing;
+  ('POSTURE_VIEWER', 'MANAGER'), ('STATIONING_UNIT_APPROVER', 'MANAGER') on conflict do nothing;
 
 -- ---- TEST holders: nobody below is an administrator except P14 --------------------------------------------------------
 insert into membership(id, person_id, organization_id, role_code, valid_from)

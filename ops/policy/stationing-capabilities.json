@@ -1,5 +1,5 @@
 {
-  "note": "قدرات المواقع والتمركز (ADR-045)، نُشرت بقرار المالك في 16 نوفمبر 2026 (ADR-063). تعريفات أدوار فقط، لا تُمنح لأحد بنشرها. مراحل الاعتماد في مسار التمركز تحملها أدوار برنامج التنقل في approval-roles.json (معتمد السلسلة الهرمية، معتمد عمليات الوحدة، المعتمد النهائي)؛ أُزيلت من هنا أدوارها المكررة (اعتماد طلبات الوحدة، اعتماد عمليات الوحدة في التمركز، الاعتماد النهائي للتمركز) قبل النشر.",
+  "note": "قدرات المواقع والتمركز (ADR-045)، نُشرت بقرار المالك في 16 نوفمبر 2026 (ADR-063)، وبُسّطت بقرار المالك في 17 نوفمبر 2026 (ADR-078، ترحيل V49): «مقدم الطلب» (STATIONING_REQUESTER) يطلب إعادة التمركز ومناطق الانتشار بصلاحية واحدة ويطلب اعتماد موقع؛ التمركز الأولي من «تهيئة المواقع» فقط؛ أُفرغت الأدوار المكررة (إنشاء طلب منطقة انتشار، طلب اعتماد موقع، ربط الوحدات بالمواقع) فلا تُنشر من هذا الملف، وإدارة المرافق وروابط المواقع صارت ضمن «معتمد عمليات الوحدة». تعريفات أدوار فقط، لا تُمنح لأحد بنشرها. مراحل الاعتماد في مسار التمركز تحملها أدوار برنامج التنقل في approval-roles.json.",
   "roles": [
     {
       "code": "POSTURE_VIEWER",
@@ -13,35 +13,11 @@
     },
     {
       "code": "STATIONING_REQUESTER",
-      "name": "إنشاء طلبات التمركز",
+      "name": "مقدم الطلب",
       "scope": "ORGANIZATION",
       "permissions": [
         "VIEW",
-        "CREATE_INITIAL_STATIONING",
-        "CREATE_DEPLOYMENT_REQUEST",
         "CREATE_RESTATIONING",
-        "REQUEST_SITE_REGISTRATION"
-      ],
-      "summaryOnly": false,
-      "grantableRoles": []
-    },
-    {
-      "code": "DEPLOYMENT_REQUESTER",
-      "name": "إنشاء طلب منطقة انتشار",
-      "scope": "ORGANIZATION",
-      "permissions": [
-        "VIEW",
-        "CREATE_DEPLOYMENT_REQUEST"
-      ],
-      "summaryOnly": false,
-      "grantableRoles": []
-    },
-    {
-      "code": "SITE_REGISTRATION_REQUESTER",
-      "name": "طلب اعتماد موقع",
-      "scope": "ORGANIZATION",
-      "permissions": [
-        "VIEW",
         "REQUEST_SITE_REGISTRATION"
       ],
       "summaryOnly": false,
@@ -65,17 +41,6 @@
       "permissions": [
         "VIEW",
         "ACTIVATE_STATIONING"
-      ],
-      "summaryOnly": false,
-      "grantableRoles": []
-    },
-    {
-      "code": "SITE_LINK_MANAGER",
-      "name": "ربط الوحدات بالمواقع",
-      "scope": "ORGANIZATION",
-      "permissions": [
-        "VIEW",
-        "MANAGE_SITE_LINKS"
       ],
       "summaryOnly": false,
       "grantableRoles": []

@@ -56,23 +56,24 @@ update hr_source set last_success_at = now() where id = md5('t:source')::uuid;
 -- ---- capabilities: what a person sees is an Arabic name; the permissions behind it stay on the server ---------------
 insert into role_def(code, name, permissions, scope, summary_only, sort_order, grantable_roles) values
   ('POSTURE_VIEWER', 'متابعة الموقف العملياتي', '{VIEW_OPERATIONAL_POSTURE}', 'ORGANIZATION', false, 100, '{}'),
-  ('STATIONING_REQUESTER', 'إنشاء طلبات التمركز', '{VIEW,CREATE_INITIAL_STATIONING,CREATE_DEPLOYMENT_REQUEST,CREATE_RESTATIONING,REQUEST_SITE_REGISTRATION}', 'ORGANIZATION', false, 101, '{}'),
-  ('DEPLOYMENT_REQUESTER', 'إنشاء طلب منطقة انتشار', '{VIEW,CREATE_DEPLOYMENT_REQUEST}', 'ORGANIZATION', false, 102, '{}'),
-  ('SITE_REGISTRATION_REQUESTER', 'طلب اعتماد موقع', '{VIEW,REQUEST_SITE_REGISTRATION}', 'ORGANIZATION', false, 103, '{}'),
+  -- ADR-078: «مقدم الطلب» asks for re-stationing and deployment areas with one right; the partial duplicates are empty
+  ('STATIONING_REQUESTER', 'مقدم الطلب', '{VIEW,CREATE_RESTATIONING,REQUEST_SITE_REGISTRATION}', 'ORGANIZATION', false, 101, '{}'),
+  ('DEPLOYMENT_REQUESTER', 'إنشاء طلب منطقة انتشار (مكرر — غير مستخدم)', '{}', 'ORGANIZATION', false, 102, '{}'),
+  ('SITE_REGISTRATION_REQUESTER', 'طلب اعتماد موقع (مكرر — غير مستخدم)', '{}', 'ORGANIZATION', false, 103, '{}'),
   ('STATIONING_UNIT_APPROVER', 'اعتماد طلبات الوحدة', '{VIEW,APPROVE}', 'ORGANIZATION', false, 104, '{}'),
   ('STATIONING_OPS_APPROVER', 'اعتماد عمليات الوحدة', '{VIEW,DECIDE_UNIT_OPERATIONS}', 'ORGANIZATION', false, 105, '{}'),
   ('STATIONING_FINAL_APPROVER', 'الاعتماد النهائي للتمركز', '{VIEW,FINAL_APPROVE_STATIONING}', 'ORGANIZATION', false, 106, '{}'),
   ('FYI_DISTRIBUTOR', 'تحديد وحدات العلم', '{VIEW,MANAGE_FYI_DISTRIBUTION}', 'ORGANIZATION', false, 107, '{}'),
   ('STATIONING_ACTIVATOR_NEXT', 'تفعيل التمركز', '{VIEW,ACTIVATE_STATIONING}', 'ORGANIZATION', false, 108, '{}'),
-  ('SITE_LINK_MANAGER', 'ربط الوحدات بالمواقع', '{VIEW,MANAGE_SITE_LINKS}', 'ORGANIZATION', false, 109, '{}'),
+  ('SITE_LINK_MANAGER', 'ربط الوحدات بالمواقع (مكرر — غير مستخدم)', '{}', 'ORGANIZATION', false, 109, '{}'),
   ('SITE_SETUP_ADMIN', 'تهيئة المواقع والتمركز', '{VIEW,MANAGE_FACILITIES,MANAGE_SITE_LINKS,CORRECT_STATIONING}', 'ALL', false, 110, '{}'),
-  ('UNIT_ACCESS_MANAGER', 'مدير صلاحيات الوحدة', '{MANAGE_ACCESS,REVIEW}', 'ORGANIZATION', false, 111, '{POSTURE_VIEWER,STATIONING_REQUESTER,DEPLOYMENT_REQUESTER,SITE_REGISTRATION_REQUESTER,SITE_LINK_MANAGER}'),
+  ('UNIT_ACCESS_MANAGER', 'مدير صلاحيات الوحدة', '{MANAGE_ACCESS,REVIEW}', 'ORGANIZATION', false, 111, '{POSTURE_VIEWER,STATIONING_REQUESTER}'),
   ('ACCESS_FINAL_APPROVER', 'معتمد طلبات الصلاحية', '{REVIEW,APPROVE}', 'ALL', false, 112, '{}')
 on conflict (code) do nothing;
 delete from access_request_offer;
 insert into access_request_offer(role_code, audience) values
-  ('POSTURE_VIEWER', 'EVERYONE'), ('STATIONING_REQUESTER', 'EVERYONE'), ('DEPLOYMENT_REQUESTER', 'EVERYONE'), ('SITE_REGISTRATION_REQUESTER', 'EVERYONE'),
-  ('STATIONING_UNIT_APPROVER', 'MANAGER'), ('SITE_LINK_MANAGER', 'MANAGER');
+  ('POSTURE_VIEWER', 'EVERYONE'), ('STATIONING_REQUESTER', 'EVERYONE'),
+  ('STATIONING_UNIT_APPROVER', 'MANAGER');
 
 -- ---- TEST holders: nobody below is an administrator except P14 --------------------------------------------------------
 insert into membership(id, person_id, organization_id, role_code, valid_from)
