@@ -4,6 +4,7 @@ import type { Integration, OrgImportPreview, PolicyVersion, Settings, SystemInfo
 import { Heading, KeyValue } from '../components/ui';
 import { HrSourcePanel } from '../components/HrSourcePanel';
 import { SignInNotesSettings } from '../components/SignInNotesSettings';
+import { SiteSetupAccessSettings } from '../components/SiteSetupAccessSettings';
 import { useApp } from '../lib/app';
 import { formatBytes, fullTime } from '../lib/dates';
 import { INTEGRATION_STATUS } from '../lib/labels';
@@ -84,6 +85,7 @@ export function SettingsPage() {
       />
       <div className="settings-grid">
         <SignInNotesSettings />
+        <SiteSetupAccessSettings />
         <section className="card padding">
           <h2>سياسات الطلب</h2>
           {TOGGLES.map(([key, title, desc]) => (

@@ -1,4 +1,5 @@
 import { PURPOSE_TITLE, isCreatablePurpose, isPurpose, type Purpose } from '../lib/requestPurpose';
+import { PartReviewPanel, ReturnedParts } from '../components/workspace/PartReviewPanel';
 import { flatSource } from '../components/tree/tree';
 import { UnitTree } from '../components/tree/UnitTree';
 import { DeploymentAreasRequest } from './DeploymentAreasRequest';
@@ -167,10 +168,15 @@ export function RestationingPage() {
     </ActionRail>
   );
 
-  // a new «طلب مناطق انتشار» (owner brief §4, phase 3): its own screen, starting from the unit's current site
-  if (editing && !editing.id && editing.purpose === 'DEPLOYMENT_AREAS') {
+  // a new «طلب مناطق انتشار» (owner brief §4, phase 3) and a new «طلب إعادة تمركز» (§5, phase 4): the map-first screen,
+  // starting from the unit's current site. A re-stationing opened towards a registered site keeps the request editor, as
+  // does every saved draft.
+  if (editing && !editing.id && (editing.purpose === 'DEPLOYMENT_AREAS' || (editing.purpose === 'RESTATIONING' && !editing.site))) {
     return (
       <DeploymentAreasRequest
+        key={editing.purpose + ':' + (editing.unit ?? '')}
+        purpose={editing.purpose}
+        preselectUnit={editing.unit ?? null}
         onClose={() => {
           setEditing(null);
           if (route().kind === 'new') history.replaceState(null, '', '#restationing');
@@ -386,6 +392,8 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
         {r.returned && r.state === 'RETURNED_FOR_CHANGES' && (
           <div className="rs-banner orange">
             <b>أعاده {r.returned.byName}</b> ({r.returned.stageLabel}): {r.returned.reason}
+            {/* «الاعتماد الجزئي» (ADR-090): what is approved stays so unless it is changed; what needs changes */}
+            {!!r.parts?.some((p) => p.last) && <ReturnedParts parts={r.parts} />}
           </div>
         )}
         <dl className="rs-facts">
@@ -461,6 +469,10 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
         )}
         {r.can.decide && decidesExcess(r) && (
           <p className="micro" data-testid="final-decides-excess">قرارك يشمل ما يتجاوز المسموح أعلاه: الاعتماد يقبله، والإرجاع أو الرفض يردّه.</p>
+        )}
+        {r.can.decide && !!r.parts?.length && (
+          <PartReviewPanel key={r.id + ':' + r.routeNo + ':' + r.route.findIndex((x) => x.current)} parts={r.parts} busy={busy}
+            onDecide={(parts, notes) => act(() => api.decideRestationing(r.id, 'PARTS', reason, parts, notes), Object.values(parts).includes('CHANGES') ? 'أُعيد الطلب لتعديل الأجزاء المطلوبة' : 'اعتُمدت الأجزاء')} />
         )}
         {r.can.decide && (
           <>

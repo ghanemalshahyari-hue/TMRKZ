@@ -230,6 +230,7 @@
 :root[data-theme="light"] .sc-delete { border-color: rgba(146, 43, 33, 0.4); }
 :root[data-theme="light"] .sc-warn { background: rgba(146, 43, 33, 0.078); }
 :root[data-theme="light"] .da-hover { box-shadow: 0 6px 16px rgba(74, 59, 34, 0.088); }
+:root[data-theme="light"] .da-look-site span { border: 2.5px solid #8c5c2b; }
 
 /* styles/app.css — dark */
 :root[data-theme="dark"] .login-shell { background: #282622; }
@@ -256,6 +257,9 @@
 :root[data-theme="dark"] .da-hover.is-bad { color: #e1837a; }
 :root[data-theme="dark"] .da-tool.is-del { color: #e1837a; }
 :root[data-theme="dark"] .rs-delreq { color: #e1837a; }
+:root[data-theme="dark"] .rs-over { color: #e2bc78; }
+:root[data-theme="dark"] .da-look-site span { border: 2.5px solid #a67a30; background: rgba(166, 122, 48, 0.188); }
+:root[data-theme="dark"] .pr-kept { color: #81dab3; }
 
 /* styles/map.css — light */
 :root[data-theme="light"] .segmented { background: #fbf9f6; }

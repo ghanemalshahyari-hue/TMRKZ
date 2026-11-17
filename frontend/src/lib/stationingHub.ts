@@ -19,8 +19,17 @@ export type HubWay = {
   allowed: boolean;
 };
 
+let siteSetupRule = false;
+/** «صلاحيات تهيئة المواقع» (ADR-089) is a rule, not a permission: the shell says whether the person may set up sites. */
+export function setSiteSetupRule(may: boolean | null | undefined) {
+  siteSetupRule = !!may;
+}
+export function mayByRule() {
+  return siteSetupRule;
+}
+
 export function hubWays(can: (p: Permission) => boolean): HubWay[] {
-  const setup = can('MANAGE_FACILITIES') || can('MANAGE_SITE_LINKS') || can('CORRECT_STATIONING');
+  const setup = can('MANAGE_FACILITIES') || can('MANAGE_SITE_LINKS') || can('CORRECT_STATIONING') || siteSetupRule;
   const request = can('CREATE_RESTATIONING');
   return [
     {

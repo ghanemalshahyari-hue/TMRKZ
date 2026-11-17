@@ -309,6 +309,17 @@ export type HubAction = { action: string; allowed: boolean; reason: string | nul
 export type HubUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; state: string; site: { id: string; name: string; lat: number | null; lng: number | null; geometry: { type: string; coordinates: unknown } | null } | null; actions: HubAction[] };
 export type RequestHub = { actions: HubAction[]; units: HubUnit[]; unitsTotal: number };
 /** «موقع جديد» of the setup administrator (ADR-067): the site, its initial stationing and each unit's two areas, in one save. */
+/** «صلاحيات تهيئة المواقع» (ADR-089): who may set up sites besides the system administrator. */
+export type SiteSetupAccessRule = {
+  saved: boolean;
+  roles: string[];
+  persons: { id: string; name: string }[];
+  units: { id: string; name: string; includeDescendants: boolean }[];
+  levels: number[];
+  reason?: string;
+  updatedAt?: string;
+  updatedBy?: string;
+};
 export type SiteDeletionRequest = { id: string; siteId: string; siteCode: string; siteName: string; requester: string; reason: string; requestedAt: string; state: string; decisionReason: string | null };
 export type SiteDeletionImpact = {
   site: { id: string; code: string; name: string };
@@ -678,6 +689,11 @@ export const api = {
   /** «إرشادات صفحة الدخول» (ADR-083): today's notes before sign-in; the whole board in the settings. */
   signInNotices: () => get<{ saved: boolean; heading?: string; subheading?: string; footer?: string; notes?: { id: string; kind: 'GUIDE' | 'NOTICE'; meta: string; title: string; text: string }[] }>('/auth/notices'),
   signInBoard: () => get<{ saved: boolean; board?: SignInBoard }>('/settings/sign-in-notes'),
+  // «صلاحيات تهيئة المواقع» (phase 7; ADR-089)
+  siteSetupAccess: () => get<{ admin: boolean; may: boolean }>('/site-setup/access'),
+  siteSetupAccessRule: () => get<SiteSetupAccessRule>('/settings/site-setup-access'),
+  saveSiteSetupAccessRule: (body: { roles: string[]; persons: string[]; units: { id: string; includeDescendants: boolean }[]; levels: number[]; reason: string }) =>
+    put<SiteSetupAccessRule>('/settings/site-setup-access', body),
   saveSignInBoard: (board: SignInBoard) => put<SignInBoard>('/settings/sign-in-notes', board),
   /** Deleting a site (ADR-086): its impact and blockers, the administrator's delete, a request, and the decision on one. */
   siteDeletion: (id: string) => get<SiteDeletionImpact>(`/sites/${id}/deletion`),
@@ -926,8 +942,8 @@ export const api = {
   /** «ختم عمليات الوحدة» and «ختم الاعتماد النهائي» (ADR-055): drawn from the recorded approvals; visual only. */
   restationingStamps: (id: string) => get<RestationingStamps>(`/restationing-requests/${id}/stamps`),
   submitRestationing: (id: string, reason?: string) => post<RestationingRequest>(`/restationing-requests/${id}/submit`, { reason }),
-  decideRestationing: (id: string, decision: 'APPROVE' | 'RETURN' | 'REJECT', reason?: string) =>
-    post<RestationingRequest>(`/restationing-requests/${id}/decision`, { decision, reason }),
+  decideRestationing: (id: string, decision: 'APPROVE' | 'RETURN' | 'REJECT' | 'PARTS', reason?: string, parts?: Record<string, 'APPROVE' | 'CHANGES'>, partNotes?: Record<string, string>) =>
+    post<RestationingRequest>(`/restationing-requests/${id}/decision`, { decision, reason, parts, partNotes }),
   activateRestationing: (id: string, reason?: string) => post<RestationingRequest>(`/restationing-requests/${id}/activate`, { reason }),
 
   // Stationing V3 policy studio (System Administrator)

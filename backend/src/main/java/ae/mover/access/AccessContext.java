@@ -59,6 +59,16 @@ public final class AccessContext {
         return new AccessContext(actor, grants, at, c);
     }
 
+    /**
+     * This context with one more grant, for one operation the caller has authorised itself (ADR-089: a site set up on a unit's
+     * behalf). The second decider has no tuple for it, so the copy has no confirmer: the caller's own check is the decision.
+     */
+    public AccessContext plus(Grant g) {
+        List<Grant> more = new java.util.ArrayList<>(grants);
+        more.add(g);
+        return new AccessContext(actor, more, at, null);
+    }
+
     public boolean confirmed() {
         return confirmer != null;
     }

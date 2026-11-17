@@ -28,6 +28,7 @@ import { WorkflowStudio } from './pages/WorkflowStudio';
 import { clearDesktopUser, startDesktopNotifications } from './lib/desktopNotifications';
 import { LAST_VIEW_KEY } from './lib/support';
 import { setGrantFacts, setSupportSeat } from './lib/navigation';
+import { setSiteSetupRule } from './lib/stationingHub';
 import { SupportConsolePage } from './pages/SupportConsolePage';
 import { SupportPage } from './pages/SupportPage';
 import { FloatingAssist } from './components/assist/FloatingAssist';
@@ -139,6 +140,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     }
   }, [view]);
   setSupportSeat(me.supportSeat);
+  setSiteSetupRule(me.siteSetup);
   setGrantFacts(me.grants);
 
   // reference data shared by screens; reloaded after mutations and identity changes

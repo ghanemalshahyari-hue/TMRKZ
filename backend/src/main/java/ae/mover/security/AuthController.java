@@ -305,8 +305,13 @@ public class AuthController {
         // «لوحة الدعم» (ADR-053): the person's support seat, if any; the server checks it on every console call
         me.put("supportSeat", jdbc.sql("select role from support_seat where person_id = :p and ended_at is null")
                 .param("p", actor.personId()).query(String.class).optional().orElse(null));
+        // «صلاحيات تهيئة المواقع» (ADR-089): may the person open «تحديد مواقع التمركز المبدئية»; each save is checked again
+        me.put("siteSetup", siteSetup != null && siteSetup.anywhere(ctx));
         return me;
     }
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ae.mover.stationing.SiteSetupAccess siteSetup;
 
     @GetMapping("/me/capabilities")
     public Map<String, Object> capabilities(Actor actor) {

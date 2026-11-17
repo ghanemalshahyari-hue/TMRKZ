@@ -1009,3 +1009,30 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Policy (owner brief §9):** each leg may have `minAreaM2` and `maxAreaM2` (optional; versions without them have no limit). The policy studio edits them per area; publishing refuses a minimum above the maximum; the server refuses an area outside them (`RestationingChecks.deploymentLeg`, every request and the setup); «طلب مناطق انتشار» shows an area chip («✓ المساحة ضمن المسموح» / «✗ أكبر/أصغر») and the limits in «ⓘ».
 - **Re-stationing areas:** the same toolbar as everywhere (select with the frame and handles, move, circle, ellipse, square, rectangle, free drawing, vertices, undo, redo, reset); the square keeps the policy's initial shape; the old buttons' accessible names stay on the square and free-drawing tools.
 - **Checks:** `SiteSetupIT` SETUP-08 (limits refused, a minimum above the maximum not published, the limits read back), `StationingRulesTest`, `StationingFoundationIT`, `RestationingWorkflowIT` — 70 tests; frontend 347.
+
+## Phase 4 of 8 — «طلب إعادة تمركز» map-first, built and connected (18 Nov 2026)
+
+- **The flow (owner brief §5):** a new re-stationing opens the same map-first screen as «طلب مناطق انتشار» (`DeploymentAreasRequest`, purpose RESTATIONING) — one progress strip «الوحدات ← الموقع الجديد ← الرئيسية ← الفرعية ← مراجعة وإرسال» (numbers, and the current step's name in full), no stacked cards.
+  - **Units:** by camp, folded at first; several may be ticked; the unit that every ticked unit is under asks for the move (the server's branch rule), named on the step; units the hub does not allow say why.
+  - **The current site by itself**, and «موقع التمركز الجديد» with the panel-5 toolbar: a copy of the current site, a circle, ellipse, square or rectangle the size of the current site within the policy's maximum, free drawing; chips (distance from the current site, area, width × length, against the maximum); an oversized site may be sent (ADR-087) or fitted with «ضبط المساحة على المسموح».
+  - **The new main area is measured from the new site**, the sub-area from the main area; pointer arrow and distance, slope colours, chips and «ⓘ» as phase 3.
+  - **Review and sending:** the units, who asks, the current and new sites, both areas; «حفظ كمسودة», «إرسال للاعتماد» (`purpose RESTATIONING`, scope the ticked units, the site recorded COPY / EDITED / DRAWN).
+  - A re-stationing opened towards a registered site (`#restationing/new?site=`) and every saved draft still open the request editor (temporary moves, occupants and exceptions stay there).
+- **Checks:** frontend 352 tests; `tests/acceptance/restationing-phase4.mjs` 18/18 on :8088 — it SENT RS-2026-0004 for «مركز صحة اثنين» (UNDER_REVIEW); 16/16 again with `SAVE=0` after the step-strip change (nothing written). Screens in `docs/evidence/stationing-redesign/phase4/`.
+
+## Phase 7 of 8 — «صلاحيات تهيئة المواقع», built and connected (18 Nov 2026; ADR-089)
+
+- «الإعدادات» has the rule: roles, people, units (with or without the units under them), levels; a sentence says it as the server applies it; a reason is required to save (audited). Initial rule: «معتمد عمليات الوحدة» in that role's reach. The system administrator always may.
+- The server checks every setup save and check: each unit, the site's responsible unit, the main site of an inside site; the site is registered on the unit's behalf. The tab shows for people the rule allows (`/me.siteSetup`).
+- **Checks:** `SiteSetupIT` 9/9 (SETUP-09: the initial rule, a unit outside the reach refused with nothing written, only the configurer changes the rule, a named person, levels); `tests/acceptance/setup-access-parts-phase78.mjs` (settings in both themes; nothing saved). Screens in `docs/evidence/stationing-redesign/phase7-8/`.
+
+## Phase 8 of 8 — «الاعتماد الجزئي», built and connected (18 Nov 2026; ADR-090)
+
+- The stage that decides now sees the parts (new site, main area, sub-area) and approves or returns each one («تعديل مطلوب» with a note); one returned part returns the request with that part named; approved parts stay approved at that stage unless changed; a changed approved part is reopened. The requester of a returned request sees each part's state. The route and its rules are unchanged.
+- **Checks:** `RestationingWorkflowIT` 17/17 (PART-01); `tests/acceptance/setup-access-parts-phase78.mjs` 11/11 on :8088 — a synthetic decider (`fahad.ktby4`, HR_AI, given «معتمد عمليات الوحدة» on the unit for the run, then ended) sees RS-2026-0004's three parts and chooses two approvals and one return; nothing was decided.
+
+## Backend suite and data left on :8088 (18 Nov 2026)
+
+- Full backend suite before phases 4/7/8: 360/362 — `AuthorizationIT` (order-dependent OpenFGA flake, 10/10 alone) and `RestationingHrSyncIT` (shared-database contamination, 2/2 alone). After the phases: `SiteSetupIT` 9/9, `RestationingWorkflowIT` 17/17; the full suite was not rerun.
+- On :8088: RS-2026-0004 (re-stationing, UNDER_REVIEW) besides RS-2026-0001…0003; the synthetic directory accounts `juma.ghfly4` (requester) and `fahad.ktby4` (decider, no grant left) in MOVER's local directory — remove with the scratch helpers or `samba-tool user delete` when no longer needed. Migrations V52, V53 applied.
+- **Owner review:** phases 4, 7 and 8 were built and connected in one pass at the owner's request («finish everything that holds»), not shown screen by screen first; the owner reviews them now.

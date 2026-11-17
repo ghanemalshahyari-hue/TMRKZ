@@ -116,6 +116,13 @@ export function SiteSetupPage() {
   // «تهيئة المواقع والتمركز» (ADR-067): who holds facilities and corrections everywhere also stations units there and places
   // their areas, in the same wizard and one save; the server checks the right again (SiteSetupService.admin)
   const admin = isSetupAdmin(app.me.grants);
+  // «صلاحيات تهيئة المواقع» (phase 7; ADR-089): whoever the settings' rule allows saves a site with its unit too; the server
+  // checks the unit on the save
+  const [mayRule, setMayRule] = useState(false);
+  useEffect(() => {
+    api.siteSetupAccess().then((r) => setMayRule(r.may), () => setMayRule(false));
+  }, []);
+  const maySave = admin || mayRule;
   const [plan, setPlan] = useState<UnitPlan[]>([]);
   // the responsible unit is the stationed unit (owner, 17 Nov 2026, ADR-076): it heads the setup's plan while responsible
   // «تحديد مواقع التمركز المبدئية» (owner brief, phase 2): the unit chosen first is the one stationed; one stationed already is not
@@ -880,8 +887,8 @@ export function SiteSetupPage() {
       <label className="sw-f"><span className="sw-l">سبب التسجيل</span>
         <textarea className="sw-input" rows={2} aria-label="سبب تسجيل الموقع" placeholder="يُحفظ في سجل التدقيق باسمك" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
       </label>
-      {!admin && <p className="sw-err" role="note" data-testid="save-needs-right">حفظ الموقع مع تمركزه المبدئي يحتاج صلاحية «تهيئة المواقع والتمركز». اطلبها من مدير النظام.</p>}
-      <button type="button" className="sw-go" data-testid="save-initial" disabled={drawing || busy || !admin} onClick={() => void saveInitial()}>{busy ? 'جارٍ الحفظ…' : 'حفظ الموقع والتمركز المبدئي'}</button>
+      {!maySave && <p className="sw-err" role="note" data-testid="save-needs-right">حفظ الموقع مع تمركزه المبدئي يحتاج «صلاحيات تهيئة المواقع» (الإعدادات). اطلبها من مدير النظام.</p>}
+      <button type="button" className="sw-go" data-testid="save-initial" disabled={drawing || busy || !maySave} onClick={() => void saveInitial()}>{busy ? 'جارٍ الحفظ…' : 'حفظ الموقع والتمركز المبدئي'}</button>
       {saveError && <p className="sw-err" role="alert" data-testid="save-error">{saveError}</p>}
     </div>
   );

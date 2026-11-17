@@ -23,7 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
  */
 class SiteSetupIT extends RestationingTestBase {
 
-    UUID fresh, fresh2;
+    UUID fresh, fresh2, rqOnlyId;
     double siteLat;
 
     @BeforeEach
@@ -36,7 +36,7 @@ class SiteSetupIT extends RestationingTestBase {
         person("setup", role("SUADM", "ALL", "VIEW", "MANAGE_FACILITIES", "MANAGE_SITE_LINKS", "CORRECT_STATIONING"), top);
         person("facOnly", role("SUFAC", "ALL", "VIEW", "MANAGE_FACILITIES"), top);
         person("unitSetup", role("SUORG", "ORGANIZATION", "VIEW", "MANAGE_FACILITIES", "CORRECT_STATIONING"), top);
-        person("rqOnly", role("SUREQ", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING", "REQUEST_SITE_REGISTRATION"), sec);
+        rqOnlyId = person("rqOnly", role("SUREQ", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING", "REQUEST_SITE_REGISTRATION"), sec);
         person("postureViewer", role("SUPOST", "ORGANIZATION", "VIEW_OPERATIONAL_POSTURE"), sec);
     }
 
@@ -383,6 +383,79 @@ class SiteSetupIT extends RestationingTestBase {
         assertThat(sitesNamed("L")).isZero();
         // read back: the limits are part of the version in force
         assertThat(login("sysadmin").get("/stationing/policy").body().path("inForce").path("values").path("primary").path("maxAreaM2").asDouble()).isEqualTo(50_000);
+    }
+
+    @Test
+    @DisplayName("SETUP-09 «صلاحيات تهيئة المواقع» (phase 7; ADR-089): «معتمد عمليات الوحدة» sets up a site for the units in its reach by default; the configured rule (people, units, levels) replaces it; nothing outside it is written")
+    void scopedSetupAccess() {
+        jdbc.sql("delete from site_setup_access").update();
+        try {
+            // the deployed role «معتمد عمليات الوحدة», as the directory seeds it (the test database starts without it)
+            jdbc.sql("""
+                    insert into role_def(code, name, permissions, scope, summary_only, sort_order)
+                    values ('UNIT_OPERATIONS_APPROVER', 'معتمد عمليات الوحدة', string_to_array('VIEW,REVIEW,DECIDE_UNIT_OPERATIONS', ','), 'ORGANIZATION', false, 900)
+                    on conflict (code) do nothing""").update();
+            UUID ops = person("opsSetup", "UNIT_OPERATIONS_APPROVER", fresh);
+            UUID rq = rqOnlyId;
+            // the initial rule: «معتمد عمليات الوحدة» for the units in that role's own reach
+            assertThat(login("opsSetup").get("/site-setup/access").body().path("may").asBoolean()).isTrue();
+            assertThat(login("rqOnly").get("/site-setup/access").body().path("may").asBoolean()).isFalse();
+            Res made = login("opsSetup").post("/site-setup", body("OPS", List.of(bare(fresh))));
+            assertThat(made.status()).as(made.toString()).isEqualTo(200);
+            assertThat(sitesNamed("OPS")).isEqualTo(1);
+            assertThat(stationings(fresh)).isEqualTo(1);
+            assertThat(count("select count(*) from site_responsibility r join site s on s.id = r.site_id where s.name = :p0 and r.organization_id = :p1",
+                    siteName("OPS"), fresh)).as("registered on the unit's behalf").isEqualTo(1);
+            // a unit outside the role's reach: refused, nothing written
+            Res outside = login("opsSetup").post("/site-setup", apart(body("OPS2", List.of(bare(fresh2))), 1));
+            assertThat(outside.status()).isEqualTo(403);
+            assertThat(sitesNamed("OPS2")).isZero();
+            assertThat(stationings(fresh2)).isZero();
+            // without a role of the rule: refused
+            assertThat(login("rqOnly").post("/site-setup", apart(body("RQ", List.of(bare(fresh2))), 2)).status()).isEqualTo(403);
+            // only whoever configures the system changes the rule; a reason is required; unknown roles are refused
+            Map<String, Object> rule = new LinkedHashMap<>();
+            rule.put("roles", List.of());
+            rule.put("persons", List.of(rq == null ? ops.toString() : rq.toString()));
+            rule.put("units", List.of(Map.of("id", sec.toString(), "includeDescendants", true)));
+            rule.put("levels", List.of());
+            rule.put("reason", "سبب");
+            assertThat(login("opsSetup").put("/settings/site-setup-access", rule).status()).isEqualTo(403);
+            assertThat(login("sysadmin").put("/settings/site-setup-access", rule).status()).as("a reason of five letters").isEqualTo(400);
+            rule.put("reason", "صلاحيات تهيئة للاختبار");
+            rule.put("roles", List.of("NO_SUCH_ROLE_" + sfx));
+            assertThat(login("sysadmin").put("/settings/site-setup-access", rule).status()).isEqualTo(400);
+            rule.put("roles", List.of());
+            Res saved = login("sysadmin").put("/settings/site-setup-access", rule);
+            assertThat(saved.status()).as(saved.toString()).isEqualTo(200);
+            assertThat(saved.body().path("units").get(0).path("includeDescendants").asBoolean()).isTrue();
+            assertThat(count("select count(*) from audit_event where action = 'SITE_SETUP_ACCESS_SAVED'")).isPositive();
+            // the role no longer counts; the person named does, for the units under «sec»
+            assertThat(login("opsSetup").post("/site-setup", apart(body("OPS3", List.of(bare(fresh2))), 3)).status()).isEqualTo(403);
+            if (rq != null) {
+                Res byPerson = login("rqOnly").post("/site-setup", apart(body("RQ2", List.of(bare(fresh2))), 4));
+                assertThat(byPerson.status()).as(byPerson.toString()).isEqualTo(200);
+                assertThat(stationings(fresh2)).isEqualTo(1);
+                // a level the units are not at: refused
+                rule.put("levels", List.of(1));
+                assertThat(login("sysadmin").put("/settings/site-setup-access", rule).status()).isEqualTo(200);
+                UUID third = hrOrg("SUC", sec, 10, publishedSnapshot());
+                assertThat(login("rqOnly").post("/site-setup", apart(body("RQ3", List.of(bare(third))), 5)).status()).isEqualTo(403);
+            }
+            rule.put("levels", List.of(0));
+            assertThat(login("sysadmin").put("/settings/site-setup-access", rule).status()).as("levels start at 1").isEqualTo(400);
+        } finally {
+            jdbc.sql("delete from site_setup_access").update();
+        }
+    }
+
+    /** The same body {@code n} cells (about 1.1 km each) further north, so the test's sites never overlap. */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> apart(Map<String, Object> b, int n) {
+        double lat = siteLat + 0.01 * n;
+        ((Map<String, Object>) b.get("site")).put("location", Map.of("lat", lat, "lng", lng0));
+        ((Map<String, Object>) b.get("boundary")).put("geometry", square(lat, lng0, 0.0008));
+        return b;
     }
 
     private static JsonNode readTree(String s) {

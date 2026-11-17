@@ -110,6 +110,75 @@ export function areaStepProblem(s: AreaState, to: AreaStep): string {
   return '';
 }
 
+// ---- «طلب إعادة تمركز», the simplified map-first flow (owner brief §5, phase 4) -----------------------------------------
+
+/** The re-stationing's progress: the units, then the new site, the main and sub-areas, the review (brief §5). */
+export const RESTATION_STEPS = ['الوحدات', 'الموقع الجديد', 'الرئيسية', 'الفرعية', 'مراجعة وإرسال'] as const;
+export type FlowPurpose = 'DEPLOYMENT_AREAS' | 'RESTATIONING';
+export type FlowStage = 'pick' | 'site' | 'primary' | 'alternative' | 'review';
+/** Each request's stages in order (the step strip's numbers are their positions, from 1). */
+export const FLOW_STAGES: Record<FlowPurpose, readonly FlowStage[]> = {
+  DEPLOYMENT_AREAS: ['pick', 'primary', 'alternative', 'review'],
+  RESTATIONING: ['pick', 'site', 'primary', 'alternative', 'review'],
+};
+export const FLOW_STEPS: Record<FlowPurpose, readonly string[]> = { DEPLOYMENT_AREAS: AREA_STEPS, RESTATIONING: RESTATION_STEPS };
+
+/** Where each area is measured from: the main area from the new site in a re-stationing, from the current site otherwise. */
+export const measuredFrom = (purpose: FlowPurpose, r: AreaRole) => (purpose === 'RESTATIONING' && r === 'primary' ? 'من مركز الموقع الجديد' : MEASURED_FROM[r]);
+
+type HubLike = UnitLike & { parentId?: string | null; actions?: readonly { action: string; allowed: boolean; reason: string | null }[] };
+
+/** Which of the person's units may move in a re-stationing (the hub's «RESTATIONING» action; the server decides again). */
+export function restationingChoices<U extends HubLike>(units: readonly U[]): UnitChoice<U>[] {
+  return units.map((unit) => {
+    if (unit.state === 'NOT_AUTHORISED') return { unit, eligible: false, note: 'لا تملك تقديم طلباتها.' };
+    if (!unit.site || unit.state === 'NO_STATIONING') return { unit, eligible: false, note: 'لا تمركز معتمد لها: يُسجَّل تمركزها المبدئي في «تحديد مواقع التمركز المبدئية».' };
+    const a = unit.actions?.find((x) => x.action === 'RESTATIONING');
+    if (a && !a.allowed) return { unit, eligible: false, note: a.reason ?? 'لا يُطلب لها الآن.' };
+    return { unit, eligible: true, note: 'متمركزة في «' + unit.site.name + '».' };
+  });
+}
+
+/**
+ * The unit that asks for the move (the server's rule: every moving unit is in its branch): the nearest unit, among the
+ * chosen ones and those above them in the person's list, that every chosen unit is under — null when there is none.
+ */
+export function requestingUnitOf<U extends HubLike>(picked: readonly string[], units: readonly U[]): U | null {
+  if (picked.length === 0) return null;
+  const byId = new Map(units.map((u) => [u.id, u]));
+  const chain = (id: string) => {
+    const out: string[] = [];
+    for (let at: string | null | undefined = id; at && byId.has(at) && !out.includes(at); at = byId.get(at)!.parentId) out.push(at);
+    return out;
+  };
+  const others = picked.map(chain);
+  for (const a of others[0]) {
+    if (others.every((c) => c.includes(a)) && byId.get(a)!.state !== 'NOT_AUTHORISED') return byId.get(a)!;
+  }
+  return null;
+}
+
+export type FlowState = { units: number; requester: boolean; site: unknown | null; primary: unknown | null; alternative: unknown | null };
+
+/** What stops moving to step `to` of this request («التالي» or a click on the strip); empty when nothing does. */
+export function flowStepProblem(purpose: FlowPurpose, s: FlowState, to: number): string {
+  const stages = FLOW_STAGES[purpose];
+  const reaches = (x: FlowStage) => to > stages.indexOf(x) + 1;
+  if (purpose === 'DEPLOYMENT_AREAS') return areaStepProblem({ unitId: s.units > 0 ? 'x' : null, primary: s.primary, alternative: s.alternative }, to as AreaStep);
+  if (reaches('pick') && s.units === 0) return 'اختر الوحدة أو الوحدات التي تنتقل أولاً.';
+  if (reaches('pick') && !s.requester) return 'اختر وحدات من فرع واحد: تقدّم الطلب الوحدة التي تضمها كلها.';
+  if (reaches('site') && !s.site) return 'حدد موقع التمركز الجديد أولاً: منه تُقاس الرئيسية.';
+  if (reaches('primary') && !s.primary) return 'ضع منطقة الانتشار الرئيسية أولاً: منها تُقاس الفرعية.';
+  if (reaches('alternative') && !s.alternative) return 'ضع منطقة الانتشار الفرعية أولاً.';
+  return '';
+}
+
+/** How the new site was made, as the server records it: a copy of the current site kept as is, edited, or drawn. */
+export function siteShapeKind(copiedFromArea: number | null, areaM2: number): 'COPY' | 'EDITED' | 'DRAWN' {
+  if (copiedFromArea == null) return 'DRAWN';
+  return Math.abs(areaM2 - copiedFromArea) <= copiedFromArea * 0.005 ? 'COPY' : 'EDITED';
+}
+
 /** «6.2 كم» */
 export const kmChip = (m: number) => (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 1 }) + ' كم';
 export const areaChip = (m2: number) => formatArea(m2);

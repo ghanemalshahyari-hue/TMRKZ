@@ -1,6 +1,7 @@
 package ae.mover.stationing;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -132,6 +133,69 @@ class RestationingWorkflowIT extends RestationingTestBase {
         decide("apSec", id, "APPROVE");
         Res done = decide("apTop", id, "APPROVE");
         assertThat(done.body().path("state").asText()).as("the carried stage is not decided again").isEqualTo("APPROVED_NOT_ACTIVATED");
+    }
+
+    // ---- «الاعتماد الجزئي» (owner brief §6, phase 8; ADR-090) -------------------------------------------------
+
+    private static Map<String, String> states(JsonNode parts, String field) {
+        Map<String, String> out = new LinkedHashMap<>();
+        parts.forEach(p -> out.put(p.path("part").asText(), field.equals("current") ? p.path("current").asText() : p.path("last").path("state").asText()));
+        return out;
+    }
+
+    @Test
+    @DisplayName("PART-01 a stage approves the new site and the main area and returns the sub-area; back at that stage the approved parts are kept, an approved part changed since is reopened, and only those are decided")
+    void partialApproval() {
+        Map<String, Object> c = permanent(List.of(sec));
+        String id = create("req", c);
+        assertThat(login("req").post("/restationing-requests/" + id + "/submit", Map.of()).status()).isEqualTo(200);
+        decide("apSec", id, "APPROVE");
+        decide("apDept", id, "APPROVE");
+        String path = "/restationing-requests/" + id + "/decision";
+        JsonNode atTop = login("apTop").get("/restationing-requests/" + id).body();
+        assertThat(states(atTop.path("parts"), "current")).containsExactly(entry("SITE", "PENDING"), entry("PRIMARY", "PENDING"), entry("ALTERNATIVE", "PENDING"));
+        // every part needs a decision
+        assertThat(login("apTop").post(path, Map.of("parts", Map.of("SITE", "APPROVE"))).status()).isEqualTo(400);
+        Res ret = login("apTop").post(path, Map.of("parts", Map.of("SITE", "APPROVE", "PRIMARY", "APPROVE", "ALTERNATIVE", "CHANGES"),
+                "partNotes", Map.of("ALTERNATIVE", "أبعدها عن الطريق")));
+        assertThat(ret.status()).as(ret.toString()).isEqualTo(200);
+        assertThat(ret.body().path("state").asText()).isEqualTo("RETURNED_FOR_CHANGES");
+        assertThat(texts(ret.body().path("returned").path("parts"))).containsExactly("ALTERNATIVE");
+        assertThat(ret.body().path("returned").path("reason").asText()).contains("منطقة الانتشار الفرعية").contains("أبعدها عن الطريق");
+        assertThat(states(login("req").get("/restationing-requests/" + id).body().path("parts"), "last"))
+                .containsExactly(entry("SITE", "APPROVED"), entry("PRIMARY", "APPROVED"), entry("ALTERNATIVE", "CHANGES_REQUESTED"));
+
+        // the requester changes the sub-area — and the main area, approved already: that approval is reopened
+        Map<String, Object> changed = new LinkedHashMap<>(c);
+        changed.put("alternative", square(lat0 - 0.01 + offsetLat(4_300), lng0 + offsetLng(6_000), 0.002));
+        changed.put("primary", square(lat0 - 0.01, lng0 + offsetLng(6_200), 0.002));
+        assertThat(login("req").put("/restationing-requests/" + id + "/content", changed).status()).isEqualTo(200);
+        Res re = login("req").post("/restationing-requests/" + id + "/submit", Map.of("reason", "عدّلت المنطقتين كما طُلب"));
+        assertThat(re.status()).as(re.toString()).isEqualTo(200);
+        // the stages before the final one decide as they always do (carried or taken again)
+        for (int i = 0; i < 4; i++) {
+            JsonNode route = login("req").get("/restationing-requests/" + id).body().path("route");
+            if (route.get(route.size() - 1).path("current").asBoolean() || marks(route).indexOf("null") == route.size() - 1) {
+                break;
+            }
+            for (String who : List.of("apSec", "apDept")) {
+                if (decide(who, id, "APPROVE").status() == 200) {
+                    break;
+                }
+            }
+        }
+        JsonNode again = login("apTop").get("/restationing-requests/" + id).body();
+        assertThat(states(again.path("parts"), "current"))
+                .as("the site stays approved; the main area approved then changed is reopened; the sub-area changed after its return")
+                .containsExactly(entry("SITE", "APPROVED"), entry("PRIMARY", "REOPENED"), entry("ALTERNATIVE", "EDITED"));
+        // a kept approval is not decided again; a reopened part must be
+        assertThat(login("apTop").post(path, Map.of("parts", Map.of("SITE", "CHANGES", "PRIMARY", "APPROVE", "ALTERNATIVE", "APPROVE"))).status()).isEqualTo(400);
+        assertThat(login("apTop").post(path, Map.of("parts", Map.of("ALTERNATIVE", "APPROVE"))).status()).isEqualTo(400);
+        Res done = login("apTop").post(path, Map.of("parts", Map.of("PRIMARY", "APPROVE", "ALTERNATIVE", "APPROVE")));
+        assertThat(done.status()).as(done.toString()).isEqualTo(200);
+        assertThat(done.body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'RESTATIONING_STAGE_APPROVED' and jsonb_exists(detail, 'parts')")
+                .param("id", id).query(Long.class).single()).isPositive();
     }
 
     // ---- hierarchy change -----------------------------------------------------------------------------------

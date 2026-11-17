@@ -105,7 +105,18 @@ public class RestationingService {
     public record ReasonInput(String reason) {
     }
 
-    public record DecisionInput(String decision, String reason) {
+    /**
+     * APPROVE, RETURN or REJECT — or, with {@code parts} (part → APPROVE or CHANGES), the stage's decision part by part
+     * («الاعتماد الجزئي», ADR-090): RETURN when a part needs changes, APPROVE when every part is approved.
+     */
+    public record DecisionInput(String decision, String reason, Map<String, String> parts, Map<String, String> partNotes) {
+        public DecisionInput(String decision, String reason) {
+            this(decision, reason, null, null);
+        }
+
+        boolean byParts() {
+            return parts != null && !parts.isEmpty();
+        }
     }
 
     /** A request as stored. */
@@ -150,6 +161,8 @@ public class RestationingService {
     private final OrgHierarchy hierarchy;
     private final StationingOutbox outbox;
     private final PersonKeys keys;
+    @org.springframework.beans.factory.annotation.Autowired
+    private PartReviews partReviews;
     private final TransactionTemplate tx;
     private final PlaceInfo placeInfo;
     private final StationingRoutes routes;
@@ -446,12 +459,13 @@ public class RestationingService {
     // ---- decisions ------------------------------------------------------------------------------------------
 
     public void decide(AccessContext ctx, UUID id, DecisionInput in, Instant now) {
-        String decision = in == null || in.decision() == null ? "" : in.decision();
-        String reason = in == null || in.reason() == null ? "" : in.reason().trim();
-        if (!Set.of("APPROVE", "RETURN", "REJECT").contains(decision)) {
+        boolean byParts = in != null && in.byParts();
+        String asked = in == null || in.decision() == null ? "" : in.decision();
+        String given = in == null || in.reason() == null ? "" : in.reason().trim();
+        if (!byParts && !Set.of("APPROVE", "RETURN", "REJECT").contains(asked)) {
             throw ApiException.validation("القرار اعتماد أو إرجاع أو رفض.");
         }
-        if (!"APPROVE".equals(decision) && reason.length() < 5) {
+        if (!byParts && !"APPROVE".equals(asked) && given.length() < 5) {
             throw ApiException.validation("اكتب سبب القرار (5 أحرف على الأقل).");
         }
         // O-10: a drifted hierarchy pauses the request before anyone decides on it (committed on its own)
@@ -479,6 +493,20 @@ public class RestationingService {
                 // the final approver decides the excess with the request (ADR-078): the decision records what it covered
                 detail.put("exceedsPolicy", excess);
             }
+            // «الاعتماد الجزئي» (ADR-090): the stage decides each part; a part it approved and that is unchanged is kept
+            String decision = asked;
+            String reason = given;
+            List<String> returnedParts = List.of();
+            if (byParts) {
+                PartReviews.Outcome o = partReviews.apply(id, r.purpose(), r.content(), stage.key(), stage.label(), in.parts(), in.partNotes(),
+                        ctx.personId(), ctx.actor().displayName(), now);
+                decision = o.decision();
+                returnedParts = o.changes();
+                detail.put("parts", o.parts());
+                if ("RETURN".equals(decision) && reason.length() < 5) {
+                    reason = PartReviews.reasonOf(o.changes(), in.partNotes());
+                }
+            }
             switch (decision) {
                 case "APPROVE" -> {
                     jdbc.sql("""
@@ -500,6 +528,9 @@ public class RestationingService {
                     ret.put("stageLabel", stage.label());
                     ret.put("reason", reason);
                     ret.put("at", now.toString());
+                    if (!returnedParts.isEmpty()) {
+                        ret.put("parts", returnedParts);
+                    }
                     jdbc.sql("""
                             update restationing_request set state = 'RETURNED_FOR_CHANGES', returned = cast(:ret as jsonb), updated_at = :now,
                                    version = version + 1 where id = :id""")
@@ -1490,6 +1521,8 @@ public class RestationingService {
         List<StageRow> route = stages(id, r.routeNo());
         StageRow current = "UNDER_REVIEW".equals(r.state()) ? route.stream().filter(x -> !x.marked()).findFirst().orElse(null) : null;
         m.put("route", route.stream().map(x -> stageView(x, current)).toList());
+        // «الاعتماد الجزئي» (ADR-090): each part, what the current stage decided on it, and the latest decision of any stage
+        m.put("parts", partReviews.view(r.id(), r.purpose(), r.content(), current == null ? null : current.key()));
         List<Map<String, Object>> previous = new ArrayList<>();
         for (int n = 1; n < r.routeNo(); n++) {
             Map<String, Object> pr = new LinkedHashMap<>();

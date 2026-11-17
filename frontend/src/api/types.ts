@@ -79,6 +79,8 @@ export type Me = {
   signInMethod: 'PROVIDER' | 'DIRECTORY';
   /** «لوحة الدعم» (ADR-053): the person's support seat, if any. */
   supportSeat?: 'AGENT' | 'SUPERVISOR' | null;
+  /** «صلاحيات تهيئة المواقع» (ADR-089): the settings' rule lets this person set up sites. */
+  siteSetup?: boolean;
   serverTime: string;
   timezone: string;
 };
@@ -1128,6 +1130,13 @@ export type RestationingRevision = {
   routeNo: number;
   policyVersion: number;
 };
+export type PartState = 'APPROVED' | 'REOPENED' | 'CHANGES_REQUESTED' | 'EDITED' | 'PENDING';
+export type RequestPart = {
+  part: 'SITE' | 'PRIMARY' | 'ALTERNATIVE';
+  label: string;
+  current: PartState;
+  last?: { state: PartState; stageLabel: string; byName: string; at: string; note: string | null };
+};
 export type RestationingRequest = {
   id: string;
   number: string;
@@ -1151,7 +1160,9 @@ export type RestationingRequest = {
   route: RestationingStage[];
   previousRoutes: { routeNo: number; stages: RestationingStage[] }[];
   revisions: RestationingRevision[];
-  returned: { byName: string; stageLabel: string; reason: string; at: string } | null;
+  returned: { byName: string; stageLabel: string; reason: string; at: string; parts?: string[] } | null;
+  /** «الاعتماد الجزئي» (ADR-090): each part, what the current stage decided on it, and the latest decision of any stage. */
+  parts?: RequestPart[];
   paused: { at: string; reason: string; from: string } | null;
   finalApprover: Ref | null;
   activation?: { by: Ref; at: string; site: Ref };

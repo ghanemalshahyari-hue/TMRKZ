@@ -2387,3 +2387,21 @@ Addition: the stationing requester is displayed «مقدم الطلب»; MOVER's
 ## ADR-088 The deployment areas' own area limits in the stationing policy (owner brief §9, 18 Nov 2026)
 
 **Decision.** `StationingPolicy.Leg` gains optional `minAreaM2` and `maxAreaM2` (written only when set, so versions published before them read back unchanged and compare without spurious changes). The leg check refuses an area outside them, the same check for a request and for the setup; publishing refuses a minimum above the maximum. Unlike the proposed site's footprint (ADR-087), these are hard limits: the brief says the shape is free within them.
+
+## ADR-089 Who may set up sites is a rule in the settings (owner brief §3, phase 7; 18 Nov 2026)
+
+**Owner.** «من يستطيع تهيئة المواقع؟ لا تكون Hard-coded … الإعدادات → صلاحيات تهيئة المواقع … الدور، الأشخاص، الوحدات، نطاق الوحدات، المستويات. الإعداد الافتراضي المبدئي: عمليات الوحدة».
+
+**Decision.** One rule (`site_setup_access`, V52) kept by whoever configures the system: roles, people, units (each with or without the units under it) and levels (1 = the top). A person may set up a site with a unit's initial stationing when they hold a role of the rule acting for that unit (not through a delegation) or are named, the unit is inside the chosen units (none: any) and at a chosen level (none: any). The system administrator («تهيئة المواقع والتمركز», ADR-067) always may. With no saved rule: «معتمد عمليات الوحدة» in that role's own reach.
+
+**How the save works.** `SiteSetupService.setup` and `check` keep the administrator's path unchanged; anyone else goes through `scoped`: at least one unit, every unit allowed, the site's responsible unit allowed (the first unit when none is named), an inside site only under a site whose responsible unit the rule covers. The write then runs with the person's context plus one grant of facility management for that unit (`AccessContext.plus`, no OpenFGA confirmer: the rule is the decision, checked just before). `/me` carries `siteSetup` so the tab shows for people the rule allows.
+
+**Consequences.** Changing the rule is audited (`SITE_SETUP_ACCESS_SAVED`) with a reason. The rule decides who may record an initial stationing; it grants nothing else (no facility management outside that save). A role a person holds through a delegation does not count.
+
+## ADR-090 Partial approval of a request's parts, inside the existing route (owner brief §6, phase 8; 18 Nov 2026)
+
+**Owner.** «إعادة التمركز تتكون من أجزاء … يمكن للمراجع أن يعتمد جزءاً، يعيد جزءاً للتعديل … الموقع والرئيسية يحتفظان بحالة معتمد ولا يعاد اعتمادهما عند تعديل الفرعية … إذا عدّل مقدم الطلب جزءاً سبق اعتماده، يعاد فتح الاعتماد لذلك الجزء فقط»; and «لا تعيد بناء Workflow engine».
+
+**Decision.** A re-stationing's parts are the new site, the main area and the sub-area (a deployment-area request's, its two areas). The decision of a stage may be given part by part (`parts`: APPROVE or CHANGES, with optional notes): any CHANGES makes the stage's decision RETURN (the reason, when none is written, names the parts and notes; `returned.parts` lists them); all approved makes it APPROVE. What each stage decided on each part is kept with the part's fingerprint (`restationing_request.part_reviews`, V53). Back at that stage, a part it approved and that is unchanged is kept and cannot be decided again; an approved part changed since is reopened; a returned part changed since waits for a decision. Other stages decide for themselves; the route, its carry-over by facts (ADR-046) and the final approval are unchanged.
+
+**Consequences.** The whole-request buttons stay for every request; the part panel is shown to the stage that decides now. The audit line of the stage's decision records the parts.

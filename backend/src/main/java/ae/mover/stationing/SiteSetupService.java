@@ -88,10 +88,12 @@ public class SiteSetupService {
     private final AuditService audit;
     private final IdempotencyService idempotency;
     private final TransactionTemplate tx;
+    private final SiteSetupAccess access;
 
     public SiteSetupService(JdbcClient jdbc, Json json, Clock clock, SiteService sites, BoundaryService boundaries, RestationingChecks checks,
                             StationingPolicyStore policies, StationingOutbox outbox, PlaceInfo placeInfo, AuditService audit,
-                            IdempotencyService idempotency, TransactionTemplate tx) {
+                            IdempotencyService idempotency, TransactionTemplate tx, @org.springframework.context.annotation.Lazy SiteSetupAccess access) {
+        this.access = access;
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -122,11 +124,51 @@ public class SiteSetupService {
 
     @Transactional
     public Map<String, Object> setup(AccessContext ctx, SetupInput in, String idemKey) {
-        requireAdmin(ctx);
         if (in == null) {
             throw ApiException.validation("أدخل بيانات الموقع.");
         }
-        return idempotency.run(ctx.actor(), idemKey, "site-setup", hashable(in), () -> write(ctx, in, idemKey), () -> replay(ctx, idemKey));
+        if (admin(ctx)) {
+            return idempotency.run(ctx.actor(), idemKey, "site-setup", hashable(in), () -> write(ctx, in, idemKey), () -> replay(ctx, idemKey));
+        }
+        // «صلاحيات تهيئة المواقع» (phase 7; ADR-089): someone the rule allows sets up a site with the units it covers
+        SetupInput scoped = scoped(ctx, in);
+        AccessContext acting = access.actingFor(ctx, UUID.fromString(scoped.site().responsibleOrgId()));
+        return idempotency.run(ctx.actor(), idemKey, "site-setup", hashable(scoped), () -> write(acting, scoped, idemKey), () -> replay(ctx, idemKey));
+    }
+
+    /**
+     * A save by someone «صلاحيات تهيئة المواقع» allows (not the administrator): at least one unit, every unit inside the rule;
+     * the site is registered under the first unit unless another unit of the rule is named; an inside site only inside a site
+     * whose responsible unit the rule covers. Anything else is refused before anything is written.
+     */
+    private SetupInput scoped(AccessContext ctx, SetupInput in) {
+        List<UUID> ids = unitIds(in);
+        if (ids.isEmpty() || !access.anywhere(ctx)) {
+            requireAdmin(ctx);
+        }
+        for (UUID u : ids) {
+            if (!access.allows(ctx, u)) {
+                throw ApiException.forbidden("تهيئة موقع لهذه الوحدة خارج «صلاحيات تهيئة المواقع» الممنوحة لك (الإعدادات). لم يُحفظ شيء.");
+            }
+        }
+        SiteService.SiteInput s = in.site();
+        if (s == null) {
+            throw ApiException.validation("أدخل بيانات الموقع.");
+        }
+        String responsible = s.responsibleOrgId() == null || s.responsibleOrgId().isBlank() ? ids.get(0).toString() : s.responsibleOrgId();
+        if (!access.allows(ctx, UUID.fromString(responsible))) {
+            throw ApiException.forbidden("الجهة المسؤولة عن الموقع خارج «صلاحيات تهيئة المواقع» الممنوحة لك.");
+        }
+        if (s.parentId() != null && !s.parentId().isBlank()) {
+            UUID parentOrg = jdbc.sql("select organization_id from site_responsibility where site_id = :s and valid_to is null order by valid_from desc limit 1")
+                    .param("s", UUID.fromString(s.parentId())).query(UUID.class).optional().orElse(null);
+            if (parentOrg == null || !access.allows(ctx, parentOrg)) {
+                throw ApiException.forbidden("الموقع الرئيسي المختار خارج «صلاحيات تهيئة المواقع» الممنوحة لك: يُضاف الموقع الداخلي فيه من مدير النظام.");
+            }
+        }
+        SiteService.SiteInput site = new SiteService.SiteInput(s.code(), s.name(), s.kind(), s.parentId(), responsible, s.capacity(), s.location(),
+                s.notes(), s.reason(), s.symbol());
+        return new SetupInput(site, in.boundary(), in.units(), in.reason(), in.reference(), in.effectiveFrom());
     }
 
     private Map<String, Object> write(AccessContext ctx, SetupInput in, String idemKey) {
@@ -278,11 +320,12 @@ public class SiteSetupService {
      * «مراجعة وحفظ»: everything the save would check, with each unit's legs as every request shows them, and the site
      * registered and rolled back so its own rules (the overlap with registered sites among them) answer too. Nothing stays.
      */
-    public Map<String, Object> check(AccessContext ctx, SetupInput in) {
-        requireAdmin(ctx);
-        if (in == null) {
+    public Map<String, Object> check(AccessContext ctx, SetupInput given) {
+        if (given == null) {
             throw ApiException.validation("أدخل بيانات الموقع.");
         }
+        // the same rule as the save (ADR-089)
+        SetupInput in = admin(ctx) ? given : scoped(ctx, given);
         return tx.execute(status -> {
             Instant now = clock.instant();
             Evaluation e = evaluate(in, now);

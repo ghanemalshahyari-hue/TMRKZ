@@ -1,6 +1,6 @@
 import type { Permission } from '../api/types';
 import { FLOW_STUDIO_UI_ENABLED, NAV, type View } from './app';
-import { hubWays } from './stationingHub';
+import { hubWays, mayByRule } from './stationingHub';
 
 /**
  * Navigation of the operational shell (owner brief «FULL APPLICATION UI REBUILD», §4): the same views and the same
@@ -46,7 +46,7 @@ export function restriction(view: View, can: (p: Permission) => boolean, summary
   if (view === 'supportConsole') return !supportSeat && !can('CONFIGURE');
   // the read-only posture opens with its own right, and that right opens nothing else
   if (view === 'posture') return !can('VIEW_OPERATIONAL_POSTURE');
-  if (view === 'siteSetup') return !(can('MANAGE_FACILITIES') || can('MANAGE_SITE_LINKS') || can('CORRECT_STATIONING'));
+  if (view === 'siteSetup') return !(can('MANAGE_FACILITIES') || can('MANAGE_SITE_LINKS') || can('CORRECT_STATIONING') || mayByRule());
   if (view === 'newRequest') return !STATIONING_REQUEST_RIGHTS.some((p) => can(p)) || (systemAdmin && !otherRequestRights);
   if (view === 'allRequests') return !STATIONING_RIGHTS.some((p) => can(p)) && !can('REVIEW');
   if (view === 'accessInbox') return !can('REVIEW');

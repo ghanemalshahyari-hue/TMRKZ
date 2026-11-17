@@ -351,4 +351,32 @@ select.sw-input { appearance: auto; }
 .sc-pending { margin: 0 0 8px; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--accent); background: var(--soft); font-size: 13px; font-weight: 700; }
 .rs-delreq { color: #c0392b; font-weight: 700; }
 .rs-over { color: #c98a1b; font-weight: 700; }
+/* «طلب إعادة تمركز», the simplified flow (phase 4): the new site's look, and units chosen together */
+.da-look-site span { border: 2.5px solid #0b9e86; background: #0b9e8630; }
+.da-unit.is-multi b { display: flex; align-items: center; gap: 6px; }
+.da-check { font-size: 1.05em; line-height: 1; color: var(--accent); }
+/* «صلاحيات تهيئة المواقع» in the settings (phase 7; ADR-089) */
+.sa-sentence { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; background: var(--paper-2, var(--paper)); border: 1px solid var(--line); }
+.sa-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.sa-box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 0; min-width: 0; display: grid; gap: 8px; align-content: start; }
+.sa-box legend { font-weight: 700; padding: 0 4px; }
+.sa-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.sa-check { display: inline-flex; align-items: center; gap: 6px; }
+.sa-chosen, .sa-hits { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.sa-chosen li { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 4px 8px; border-radius: 8px; background: var(--paper); border: 1px solid var(--line); }
+.sa-chosen button, .sa-hits button { border: 0; background: none; color: inherit; cursor: pointer; font: inherit; text-align: start; }
+.sa-hits button { width: 100%; padding: 4px 8px; border-radius: 6px; }
+.sa-hits button:hover { background: var(--line); }
+.sa-save { display: flex; gap: 8px; margin-top: 12px; }
+.sa-save .sw-input { flex: 1; }
+/* «الاعتماد الجزئي» (phase 8; ADR-090) */
+.pr-panel { display: grid; gap: 8px; }
+.pr-panel h4 { margin: 0; }
+.pr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pr-row { display: grid; gap: 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.pr-row.is-kept { opacity: 0.85; }
+.pr-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pr-choose { display: flex; gap: 6px; }
+.pr-kept { color: #2f9e6e; font-weight: 700; }
+.pr-returned { margin-top: 8px; }
 
