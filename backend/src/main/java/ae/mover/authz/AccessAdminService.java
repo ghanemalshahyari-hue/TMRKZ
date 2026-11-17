@@ -134,6 +134,7 @@ public class AccessAdminService {
         if ((Boolean) role.get("system") || GrantAdminService.permissions(role.get("permissions")).contains(Permission.MANAGE_ACCESS)) {
             throw ApiException.validation("تصريح المناوبة لا يمنح إدارة الصلاحيات ولا دور نظام.");
         }
+        GrantAdminService.requireGivable(GrantAdminService.permissions(role.get("permissions")));
         grants.requireAuthorityForRole(ctx, org, in.roleCode(), null, Right.DUTY);
         Instant from = in.validFrom() == null || in.validFrom().isBlank() ? clock.instant() : Times.parse(in.validFrom(), "validFrom");
         Instant to = in.validTo() == null || in.validTo().isBlank() ? null : Times.parse(in.validTo(), "validTo");

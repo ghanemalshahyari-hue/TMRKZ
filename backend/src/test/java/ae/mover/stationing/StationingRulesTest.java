@@ -56,7 +56,7 @@ class StationingRulesTest {
 
         @Test
         void startsAtTheRequestingUnitAndFollowsOracleUpward() {
-            List<RouteStage> r = RouteDerivation.derive(h.path(h.id("900")), policy.routing(), policy.crossBranch(), List.of(), false);
+            List<RouteStage> r = RouteDerivation.derive(h.path(h.id("900")), policy.routing(), policy.crossBranch(), List.of());
             assertThat(r).extracting(RouteStage::unit).containsExactly(h.id("900"), h.id("800"), h.id("700"), h.id("600"));
             assertThat(RouteDerivation.complete(r)).isTrue();
             assertThat(r.get(r.size() - 1).dependsOn()).containsExactlyInAnyOrder(Fact.values());
@@ -65,25 +65,25 @@ class StationingRulesTest {
         @Test
         void aLevelConfiguredNotToApproveHasNoStageAndNoLevelIsHardCoded() {
             // L10 does not approve: a request from u1000 starts at its L9 parent's stage
-            List<RouteStage> r = RouteDerivation.derive(h.path(h.id("1000")), policy.routing(), policy.crossBranch(), List.of(), false);
+            List<RouteStage> r = RouteDerivation.derive(h.path(h.id("1000")), policy.routing(), policy.crossBranch(), List.of());
             assertThat(r).extracting(RouteStage::unit).containsExactly(h.id("900"), h.id("800"), h.id("700"), h.id("600"));
             var skip7 = new Routing(StartAt.SELF, policy.routing().levels().stream()
                     .map(l -> l.level() == 7 ? new StationingPolicy.RoutingLevel(7, false, l.label(), false, l.dependsOn()) : l).toList());
-            assertThat(RouteDerivation.derive(h.path(h.id("900")), skip7, policy.crossBranch(), List.of(), false))
+            assertThat(RouteDerivation.derive(h.path(h.id("900")), skip7, policy.crossBranch(), List.of()))
                     .extracting(RouteStage::unit).containsExactly(h.id("900"), h.id("800"), h.id("600"));
         }
 
         @Test
         void parentFirstIsConfigurable() {
             var parent = new Routing(StartAt.PARENT, policy.routing().levels());
-            assertThat(RouteDerivation.derive(h.path(h.id("900")), parent, policy.crossBranch(), List.of(), false).get(0).unit())
+            assertThat(RouteDerivation.derive(h.path(h.id("900")), parent, policy.crossBranch(), List.of()).get(0).unit())
                     .isEqualTo(h.id("800"));
         }
 
         @Test
         void aRouteWithoutTheFinalLevelIsIncomplete() {
             var noFinal = new Routing(StartAt.SELF, policy.routing().levels().stream().filter(l -> l.level() != 6).toList());
-            assertThat(RouteDerivation.complete(RouteDerivation.derive(h.path(h.id("900")), noFinal, policy.crossBranch(), List.of(), false))).isFalse();
+            assertThat(RouteDerivation.complete(RouteDerivation.derive(h.path(h.id("900")), noFinal, policy.crossBranch(), List.of()))).isFalse();
         }
     }
 
@@ -96,14 +96,14 @@ class StationingRulesTest {
         @Test
         void eachConfiguredAuthorityIsARequirementBeforeTheFinalStage() {
             var cb = new CrossBranch(true, List.of(CrossAuthority.OTHER_UNIT, CrossAuthority.OTHER_UNIT_PARENT), false);
-            var r = RouteDerivation.derive(h.path(h.id("800")), policy.routing(), cb, List.of(networks), false);
+            var r = RouteDerivation.derive(h.path(h.id("800")), policy.routing(), cb, List.of(networks));
             assertThat(r).extracting(RouteStage::unit).containsExactly(h.id("800"), h.id("700"), h.id("802"), h.id("701"), h.id("600"));
         }
 
         @Test
         void anAuthorityAlreadyOnTheRouteSatisfiesTheRequirementAndRecordsIt() {
             var cb = new CrossBranch(true, List.of(CrossAuthority.OTHER_UNIT, CrossAuthority.SITE_RESPONSIBLE), false);
-            var r = RouteDerivation.derive(h.path(h.id("800")), policy.routing(), cb, List.of(networks), false);
+            var r = RouteDerivation.derive(h.path(h.id("800")), policy.routing(), cb, List.of(networks));
             assertThat(r).extracting(RouteStage::unit).containsExactly(h.id("800"), h.id("700"), h.id("802"), h.id("600"));
             assertThat(r.get(0).satisfies()).extracting(RouteDerivation.Requirement::label)
                     .containsExactly("اعتماد هرمي", "موافقة المسؤول عن موقع الوحدة المضافة (ضم قسم الشبكات)");
@@ -112,7 +112,7 @@ class StationingRulesTest {
         @Test
         void independenceAddsASeparateStageThatAnotherHumanMustDecide() {
             var cb = new CrossBranch(true, List.of(CrossAuthority.OTHER_UNIT, CrossAuthority.SITE_RESPONSIBLE), true);
-            var r = RouteDerivation.derive(h.path(h.id("800")), policy.routing(), cb, List.of(networks), false);
+            var r = RouteDerivation.derive(h.path(h.id("800")), policy.routing(), cb, List.of(networks));
             var hier = r.get(0);
             var independent = r.stream().filter(s -> s.kind() == RouteDerivation.Kind.CROSS_BRANCH && h.id("800").equals(s.unit())).findFirst().orElseThrow();
             assertThat(independent.independentOf()).isEqualTo(hier.key());
@@ -124,10 +124,12 @@ class StationingRulesTest {
         }
 
         @Test
-        void aDistanceExceptionAddsItsPermissionStageBeforeTheFinal() {
-            var r = RouteDerivation.derive(h.path(h.id("800")), policy.routing(), policy.crossBranch(), List.of(), true);
-            assertThat(r).extracting(RouteStage::kind).containsExactly(RouteDerivation.Kind.HIERARCHY, RouteDerivation.Kind.HIERARCHY,
-                    RouteDerivation.Kind.EXCEPTION, RouteDerivation.Kind.HIERARCHY);
+        @DisplayName("ADR-078: a distance exception has no stage of its own; the route's final stage decides it")
+        void aDistanceExceptionIsDecidedByTheFinalStage() {
+            var r = RouteDerivation.derive(h.path(h.id("800")), policy.routing(), policy.crossBranch(), List.of());
+            assertThat(r).extracting(RouteStage::kind).containsOnly(RouteDerivation.Kind.HIERARCHY);
+            assertThat(r.get(r.size() - 1).finalStage()).isTrue();
+            assertThat(java.util.Arrays.stream(RouteDerivation.Kind.values()).map(Enum::name)).doesNotContain("EXCEPTION");
         }
     }
 
@@ -156,7 +158,7 @@ class StationingRulesTest {
             assertThat(HierarchyDrift.activationRefusal(RestationingState.APPROVED_NOT_ACTIVATED, snap, h))
                     .hasValueSatisfying(m -> assertThat(m).contains(HierarchyDrift.MESSAGE));
             // the rebuilt route starts at the SAME requesting unit with its new ancestry
-            assertThat(RouteDerivation.derive(h.path(h.id("800")), policy.routing(), policy.crossBranch(), List.of(), false))
+            assertThat(RouteDerivation.derive(h.path(h.id("800")), policy.routing(), policy.crossBranch(), List.of()))
                     .extracting(RouteStage::unit).containsExactly(h.id("800"), h.id("701"), h.id("600"));
         }
 

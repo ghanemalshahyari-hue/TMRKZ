@@ -60,7 +60,7 @@ export function routeStrip(r: RestationingRequest, checks: RestationingChecks | 
         person: s.decidedBy?.name ?? null,
         at: s.decidedAt,
         status,
-        note: s.mark === 'SKIPPED' ? 'تم التجاوز — ' + (s.skipReason ?? 'لا يوجد معتمد للسلسلة الهرمية') : s.kind === 'EXCEPTION' ? 'استثناء مسافة الانتشار' : s.kind === 'CROSS_BRANCH' ? 'جهة من فرع آخر' : s.mark === 'CARRIED' ? 'محمول من قرار سابق' : null,
+        note: s.mark === 'SKIPPED' ? 'تم التجاوز — ' + (s.skipReason ?? 'لا يوجد معتمد للسلسلة الهرمية') : s.kind === 'EXCEPTION' ? HISTORICAL_EXCEPTION_STAGE : s.kind === 'CROSS_BRANCH' ? 'جهة من فرع آخر' : s.mark === 'CARRIED' ? 'محمول من قرار سابق' : null,
         final: s.final,
       });
     }
@@ -97,6 +97,39 @@ export function routeStrip(r: RestationingRequest, checks: RestationingChecks | 
 
 const km = (m: number | null | undefined) => (m == null ? '—' : (m / 1000).toLocaleString('ar-AE', { maximumFractionDigits: 1 }));
 
+/** A distance-exception stage of a request sent before ADR-078: shown as it was; none is created now. */
+export const HISTORICAL_EXCEPTION_STAGE = 'مرحلة سابقة لاستثناء المسافة — يقرر المعتمد النهائي التجاوز الآن';
+
+/** The flag of a request asking for more than the policy allows (ADR-078), on every stage and in the lists. */
+export const EXCEEDS_CHIP = 'يتجاوز المسموح';
+
+/** «يتجاوز المسموح بـ 450 م», or in kilometres from one kilometre up. */
+export function excessText(excessM: number): string {
+  const m = Math.max(0, excessM);
+  return EXCEEDS_CHIP + ' بـ ' + (m >= 1000 ? km(m) + ' كم' : Math.round(m).toLocaleString('ar-AE') + ' م');
+}
+
+export type ExcessLine = { leg: string; label: string; text: string; detail: string; reason: string | null };
+
+/**
+ * The legs beyond the policy's range in the last submitted revision (ADR-078): no stage of their own any more — the request is
+ * flagged where everyone who sees it reads it, and the final approver decides it with the normal approve, return or reject.
+ */
+export function excessLines(r: Pick<RestationingRequest, 'exceedsPolicy'>): ExcessLine[] {
+  return (r.exceedsPolicy ?? []).map((e) => ({
+    leg: e.leg,
+    label: e.label,
+    text: excessText(e.excessM),
+    detail: `${km(e.distanceM)} كم من حد ${km(e.allowedMaxM)} كم`,
+    reason: e.reason && e.reason.trim() ? e.reason.trim() : null,
+  }));
+}
+
+/** Whether the person deciding now is the final approver of a flagged request: their decision includes the excess. */
+export function decidesExcess(r: Pick<RestationingRequest, 'exceedsPolicy' | 'route' | 'can'>): boolean {
+  return !!r.can.decide && !!r.exceedsPolicy?.length && !!r.route.find((s) => s.current)?.final;
+}
+
 export type DeploymentRow = {
   leg: 'primary' | 'alternative';
   title: string;
@@ -114,7 +147,7 @@ export type DeploymentRow = {
 const VERDICT: Record<RestationingLeg['status'], [string, DeploymentRow['tone']]> = {
   NOT_PLACED: ['غير موضوعة', 'none'],
   OK: ['ضمن النطاق', 'ok'],
-  NEEDS_EXCEPTION: ['تحتاج استثناء مسافة الانتشار', 'warn'],
+  NEEDS_EXCEPTION: ['تتجاوز المسموح — يقررها المعتمد النهائي', 'warn'],
   OUT_OF_RANGE: ['خارج نطاق مسافة الانتشار', 'bad'],  // completed with the range below
   TERRAIN_TIE_UNRESOLVED: ['تعادل فئات أرض دون أولوية', 'bad'],
 };

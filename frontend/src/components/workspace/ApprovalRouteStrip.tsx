@@ -13,12 +13,15 @@ const MARK: Record<StripStatus, [string, string]> = {
   returned: ['↩', 'أعادت الطلب للتعديل'],
 };
 
-/** The unit of a stage, shown apart from its fixed label (owner, 4 Nov 2026); the exception stage acts for the requesting unit. */
+/**
+ * The unit of a stage, shown apart from its fixed label (owner, 4 Nov 2026). A distance-exception stage exists only on requests
+ * sent before ADR-078: the final approver decides an excess now, with the request.
+ */
 function StageUnit({ unit, kind }: { unit: { name: string } | null; kind: string }) {
   if (unit) return <small className="rs-stage-unit">الجهة: {unit.name}</small>;
   if (kind === 'UNIT_OPERATIONS') return <small className="rs-stage-unit">يقررها صاحب «اعتماد عمليات الوحدة»</small>;
   if (kind === 'FINAL') return <small className="rs-stage-unit">يقررها صاحب «الاعتماد النهائي»</small>;
-  return kind === 'EXCEPTION' ? <small className="rs-stage-unit">يقررها صاحب «اعتماد استثناء مسافة الانتشار»</small> : null;
+  return kind === 'EXCEPTION' ? <small className="rs-stage-unit">مرحلة سابقة؛ يقرر المعتمد النهائي التجاوز الآن</small> : null;
 }
 
 /**

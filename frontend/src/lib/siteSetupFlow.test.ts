@@ -13,7 +13,11 @@ describe('who sees the six steps (ADR-067)', () => {
     expect(isSetupAdmin([grant(['MANAGE_FACILITIES'], true)])).toBe(false);
     expect(isSetupAdmin([grant(['MANAGE_FACILITIES', 'CORRECT_STATIONING'], false)])).toBe(false);
     expect(isSetupAdmin([grant(['MANAGE_FACILITIES'], true), grant(['CORRECT_STATIONING'], false)])).toBe(false);
-    expect(isSetupAdmin([grant(['CREATE_INITIAL_STATIONING', 'CREATE_DEPLOYMENT_REQUEST'], false)])).toBe(false);
+    // a requester has no setup (initial stationing is set up here only, ADR-078); «معتمد عمليات الوحدة» manages facilities and
+    // site links within its grant, never corrections: it keeps the three steps of the site alone
+    expect(isSetupAdmin([grant(['VIEW', 'CREATE_RESTATIONING', 'REQUEST_SITE_REGISTRATION'], false)])).toBe(false);
+    expect(isSetupAdmin([grant(['VIEW', 'REVIEW', 'DECIDE_UNIT_OPERATIONS', 'MANAGE_FACILITIES', 'MANAGE_SITE_LINKS'], false)])).toBe(false);
+    expect(isSetupAdmin([grant(['CONFIGURE', 'MANAGE_ACCESS', 'MANAGE_FACILITIES', 'CREATE_RESTATIONING', 'MANAGE_SITE_LINKS', 'CORRECT_STATIONING', 'REPLAY_STATIONING_EVENTS'], true)])).toBe(true);
     expect(isSetupAdmin(null)).toBe(false);
   });
   it('the administrator has six steps with the owner\'s labels; everyone else keeps the three steps of the site alone', () => {

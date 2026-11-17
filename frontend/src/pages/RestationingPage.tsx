@@ -1,4 +1,4 @@
-import { PURPOSE_TITLE, isPurpose, type Purpose } from '../lib/requestPurpose';
+import { PURPOSE_TITLE, isCreatablePurpose, isPurpose, type Purpose } from '../lib/requestPurpose';
 import { flatSource } from '../components/tree/tree';
 import { UnitTree } from '../components/tree/UnitTree';
 import { ApprovalStamps } from '../components/workspace/ApprovalStamps';
@@ -26,6 +26,7 @@ import { restriction } from '../lib/navigation';
 import { parseRestationingHash } from '../lib/restationingRoute';
 import { partsOf, siteArea } from '../lib/siteGeometry';
 import { HIERARCHY_CHANGED } from '../lib/stationingV3';
+import { decidesExcess, excessLines } from '../lib/workspace';
 import { RestationingEditor } from './RestationingEditor';
 import './restationing.css';
 
@@ -60,10 +61,13 @@ const idFromHash = () => {
   const r = route();
   return r.kind === 'request' ? r.id : null;
 };
-/** #restationing/new?site=<siteId> or ?unit=<orgId>: a new request opened from a site (the Sites page) or a unit. */
+/**
+ * #restationing/new?site=<siteId> or ?unit=<orgId>: a new request opened from a site (the Sites page) or a unit. An address
+ * naming initial stationing opens a re-stationing instead: that request is no longer made (ADR-078).
+ */
 const newFromHash = (): { id: null; unit: string | null; site: string | null; purpose: Purpose | null } | null => {
   const r = route();
-  return r.kind === 'new' ? { id: null, unit: r.unit, site: r.site, purpose: isPurpose(r.purpose) ? r.purpose : null } : null;
+  return r.kind === 'new' ? { id: null, unit: r.unit, site: r.site, purpose: isCreatablePurpose(r.purpose) ? r.purpose : null } : null;
 };
 
 /**
@@ -116,7 +120,8 @@ export function RestationingPage() {
     history.replaceState(null, '', '#restationing/' + id);
   };
 
-  const canCreate = (['CREATE_RESTATIONING', 'CREATE_INITIAL_STATIONING', 'CREATE_DEPLOYMENT_REQUEST', 'REQUEST_SITE_REGISTRATION'] as const).some((p) => app.can(p));
+  // «طلب إعادة التمركز ومناطق الانتشار» and «طلب اعتماد موقع»: initial stationing is set up in «تهيئة المواقع» (ADR-078)
+  const canCreate = (['CREATE_RESTATIONING', 'REQUEST_SITE_REGISTRATION'] as const).some((p) => app.can(p));
   const canAccess = !restriction('permissions', app.can, app.summaryOnly) || !restriction('audit', app.can, app.summaryOnly);
   // one action is lit at a time, the view in front: the approval route over the linked sites over the request list (owner, 11 Nov 2026)
   const current = historyOpen ? 'route' : !editing && tab === 'sites' ? 'links' : drawerOpen ? 'map' : null;
@@ -341,6 +346,7 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
 }) {
   const c = r.content;
   const resubmit = r.state === 'RETURNED_FOR_CHANGES' || r.state === 'PAUSED_HIERARCHY_CHANGED';
+  const excess = excessLines(r);
   return (
     <>
       {/* the number, kind and state are the map header's; the panel starts with the request's reason */}
@@ -349,6 +355,19 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
         {r.state === 'PAUSED_HIERARCHY_CHANGED' && (
           <div className="rs-banner red">
             <b>موقوف — تغيّر الهيكل:</b> {HIERARCHY_CHANGED}. المسار السابق محفوظ بقراراته، وبعد التأكيد يُعاد بناء المسار من الوحدة نفسها وتُعاد كل المراحل.
+          </div>
+        )}
+        {excess.length > 0 && (
+          // flagged on every stage; no stage of its own: the final approver decides it with the request (ADR-078)
+          <div className="rs-banner orange" data-testid="exceeds-policy">
+            <b>يتجاوز المسموح</b> — يقرره المعتمد النهائي مع الطلب: اعتماده يقبل التجاوز، وله الإرجاع للتعديل أو الرفض.
+            <ul>
+              {excess.map((e) => (
+                <li key={e.leg} data-exceeds-leg={e.leg}>
+                  {e.label}: <b>{e.text}</b> ({e.detail}){e.reason ? ' — السبب: ' + e.reason : ''}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         {r.returned && r.state === 'RETURNED_FOR_CHANGES' && (
@@ -427,6 +446,9 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
             {r.state === 'PAUSED_HIERARCHY_CHANGED' ? 'تأكيد وإعادة بناء المسار' : resubmit ? 'إعادة الإرسال' : 'إرسال للاعتماد'}
           </button>
         )}
+        {r.can.decide && decidesExcess(r) && (
+          <p className="micro" data-testid="final-decides-excess">قرارك يشمل ما يتجاوز المسموح أعلاه: الاعتماد يقبله، والإرجاع أو الرفض يردّه.</p>
+        )}
         {r.can.decide && (
           <>
             <button className="button primary" disabled={busy} onClick={() => act(() => api.decideRestationing(r.id, 'APPROVE', reason), 'اعتُمدت المرحلة')}>
@@ -476,9 +498,10 @@ const hasLifecycle = (r: RestationingRequest) =>
   !!(r.can.askCancellation || r.can.askStartCancellation || r.can.askEarlyReturn || r.can.askExtension || r.can.decideAction);
 
 /**
- * The lifecycle of a request (ADR-034): ask for a cancellation, a cancellation before the start, an early return or an
- * extension; decide a pending action (another human with its own right); and the history of actions and extensions.
- * Every button follows the server's `can`; the server refuses anything else.
+ * The lifecycle of a request (ADR-034, ADR-078): whoever holds the request's right for the requesting unit asks for a
+ * cancellation, a cancellation before the start, an early return or an extension; the unit's final approver (nearest scope)
+ * decides a pending action, never the one who asked; an approved extension is activated with «تفعيل التمركز». The history of
+ * actions and extensions follows. Every button follows the server's `can`; the server refuses anything else.
  */
 function Lifecycle({ r, busy, act, onOpen }: { r: RestationingRequest; busy: boolean; act: (what: () => Promise<RestationingRequest>, done: string) => void; onOpen: (id: string) => void }) {
   const [why, setWhy] = useState('');
@@ -501,6 +524,7 @@ function Lifecycle({ r, busy, act, onOpen }: { r: RestationingRequest; busy: boo
       {pending && (
         <div className="rs-banner orange">
           <b>{ACTION_KIND[pending.kind]}</b> — طلبه {pending.requestedBy} · {fullDate(pending.requestedAt)} · السبب: {pending.reason}
+          <div className="micro" data-testid="action-decider">يقرره المعتمد النهائي للوحدة الطالبة، ولا يقرره من طلبه.</div>
           {pending.heldAt && <div>أُوقف البدء في {fullDate(pending.heldAt)}: التمركز الدائم هو المعتمد حتى القرار.</div>}
         </div>
       )}

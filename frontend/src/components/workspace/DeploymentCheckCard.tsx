@@ -3,8 +3,8 @@ import { deploymentRows, movementInfo } from '../../lib/workspace';
 
 /**
  * The live checks of a request (§18): the server's verdict and problems, then one compact row per DEPLOYMENT leg — the
- * measured distance against the locked policy range, the terrain class and allowance, the effective maximum, and the
- * exception when one is needed. The distance from the current site to the proposed re-stationing site is shown last,
+ * measured distance against the locked policy range, the terrain class and allowance, the effective maximum, and a leg
+ * beyond the range (within the exception margin) flagged for the final approver, who decides it with the request (ADR-078). The distance from the current site to the proposed re-stationing site is shown last,
  * as information: re-stationing has no distance restriction.
  */
 export function DeploymentCheckCard({ request, checks, compact = false }: { request: RestationingRequest; checks: RestationingChecks | null; compact?: boolean }) {
@@ -56,7 +56,7 @@ export function DeploymentCheckCard({ request, checks, compact = false }: { requ
               <dd>{r.effectiveMax}</dd>
             </div>
           </dl>
-          {r.exception && <p className="tz-leg-note warn">تحتاج استثناء مسافة الانتشار</p>}
+          {r.exception && <p className="tz-leg-note warn" data-testid="leg-exceeds">تتجاوز المسموح: يقررها المعتمد النهائي مع الطلب (اعتماد أو إرجاع أو رفض).</p>}
           {r.conflicts.length > 0 && <p className="tz-leg-note bad">أرض مشغولة: {r.conflicts.join('، ')}</p>}
         </div>
       ))}

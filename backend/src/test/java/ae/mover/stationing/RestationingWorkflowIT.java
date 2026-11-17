@@ -222,7 +222,7 @@ class RestationingWorkflowIT extends RestationingTestBase {
     // ---- checks -----------------------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("Checks: occupied ground blocks, a vacated site does not, footprint, deployment pair, range and exception")
+    @DisplayName("Checks: occupied ground blocks, a vacated site does not, footprint, deployment pair, range; beyond the range is flagged on every stage and decided by the final approver (ADR-078)")
     void checks() {
         // the proposed site over the other branch's site: occupied ground
         Map<String, Object> onOther = permanent(List.of(sec, team));
@@ -252,19 +252,49 @@ class RestationingWorkflowIT extends RestationingTestBase {
         margin.put("primary", square(lat0 - 0.01, lng0 + offsetLng(8_500), 0.002));
         margin.put("alternative", square(lat0 - 0.01 + offsetLat(4_000), lng0 + offsetLng(8_500), 0.002));
         String mid = create("req", margin);
-        assertThat(problems(mid)).anyMatch(p -> p.contains("استثناء"));
+        assertThat(problems(mid)).as("beyond the range: a written reason is needed").anyMatch(p -> p.contains("تتجاوز المسموح"));
         margin.put("exceptions", Map.of("primary", "طريق الوصول الوحيد يمر من هناك"));
         login("req").put("/restationing-requests/" + mid + "/content", margin);
         assertThat(problems(mid)).isEmpty();
+        assertThat(login("req").get("/restationing-requests/" + mid).body().path("exceedsPolicy")).as("a draft is not flagged yet").isEmpty();
         Res s = login("req").post("/restationing-requests/" + mid + "/submit", Map.of());
-        assertThat(keys(s.body().path("route"))).as("the exception stage comes before the final stage").containsExactly("H:" + sec, "H:" + dept,
-                "X:distance", "H:" + top);
+        assertThat(keys(s.body().path("route"))).as("no exception stage: the final stage decides it").containsExactly("H:" + sec, "H:" + dept, "H:" + top);
         assertThat(jdbc.sql("select detail::text from audit_event where entity_id = :id and action = 'RESTATIONING_SUBMITTED'").param("id", mid)
                 .query(String.class).single()).as("O-17: the written reason is audited with the submission").contains("طريق الوصول الوحيد");
+        // flagged on every stage, with the excess
+        for (String who : List.of("apSec", "req")) {
+            JsonNode flag = login(who).get("/restationing-requests/" + mid).body().path("exceedsPolicy");
+            assertThat(flag).as(who).hasSize(1);
+            assertThat(flag.get(0).path("leg").asText()).isEqualTo("primary");
+            assertThat(flag.get(0).path("excessM").asLong()).as("about 500 m beyond the 8,000 m maximum").isBetween(300L, 700L);
+            assertThat(flag.get(0).path("allowedMaxM").asLong()).isEqualTo(8000L);
+            assertThat(flag.get(0).path("reason").asText()).isEqualTo("طريق الوصول الوحيد يمر من هناك");
+        }
+        assertThat(login("apSec").get("/restationing-requests").body().findValues("exceedsPolicy").stream().anyMatch(JsonNode::asBoolean))
+                .as("the list marks it too").isTrue();
         decide("apSec", mid, "APPROVE");
         decide("apDept", mid, "APPROVE");
-        assertThat(decide("apTop", mid, "APPROVE").status()).as("a seat does not decide the exception").isEqualTo(403);
-        assertThat(decide("exc", mid, "APPROVE").status()).isEqualTo(200);
+        assertThat(login("apTop").get("/restationing-requests/" + mid).body().path("can").path("decide").asBoolean())
+                .as("the final approver decides the excess with the request").isTrue();
+        // the final approver's normal decisions: a return for changes …
+        Res back = login("apTop").post("/restationing-requests/" + mid + "/decision", Map.of("decision", "RETURN", "reason", "قرّب منطقة الانتشار"));
+        assertThat(back.body().path("state").asText()).isEqualTo("RETURNED_FOR_CHANGES");
+        assertThat(jdbc.sql("select detail::text from audit_event where entity_id = :id and action = 'RESTATIONING_RETURNED'").param("id", mid)
+                .query(String.class).single()).as("the decision records the excess it covered").contains("exceedsPolicy").contains("excessM");
+        // … then, sent again unchanged, approval
+        Res again = login("req").post("/restationing-requests/" + mid + "/submit", Map.of("reason", "الطريق الوحيد؛ أبقيت المنطقة"));
+        assertThat(again.status()).as(again.toString()).isEqualTo(200);
+        assertThat(decide("apTop", mid, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(jdbc.sql("select detail::text from audit_event where entity_id = :id and action = 'RESTATIONING_STAGE_APPROVED' and detail->>'stage' = :st")
+                .param("id", mid).param("st", "H:" + top).query(String.class).single()).contains("exceedsPolicy");
+
+        // and a rejection by the final approver ends it
+        String far2 = create("req", margin);
+        assertThat(login("req").post("/restationing-requests/" + far2 + "/submit", Map.of()).status()).isEqualTo(200);
+        decide("apSec", far2, "APPROVE");
+        decide("apDept", far2, "APPROVE");
+        Res no = login("apTop").post("/restationing-requests/" + far2 + "/decision", Map.of("decision", "REJECT", "reason", "التجاوز غير مبرر"));
+        assertThat(no.body().path("state").asText()).isEqualTo("REJECTED");
     }
 
     @Test

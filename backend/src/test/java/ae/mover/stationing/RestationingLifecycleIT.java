@@ -24,8 +24,9 @@ import ae.mover.security.Actor;
  * disposable PostgreSQL + PostGIS with OpenFGA in the loop: cancellation before activation, cancellation of an activated
  * temporary before its start (including a start held by a pending cancellation, a refusal after the approved start and a
  * window that ends without a start), early return, extension with its separate activation, and an extension that lapses.
- * Every decision is taken by another human holding the action's own right. Time-dependent steps run the scheduler and
- * the decisions at explicit instants.
+ * Since ADR-078 none of these is a permission of its own: a requester of the requesting unit starts each, the unit's final
+ * approver (the nearest holder of «الاعتماد النهائي») decides it, never the human who started it, and «تفعيل التمركز» activates
+ * an approved extension. Time-dependent steps run the scheduler and the decisions at explicit instants.
  */
 class RestationingLifecycleIT extends RestationingTestBase {
 
@@ -38,36 +39,50 @@ class RestationingLifecycleIT extends RestationingTestBase {
 
     @BeforeEach
     void lifecycleRights() {
-        person("cancelDecider", role("LCCANCEL", "ORGANIZATION", "DECIDE_PRE_ACTIVATION_CANCELLATION"), top);
-        person("startDecider", role("LCSTART", "ORGANIZATION", "DECIDE_BEFORE_START_CANCELLATION"), top);
-        person("returnDecider", role("LCRETURN", "ORGANIZATION", "DECIDE_EARLY_RETURN"), top);
-        person("extActivator", role("LCEXT", "ORGANIZATION", "ACTIVATE_TEMPORARY_EXTENSION"), top);
+        String fin = role("LCFIN", "ORGANIZATION", "VIEW", "FINAL_APPROVE_STATIONING");
+        // the requesting unit's final approver: the nearest holder covering it (the department, above the section)
+        person("finalApprover", fin, dept);
+        // a wider holder over the top unit: covers the unit, but is not the nearest, so has no turn (ADR-066)
+        person("finalTop", fin, top);
+        // another requester of the requesting unit: the request belongs to the unit (ADR-069)
+        person("unitRequester", role("LCREQ", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING"), sec);
+        // a requester who is also a final approver at the department: may start an action, never decide the one they started
+        person("requesterFinal", role("LCBOTH", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING", "FINAL_APPROVE_STATIONING"), dept);
     }
 
     // ---- cancellation before activation (D9, D16) ---------------------------------------------------------
 
     @Test
-    @DisplayName("Cancellation before activation: pending blocks activation; decided by another human with its own right; rejection restores")
+    @DisplayName("Cancellation before activation: started by a requester of the unit; pending blocks activation; decided by the unit's final approver, never by who started it; rejection restores")
     void cancellationBeforeActivation() {
         String id = approvedPermanent(List.of(team));
         Res asked = login("req").post("/restationing-requests/" + id + "/cancellation", Map.of("reason", "لم تعد الحاجة قائمة"));
         assertThat(asked.status()).as(asked.toString()).isEqualTo(200);
         assertThat(asked.body().path("state").asText()).isEqualTo("CANCELLATION_PENDING");
         String action = asked.body().path("actions").get(0).path("id").asText();
-        assertThat(login("cancelDecider").get("/restationing-requests/" + id).body().path("can").path("decideAction").asText()).isEqualTo(action);
+        assertThat(login("finalApprover").get("/restationing-requests/" + id).body().path("can").path("decideAction").asText()).isEqualTo(action);
+        assertThat(login("finalTop").get("/restationing-requests/" + id).body().path("can").path("decideAction").isNull())
+                .as("a wider final approver has no turn: the nearest decides").isTrue();
         assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).status()).as("a pending cancellation blocks activation")
                 .isEqualTo(400);
         Res self = decideAction("req", id, action, "APPROVE", null);
         assertThat(self.status()).isEqualTo(403);
         assertThat(self.code()).isEqualTo("SEPARATION_OF_DUTIES");
-        assertThat(decideAction("returnDecider", id, action, "APPROVE", null).status()).as("another lifecycle right does not decide it").isEqualTo(403);
-        assertThat(decideAction("cancelDecider", id, action, "REJECT", null).status()).as("a rejection needs a reason").isEqualTo(400);
-        Res rejected = decideAction("cancelDecider", id, action, "REJECT", "الطلب ما زال مطلوباً");
+        assertThat(decideAction("apTop", id, action, "APPROVE", null).status()).as("a hierarchy approver does not decide it").isEqualTo(403);
+        assertThat(decideAction("activator", id, action, "APPROVE", null).status()).as("nor the activator").isEqualTo(403);
+        assertThat(decideAction("finalTop", id, action, "APPROVE", null).status()).as("nor a wider final approver").isEqualTo(403);
+        assertThat(decideAction("finalApprover", id, action, "REJECT", null).status()).as("a rejection needs a reason").isEqualTo(400);
+        Res rejected = decideAction("finalApprover", id, action, "REJECT", "الطلب ما زال مطلوباً");
         assertThat(rejected.body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
 
-        String again = login("req").post("/restationing-requests/" + id + "/cancellation", Map.of("reason", "أُلغيت الحاجة نهائياً"))
+        assertThat(login("apSec").post("/restationing-requests/" + id + "/cancellation", Map.of("reason", "ليس من مقدمي الطلب")).status())
+                .as("only a requester of the unit starts it").isEqualTo(403);
+        // another requester of the unit starts it; the final approver who is also a requester may not decide what they started
+        String again = login("requesterFinal").post("/restationing-requests/" + id + "/cancellation", Map.of("reason", "أُلغيت الحاجة نهائياً"))
                 .body().path("actions").get(1).path("id").asText();
-        Res cancelled = decideAction("cancelDecider", id, again, "APPROVE", null);
+        Res own = decideAction("requesterFinal", id, again, "APPROVE", null);
+        assertThat(own.code()).as("whoever started an action never decides it").isEqualTo("SEPARATION_OF_DUTIES");
+        Res cancelled = decideAction("finalApprover", id, again, "APPROVE", null);
         assertThat(cancelled.body().path("state").asText()).isEqualTo("CANCELLED_BEFORE_ACTIVATION");
         assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(400);
         assertThat(jdbc.sql("select count(*) from org_stationing where request_id = cast(:id as uuid)").param("id", id).query(Long.class).single()).isZero();
@@ -81,10 +96,11 @@ class RestationingLifecycleIT extends RestationingTestBase {
         String id = create("req", permanent(List.of(team)));
         login("req").post("/restationing-requests/" + id + "/submit", Map.of());
         decide("apSec", id, "APPROVE");
-        String action = login("req").post("/restationing-requests/" + id + "/cancellation", Map.of("reason", "مراجعة الحاجة"))
+        // the request belongs to the unit: a requester who did not start it may ask
+        String action = login("unitRequester").post("/restationing-requests/" + id + "/cancellation", Map.of("reason", "مراجعة الحاجة"))
                 .body().path("actions").get(0).path("id").asText();
         assertThat(decide("apDept", id, "APPROVE").status()).as("no stage decision while the cancellation is pending").isNotEqualTo(200);
-        assertThat(decideAction("cancelDecider", id, action, "REJECT", "يستمر الطلب").body().path("state").asText()).isEqualTo("UNDER_REVIEW");
+        assertThat(decideAction("finalApprover", id, action, "REJECT", "يستمر الطلب").body().path("state").asText()).isEqualTo("UNDER_REVIEW");
         assertThat(decide("apDept", id, "APPROVE").status()).isEqualTo(200);
     }
 
@@ -101,8 +117,9 @@ class RestationingLifecycleIT extends RestationingTestBase {
         Res asked = login("req").post("/restationing-requests/" + id + "/start-cancellation", Map.of("reason", "أُلغي النشاط المؤقت"));
         assertThat(asked.body().path("state").asText()).isEqualTo("TEMPORARY_SCHEDULED");
         String action = asked.body().path("actions").get(0).path("id").asText();
-        assertThat(decideAction("returnDecider", id, action, "APPROVE", null).status()).as("DECIDE_EARLY_RETURN never carries it").isEqualTo(403);
-        Res approved = decideAction("startDecider", id, action, "APPROVE", null);
+        assertThat(decideAction("req", id, action, "APPROVE", null).code()).as("the requester who started it").isEqualTo("SEPARATION_OF_DUTIES");
+        assertThat(decideAction("finalTop", id, action, "APPROVE", null).status()).as("not the nearest final approver").isEqualTo(403);
+        Res approved = decideAction("finalApprover", id, action, "APPROVE", null);
         assertThat(approved.body().path("state").asText()).isEqualTo("TEMPORARY_CANCELLED_BEFORE_START");
         Map<String, Object> rec = temporaryRecord(id);
         assertThat(rec.get("end_reason")).isEqualTo("CANCELLED");
@@ -128,7 +145,7 @@ class RestationingLifecycleIT extends RestationingTestBase {
         assertThat(state(id)).as("repeating the job does not start it").isEqualTo("START_HELD_PENDING_CANCELLATION");
 
         Instant decided = start.plus(Duration.ofMinutes(30));
-        lifecycle.decide(ctx("startDecider"), UUID.fromString(id), UUID.fromString(action), new RestationingLifecycle.DecideInput("REJECT", "يستمر النشاط"), decided);
+        lifecycle.decide(ctx("finalApprover"), UUID.fromString(id), UUID.fromString(action), new RestationingLifecycle.DecideInput("REJECT", "يستمر النشاط"), decided);
         assertThat(state(id)).isEqualTo("ACTIVE_TEMPORARY");
         Map<String, Object> rec = temporaryRecord(id);
         assertThat(((java.sql.Timestamp) rec.get("valid_from")).toInstant()).as("in force from the decision, not the approved start").isEqualTo(decided);
@@ -155,7 +172,7 @@ class RestationingLifecycleIT extends RestationingTestBase {
         assertThat(rec.get("valid_to")).isEqualTo(rec.get("valid_from"));
         assertThat(jdbc.sql("select state from restationing_action where id = cast(:a as uuid)").param("a", action).query(String.class).single())
                 .isEqualTo("NO_LONGER_ACTIONABLE");
-        assertThatThrownBy(() -> lifecycle.decide(ctx("startDecider"), UUID.fromString(id), UUID.fromString(action),
+        assertThatThrownBy(() -> lifecycle.decide(ctx("finalApprover"), UUID.fromString(id), UUID.fromString(action),
                 new RestationingLifecycle.DecideInput("APPROVE", null), end.plus(Duration.ofMinutes(10))))
                 .isInstanceOf(ApiException.class).hasMessageContaining("انقضت نافذة النفاذ");
     }
@@ -163,7 +180,7 @@ class RestationingLifecycleIT extends RestationingTestBase {
     // ---- early return (D12) ---------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("Early return: decided by DECIDE_EARLY_RETURN (not the asker), the temporary ends at the decision with planned and actual end")
+    @DisplayName("Early return: started by a requester of the unit, decided by the unit's final approver (never the asker); the temporary ends at the decision with planned and actual end")
     void earlyReturn() {
         Instant start = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plus(Duration.ofHours(1));
         Instant end = start.plus(Duration.ofHours(2));
@@ -171,9 +188,10 @@ class RestationingLifecycleIT extends RestationingTestBase {
         service.runTemporaryLifecycle(start.plus(Duration.ofMinutes(5)));
         String action = login("req").post("/restationing-requests/" + id + "/early-return", Map.of("reason", "انتهى العمل قبل موعده"))
                 .body().path("actions").get(0).path("id").asText();
-        assertThat(decideAction("startDecider", id, action, "APPROVE", null).status()).isEqualTo(403);
+        assertThat(decideAction("apDept", id, action, "APPROVE", null).status()).as("a hierarchy approver does not decide it").isEqualTo(403);
+        assertThat(decideAction("req", id, action, "APPROVE", null).code()).isEqualTo("SEPARATION_OF_DUTIES");
         Instant decided = start.plus(Duration.ofMinutes(40));
-        lifecycle.decide(ctx("returnDecider"), UUID.fromString(id), UUID.fromString(action), new RestationingLifecycle.DecideInput("APPROVE", "انتهى العمل"), decided);
+        lifecycle.decide(ctx("finalApprover"), UUID.fromString(id), UUID.fromString(action), new RestationingLifecycle.DecideInput("APPROVE", "انتهى العمل"), decided);
         assertThat(state(id)).isEqualTo("TEMPORARY_RETURNED");
         Map<String, Object> rec = temporaryRecord(id);
         assertThat(rec.get("end_reason")).isEqualTo("ENDED_EARLY");
@@ -188,7 +206,7 @@ class RestationingLifecycleIT extends RestationingTestBase {
     // ---- extension (D10, A5) --------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("Extension: its own approval, a separate activation by its own right; the stationing runs on to the new end")
+    @DisplayName("Extension: its own approval, a separate activation with «تفعيل التمركز» (never by its requester); the stationing runs on to the new end")
     void extension() {
         Instant start = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plus(Duration.ofHours(1));
         Instant end = start.plus(Duration.ofHours(2));
@@ -196,10 +214,12 @@ class RestationingLifecycleIT extends RestationingTestBase {
         String id = activatedTemporary(start, end);
         service.runTemporaryLifecycle(start.plus(Duration.ofMinutes(5)));
         String ext = approvedExtension(id, extended);
-        assertThat(login("activator").post("/restationing-requests/" + ext + "/activate", Map.of()).status())
-                .as("«تفعيل التمركز» does not activate an extension").isEqualTo(403);
-        assertThat(login("req").post("/restationing-requests/" + ext + "/activate", Map.of()).status()).isEqualTo(403);
-        Res act = login("extActivator").post("/restationing-requests/" + ext + "/activate", Map.of());
+        assertThat(login("req").post("/restationing-requests/" + ext + "/activate", Map.of()).code()).as("its requester never activates it")
+                .isEqualTo("SEPARATION_OF_DUTIES");
+        assertThat(login("finalApprover").post("/restationing-requests/" + ext + "/activate", Map.of()).status())
+                .as("deciding is not activating").isEqualTo(403);
+        assertThat(login("activator").get("/restationing-requests/" + ext).body().path("can").path("activate").asBoolean()).isTrue();
+        Res act = login("activator").post("/restationing-requests/" + ext + "/activate", Map.of());
         assertThat(act.status()).as(act.toString()).isEqualTo(200);
         assertThat(act.body().path("state").asText()).isEqualTo("EXTENSION_ACTIVATED");
         List<Map<String, Object>> recs = jdbc.sql("""
@@ -231,7 +251,7 @@ class RestationingLifecycleIT extends RestationingTestBase {
         assertThat(state(ext)).isEqualTo("LAPSED_NOT_ACTIVATED");
         assertThat(jdbc.sql("select lapse_reason from restationing_request where id = cast(:id as uuid)").param("id", ext).query(String.class).single())
                 .isNotBlank();
-        assertThat(login("extActivator").post("/restationing-requests/" + ext + "/activate", Map.of()).status()).isEqualTo(400);
+        assertThat(login("activator").post("/restationing-requests/" + ext + "/activate", Map.of()).status()).isEqualTo(400);
     }
 
     // ---- helpers -------------------------------------------------------------------------------------------

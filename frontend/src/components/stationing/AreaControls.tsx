@@ -123,7 +123,7 @@ export function AreaControls({ editor, listeners, area, onArea, hasPrimary, plac
           {open ? ((d?.count ?? 0) < 3 ? 'لم يكتمل الرسم' : d?.ok ? '✓ صالح' : '✕ غير صالح') : has ? (live!.ok ? '✓ صالح' : '✕ ' + live!.problems.join('، ')) : '—'}
         </dd>
         <dt>تحقق الخادم</dt>
-        <dd>{checked && checked.status !== 'NOT_PLACED' ? 'عند آخر حفظ: ' + (checked.status === 'OK' ? 'ضمن النطاق' : checked.status === 'NEEDS_EXCEPTION' ? 'يحتاج استثناء' : checked.status === 'OUT_OF_RANGE' ? 'خارج النطاق' : 'تعادل في طبيعة الأرض') : 'عند الحفظ'}</dd>
+        <dd>{checked && checked.status !== 'NOT_PLACED' ? 'عند آخر حفظ: ' + (checked.status === 'OK' ? 'ضمن النطاق' : checked.status === 'NEEDS_EXCEPTION' ? 'يتجاوز المسموح — يقرره المعتمد النهائي' : checked.status === 'OUT_OF_RANGE' ? 'خارج النطاق' : 'تعادل في طبيعة الأرض') : 'عند الحفظ'}</dd>
       </dl>
       {children}
       {vertexMode && ring && (

@@ -19,6 +19,8 @@ services:
   backend:
     environment:
       TMRKZ_SIGNING_PROVIDER: PKCS12_DIRECTORY
+      # the fictional facilities journey (seed.sql, journey.mjs) still uses MOVER's facilities roles (ADR-078)
+      TMRKZ_LEGACY_FACILITY_ROLES: "true"
     volumes:
       - ./ops/test-env/.generated/signing/keystores:/etc/tmrkz/signing/keystores:ro
       - ./ops/test-env/.generated/signing/keystore-password:/etc/tmrkz/signing/keystore-password:ro

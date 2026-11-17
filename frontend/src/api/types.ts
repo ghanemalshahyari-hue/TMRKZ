@@ -19,20 +19,13 @@ export type Permission =
   | 'MANAGE_SITE_LINKS'
   | 'REPLAY_STATIONING_EVENTS'
   | 'CREATE_RESTATIONING'
-  | 'CREATE_INITIAL_STATIONING'
-  | 'CREATE_DEPLOYMENT_REQUEST'
   | 'REQUEST_SITE_REGISTRATION'
   | 'DECIDE_UNIT_OPERATIONS'
   | 'FINAL_APPROVE_STATIONING'
   | 'APPROVE_HIERARCHY'
   | 'MANAGE_FYI_DISTRIBUTION'
   | 'VIEW_OPERATIONAL_POSTURE'
-  | 'ACTIVATE_STATIONING'
-  | 'APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION'
-  | 'DECIDE_PRE_ACTIVATION_CANCELLATION'
-  | 'ACTIVATE_TEMPORARY_EXTENSION'
-  | 'DECIDE_EARLY_RETURN'
-  | 'DECIDE_BEFORE_START_CANCELLATION';
+  | 'ACTIVATE_STATIONING';
 export type Scope = 'ALL' | 'ORGANIZATION' | 'SITE' | 'ORGANIZATION_AND_SITE';
 export type Ref = { id: string; name: string; code?: string };
 export type Period = { start: string; end: string | null };
@@ -1091,6 +1084,7 @@ export type RestationingContent = {
 };
 export type RestationingStage = {
   key: string;
+  /** EXCEPTION: a distance-exception stage of a request sent before ADR-078 (history only; none is created now). */
   kind: 'HIERARCHY' | 'CROSS_BRANCH' | 'EXCEPTION' | 'UNIT_OPERATIONS' | 'FINAL';
   label: string;
   unit: Ref | null;
@@ -1118,7 +1112,11 @@ export type RestationingListItem = {
   currentStage?: string;
   currentStageUnit?: string | null;
   mine: boolean;
+  /** A deployment area beyond the policy's range (within its exception margin): flagged on every stage, the final approver decides it (ADR-078). */
+  exceedsPolicy?: boolean;
 };
+/** One deployment leg beyond the policy's range as last submitted (ADR-078): the final approver decides it with the request. */
+export type RestationingExcess = { leg: string; label: string; distanceM: number; allowedMaxM: number; excessM: number; reason: string | null };
 export type RestationingRevision = {
   n: number;
   submittedAt: string;
@@ -1134,12 +1132,15 @@ export type RestationingRequest = {
   id: string;
   number: string;
   state: RestationingState;
+  /** INITIAL_STATIONING: a request made before ADR-078, read only (initial stationing is set up in «تهيئة المواقع» now). */
   purpose?: 'RESTATIONING' | 'INITIAL_STATIONING' | 'DEPLOYMENT_AREAS' | 'SITE_REGISTRATION';
   /** The registered site an initial stationing asks for. */
   targetSite?: { id: string; name: string; geometry: { type: string; coordinates: unknown } | null } | null;
   fyi?: { required: boolean; doneAt: string | null; doneBy: string | null; note: string | null; units: string[]; active?: { id: string; name: string }[] };
   /** This person reads this one request because their unit was chosen for information, and holds nothing else on it. */
   readOnlyFyi?: boolean;
+  /** Legs beyond the policy's range in the last submitted revision (empty when none): «يتجاوز المسموح», decided by the final approver (ADR-078). */
+  exceedsPolicy?: RestationingExcess[];
   requestingUnit: Ref;
   requester: Ref;
   content: RestationingContent;
@@ -1234,6 +1235,7 @@ export type RestationingChecks = {
   legs?: RestationingLeg[];
   otherBranch?: { unit: string; name: string; siteName: string; decisionRequired: boolean; decision: string | null }[];
   route?: { key: string; kind: string; label: string; unit: Ref | null; satisfies: string[]; final: boolean }[];
+  /** A leg beyond the range within the exception margin: the request is flagged and the final approver decides it (ADR-078). */
   needsDistanceException?: boolean;
 };
 

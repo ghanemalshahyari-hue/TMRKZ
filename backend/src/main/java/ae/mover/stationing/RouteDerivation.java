@@ -29,14 +29,18 @@ public final class RouteDerivation {
     private RouteDerivation() {
     }
 
-    public enum Kind { HIERARCHY, CROSS_BRANCH, EXCEPTION, UNIT_OPERATIONS, FINAL }
+    /**
+     * The kinds of stage a route is built from. A distance exception has no stage of its own since ADR-078: a request beyond the
+     * policy's range is flagged and its final stage decides it (an old request may still show an {@code EXCEPTION} stage).
+     */
+    public enum Kind { HIERARCHY, CROSS_BRANCH, UNIT_OPERATIONS, FINAL }
 
     /** One approval condition a stage's decision satisfies (written to the decision record). */
     public record Requirement(String code, String label) {
     }
 
     /**
-     * @param unit        the approver seat's unit, or null for a permission-based stage (distance exception)
+     * @param unit        the approver seat's unit, or null for a stage decided by permission (unit operations, final approval)
      * @param independentOf the key of the stage whose human may not decide this one (independent approvals), or null
      */
     public record RouteStage(String key, UUID unit, Kind kind, String label, List<Requirement> satisfies,
@@ -59,7 +63,7 @@ public final class RouteDerivation {
      * @param path the requesting unit and its ancestors, nearest first (current hierarchy, {@link OrgHierarchy#path})
      */
     public static List<RouteStage> derive(List<OrgUnit> path, Routing routing, CrossBranch crossBranch,
-                                          List<CrossBranchInclusion> inclusions, boolean distanceExceptionRequested) {
+                                          List<CrossBranchInclusion> inclusions) {
         List<OrgUnit> walk = routing.startAt() == StartAt.PARENT && !path.isEmpty() ? path.subList(1, path.size()) : path;
         List<RouteStage> stages = new ArrayList<>();
         for (OrgUnit u : walk) {
@@ -91,11 +95,6 @@ public final class RouteDerivation {
                             existing == null ? null : existing.key()));
                 }
             }
-        }
-        if (distanceExceptionRequested) {
-            extra.add(new RouteStage("X:distance", null, Kind.EXCEPTION, "اعتماد استثناء مسافة الانتشار",
-                    new ArrayList<>(List.of(new Requirement("DISTANCE_EXCEPTION", "استثناء المسافة"))), false,
-                    EnumSet.of(Fact.DEPLOYMENT), null));
         }
         // additional requirements are decided before the final stage
         int at = stages.isEmpty() || !stages.get(stages.size() - 1).finalStage() ? stages.size() : stages.size() - 1;

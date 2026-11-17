@@ -5,7 +5,7 @@ resource: tmrkz://okf/how-to/restationing
 title: طلبات إعادة التمركز على الخريطة
 lifecycle: current
 verified: 2026-11-11
-audience: [CREATE_RESTATIONING, CREATE_INITIAL_STATIONING, CREATE_DEPLOYMENT_REQUEST, VIEW, APPROVE, REVIEW]
+audience: [CREATE_RESTATIONING, REQUEST_SITE_REGISTRATION, VIEW, APPROVE, APPROVE_HIERARCHY, REVIEW]
 keywords: [إعادة التمركز, طلب تمركز, طلب جديد, الخريطة, مسار الاعتماد, ربط الوحدات بالمواقع, الحدود والمناطق]
 screen: restationing
 ---

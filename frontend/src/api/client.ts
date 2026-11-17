@@ -307,7 +307,6 @@ export type AccessScope = { mode: 'UNIT' | 'UNIT_TREE' | 'UNITS' | 'SITES' | 'AL
 export type HubAction = { action: string; allowed: boolean; reason: string | null; openRequest: string | null };
 export type HubUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; state: string; site: { id: string; name: string; lat: number | null; lng: number | null; geometry: { type: string; coordinates: unknown } | null } | null; actions: HubAction[] };
 export type RequestHub = { actions: HubAction[]; units: HubUnit[]; unitsTotal: number };
-export type HubSite = { id: string; code: string; name: string; lat: number | null; lng: number | null; geometry: { type: string; coordinates: unknown } | null; linked: boolean };
 /** «موقع جديد» of the setup administrator (ADR-067): the site, its initial stationing and each unit's two areas, in one save. */
 export type SiteSetupBody = {
   site: { code: string; name: string; kind: string; parentId?: string | null; responsibleOrgId: string | null; capacity?: number | null; location: { lat: number; lng: number }; notes?: string | null; reason?: string; symbol?: string | null };
@@ -326,7 +325,7 @@ export type SiteSetupCheck = {
   units: { organizationId: string; name: string; ok: boolean; problems: string[]; legs: RestationingLeg[] }[];
 };
 export type SiteSetupResult = { site: Site; units: { organizationId: string; name: string; stationingId: string; areas: { PRIMARY: string | null; ALTERNATIVE: string | null } }[]; policyVersion: number | null; effectiveFrom: string | null };
-export type OverviewItem = { id: string; number: string; type: string; state: string; stateLabel?: string; updatedAt?: string; requestingUnit?: { name: string }; person?: string; mine?: boolean; myTurn?: boolean; currentStage?: string; currentStageKind?: string; fyi?: boolean; fyiPending?: boolean; activatable?: boolean };
+export type OverviewItem = { id: string; number: string; type: string; state: string; stateLabel?: string; updatedAt?: string; requestingUnit?: { name: string }; person?: string; mine?: boolean; myTurn?: boolean; currentStage?: string; currentStageKind?: string; fyi?: boolean; fyiPending?: boolean; activatable?: boolean; exceedsPolicy?: boolean };
 export type StationingRouteVersion = { id: string; version: number; routing: { startAt: 'SELF' | 'PARENT'; levels: RoutingLevelValue[] }; stages: { unitOperations: boolean; finalByPermission: boolean; fyiBeforeActivation: boolean }; reason: string | null; publishedAt: string | null; publishedBy: string | null };
 export type StationingRouteRow = { purpose: string; published: StationingRouteVersion | null; draft: StationingRouteVersion | null };
 export type StationingRouteTry = { stages: { key: string; kind: string; label: string; unit: string | null; holders: number; inheritedFrom?: string | null; skipped?: boolean }[]; complete: boolean; problems: string[]; activators?: number; fyiHolders?: number };
@@ -680,7 +679,6 @@ export const api = {
   tryStationingRoute: (purpose: string, body: { routing: unknown; stages: unknown; orgId: string }) => post<StationingRouteTry>(`/stationing/routes/${purpose}/simulate`, body),
   requestHub: () => get<RequestHub>('/request-hub'),
   hubUnit: (id: string) => get<HubUnit>(`/request-hub/units/${id}`),
-  hubSites: (unit: string) => get<HubSite[]>(`/request-hub/units/${unit}/sites`),
   requestOverview: (filter: string) => get<OverviewItem[]>('/request-hub/overview' + query({ filter })),
   homeCards: () => get<HomeCard[]>('/request-hub/home-cards'),
   operationalPosture: () => get<{ units: PostureUnit[]; unitsTotal: number }>('/operational-posture'),

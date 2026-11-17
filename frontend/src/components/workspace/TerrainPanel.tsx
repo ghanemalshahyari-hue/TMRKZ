@@ -218,7 +218,7 @@ export function TerrainPanel({ role, roles, onRole, insight, rule, move, connect
                   </div>
                   {lines.exception && (
                     <div>
-                      <dt>الاستثناء</dt>
+                      <dt>حد التجاوز</dt>
                       <dd>{lines.exception}</dd>
                     </div>
                   )}

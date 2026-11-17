@@ -33,8 +33,9 @@ import ae.mover.stationing.StationingPolicy.RoutingLevel;
 @Service
 public class StationingRoutes {
 
-    public static final List<String> PURPOSES = List.of(RestationingChecks.RESTATIONING, RestationingChecks.INITIAL_STATIONING,
-            RestationingChecks.DEPLOYMENT_AREAS, RestationingChecks.SITE_REGISTRATION);
+    /** The types a path can be set for: those that can be asked for (initial stationing is site setup since ADR-078). */
+    public static final List<String> PURPOSES = List.of(RestationingChecks.RESTATIONING, RestationingChecks.DEPLOYMENT_AREAS,
+            RestationingChecks.SITE_REGISTRATION);
 
     /** What a request's route is built from. */
     public record RouteRule(Routing routing, ApprovalStages stages) {
@@ -211,7 +212,7 @@ public class StationingRoutes {
         if (problems.isEmpty()) {
             List<OrgUnit> path = hierarchy.path(in.orgId());
             List<RouteStage> route = RouteDerivation.withConfiguredStages(
-                    RouteDerivation.derive(path, in.routing(), new StationingPolicy.CrossBranch(false, List.of(), false), List.of(), false), in.stages());
+                    RouteDerivation.derive(path, in.routing(), new StationingPolicy.CrossBranch(false, List.of(), false), List.of()), in.stages());
             complete = RouteDerivation.complete(route);
             if (!complete) {
                 problems.add("لا يصل المسار من هذه الوحدة إلى آخر مستوى محدد؛ لن يُقبل إرسال طلبها.");

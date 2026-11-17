@@ -196,12 +196,17 @@ public class GrantSource {
                 .query(UUID.class).list());
     }
 
+    /**
+     * A role's stored action names as actions. A name that is no longer an action (retired by ADR-078, or written by hand) gives
+     * nothing and never fails the request: V49 removed them from every role, and an old policy version is translated when it is
+     * brought back ({@link Permission#current}).
+     */
     static Set<Permission> permissions(Object value) {
         EnumSet<Permission> set = EnumSet.noneOf(Permission.class);
         try {
             Object[] items = (Object[]) ((java.sql.Array) value).getArray();
             for (Object item : items) {
-                set.add(Permission.valueOf(String.valueOf(item)));
+                Permission.parse(String.valueOf(item)).ifPresent(set::add);
             }
         } catch (java.sql.SQLException e) {
             throw new IllegalStateException(e);

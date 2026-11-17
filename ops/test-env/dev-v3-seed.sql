@@ -33,7 +33,7 @@ select gen_random_uuid(), o.id, s.id, 'PERMANENT', now() - interval '30 days', '
 insert into role_def(code, name, permissions, scope, summary_only, sort_order) values
   ('DEV_RESTATIONING_REQUESTER', 'مقدم طلب إعادة تمركز (تطوير)', '{VIEW,CREATE_RESTATIONING}', 'ORGANIZATION', false, 950),
   ('DEV_RESTATIONING_APPROVER', 'معتمد إعادة التمركز في الوحدة (تطوير)', '{VIEW,APPROVE}', 'ORGANIZATION', false, 951),
-  ('DEV_DISTANCE_EXCEPTION', 'معتمد استثناء مسافة الانتشار (تطوير)', '{VIEW,APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION}', 'ALL', false, 952),
+  ('DEV_DISTANCE_EXCEPTION', 'المعتمد النهائي — يقرر تجاوز المسافة (تطوير، ADR-078)', '{VIEW,FINAL_APPROVE_STATIONING}', 'ALL', false, 952),
   ('DEV_STATIONING_ACTIVATOR', 'مفعّل التمركز (تطوير)', '{VIEW,ACTIVATE_STATIONING}', 'ORGANIZATION', false, 953)
 on conflict (code) do nothing;
 insert into membership(id, person_id, organization_id, role_code, valid_from, follows_affiliation)

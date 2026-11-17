@@ -36,7 +36,8 @@ with ins as (
   insert into role_def(code, name, permissions, scope, summary_only, sort_order) values
     ('ACC_V3_RESTATIONING_REQUESTER', 'مقدم طلب إعادة تمركز (بيانات قبول وهمية)', '{CREATE_RESTATIONING}', 'ORGANIZATION', false, 960),
     ('ACC_V3_UNIT_APPROVER', 'معتمد إعادة التمركز في الوحدة (بيانات قبول وهمية)', '{APPROVE}', 'ORGANIZATION', false, 961),
-    ('ACC_V3_DISTANCE_EXCEPTION', 'معتمد استثناء مسافة الانتشار (بيانات قبول وهمية)', '{APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION}', 'ALL', false, 962),
+    -- ADR-078: no exception stage; the final approver decides a request beyond the range
+    ('ACC_V3_DISTANCE_EXCEPTION', 'المعتمد النهائي — يقرر تجاوز المسافة (بيانات قبول وهمية)', '{FINAL_APPROVE_STATIONING}', 'ALL', false, 962),
     ('ACC_V3_STATIONING_ACTIVATOR', 'مفعّل التمركز (بيانات قبول وهمية)', '{ACTIVATE_STATIONING}', 'ORGANIZATION', false, 963)
   on conflict (code) do nothing
   returning 1)

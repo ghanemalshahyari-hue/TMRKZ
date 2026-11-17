@@ -88,7 +88,7 @@ const km = (m: number) => (m / 1000).toLocaleString('ar-AE', { maximumFractionDi
 
 export const VERDICT: Record<RestationingLeg['status'], { text: string; tone: 'ok' | 'warn' | 'bad' | 'none' }> = {
   OK: { text: 'ضمن النطاق', tone: 'ok' },
-  NEEDS_EXCEPTION: { text: 'يحتاج استثناء', tone: 'warn' },
+  NEEDS_EXCEPTION: { text: 'يتجاوز المسموح', tone: 'warn' },
   OUT_OF_RANGE: { text: 'خارج النطاق', tone: 'bad' },
   TERRAIN_TIE_UNRESOLVED: { text: 'تعادل في طبيعة الأرض', tone: 'bad' },
   NOT_PLACED: { text: 'لم تُحدَّد بعد', tone: 'none' },
@@ -101,7 +101,7 @@ export function ruleLines(l: RestationingLeg): { base: string; terrain: string; 
     base: `${km(l.baseMinM)}–${km(l.baseMaxM)} كم`,
     terrain: (add >= 0 ? '+' : '−') + km(Math.abs(add)) + ' كم' + (l.terrain?.controllingLabel ? ` (${l.terrain.controllingLabel})` : ''),
     effective: `${km(l.effectiveMinM)}–${km(l.effectiveMaxM)} كم`,
-    exception: l.exceptionMaxM != null ? `حتى ${km(l.exceptionMaxM)} كم باستثناء معتمد` : null,
+    exception: l.exceptionMaxM != null ? `حتى ${km(l.exceptionMaxM)} كم بقرار المعتمد النهائي` : null,
   };
 }
 

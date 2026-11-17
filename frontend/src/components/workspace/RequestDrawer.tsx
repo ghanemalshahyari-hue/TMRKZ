@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { RestationingListItem, RestationingState } from '../../api/types';
 import { fullDate } from '../../lib/dates';
 import { newRequestHref } from '../../lib/navigation';
+import { EXCEEDS_CHIP } from '../../lib/workspace';
 import { Icon } from '../ui';
 import { StatePill } from './StatePill';
 
@@ -15,7 +16,7 @@ const GROUPS: { key: string; label: string; states: RestationingState[] | null }
 
 /**
  * The request list as a collapsible drawer (§16): number, state, requesting unit, permanent/temporary and the current
- * approval stage. Choosing a request updates the same workspace.
+ * approval stage, and «يتجاوز المسموح» on a request beyond the policy (ADR-078). Choosing a request updates the same workspace.
  */
 export function RequestDrawer({ items, selected, onSelect, open, setOpen, canCreate, onCreate }: {
   items: RestationingListItem[] | null;
@@ -60,6 +61,7 @@ export function RequestDrawer({ items, selected, onSelect, open, setOpen, canCre
                   <b>{r.number}</b>
                   {r.purpose && r.purpose !== 'RESTATIONING' && isPurpose(r.purpose) && <small className="tz-code">{PURPOSE_TITLE[r.purpose]}</small>}
                   <StatePill state={r.state} />
+                  {r.exceedsPolicy && <span className="pill orange" data-exceeds>{EXCEEDS_CHIP}</span>}
                 </span>
                 <span>
                   {r.requestingUnit.name} · {r.kind === 'TEMPORARY' ? 'مؤقت' : r.kind === 'EXTENSION' ? 'تمديد' : 'دائم'} · {r.units} وحدة

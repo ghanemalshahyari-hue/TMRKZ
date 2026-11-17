@@ -103,6 +103,15 @@ public class GrantAdminService {
         return keys;
     }
 
+    static final String EMPTY_ROLE = "دور بلا صلاحيات لا يُمنح (أُفرغ بقرار المالك، ADR-078).";
+
+    /** A role with no action gives nothing: it is not handed out at all — grant, unit grant, seat or duty permit (ADR-078). */
+    public static void requireGivable(Set<Permission> perms) {
+        if (perms.isEmpty()) {
+            throw ApiException.validation(EMPTY_ROLE);
+        }
+    }
+
     // ---- create -------------------------------------------------------------------------------------------------
 
     @Transactional
@@ -123,6 +132,7 @@ public class GrantAdminService {
                 .param("c", in.roleCode()).query().listOfRows().stream().findFirst()
                 .orElseThrow(() -> ApiException.validation("الدور غير موجود في السياسة المنشورة."));
         Set<Permission> perms = permissions(role.get("permissions"));
+        requireGivable(perms);
         String roleScope = (String) role.get("scope");
         ScopeInput scope = in.scope() == null ? new ScopeInput("ROLE", false, "AND", List.of()) : in.scope();
         String mode = scope.mode() == null ? "ROLE" : scope.mode();
@@ -730,6 +740,9 @@ public class GrantAdminService {
             String name = (String) role.get("name");
             Set<Permission> perms = permissions(role.get("permissions"));
             List<String> problems = new ArrayList<>();
+            if (perms.isEmpty()) {
+                problems.add("«" + name + "»: " + EMPTY_ROLE);
+            }
             List<String> notes = new ArrayList<>();
             if (!seen.add(code)) {
                 problems.add("«" + name + "» مكرر؛ يُعطى كل دور مرة واحدة بنطاقه.");
@@ -941,6 +954,9 @@ public class GrantAdminService {
             if (FINAL_ROLES.contains(role) && !ctx.canEverywhere(Permission.MANAGE_ACCESS)) {
                 throw ApiException.forbidden("الاعتماد النهائي يمنحه ويسحبه مدير الصلاحيات العام فقط.");
             }
+            requireGivable(permissions(jdbc.sql("select permissions from role_def where code = :c").param("c", role).query()
+                    .listOfRows().stream().findFirst().map(x -> x.get("permissions")).orElseThrow(
+                            () -> ApiException.validation("الدور غير موجود في السياسة المنشورة."))));
             long held = jdbc.sql("""
                     select count(*) from membership where person_id = :p and organization_id = :o and role_code = :r
                       and valid_from <= :now and (valid_to is null or valid_to > :now)""")
@@ -1175,11 +1191,12 @@ public class GrantAdminService {
         }
     }
 
-    static Set<Permission> permissions(Object value) {
+    public static Set<Permission> permissions(Object value) {
         EnumSet<Permission> set = EnumSet.noneOf(Permission.class);
         try {
             for (Object item : (Object[]) ((java.sql.Array) value).getArray()) {
-                set.add(Permission.valueOf(String.valueOf(item)));
+                // a name that is no longer an action gives nothing (ADR-078; see GrantSource.permissions)
+                Permission.parse(String.valueOf(item)).ifPresent(set::add);
             }
         } catch (java.sql.SQLException e) {
             throw new IllegalStateException(e);

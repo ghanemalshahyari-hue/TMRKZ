@@ -3,7 +3,8 @@ import { api } from '../../api/client';
 import type { AccessPolicyVersion, Permission, PolicyImpact, PolicyRole, RoleDef, Scope } from '../../api/types';
 import { useApp } from '../../lib/app';
 import { fullTime } from '../../lib/dates';
-import { PERMISSIONS, PERMISSION_NAMES, SCOPES } from '../../lib/labels';
+import { PERMISSIONS, PERMISSION_NAMES, SCOPES, permissionName } from '../../lib/labels';
+import { EMPTY_ROLE, isEmptyRole } from '../../lib/rolePicker';
 import { Dialog, DialogHead, Icon } from '../ui';
 
 const STATUS_NAMES: Record<AccessPolicyVersion['status'], [string, string]> = {
@@ -225,6 +226,10 @@ export function PolicyStudio({ global }: { global: boolean }) {
                   <tr key={role.code} className={(role.system ? 'disabled ' : '') + (draft && changed(role) ? 'row-changed' : '')}>
                     <td>
                       {role.name}
+                      {isEmptyRole(role) && !role.system && (
+                        // kept as history of earlier grants; never offered to give or ask for (ADR-078)
+                        <span className="pill" data-empty-role={role.code} style={{ marginInlineStart: 6 }}>{EMPTY_ROLE}</span>
+                      )}
                       <br />
                       <span className="latin tiny muted">{role.code}</span>
                     </td>
@@ -356,7 +361,8 @@ export function PolicyStudio({ global }: { global: boolean }) {
               </p>
               <ul className="test-list">
                 {roles
-                  .filter((r) => !r.system)
+                  // a role with no permissions is not handed out; one already listed stays visible so it can be taken off
+                  .filter((r) => !r.system && (!isEmptyRole(r) || grantableRole.grantableRoles.includes(r.code)))
                   .map((r) => (
                     <li key={r.code}>
                       <label className="check-label">
@@ -462,8 +468,8 @@ function ImpactPanel({ impact }: { impact: PolicyImpact }) {
                 <tr key={r.code}>
                   <td>{r.name}</td>
                   <td>{CHANGE_NAMES[r.change]}</td>
-                  <td className="good">{r.added.map((p) => PERMISSION_NAMES[p]).join('، ') || '—'}</td>
-                  <td className="bad">{r.removed.map((p) => PERMISSION_NAMES[p]).join('، ') || '—'}</td>
+                  <td className="good">{r.added.map(permissionName).join('، ') || '—'}</td>
+                  <td className="bad">{r.removed.map(permissionName).join('، ') || '—'}</td>
                   <td>
                     {r.scopeFrom && r.scopeFrom !== r.scopeTo
                       ? SCOPES.find(([s]) => s === r.scopeFrom)?.[1] + ' ← ' + SCOPES.find(([s]) => s === r.scopeTo)?.[1]

@@ -55,7 +55,7 @@ describe('deployment leg preview (the server decides on save)', () => {
     expect(l.status).toBe('OK');
     expect([l.baseMinM, l.baseMaxM, l.effectiveMinM, l.effectiveMaxM]).toEqual([5000, 8000, 5000, 10000]);
     expect(l.terrain?.allowanceM).toBe(2000);
-    expect(ruleLines(l)).toEqual({ base: '5–8 كم', terrain: '+2 كم (جبلي)', effective: '5–10 كم', exception: 'حتى 11 كم باستثناء معتمد' });
+    expect(ruleLines(l)).toEqual({ base: '5–8 كم', terrain: '+2 كم (جبلي)', effective: '5–10 كم', exception: 'حتى 11 كم بقرار المعتمد النهائي' });
   });
 
   it('flat ground has no allowance; beyond the maximum is out of range or needs the exception', () => {
