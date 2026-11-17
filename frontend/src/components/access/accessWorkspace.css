@@ -38,7 +38,7 @@
 .aw-hits small { color: var(--muted); font-size: 11px; }
 
 /* the side panels' widths are the viewer's (owner, 16 Nov 2026): set on the dividers between the columns, see panelWidths.ts */
-.aw-cols { display: grid; grid-template-columns: var(--aw-tree, 330px) 14px minmax(0, 1fr) 14px var(--aw-file, 300px); gap: 14px 0; align-items: start; }
+.aw-cols { display: grid; grid-template-columns: var(--aw-tree, 330px) 14px minmax(0, 1fr); gap: 14px 0; align-items: start; }
 .aw-divider { align-self: stretch; position: relative; cursor: col-resize; touch-action: none; outline: none; min-height: 120px; }
 .aw-divider > span { position: absolute; top: 0; bottom: 0; inset-inline-start: 50%; width: 2px; transform: translateX(-50%); border-radius: 2px; background: transparent; transition: background .12s; }
 /* the grip follows the scroll, so it stays in view beside a long list */

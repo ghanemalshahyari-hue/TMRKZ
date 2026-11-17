@@ -2233,3 +2233,9 @@ for narrow steep ground: `docs/evidence/terrain-3d/slope-inside/README.md`.
 - A site saved before this decision («معسكر البانه») is stationed from its card («تثبيت»), by the administrator.
 
 **Tests.** `SiteSetupIT` SETUP-07 (the system administrator's six-step save stations its unit with both areas; «تثبيت» stations another; no VIEW, no APPROVE); `siteSetupFlow.test.ts` (the responsible unit heads the plan and keeps its areas; replaced on change; not stationed when stationed elsewhere).
+
+## ADR-077 «ملف الوحدة» removed from «إدارة الصلاحيات والوحدات» (owner decision, 17 Nov 2026)
+
+**Owner.** Of the card «04 ملف الوحدة» (the unit's name, level, parent, manager and counts; «صلاحيات موروثة من عضوية الوحدة»; «منح لكل أعضاء الوحدة»; «إدارات التوفير التي تزوّدها الوحدة»): "remove this card".
+
+**Decision.** The card and its divider are removed; the workspace is two panels (the unit tree and the unit's work area). Nothing on the server changes: existing unit grants («موروثة من الوحدة», V36) and providing departments keep their effect and their API, but are no longer edited from this page. `tests/acceptance` scripts that open `aw-file` describe the removed card.

@@ -17,7 +17,7 @@ import type { GrantView, RoleDef } from '../../api/types';
 import { useApp } from '../../lib/app';
 import { dubaiISO, fullDate, todayDubai } from '../../lib/dates';
 import { Dialog, DialogHead, Icon } from '../ui';
-import { AccessAdminDialog, AccountCardDialog, AvailabilityChips, PermitsTab, ProvidersSection, useRightsCatalogue } from './AccessAdmin';
+import { AccessAdminDialog, AccountCardDialog, AvailabilityChips, PermitsTab, useRightsCatalogue } from './AccessAdmin';
 import { AddUserDialog } from './AddUserDialog';
 import { rightsText } from './adminText';
 import { cellText, existingUnits } from './assign';
@@ -120,7 +120,7 @@ export function AccessWorkspace({ onStudio }: { onStudio: () => void }) {
         <div>
           <span className="aw-eyebrow">إدارة الصلاحيات والوحدات</span>
           <h1>ابحث أولاً، ثم اعمل داخل نطاق صغير</h1>
-          <p>واجهة واحدة تجمع البحث، مساحة الوحدة، دليل التغيير، ملف الوحدة ومصفوفة التدقيق — دون تحميل المؤسسة كاملة.</p>
+          <p>واجهة واحدة تجمع البحث، مساحة الوحدة، دليل التغيير ومصفوفة التدقيق — دون تحميل المؤسسة كاملة.</p>
         </div>
         <button className="button aw-studio" onClick={onStudio} data-testid="aw-studio">
           <Icon name="external" /> مركز الإدارة الحالي
@@ -235,8 +235,7 @@ export function AccessWorkspace({ onStudio }: { onStudio: () => void }) {
           )}
         </section>
 
-        <Divider panel="file" label="عرض ملف الوحدة" value={widths.file} box={colsRef} onWidth={setWidth} onDone={keep} onReset={() => reset('file')} />
-        <UnitFile file={file} global={!!summary?.global} onChanged={(f) => (setFile(f), reload())} onReload={reload} />
+        {/* «ملف الوحدة» removed at the owner's request (17 Nov 2026, ADR-077) */}
       </div>
 
       <section className="aw-note" role="note">
@@ -930,92 +929,6 @@ function AuditTab({ unit, revision }: { unit: Unit; revision: number }) {
         </div>
       )}
     </div>
-  );
-}
-
-// ---- 04 unit file ------------------------------------------------------------------------------------------------
-
-function UnitFile({ file, global, onChanged, onReload }: { file: WorkspaceUnit | null; global: boolean; onChanged: (f: WorkspaceUnit) => void; onReload: () => void }) {
-  const app = useApp();
-  const [busy, setBusy] = useState<string | null>(null);
-  const rows = useMemo(
-    () =>
-      file
-        ? ([
-            ['اسم الوحدة', file.name],
-            ['المستوى', file.level ?? '—'],
-            ['الوحدة الأم', file.parent?.name ?? '—'],
-            ['مدير الوحدة', file.managers.length ? file.managers.join('، ') : 'غير معيّن'],
-            ['المستخدمون', n(file.people)],
-            ['النشطون', n(file.active)],
-            ['الوحدات الفرعية', n(file.children)],
-          ] as [string, string | number][])
-        : [],
-    [file],
-  );
-  const flip = (code: string, on: boolean, name: string) => {
-    if (!file) return;
-    let reason: string | undefined;
-    if (!on) {
-      const r = window.prompt('سبب سحب «' + name + '» من كل أعضاء «' + file.name + '»؟');
-      if (!r || !r.trim()) return;
-      reason = r.trim();
-    }
-    setBusy(code);
-    api
-      .workspaceUnitGrant(file.id, code, on, reason)
-      .then((f) => (onChanged(f), app.toast(on ? 'يرث كل أعضاء الوحدة «' + name + '»' : 'سُحب «' + name + '» من أعضاء الوحدة')))
-      .catch((e: Error) => app.toast(e.message))
-      .finally(() => setBusy(null));
-  };
-  return (
-    <section className="aw-card aw-file" aria-label="ملف الوحدة" data-testid="aw-file">
-      <header className="aw-head">
-        <span className="aw-num">04</span>
-        <h2>ملف الوحدة</h2>
-        <span className="aw-badge">للقراءة</span>
-      </header>
-      {!file ? (
-        <p className="aw-muted">اختر وحدة لعرض المصدر والنطاق والإحصاءات.</p>
-      ) : (
-        <>
-          <dl className="aw-kv">
-            {rows.map(([k, v]) => (
-              <div key={k}>
-                <dt>{k}</dt>
-                <dd>{v}</dd>
-              </div>
-            ))}
-          </dl>
-          <h3>صلاحيات موروثة من عضوية الوحدة</h3>
-          <div className="aw-chips">
-            {file.inherited.length === 0 && <span className="aw-muted">لا شيء؛ كل صلاحية هنا ممنوحة لشخص بعينه.</span>}
-            {file.inherited.map((r) => (
-              <span key={r.code} className="aw-chip inherit" title={'منذ ' + fullDate(r.since) + (r.grantedBy ? ' · ' + r.grantedBy : '')}>
-                {r.name} · {r.scope === 'SITE' ? 'للعلم' : 'own_unit'}
-              </span>
-            ))}
-          </div>
-          {file.unitRoles.length > 0 && (
-            <>
-              <h3>منح لكل أعضاء الوحدة</h3>
-              <ul className="aw-unit-roles">
-                {file.unitRoles.map((r) => (
-                  <li key={r.code}>
-                    <label title={r.lock ?? undefined}>
-                      <input type="checkbox" checked={r.on} disabled={!!r.lock || busy === r.code} onChange={() => flip(r.code, !r.on, r.name)} />
-                      {r.lock && <Icon name="lock" />} {r.name}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-              <small className="aw-muted">يرثها كل من في الوحدة الآن ومن يُضاف لاحقاً. الاعتمادات تُمنح لشخص بعينه فقط.</small>
-            </>
-          )}
-          <ProvidersSection file={file} global={global} onChanged={onReload} />
-        </>
-      )}
-    </section>
   );
 }
 
