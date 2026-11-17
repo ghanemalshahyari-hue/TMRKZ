@@ -65,6 +65,10 @@ class DirectorySignInIT extends IntegrationTest {
             LDAP.add("dn: " + BASE, "objectClass: domain", "dc: tmrkz");
             LDAP.add("dn: " + PEOPLE, "objectClass: organizationalUnit", "ou: people");
             LDAP.add("dn: ou=other," + BASE, "objectClass: organizationalUnit", "ou: other");
+            // as Active Directory searched from its domain root (MOVER's LDAP_BASE_DN): a continuation reference to another
+            // partition comes back with the entries; every sign-in below searches through it (ADR-079)
+            LDAP.add("dn: ou=DomainDnsZones," + BASE, "objectClass: referral", "objectClass: extensibleObject", "ou: DomainDnsZones",
+                    "ref: ldap://dns-zones.directory.invalid/DC=DomainDnsZones,DC=tmrkz,DC=local");
             LDAP.startListening();
         } catch (Exception e) {
             throw new IllegalStateException(e);

@@ -91,7 +91,7 @@ class HrLinkedPeopleIT extends IntegrationTest {
         exec("create schema " + schema,
                 "create table " + schema + ".units_t (id text, name text, parent_id text, status int, code text)",
                 "create table " + schema + ".people_t (person_id text, emp_no text, full_name text, unit_id text, status_desc text,"
-                        + " account text, position_id text, position_name text, grade_name text, leave_text text)",
+                        + " account text, position_id text, position_name text, grade_name text, leave_text text, legacy_no text)",
                 "create view " + schema + ".units_v as select * from " + schema + ".units_t",
                 "create view " + schema + ".people_v as select * from " + schema + ".people_t",
                 "create role " + reader + " login password 'Reader#" + sfx + "'",
@@ -153,9 +153,14 @@ class HrLinkedPeopleIT extends IntegrationTest {
     }
 
     private void personRow(String id, String name, String unitId, String status) {
-        jdbc.sql("insert into " + schema + ".people_t values (:i, :e, :n, :u, :s, :a, :pos, :pn, null, null)")
+        jdbc.sql("insert into " + schema + ".people_t values (:i, :e, :n, :u, :s, :a, :pos, :pn, null, null, :ln)")
                 .param("i", p(id)).param("e", number(id)).param("n", name).param("u", u(unitId)).param("s", status)
-                .param("a", account(id)).param("pos", "POS" + id).param("pn", "منصب " + id).update();
+                .param("a", account(id)).param("pos", "POS" + id).param("pn", "منصب " + id).param("ln", legacy(id)).update();
+    }
+
+    /** The earlier (legacy) number, MOVER's MILITARY_NUMBER beside the new one. */
+    private String legacy(String id) {
+        return "L" + sfx + "-" + id;
     }
 
     private static Map<String, Object> field(String entity, String field, String column) {
@@ -189,6 +194,7 @@ class HrLinkedPeopleIT extends IntegrationTest {
         f.add(field("UNIT", "code", "CODE"));
         f.add(field("PERSON", "external_person_id", "PERSON_ID"));
         f.add(field("PERSON", "employee_number", "EMP_NO"));
+        f.add(field("PERSON", "legacy_employee_number", "LEGACY_NO"));
         f.add(field("PERSON", "full_name", "FULL_NAME"));
         f.add(field("PERSON", "unit_external_id", "UNIT_ID"));
         f.add(field("PERSON", "status_text", "STATUS_DESC"));
@@ -345,6 +351,11 @@ class HrLinkedPeopleIT extends IntegrationTest {
         assertThat(byNumber.body().path("displayName").asText()).isEqualTo("موظف 4");
         assertThat(byNumber.body().path("unitName").asText()).isEqualTo("إدارة 2");
         assertThat(byNumber.body().path("acting").asBoolean()).isFalse();
+        // MOVER's lookup takes the new number or the earlier one (hr_live.find_person_by_number): the same person either way
+        Res byLegacy = lookup(admin, orgOf("2"), legacy("4"));
+        assertThat(byLegacy.status()).as("by the earlier number").isEqualTo(200);
+        assertThat(byLegacy.body().path("displayName").asText()).isEqualTo("موظف 4");
+        assertThat(byLegacy.body().path("importOnSave").asBoolean()).isTrue();
         Res byAccount = lookup(admin, orgOf("3"), account("4").toLowerCase());
         assertThat(byAccount.status()).as("by User ID, any case").isEqualTo(200);
         assertThat(byAccount.body().path("acting").asBoolean()).as("posted in unit 2").isTrue();

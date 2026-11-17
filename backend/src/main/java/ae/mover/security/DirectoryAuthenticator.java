@@ -241,6 +241,11 @@ public class DirectoryAuthenticator {
             }
         } catch (javax.naming.SizeLimitExceededException e) {
             count = 2;
+        } catch (javax.naming.PartialResultException e) {
+            // Active Directory searched from the domain root (MOVER's LDAP_BASE_DN, DC=…,DC=…) adds continuation references to its
+            // other partitions (DomainDnsZones, ForestDnsZones, Configuration); with referrals ignored JNDI raises this after
+            // this domain's entries, which are the answer (as Spring LDAP's ignorePartialResultException for AD). Found on
+            // MOVER's Samba AD, 17 Nov 2026 (ADR-079).
         }
         if (count == 0) {
             throw invalid();

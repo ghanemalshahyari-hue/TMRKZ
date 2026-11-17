@@ -68,7 +68,7 @@ public class HrPeopleService {
     }
 
     /**
-     * Live and read-only: the HR records whose employee number is exactly {@code number}, or whose domain account equals
+     * Live and read-only: the HR records whose employee number or earlier (legacy) number is exactly {@code number}, or whose domain account equals
      * {@code account} ignoring case (either may be null), active or not, at most {@value #LIMIT}. Nothing is written.
      *
      * @throws ApiException HR_SOURCE_NOT_CONFIGURED when there is no HR to ask, HR_SOURCE_UNAVAILABLE when it cannot be
@@ -97,8 +97,12 @@ public class HrPeopleService {
                 discovered.put(Entity.UNIT, session.columns(cfg.unitView()));
                 discovered.put(Entity.PERSON, session.columns(cfg.personView()));
                 HrMapping.Compiled compiled = HrMapping.compile(def, discovered);
-                HrMapping.Condition where = HrMapping.Condition.or(
-                        n == null ? null : compiled.in(Entity.PERSON, "employee_number", List.of(n)),
+                // a number is the employee number or the earlier one, as MOVER's live lookup (NEW_MILITARY_NO = :n OR
+                // MILITARY_NUMBER = :n, hr_live.find_person_by_number; owner 17 Nov 2026); the legacy field only when mapped
+                HrMapping.Condition byNumber = n == null ? null : HrMapping.Condition.or(
+                        compiled.in(Entity.PERSON, "employee_number", List.of(n)),
+                        compiled.in(Entity.PERSON, "legacy_employee_number", List.of(n)));
+                HrMapping.Condition where = HrMapping.Condition.or(byNumber,
                         a == null ? null : compiled.equalsIgnoreCase(Entity.PERSON, "domain_account", a));
                 if (where == null) {
                     return List.of();
@@ -110,7 +114,7 @@ public class HrPeopleService {
                         continue; // the sync would not store it either
                     }
                     // exactly the key asked for, whatever the source compared
-                    boolean exact = (n != null && n.equals(v.get("employee_number")))
+                    boolean exact = (n != null && (n.equals(v.get("employee_number")) || n.equals(v.get("legacy_employee_number"))))
                             || (a != null && v.get("domain_account") != null && a.equalsIgnoreCase(v.get("domain_account")));
                     if (exact) {
                         out.add(record(v));

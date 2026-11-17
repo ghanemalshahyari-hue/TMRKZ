@@ -108,7 +108,8 @@ public class UnitMemberService {
                 left join hr_person h on h.external_id = p.source_external_id
                   and h.snapshot_id = (select id from hr_snapshot where status = 'PUBLISHED')
                 where p.source = 'HR' and p.status = 'ACTIVE'
-                  and (lower(p.employee_no) = lower(:k) or (cast(:l as text) is not null and (lower(p.username) = :l or lower(h.domain_account) = :l)))
+                  and (lower(p.employee_no) = lower(:k) or lower(h.legacy_employee_number) = lower(:k)
+                       or (cast(:l as text) is not null and (lower(p.username) = :l or lower(h.domain_account) = :l)))
                 limit 2""")
                 .param("k", k).param("l", login).query(UUID.class).list();
         if (found.isEmpty()) {
