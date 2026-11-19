@@ -2,7 +2,9 @@
 # Runs the backend acceptance suite against throw-away PostgreSQL + PostGIS and OpenFGA containers (no JDK needed on the
 # host). Usage: ops/test-backend.sh                 (whole suite)
 #               ops/test-backend.sh AccessAcceptanceIT,AuthorizationIT   (only the classes affected by a change)
-# Offline: TMRKZ_TEST_MAVEN_IMAGE and TMRKZ_TEST_MAVEN_VOLUME may name an approved local builder and populated cache.
+# Offline: TMRKZ_TEST_MAVEN_IMAGE and TMRKZ_TEST_MAVEN_VOLUME may name an approved local builder and populated cache;
+# from tmrkz-images.tar:  docker run --rm --entrypoint true -v tmrkz-m2:/root/.m2 tmrkz/folder-backend:1   (fills the volume)
+#   then  TMRKZ_TEST_MAVEN_IMAGE=tmrkz/folder-backend:1 TMRKZ_TEST_MAVEN_VOLUME=tmrkz-m2 sh ops/test-backend.sh SomeIT
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
@@ -55,4 +57,4 @@ HOST_DIR="$(pwd -W 2>/dev/null || pwd)"
 docker run --rm --pull never --network "$NET" -v "$CACHE:/root/.m2" -v "$HOST_DIR:/repo" -w /repo/backend \
   -e MOVER_TEST_DB_URL="jdbc:postgresql://$PG:5432/mover_test" \
   -e MOVER_TEST_FGA_URL="http://$FGA:8080" -e MOVER_TEST_FGA_KEY="$FGA_KEY" \
-  "$IMAGE" mvn -B -o test ${1:+-Dtest="$1" -Dsurefire.failIfNoSpecifiedTests=false}
+  --entrypoint mvn "$IMAGE" -B -o test ${1:+-Dtest="$1" -Dsurefire.failIfNoSpecifiedTests=false}

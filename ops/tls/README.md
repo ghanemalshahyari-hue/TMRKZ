@@ -16,7 +16,7 @@ on port 80 only redirects. TLS 1.2 and 1.3, HSTS.
 3. **Switch on.** `sh ops/tls/enable.sh [project] [port]` (defaults `tmrkz-mover`, 443). It keeps a copy of `.env`, sets
    `TMRKZ_PUBLIC_URL=https://<name>`, `MOVER_SECURE_COOKIE=true`, `COMPOSE_PROFILES=tls`, `MOVER_HTTP_BIND=127.0.0.1` and
    `TMRKZ_HTTPS_PORT`, and gives the identity provider the new address (`ops/keycloak/set-public-url.sh`). Then restart:
-   `docker compose -p <project> up -d` (this development PC: `sh ops/local/up.sh`).
+   `docker compose -p <project> up -d` (this folder: `sh start.sh`).
 4. **DNS and clients.** The name must resolve in the organisation's DNS to this server. Domain PCs already trust the
    organisation's CA; others need its root certificate installed.
 

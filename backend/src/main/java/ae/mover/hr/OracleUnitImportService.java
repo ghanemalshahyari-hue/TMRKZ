@@ -11,6 +11,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -28,6 +30,7 @@ import ae.mover.common.Json;
 @Service
 public class OracleUnitImportService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(OracleUnitImportService.class);
     private static final java.time.Duration PREVIEW_TTL = java.time.Duration.ofMinutes(30);
     private static final int BATCH = 1000;
 
@@ -93,15 +96,27 @@ public class OracleUnitImportService {
 
     /** Publish a preview, never a caller-selected file or timestamp. Re-read and verify exactly the staged private bytes. */
     public Result commit(AccessContext ctx, UUID runId) {
+        checkpoint("commit-service-entered");
         ctx.require(Permission.CONFIGURE);
-        Committed committed = Objects.requireNonNull(tx.execute(status -> commitLocked(ctx, runId)));
-        if (committed.publishEvent()) {
-            events.publishEvent(new HrSnapshotPublished(committed.snapshot()));
+        try {
+            Committed committed = Objects.requireNonNull(tx.execute(status -> commitLocked(ctx, runId)));
+            if (committed.publishEvent()) {
+                events.publishEvent(new HrSnapshotPublished(committed.snapshot()));
+            }
+            return committed.result();
+        } catch (RuntimeException e) {
+            String state = e instanceof org.springframework.dao.DataAccessException db
+                    ? String.valueOf(e.getClass().getSimpleName() + "/" + e.getClass().getName()) : e.getClass().getSimpleName();
+            LOG.error("Oracle unit publication failed: {}", state);
+            throw e;
         }
-        return committed.result();
     }
 
     private record Committed(UUID snapshot, Result result, boolean publishEvent) {
+    }
+
+    private static void checkpoint(String phase) {
+        LOG.info("Oracle unit publication: {}", phase);
     }
 
     private Committed commitLocked(AccessContext ctx, UUID runId) {
@@ -123,6 +138,7 @@ public class OracleUnitImportService {
         }
         UUID snapshot = uuid(run, "snapshot_id");
         OracleUnitPayload.Payload payload = files.read((String) run.get("storage_key"));
+        checkpoint("source-read");
         if (!payload.sha256().equals(run.get("payload_sha256")) || payload.size() != ((Number) run.get("payload_size")).longValue()
                 || !payload.schemaVersion().equals(run.get("schema_version"))
                 || !payload.syncedAt().equals(Db.toInstant(run.get("source_synced_at")))
@@ -130,10 +146,12 @@ public class OracleUnitImportService {
             throw invalid("UNIT_IMPORT_PAYLOAD_CHANGED", "تغير ملف الجهات بعد المعاينة؛ أعد المعاينة على أحدث ملف.");
         }
         String fingerprint = structureFingerprint();
+        checkpoint("source-metadata-verified");
         if (!fingerprint.equals(run.get("structure_fingerprint"))) {
             throw invalid("UNIT_IMPORT_STALE", "تغير الهيكل التنظيمي بعد المعاينة؛ لن تُكتب فوق تغيير أحدث.");
         }
         Map<String, Object> expected = effects(snapshot);
+        checkpoint("structure-fingerprint-verified");
         if (!expected.equals(mapNumbers(run.get("expected")))) {
             throw invalid("UNIT_IMPORT_EFFECTS_CHANGED", "تغيرت آثار الدفعة منذ المعاينة؛ أعد المعاينة.");
         }
@@ -141,6 +159,7 @@ public class OracleUnitImportService {
             throw invalid("UNIT_IMPORT_UNSAFE", "لا يمكن نشر دفعة ذات تصادمات أو أعمال جارية غير معالجة.");
         }
         stageCheck(snapshot, payload.units());
+        checkpoint("effects-and-staged-fields-verified");
         Map<String, Object> previous = jdbc.sql("""
                 select * from hr_snapshot where status = 'PUBLISHED'""").query().listOfRows().stream().findFirst().orElse(null);
         List<UUID> retiring = retiring(snapshot);
@@ -165,13 +184,16 @@ public class OracleUnitImportService {
                     .param("p", previous.get("person_count")).param("a", previous.get("active_person_count"))
                     .param("id", snapshot).update();
         }
+        checkpoint("person-mirror-carried");
         jdbc.sql("update hr_snapshot set unit_count = :u, active_unit_count = :a where id = :s")
                 .param("u", payload.units().size()).param("a", payload.units().stream().filter(OracleUnitPayload.Unit::active).count())
                 .param("s", snapshot).update();
 
         HrProjection.OrganizationResult organizations = projection.applyOrganizations(snapshot, Set.of(), true);
+        checkpoint("organizations-projected");
         int membershipsEnded = endMemberships(retiring, now);
         int responsibilitiesClosed = closeResponsibilities(retiring, now);
+        checkpoint("memberships-and-responsibilities-closed");
         jdbc.sql("update hr_snapshot set status = 'SUPERSEDED' where status = 'PUBLISHED'").update();
         jdbc.sql("update hr_snapshot set status = 'PUBLISHED', published_at = :now where id = :id and status = 'PREVIEWED'")
                 .param("now", Db.ts(now)).param("id", snapshot).update();
@@ -194,6 +216,7 @@ public class OracleUnitImportService {
                 .param("by", ctx.personId()).param("now", Db.ts(now)).param("actual", json.write(actual))
                 .param("carried", carried).param("id", runId).update();
         assertPublishedOracleOnly(snapshot);
+        checkpoint("oracle-active-only-verified");
         audit.recordAs(ctx.actor(), "ORACLE_UNIT_IMPORT_PUBLISHED", "ORACLE_UNIT_IMPORT", runId.toString(), null, actual,
                 (String) run.get("reason"));
         return new Committed(snapshot, result(runId, payload, snapshot, "PUBLISHED", actual), true);
@@ -440,6 +463,7 @@ public class OracleUnitImportService {
         if (!jdbc.sql("select pg_try_advisory_xact_lock(" + HrSyncService.LOCK_KEY + ")").query(Boolean.class).single()) {
             throw invalid("HR_IMPORT_BUSY", "توجد مزامنة أو عملية جهات أخرى؛ أعد المحاولة بعد اكتمالها.");
         }
+        checkpoint("advisory-lock-acquired");
     }
 
     private void require(AccessContext ctx, String reason) {

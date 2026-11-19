@@ -176,12 +176,14 @@ configuration changes never require data migration of in-flight requests.
   `tmrkz-platform`. After the first start, run `sh ops/platform-accounts.sh [project]`. It reads
   `TMRKZ_PLATFORM_ADMIN_PASSWORD` and `TMRKZ_PLATFORM_DEVELOPER_PASSWORD` from `.env`. Run it again after changing
   either password. They sign in manually through the restricted client supplied by
-  `ops/keycloak/set-platform-password-client.sh` (also run by `ops/local/up.sh`), with local Keycloak step-up/logout. A
+  `ops/keycloak/set-platform-password-client.sh` (in the folder installation, the `keycloak-setup` service does all three on
+  every start), with local Keycloak step-up/logout. A
   single-provider development setup retains its ordinary automatic local flow too; after enterprise automatic cutover,
   these platform accounts must use the local path. They hold every administrative right. HR and the
   directory never disable them. To revoke one, remove its role in Keycloak or drop it from `TMRKZ_PLATFORM_ACCOUNTS`.
-- **Single local installation:** `sh ops/local/up.sh` starts `tmrkz-mover` empty on :8088. Until `LDAP_*` point at the
-  enterprise directory, it uses a stand-in directory with no people, then creates the platform accounts.
+- **Single local installation (ADR-091):** `sh start.sh` asks for the IP address and the port and starts `tmrkz-mover`
+  from this folder (`docker-compose.override.yml`; data in `data/`; the procedure in `RUN.md`). Until `LDAP_*` point at the
+  enterprise directory, it uses a stand-in directory with no people; the platform accounts are set on every start.
 
 ### Manual direct LDAP on an isolated installation (ADR-070)
 
@@ -193,14 +195,13 @@ separate protected file containing exactly one `{username}` marker. Then:
 python3 ops/keycloak/configure-manual-direct.py \
   --stage-file /path/to/protected-directory-stage.json \
   --bind-pattern-file /path/to/protected-bind-pattern.txt
-# With previously saved runtime images; builds never fetch on the isolated host:
-TMRKZ_OFFLINE=1 sh ops/local/up.sh
-sh ops/local/offline.sh check
+# then COMPOSE_PROFILES=enterprise-ldap in .env, and:
+sh start.sh
 ```
 
 The helper updates only the generated `TMRKZ_MANUAL_LDAP_*` and relay settings in `.env`, imports public CA files, and
-leaves the shared/federated configuration and user's password alone. `ops/local/up.sh` selects
-`compose.enterprise-manual.yml`: the existing internal network stays isolated; the backend resolves only the directory's
+leaves the shared/federated configuration and user's password alone. The profile `enterprise-ldap` adds the `ldap-relay`
+service of `docker-compose.override.yml`: the existing internal network stays isolated; the backend resolves only the directory's
 DNS name to the internal bridge gateway; the gateway-only Nginx stream relays raw TLS to the fixed upstream without
 terminating TLS. Re-run the helper if the compose network is recreated and its gateway changes. Never replace the relay
 with a general outbound network merely because the endpoint is unreachable.

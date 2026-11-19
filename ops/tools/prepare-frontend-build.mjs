@@ -56,9 +56,9 @@ if (!existsSync(join(context, 'frontend/src/components/tree/UnitTree.tsx'))) thr
 
 // Map access is an independent accepted correction; it is not a text edit inside a built static asset.
 const mapConfig = join(ROOT, 'frontend/nginx.conf');
-const mapOverride = join(ROOT, 'ops/local/compose.map-access.yml');
+const mapOverride = join(ROOT, 'docker-compose.yml');
 copyFileSync(mapConfig, join(context, 'frontend/nginx.conf'));
-if (!existsSync(mapOverride)) throw new Error('The accepted map-access compose override is missing');
+if (!existsSync(mapOverride)) throw new Error('The canonical Compose configuration is missing');
 
 const envText = existsSync(join(ROOT, '.env')) ? readFileSync(join(ROOT, '.env'), 'utf8') : '';
 const flag = (key, fallback = false) => {

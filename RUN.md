@@ -1,0 +1,362 @@
+# TMRKZ — the full process: from the Windows PC to the offline VM
+
+This folder is the whole application: code, settings, images and data. It needs no internet.
+
+| In the folder | What it is |
+|---|---|
+| `docker-compose.yml` + `docker-compose.override.yml` | how everything runs (Compose reads both automatically) |
+| `.env` | settings and passwords; `TMRKZ_IP` and `TMRKZ_PORT` at the top are the address people open |
+| `tmrkz-images.tar` | all Docker images in one file (about 1 GB) |
+| `data/` | the data: `data/db` (PostgreSQL 17 database), `data/files` (uploads), `data/ldap-data` + `data/ldap-config` (local directory) |
+| `backend/`, `frontend/` | the code — a saved change is rebuilt and live in about 25 seconds, no image build |
+| `start.sh` | asks for the IP address and the port, loads the images, starts everything |
+| `map-data/runtime/current` | the offline map package (base map, 3D terrain, fonts, styles) |
+
+Sign-in accounts: `developer` and `admin`. Their passwords are in `.env`:
+`TMRKZ_PLATFORM_DEVELOPER_PASSWORD` and `TMRKZ_PLATFORM_ADMIN_PASSWORD`.
+The database has **no password**: it accepts only TMRKZ's own containers, on an internal network with no route out.
+
+---
+
+## 1. On the Windows PC — make the zip
+
+All commands run in the folder `C:\Users\ADMIN\Desktop\TMRKZ`. Use Git Bash, or PowerShell for the `docker` commands.
+
+1. **Stop TMRKZ.** A database copied while it runs can be damaged.
+   ```
+   docker compose stop
+   ```
+2. **Make the zip.** It goes on the Desktop. It leaves out three things the VM does not need:
+   - `frontend/node_modules`, which is Windows-only;
+   - the git history `.git`, which stays on this PC (the VM starts its own, section 9);
+   - the test evidence `docs/evidence`.
+   ```
+   cd /c/Users/ADMIN/Desktop/TMRKZ
+   /c/Windows/System32/tar.exe -a -c -f "C:\Users\ADMIN\Desktop\TMRKZ.zip" --exclude "frontend/node_modules" --exclude "backend/target" --exclude "docs/evidence" -C "C:\Users\ADMIN\Desktop\TMRKZ" $(ls -A | grep -vx .git)
+   cd /c/Users/ADMIN/Desktop && sha256sum TMRKZ.zip > TMRKZ.zip.sha256
+   ```
+3. **Start TMRKZ again.**
+   ```
+   docker compose up -d
+   ```
+4. **Copy to the USB stick:** `TMRKZ.zip` and `TMRKZ.zip.sha256`.
+   - A FAT32 stick cannot hold a file over 4 GB. If the zip ever grows past that, split it:
+     `split -b 3900m -d -a 1 TMRKZ.zip TMRKZ.zip.part`
+   - On the VM, join the parts again: `cat TMRKZ.zip.part0 TMRKZ.zip.part1 > TMRKZ.zip`
+
+## 2. On the VM — put the folder in place
+
+1. **Copy the files from the USB to the VM,** for example into `~/transfer/`.
+2. **Check the zip.** It must print `TMRKZ.zip: OK`.
+   ```
+   cd ~/transfer
+   sha256sum -c TMRKZ.zip.sha256
+   ```
+   If it came in parts, first join them: `cat TMRKZ.zip.part0 TMRKZ.zip.part1 > TMRKZ.zip`
+3. **Create the folder TMRKZ on the VM's own disk and unzip into it.**
+   - Not a VirtualBox shared folder (`/media/sf_...`): PostgreSQL refuses to run there.
+   ```
+   mkdir -p ~/TMRKZ && cd ~/TMRKZ
+   unzip -q ~/transfer/TMRKZ.zip
+   ```
+   If `unzip` is missing: `python3 -m zipfile -e ~/transfer/TMRKZ.zip ~/TMRKZ`
+4. **Check what you got.**
+   ```
+   ls -a ~/TMRKZ
+   ```
+   You should see `docker-compose.yml`, `docker-compose.override.yml`, `.env`, `start.sh`, `tmrkz-images.tar`, `data`, `backend`, `frontend` and the rest.
+
+## 3. On the VM — first start
+
+1. **Check Docker.** You need Docker Compose v2.24 or newer. If `docker` needs `sudo`, prefix the commands with `sudo`.
+   ```
+   docker --version
+   docker compose version
+   ```
+2. **Find the VM's IP address.**
+   ```
+   hostname -I
+   ```
+3. **Start.**
+   ```
+   cd ~/TMRKZ
+   sh start.sh
+   ```
+   It asks two questions:
+   - **IP address:** the address people will open. `127.0.0.1` means only inside the VM.
+   - **Port:** for example `8088`.
+
+   It then does four things:
+   - checks and loads `tmrkz-images.tar` (1–2 minutes the first time);
+   - writes the address into `.env`;
+   - runs `docker compose up -d`;
+   - waits until TMRKZ answers. The first start builds the code inside the containers and takes a few minutes.
+
+   The same by hand: set `TMRKZ_IP` and `TMRKZ_PORT` at the top of `.env`, then
+   ```
+   docker load -i tmrkz-images.tar
+   docker compose up -d
+   ```
+4. **Open** `http://<IP>:<PORT>` and sign in.
+   - The manual form: `developer` with its password.
+   - Or the automatic button, which opens Keycloak's sign-in page.
+5. **Check that everything is up.**
+   ```
+   docker compose ps
+   ```
+   - Running and healthy: `db`, `keycloak`, `openfga`, `backend`, `web-build`, `web`, `openldap`.
+   - Finished with `Exited (0)` (correct for one-time jobs): `db-init`, `openfga-migrate`, `keycloak-setup`.
+6. **Reach it from other computers.**
+   - Open the port in the firewall, if one is active: `sudo ufw allow 8088/tcp`
+   - In VirtualBox, a **Bridged** network adapter gives the VM its own LAN address.
+   - With **NAT**, add a port forward instead (host 8088 → guest 8088). People then open the host computer's IP.
+
+## 4. Daily use (on the VM or on the PC)
+
+| What | Command (inside the TMRKZ folder) |
+|---|---|
+| start | `docker compose up -d` |
+| stop (data stays in `data/`) | `docker compose stop` |
+| status | `docker compose ps` |
+| watch the code builds | `docker compose logs -f backend web-build` |
+| after changing `.env` | `docker compose up -d` |
+| change the IP address or port | `sh start.sh` again |
+| copy or back up everything | `docker compose stop`, copy or zip the whole folder, `docker compose up -d` |
+
+**Never** run `docker compose down -v`, and never delete files inside `data/`.
+
+## 5. Changing the code
+
+1. **Edit** files in `backend/` (Java) or `frontend/` (React/TypeScript) and save.
+2. **Watch the rebuild.**
+   ```
+   docker compose logs -f --since 1m backend web-build
+   ```
+   - success: `[backend] build ready` → `Started MoverApplication`, and `[web] published`
+   - `BUILD FAILED`: the previous version keeps running. Read the error, fix it, save again.
+3. **Run tests, offline.**
+   - Frontend, one or more test files:
+     ```
+     docker run --rm --network none --entrypoint sh -v "$PWD/frontend:/src:ro" tmrkz/folder-web:1 -c 'mkdir /w && tar -C /src --exclude=./node_modules --exclude=./dist -cf - . | tar -C /w -xf - && ln -s /modules/node_modules /w/node_modules && cd /w && npx vitest run src/lib/signInNotes.test.ts'
+     ```
+   - Backend test classes. They use a throw-away database, never `data/`. The first command is needed once only:
+     ```
+     docker run --rm --entrypoint true -v tmrkz-m2:/root/.m2 tmrkz/folder-backend:1
+     TMRKZ_TEST_MAVEN_IMAGE=tmrkz/folder-backend:1 TMRKZ_TEST_MAVEN_VOLUME=tmrkz-m2 sh ops/test-backend.sh OracleUnitImportIT
+     ```
+4. **Database changes:** a new file in `backend/src/main/resources/db/migration` with the next number (now `V54__...sql`).
+   Never edit an existing migration.
+
+## 6. Bringing in your offline database
+
+The database has no password, so passwords no longer need to match.
+
+1. **Stop TMRKZ and move the current database aside.**
+   ```
+   docker compose stop
+   mv data/db data/db.before
+   ```
+2. **Put your database in as `data/db`.**
+   - **If it is a PostgreSQL folder** (it contains `PG_VERSION`, `base`, `global`, `pg_wal`): copy it to `data/db`.
+     `cat data/db/PG_VERSION` must print `17`.
+   - **If it is inside Docker on the old installation:** run this there, then bring `data/db` over.
+     ```
+     docker run --rm -v tmrkz-mover_db-data:/from:ro -v "$PWD/data/db:/to" postgis/postgis:17-3.5-alpine cp -a /from/. /to/
+     ```
+     Do the same for uploaded files: `tmrkz-mover_files` → `data/files`.
+3. **Start.**
+   ```
+   docker compose up -d
+   ```
+   - An older database (V53 or below) is upgraded automatically.
+   - `keycloak-setup` sets the `developer` and `admin` passwords from `.env`, the sign-in address, the local directory's password and the sign-in client's secret.
+4. **Check.** Sign in, look at the units and requests, and run `docker compose ps`.
+5. **The HR (Oracle) connection.** If its sync fails, enter the Oracle password again in «إعدادات النظام ← مصدر الموارد البشرية».
+   The other machine stored it with its own `TMRKZ_HR_SETTINGS_KEY`.
+6. **Remove the old copy** when everything works:
+   ```
+   rm -rf data/db.before
+   ```
+
+## 7. Optional — manual sign-in against the enterprise directory
+
+This applies only on a machine that can reach the enterprise directory.
+
+1. In `.env`, in the block `manual enterprise LDAP`, remove the leading `#` from `COMPOSE_PROFILES` and from every `TMRKZ_MANUAL_LDAP_` line.
+2. Run `docker compose up -d`.
+
+## 8. A new library, or newer server images (a connected machine only)
+
+When `backend/pom.xml` or `frontend/package-lock.json` gets a new dependency, the offline machine cannot download it.
+
+1. **On a machine with internet, in the TMRKZ folder:**
+   ```
+   sh ops/local/workspace/pack-images.sh
+   ```
+2. **Carry the new files** `tmrkz-images.tar` and `tmrkz-images.tar.sha256` to the VM's TMRKZ folder.
+3. **On the VM:**
+   ```
+   sh start.sh
+   ```
+   It loads the new images by itself.
+
+## 9. Working with the AI agent (GLM 5.3 Flash) on the VM
+
+1. **Open the agent** with `~/TMRKZ` as its working folder.
+2. **Paste the prompt** from **Appendix A** as its system prompt (or first message), once per session.
+3. **Start a local history, once.** The zip carries no git history.
+   `.gitignore` keeps `data/`, `.env` and `tmrkz-images.tar` out of it. It stays on the VM; never push from the VM.
+   ```
+   cd ~/TMRKZ
+   git init -q && git config user.name "TMRKZ VM" && git config user.email "vm@tmrkz.local"
+   git add -A && git commit -q -m "baseline as received"
+   ```
+   **Make a checkpoint before each task:**
+   ```
+   git add -A && git commit -q -m "checkpoint before agent task"
+   ```
+4. **Give one clear task at a time.** Example:
+   *"In the sign-in page, make the subtitle smaller. Change only frontend/src/styles/signin.css. Check it in the browser and report."*
+5. **After the task, check what it changed.**
+   ```
+   git status
+   git diff --stat
+   git diff <file>
+   ```
+6. **Undo a bad change** to one file, back to your checkpoint:
+   ```
+   git restore <file>
+   ```
+7. **Red flags.** Stop the agent if it:
+   - touches `data/`, `.env`, `docker-compose*.yml`, `start.sh`, `ops/local/workspace/` or an existing migration;
+   - tries to download or install anything;
+   - says "done" without a test or a browser check.
+
+## 10. When something is wrong
+
+| You see | Do |
+|---|---|
+| the page does not open | `docker compose ps`, then `docker compose logs --tail 80 backend web-build web` |
+| `BUILD FAILED` in the logs | the last saved change has an error; fix it — the previous version keeps running |
+| sign-in fails | `docker compose logs keycloak-setup` must end with `password client ready`; then `docker compose up -d` |
+| `db` restarts again and again | is the folder on a VirtualBox shared folder? Move it to the VM's own disk |
+| `TMRKZ_IP` error when starting | write `TMRKZ_IP` and `TMRKZ_PORT` at the top of `.env`, or run `sh start.sh` |
+| a port is already in use | run `sh start.sh` and choose another port |
+| the map is empty | `ls map-data/runtime/current` must list `basemap`, `terrain`, `styles` and `fonts` |
+
+---
+
+## Appendix A — the prompt for the AI agent (GLM 5.3 Flash)
+
+Paste everything between the two lines.
+
+----------------------------------------------------------------------------------------------------
+
+# You are the coding agent for TMRKZ on an OFFLINE machine
+
+You work inside the folder `TMRKZ` (the current directory). This folder IS the whole application:
+code, settings, images and data. The machine has NO internet. The owner gives you tasks; you make
+small, correct changes, check them, and report honestly. Reply to the owner in the language they use.
+
+`RUN.md` (how to run) and this prompt override anything older. `AGENTS.md` is history: its
+`docker compose up -d --build` and `ops/local/up.sh` instructions are OUT OF DATE — never use them.
+
+## 1. How the application runs (facts — do not change them)
+
+- Start: `docker compose up -d` (or `sh start.sh`, which asks for the IP address and port).
+  Stop: `docker compose stop`. Status: `docker compose ps`.
+- `docker-compose.yml` (base) + `docker-compose.override.yml` (read automatically) — project `tmrkz-mover`.
+- `.env`: `TMRKZ_IP` and `TMRKZ_PORT` at the top = the address people open. After editing `.env`: `docker compose up -d`.
+- `tmrkz-images.tar`: all images, loaded with `docker load -i tmrkz-images.tar`. Nothing is ever pulled.
+- `data/db`: the PostgreSQL 17 database (NO password; rules in `ops/local/workspace/pg_hba.conf`).
+  `data/files`: uploaded files. `data/ldap-data`, `data/ldap-config`: the local LDAP directory.
+- `map-data/runtime/current`: the offline map package, served at `/map-data/`. Never move or delete it.
+- `backend/`: Spring Boot 4, Java 25. Flyway migrations in `backend/src/main/resources/db/migration` (latest V53).
+  `frontend/`: React 19 + Vite + TypeScript, Arabic right-to-left UI.
+- **Code changes rebuild themselves.** Save a file → within ~25 s the container rebuilds it.
+  Watch: `docker compose logs -f --since 1m backend web-build`
+  - success: `[backend] build ready` then `Started MoverApplication`; `[web] published`
+  - failure: `BUILD FAILED` — the old version keeps running; read the error and fix it.
+- Sign-in: `developer` or `admin`; their passwords are `TMRKZ_PLATFORM_DEVELOPER_PASSWORD` and
+  `TMRKZ_PLATFORM_ADMIN_PASSWORD` in `.env` (use them, never print them).
+  The automatic button opens Keycloak's standard sign-in page (realm `tmrkz`, under `/auth`).
+  Keycloak reads the local LDAP directory. The manual form checks the directory directly.
+  The service `keycloak-setup` configures Keycloak on every `docker compose up -d`. Do NOT run
+  `ops/platform-accounts.sh`, `ops/keycloak/set-*.sh` or `ops/local/use-mover-sources.sh` — they are
+  for other setups.
+- Decisions are recorded in `docs/ARCHITECTURE_DECISIONS.md` (last: ADR-090, next: ADR-091);
+  status in `docs/STATUS.md`.
+
+## 2. NEVER (these broke the app before)
+
+1. Never edit, rename or delete an existing migration (V1–V53). A schema change is a NEW file with the next number:
+   check `ls backend/src/main/resources/db/migration | sort -V | tail -1`, then create `V54__short_name.sql`.
+   Two files with the same version number stop the app from starting. Never UPDATE rows of
+   `access_policy_version` whose status is PUBLISHED or SUPERSEDED.
+2. Never touch the files in `data/`. Never run `docker compose down -v`, `docker volume rm`, `docker system prune`
+   or anything that deletes data. Stop the app (`docker compose stop`) before copying the folder.
+3. Never change `docker-compose.yml`, `docker-compose.override.yml`, `start.sh`, `ops/local/workspace/*`
+   or the layout of `.env` unless the owner asks for exactly that. Never make a variable mandatory (`${VAR:?}`).
+   Never write a machine-specific path (`/media/sf_...`, `/home/...`, `C:\...`) into any file.
+4. Never change secrets in `.env` or the files in `ops/local/.generated/` (certificates, LDAP password).
+   Never print a password, token or secret in output, logs, docs or reports.
+5. No internet: never `docker pull`, `docker build`, `npm install`/`npm ci`, `pip install`, or Maven without `-o`.
+   If a new library is truly needed: STOP and tell the owner (it must be packed on a connected machine
+   with `sh ops/local/workspace/pack-images.sh`).
+6. Never build an image to apply a code change — saving the file is enough.
+7. Git: never commit, push, `reset --hard`, `checkout --`, `clean`, `rebase` or force anything unless the owner
+   explicitly says so. Never add `data/`, `.env` or `tmrkz-images.tar` to git.
+8. Keep the folder clean: no new top-level files or folders, no copies of compose/.env files, no backups,
+   no leftovers. Temporary files go in `/tmp` and are deleted when done.
+9. Never put real people's names or military numbers in code, tests, docs or screenshots. Use the fictional
+   acceptance accounts (`full26.*`).
+10. Do only what was asked: no refactoring, reformatting, renaming or "improvements" on the side. Never undo
+    the owner's decisions (sign-in logo and layout, Keycloak's standard page, database without password).
+11. Scope: administrative stationing, sites and requests only — no military deployment optimisation, tactical
+    positioning or operational recommendations.
+
+## 3. ALWAYS — how to do a task
+
+1. **Understand.** Restate the request in 1–3 lines. If it is unclear, or it conflicts with section 2, ask the owner
+   BEFORE changing anything.
+2. **Look first.** `git status`; read the files you will change and their tests; `grep` for the existing pattern
+   and follow it.
+3. **Change the minimum.** Keep the surrounding style. UI text in Arabic. Unix line endings (LF) in `.sh` files.
+4. **Watch the rebuild** (section 1) until it succeeds. Fix every `BUILD FAILED` — type errors appear there.
+5. **Test what you changed** (offline):
+   - Frontend unit tests:
+     ```
+     docker run --rm --network none --entrypoint sh -v "$PWD/frontend:/src:ro" tmrkz/folder-web:1 -c 'mkdir /w && tar -C /src --exclude=./node_modules --exclude=./dist -cf - . | tar -C /w -xf - && ln -s /modules/node_modules /w/node_modules && cd /w && npx vitest run src/lib/example.test.ts'
+     ```
+   - Backend tests (they use a throw-away database, never `data/`). Once:
+     `docker run --rm --entrypoint true -v tmrkz-m2:/root/.m2 tmrkz/folder-backend:1`
+     then: `TMRKZ_TEST_MAVEN_IMAGE=tmrkz/folder-backend:1 TMRKZ_TEST_MAVEN_VOLUME=tmrkz-m2 sh ops/test-backend.sh SomeClassIT`
+   - In the browser: `http://<TMRKZ_IP>:<TMRKZ_PORT>`, sign in as `developer`, click through what changed.
+6. **Record** a behaviour change: a short ADR with the next number in `docs/ARCHITECTURE_DECISIONS.md`, and one line
+   in `docs/STATUS.md`.
+7. **Report** to the owner:
+   - which files changed;
+   - how you checked, with the exact command and result;
+   - what you did NOT check;
+   - what needs the owner's decision.
+
+   Never say something works unless you saw it work. If a test failed, say so and show the error line.
+
+## 4. STOP and ask the owner when
+
+- the request is unclear or has two possible meanings;
+- it needs a new migration that changes or deletes existing data;
+- it needs a new library, the internet, or a change to compose files, `.env` or secrets;
+- you are about to delete anything;
+- a build or test fails and you do not know why after one careful attempt.
+
+## 5. Quick fixes
+
+| Problem | Do |
+|---|---|
+| page does not open | `docker compose ps`, then `docker compose logs --tail 80 backend web-build web` |
+| app stopped | `docker compose up -d` (never `down -v`) |
+| sign-in fails | `docker compose logs keycloak-setup` — it must end with `... password client ready` |
+| changed `.env` | `docker compose up -d` |
+
+----------------------------------------------------------------------------------------------------

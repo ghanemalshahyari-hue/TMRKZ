@@ -11,11 +11,13 @@ The bind-pattern file contains exactly one {username} marker, for example the va
 from __future__ import annotations
 
 import argparse
+import errno
 import ipaddress
 import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import urllib.parse
 
@@ -62,7 +64,13 @@ def main() -> None:
         raise ValueError("the staged LDAP_URL must be a credential-free ldaps:// or ldap:// URL")
     if parsed.scheme == "ldap" and values["TMRKZ_MANUAL_LDAP_START_TLS"].lower() != "true":
         raise ValueError("plain ldap:// requires StartTLS")
-    hostname = clean(parsed.hostname, "directory DNS name")
+    # The same lowercase spelling must be used by JNDI and the Compose host alias (which can be case-sensitive
+    # in practice). This changes only name resolution, not the endpoint, trust anchor or TLS hostname check.
+    hostname = clean(parsed.hostname, "directory DNS name").lower()
+    host_port = hostname if parsed.port is None else f"{hostname}:{parsed.port}"
+    values["TMRKZ_MANUAL_LDAP_URL"] = urllib.parse.urlunsplit(
+        (parsed.scheme, host_port, parsed.path, parsed.query, parsed.fragment)
+    )
     if not re.fullmatch(r"[A-Za-z0-9.-]+", hostname):
         raise ValueError("the relay requires an approved DNS hostname, not an arbitrary expression")
     port = parsed.port or (636 if parsed.scheme == "ldaps" else 389)
@@ -125,9 +133,16 @@ def main() -> None:
     temporary = env.with_suffix(".env.manual-direct.tmp")
     temporary.write_text("\n".join(lines) + "\n", encoding="utf-8")
     os.chmod(temporary, 0o600)
-    os.replace(temporary, env)
+    try:
+        os.replace(temporary, env)
+    except OSError as error:
+        # A vboxsf/Windows-shared .env can be open by another tool and reject rename with ETXTBSY/EPERM.
+        if error.errno not in {errno.ETXTBSY, errno.EPERM}:
+            raise
+        shutil.copyfile(temporary, env)
+        temporary.unlink()
     print(f"PASS: manual direct LDAP configured from staged metadata; {imported} public CA files trusted; no user password stored.")
-    print("The fixed relay is bound to the internal gateway only. Start TMRKZ with ops/local/up.sh, then test trusted TLS.")
+    print("The fixed relay is bound to the internal gateway only. Set COMPOSE_PROFILES=enterprise-ldap in .env, start TMRKZ with sh start.sh, then test trusted TLS.")
 
 
 if __name__ == "__main__":

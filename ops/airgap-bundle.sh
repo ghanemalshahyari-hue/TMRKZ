@@ -15,7 +15,7 @@ mkdir -p "$OUT/images"
 
 # Build only: the directory settings are required at run time, not to build images.
 LDAP_URL="${LDAP_URL:-build-only}" LDAP_BIND_DN="${LDAP_BIND_DN:-build-only}" LDAP_BIND_CREDENTIAL="${LDAP_BIND_CREDENTIAL:-build-only}" \
-  LDAP_USERS_DN="${LDAP_USERS_DN:-build-only}" docker compose build backend web keycloak
+  LDAP_USERS_DN="${LDAP_USERS_DN:-build-only}" docker compose -f docker-compose.yml build backend web keycloak
 IMAGES="mover/backend:1.0.0 mover/web:1.0.0 tmrkz/keycloak:26.7.5-2 postgis/postgis:17-3.5-alpine openfga/openfga:v1.8.16"
 for img in $IMAGES; do
   file="$OUT/images/$(echo "$img" | tr '/:' '__').tar"
@@ -24,7 +24,7 @@ for img in $IMAGES; do
   docker image inspect -f '{{.Id}}' "$img" > "$file.id"
 done
 
-cp docker-compose.yml .env.example "$OUT/"
+cp docker-compose.yml "$OUT/"
 mkdir -p "$OUT/ops/keycloak" && cp -r ops/*.sh ops/sql ops/db "$OUT/ops/" && cp -r ops/keycloak/truststores "$OUT/ops/keycloak/"
 # https entry point and its steps (ADR-051); never the private key directory
 mkdir -p "$OUT/ops/tls" && cp ops/tls/*.sh ops/tls/proxy.conf.template ops/tls/README.md "$OUT/ops/tls/" && cp ops/keycloak/set-public-url.sh ops/keycloak/set-directory.sh "$OUT/ops/keycloak/"

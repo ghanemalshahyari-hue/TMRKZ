@@ -7,7 +7,7 @@
 #   TMRKZ_PUBLIC_URL=https://<certificate name>[:port]   MOVER_SECURE_COOKIE=true   COMPOSE_PROFILES=tls
 #   MOVER_HTTP_BIND=127.0.0.1 (plain http from this host only)   TMRKZ_HTTPS_PORT=<port>
 # then the new address in the identity provider (ops/keycloak/set-public-url.sh). Restart the stack afterwards:
-#   production: docker compose -p <project> up -d        this PC: sh ops/local/up.sh
+#   production: docker compose -p <project> up -d        this folder: sh start.sh
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."

@@ -2,7 +2,7 @@
   "realm": "tmrkz",
   "enabled": true,
   "displayName": "TMRKZ",
-  "loginTheme": "tmrkz",
+  "loginTheme": "keycloak.v2",
   "internationalizationEnabled": true,
   "supportedLocales": ["ar"],
   "defaultLocale": "ar",

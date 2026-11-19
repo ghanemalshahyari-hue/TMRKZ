@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TMRKZ sign-in artwork — original local illustration, graphite-and-sand edition.
+  Administrative stationing and re-stationing concept: current registered site,
+  proposed site, and governed handover. Fictional geometry; no real location,
+  coordinates, tactical recommendation, target, route optimization or named unit.
+  All artwork is local SVG; Arabic captions are rendered by LoginPage.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 960" width="1440" height="960" fill="none">
+  <defs>
+    <g id="unit-mark" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="-34" y="-25" width="68" height="50" rx="2" fill="#1c1b18" fill-opacity=".88" stroke-width="2.5"/>
+      <path d="M-27-18 27 18M27-18-27 18" stroke-width="3"/>
+      <path d="M-19 32h38" stroke-width="2.5"/>
+      <circle cx="0" cy="0" r="3.5" stroke="none"/>
+    </g>
+    <g id="building" stroke="#9dbb9f" stroke-width="1.7" stroke-linejoin="round">
+      <path d="M-22-3 0-19 22-3v19h-44Z" fill="#1c1b18" fill-opacity=".62"/>
+      <path d="M-8 16V2H8v14M-27 21h54"/>
+    </g>
+    <g id="check" stroke="#9dbb9f" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle r="18" fill="#1c1b18" stroke="#c19656" stroke-width="1.4"/>
+      <path d="m-8 0 5 5 11-12"/>
+    </g>
+    <marker id="move-arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="11" markerHeight="11" orient="auto-start-reverse">
+      <path d="m1 1 9 5-9 5 2-5Z" fill="#d4ab6a"/>
+    </marker>
+  </defs>
+
+  <!-- abstract survey contours, deliberately not a map of a real place -->
+  <g stroke="#c19656" stroke-width="1.1" stroke-linecap="round" opacity=".16">
+    <path d="M-130 300C68 10 351 36 520 186s349 111 534 6 327-179 504-35"/>
+    <path d="M-112 344C86 54 344 81 513 231s352 112 539 8 331-180 502-33"/>
+    <path d="M-92 389C106 99 337 126 506 276s355 113 544 10 334-180 501-30"/>
+    <path d="M-95 705C147 534 252 565 425 673s327 6 514 95 390 61 569-33"/>
+    <path d="M-80 752C162 581 263 610 436 719s327 5 514 95 389 60 562-34"/>
+    <path d="M-67 799C177 628 274 655 447 765s327 5 514 95 389 59 554-35"/>
+  </g>
+  <g fill="#c19656" opacity=".16">
+    <circle cx="75" cy="325" r="2"/><circle cx="135" cy="325" r="2"/><circle cx="195" cy="325" r="2"/>
+    <circle cx="1180" cy="585" r="2"/><circle cx="1240" cy="585" r="2"/><circle cx="1300" cy="585" r="2"/>
+    <circle cx="1180" cy="645" r="2"/><circle cx="1240" cy="645" r="2"/><circle cx="1300" cy="645" r="2"/>
+  </g>
+
+  <!-- the subject statement is rendered by LoginPage with the application's Arabic font -->
+  <path d="M176 202h232" stroke="#c19656" stroke-width="2" opacity=".45"/>
+  <circle cx="177" cy="202" r="3" fill="#d4ab6a" opacity=".62"/>
+
+  <!-- current, registered and occupied site -->
+  <g>
+    <path d="M104 493 181 424 311 444 374 531 334 658 197 692 110 621Z" fill="#9dbb9f" fill-opacity=".12" stroke="#9dbb9f" stroke-width="3.2" stroke-linejoin="round"/>
+    <path d="M121 502 187 442 301 460 355 535 320 642 202 674 127 615Z" stroke="#9dbb9f" stroke-width="1" stroke-opacity=".32"/>
+    <g opacity=".64">
+      <use href="#building" transform="translate(171 551) scale(.72)"/>
+      <use href="#building" transform="translate(286 587) scale(.72)"/>
+      <use href="#building" transform="translate(310 491) scale(.52)"/>
+    </g>
+    <use href="#unit-mark" transform="translate(239 514) scale(1.25)" stroke="#9dbb9f" fill="#9dbb9f"/>
+    <use href="#check" transform="translate(360 467)"/>
+  </g>
+
+  <!-- proposed site: same informational unit identity, never a deployed tactical symbol -->
+  <g>
+    <path d="m866 289 94-73 121 25 39 100-70 99-117-11-65-60Z" fill="#d4ab6a" fill-opacity=".12" stroke="#d4ab6a" stroke-width="3.2" stroke-dasharray="12 9" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m885 294 81-59 102 21 32 82-58 84-99-9-56-50Z" stroke="#d4ab6a" stroke-width="1" stroke-dasharray="3 7" stroke-opacity=".38"/>
+    <use href="#unit-mark" transform="translate(989 324) scale(1.25)" stroke="#d4ab6a" fill="#d4ab6a"/>
+    <g stroke="#d4ab6a" stroke-width="2" stroke-linecap="round" opacity=".62">
+      <path d="M991 205v-28m-8 10 8-10 8 10"/>
+      <path d="M1119 389h31m-11-8 11 8-11 8"/>
+    </g>
+  </g>
+
+  <!-- governed re-stationing handoff: an illustrative request, not a movement route -->
+  <path d="M377 521C507 641 692 624 851 399" stroke="#161513" stroke-opacity=".86" stroke-width="11" stroke-linecap="round"/>
+  <path d="M377 521C507 641 692 624 851 399" stroke="#d4ab6a" stroke-width="4" stroke-dasharray="12 10" stroke-linecap="round" marker-end="url(#move-arrow)"/>
+  <path d="M94 873h244M1104 112h228" stroke="#c19656" stroke-opacity=".2"/>
+</svg>

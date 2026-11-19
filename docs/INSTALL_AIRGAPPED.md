@@ -1,25 +1,23 @@
 # MOVER — Installation in an isolated network
 
-## 0. This folder is the offline installation (owner, 16 Nov 2026)
+## 0. This folder is the offline installation (owner, 19 Nov 2026; ADR-091)
 
-The TMRKZ folder itself is carried to the isolated machine; nothing else is needed. It holds the runtime images saved with
-`docker save` in `images/` (with `SHA256SUMS` and each image id), the newest verified backup in `backups/tmrkz-mover-*/`
-(business, identity and authorisation databases, files, and `oracle-hr-demo-data.tgz` for the demo HR source), the installed
-offline map in `map-data/runtime/current` (official `tmrkz-map-2026.11.2`, the only map kept), and the settings `.env`,
-`ops/local/.generated/` and `ops/hr-demo/.generated/` (git-ignored; secrets — carry them only on the approved medium).
-
-On the isolated machine (Docker Desktop or Docker Engine with compose, Git Bash or any POSIX shell):
+The TMRKZ folder itself is carried to the isolated machine, with its one image file `tmrkz-images.tar` (made on a connected
+machine by `sh ops/local/workspace/pack-images.sh`), `.env` and `ops/local/.generated/` (git-ignored; secrets — carry them
+only on the approved medium). The data lives in the folder, in `data/`. On the isolated machine (Docker Engine with compose
+2.24 or newer, any POSIX shell):
 
 ```sh
-sh ops/local/offline.sh          # loads missing images (checksums first), restores the backup on a machine without data, starts everything
-sh ops/local/offline.sh check    # proves the application network has no route to the internet
-sh ops/local/offline.sh stop     # stops everything; data kept in the Docker volumes
+sh start.sh                      # asks for the IP address and the port, loads tmrkz-images.tar (checksum first), starts everything
+# the same by hand: TMRKZ_IP and TMRKZ_PORT in .env, then
+docker load -i tmrkz-images.tar
+docker compose up -d
 ```
 
-Nothing is built or pulled (`--no-build --pull never`), and the application's compose network is `internal` (no route out;
-only the web container also joins `edge` to publish its port on this host) — `ops/local/compose.offline.yml`. Before a
-transfer, refresh `images/` and the backup from the running installation (`docker save`; `ops/backup.sh` then
-`ops/verify-backup.sh`, then archive the demo Oracle volume beside it) so the folder carries the latest state.
+Nothing is pulled (`pull_policy: never`), and the application's compose network is `internal` (no route out; only the web
+container also joins `edge` to publish its port). The backend and the web are built from `backend/` and `frontend/` inside
+their containers with no network. The whole procedure — transfer, first start, importing a database, the enterprise LDAP
+relay — is in `RUN.md`.
 
 The procedure below (a separate bundle directory) remains for building a release bundle on a connected build host.
 
@@ -31,7 +29,7 @@ sh ops/airgap-bundle.sh            # → offline-bundle/mover-1.0.0/
 
 The bundle contains the runtime images saved with `docker save` (`mover/backend:1.0.0`, `mover/web:1.0.0`,
 `tmrkz/keycloak:26.7.5-2`, `postgis/postgis:17-3.5-alpine` — PostgreSQL 17.11 with PostGIS 3.5, GEOS and PROJ, whose
-coordinate transformations run locally with network access disabled) with their image IDs, `docker-compose.yml`, `.env.example`, operational scripts, the local
+coordinate transformations run locally with network access disabled) with their image IDs, `docker-compose.yml`, operational scripts (`ops/init-env.sh` writes `.env`), the local
 map packages, all documentation, and a `SHA256SUMS` manifest. Build-only images (Maven, Node) are not needed in the
 isolated network. Transfer the directory through the organisation's approved media/transfer process.
 

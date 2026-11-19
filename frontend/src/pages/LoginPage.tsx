@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ApiError, api } from '../api/client';
 import type { AuthStatus, Me } from '../api/types';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { BrandMark } from '../components/shell/TopNavigation';
 import '../styles/signin.css';
 import { DEFAULT_BOARD, visibleNotes, type SignInBoard } from '../lib/signInNotes';
 
@@ -154,14 +155,18 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
         <div className="tm-backdrop" aria-hidden="true" />
         <main className="tm-main">
           <div className="tm-card">
+            {/* the application's own mark, as in the top bar (owner, 19 Nov 2026): Arabic name first, the Latin name under it */}
             <h1 className="tm-logo">
               <span className="tm-mark" aria-hidden="true">
-                <svg viewBox="0 0 48 48" width="48" height="48">
-                  <path d="M24 4 41 14v20L24 44 7 34V14Z" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round" />
-                  <path d="M24 13c-4.4 0-8 3.4-8 7.8C16 27 24 35 24 35s8-8 8-14.2C32 16.4 28.4 13 24 13Zm0 11a3.2 3.2 0 1 1 0-6.4 3.2 3.2 0 0 1 0 6.4Z" fill="currentColor" />
-                </svg>
+                <BrandMark size={88} />
               </span>
-              <span className="tm-word">TMRKZ</span>
+              {/* the Latin name spreads over exactly the width of the Arabic one (owner, 19 Nov 2026) */}
+              <span className="tm-names">
+                <span className="tm-arabic-name" lang="ar">تمـــــركـــــز</span>
+                <span className="tm-word" lang="en">
+                  {'TMRKZ'.split('').map((letter, i) => <span key={i}>{letter}</span>)}
+                </span>
+              </span>
             </h1>
             <p className="tm-sub">المواقع · المرافق · الإجراءات الإدارية</p>
             <span className="tm-rule" aria-hidden="true" />

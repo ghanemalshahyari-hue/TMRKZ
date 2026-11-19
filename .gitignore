@@ -31,7 +31,7 @@ offline-bundle/
 .vscode/
 # Acceptance test environment: generated test CA, keys and passwords
 ops/test-env/.generated/
-# Single local installation: generated directory CA, key and password (ops/local/up.sh)
+# Single local installation: generated directory CA, key and password (start.sh)
 ops/local/.generated/
 # Large terrain/map data (raw DEM, derived rasters, PMTiles): packaged with checksums, never in git
 map-data/
@@ -57,3 +57,9 @@ ops/hr-demo/.generated/
 
 # offline images (docker save) carried with the folder, never in git
 /images/
+
+# The installation's data when TMRKZ runs from this folder (docker-compose.override.yml): database, files, directory.
+# Real people's data — never committed.
+/data/
+# the one image file of the folder (ops/local/workspace/pack-images.sh): docker load -i tmrkz-images.tar
+/tmrkz-images.tar*

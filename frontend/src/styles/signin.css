@@ -44,6 +44,7 @@
     repeating-linear-gradient(0deg, transparent 0 63px, rgba(184, 151, 90, .07) 63px 64px),
     repeating-linear-gradient(90deg, transparent 0 63px, rgba(184, 151, 90, .07) 63px 64px),
     linear-gradient(170deg, #fbf8f0 0%, #f4eedf 60%, #ece2cc 100%);
+  --tm-backdrop-art: url('../img/tmrkz-login-backdrop-light.svg?v=20261119');
 }
 
 :root[data-theme='dark'] {
@@ -84,6 +85,7 @@
     repeating-linear-gradient(0deg, transparent 0 63px, rgba(214, 200, 172, .03) 63px 64px),
     repeating-linear-gradient(90deg, transparent 0 63px, rgba(214, 200, 172, .03) 63px 64px),
     linear-gradient(170deg, #1c1b18 0%, #161513 60%, #121110 100%);
+  --tm-backdrop-art: url('../img/tmrkz-login-backdrop-dark.svg?v=20261119');
 }
 
 * { box-sizing: border-box; }
@@ -117,6 +119,15 @@ html, body { margin: 0; min-height: 100%; }
   background: var(--tm-backdrop);
 }
 
+/* Original, bundled administrative-map illustration. Decorative only; never above the card or interactive. */
+.tm-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--tm-backdrop-art) center / cover no-repeat;
+  pointer-events: none;
+}
+
 .tm-main { display: grid; place-items: center; padding: 2rem 1rem; }
 
 /* ---- card ----------------------------------------------------------------------------------------------------- */
@@ -138,20 +149,31 @@ html, body { margin: 0; min-height: 100%; }
   .tm-card { background: var(--tm-card-solid); }
 }
 
+/* The brand lockup (owner, 19 Nov 2026): the application's mark, large; the Arabic name as the title; the Latin name small,
+   spaced and in gold under it — the same order as the top bar. */
 .tm-logo {
-  margin: 0 0 .5rem;
+  margin: 4px 0 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 0;
   color: var(--tm-ink);
-  filter: drop-shadow(0 18px 32px var(--tm-shadow));
 }
-.tm-mark { color: var(--tm-gold); display: inline-flex; }
-.tm-mark svg { width: 54px; height: 54px; }
-.tm-word { font: 800 30px/1 Arial, 'Segoe UI', sans-serif; letter-spacing: 6px; direction: ltr; }
+.tm-mark { display: inline-flex; margin-bottom: 14px; filter: drop-shadow(0 12px 22px var(--tm-shadow)); }
+.tm-mark svg { width: 88px; height: 88px; }
+/* the two names share one width: the column is as wide as the Arabic name, and the Latin letters spread across it */
+.tm-names { display: inline-flex; flex-direction: column; align-items: stretch; }
+.tm-arabic-name { font: 800 36px/1.2 Arabic, 'TMRKZ Arabic', 'Noto Sans Arabic', Tahoma, sans-serif; letter-spacing: 0; text-align: center; }
+.tm-word {
+  margin-top: 8px;
+  display: flex;
+  justify-content: space-between;
+  font: 700 14px/1 'Segoe UI', Arial, sans-serif;
+  color: var(--tm-gold);
+  direction: ltr;
+}
 
-.tm-sub { margin: 0; font-size: 13.5px; color: var(--tm-muted); }
+.tm-sub { margin: 10px 0 0; font-size: 13.5px; color: var(--tm-muted); }
 .tm-rule { display: block; width: 48px; height: 2px; border-radius: 2px; margin: 11px auto 1px; background: linear-gradient(90deg, var(--tm-sand), var(--tm-gold)); opacity: .8; }
 
 /* ---- messages ------------------------------------------------------------------------------------------------- */
@@ -273,4 +295,3 @@ html, body { margin: 0; min-height: 100%; }
 .tm .theme-toggle svg { width: 18px; height: 18px; }
 /* an important notice on the sign-in board (ADR-083) */
 .tm-note.is-notice { border-color: var(--tm-gold); box-shadow: inset 3px 0 0 var(--tm-gold); }
-

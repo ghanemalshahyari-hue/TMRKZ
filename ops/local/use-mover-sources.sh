@@ -14,7 +14,7 @@ MOVER="${MOVER_DIR:-../../mover}"   # MOVER's folder (read only): its directory 
 rand() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c "$1"; }
 
 # 1. MOVER's Oracle and directory join TMRKZ's isolated network (an extra network for those two containers; MOVER keeps its own)
-docker network inspect "$NET" >/dev/null 2>&1 || { echo "[mover-sources] start TMRKZ first: TMRKZ_OFFLINE=1 sh ops/local/up.sh" >&2; exit 2; }
+docker network inspect "$NET" >/dev/null 2>&1 || { echo "[mover-sources] start TMRKZ first: sh start.sh" >&2; exit 2; }
 for c in mover-oracle-hr mover-ldap; do
   docker inspect "$c" >/dev/null 2>&1 || { echo "[mover-sources] $c is not on this machine" >&2; exit 2; }
   docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$c" | grep -qw "$NET" || docker network connect "$NET" "$c"
@@ -69,7 +69,7 @@ setkv TMRKZ_OIDC_CLAIM_POSITION tmrkz_position
 echo "[mover-sources] .env names MOVER's directory"
 cat <<'EOF'
 [mover-sources] next, in this order:
-  TMRKZ_OFFLINE=1 sh ops/local/up.sh                                   (the stand-in directory is left out)
+  sh start.sh                                                         (the stand-in directory is left out)
   CONFIRM=yes sh ops/keycloak/set-directory.sh tmrkz-mover             (Keycloak's federation → mover-ldap, tested first)
   CONFIRM=yes sh ops/keycloak/set-employment-attributes.sh tmrkz-mover
   sh ops/platform-accounts.sh tmrkz-mover && sh ops/keycloak/set-platform-password-client.sh tmrkz-mover

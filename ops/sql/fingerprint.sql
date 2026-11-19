@@ -19,4 +19,5 @@ union all select 'reservation_change|' || count(*) || '|' || coalesce(md5(string
 union all select 'attachment|' || count(*) || '|' || coalesce(md5(string_agg(t::text, '§' order by t::text)), '-') from attachment t
 union all select 'audit_event|' || count(*) || '|' || coalesce(md5(string_agg(t::text, '§' order by t::text)), '-') from audit_event t
 union all select 'map_package|' || count(*) || '|' || coalesce(md5(string_agg(t::text, '§' order by t::text)), '-') from map_package t
-union all select 'act_re_procdef|' || count(*) || '|' || coalesce(md5(string_agg(t.id_ || t.key_ || t.version_, '§' order by t.id_)), '-') from act_re_procdef t;
+union all select 'act_re_procdef|' || count(*) || '|' || coalesce(md5(string_agg(t.id_ || t.key_ || t.version_, '§' order by t.id_)), '-') from act_re_procdef t
+order by 1;

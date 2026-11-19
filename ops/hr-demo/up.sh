@@ -25,7 +25,7 @@ ORACLE_MOVER_USER=TMRKZ_HR
 ORACLE_MOVER_PASSWORD=R$(rand 20)
 EOF
 fi
-docker network inspect tmrkz-mover_internal >/dev/null 2>&1 || { echo "[hr-demo] start TMRKZ first (sh ops/local/up.sh)" >&2; exit 2; }
+docker network inspect tmrkz-mover_internal >/dev/null 2>&1 || { echo "[hr-demo] start TMRKZ first (sh start.sh)" >&2; exit 2; }
 docker compose -p tmrkz-hr-demo --env-file "$G/oracle_hr.env" -f compose.yml up -d
 i=0
 until [ "$(docker inspect -f '{{.State.Health.Status}}' tmrkz-hr-demo-oracle 2>/dev/null)" = healthy ]; do
