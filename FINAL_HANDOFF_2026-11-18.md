@@ -10,14 +10,14 @@ the other way round (section «Source of truth» below).
 | | |
 |---|---|
 | Release | **TMRKZ 2026.11.20.1** (the map packages use the same `year.month.n` scheme: `tmrkz-map-2026.11.2`) |
-| Source (the release commit) | `<<RELEASE_SHA>>` |
-| Final `main` (adds only this record) | `<<FINAL_SHA>>` |
+| Source (the release commit) | ``9f12f4f9b3ece481e808518efdee5855960a5a66`` |
+| Final `main` | the commit that adds this record on top of the release commit (docs only; `git rev-parse origin/main` on the PC names it, and the closure report states it in full) |
 | Schema (Flyway) | **V54** (`V54__integration_settings.sql`; V52, V53 from phases 7–8) |
 | Architecture of the transfer images | **linux/amd64** (the Ubuntu server); the development Mac runs the same source on linux/arm64 |
 | Images in the transfer file | `tmrkz/folder-backend:1`, `tmrkz/folder-web:1`, `postgis/postgis:17-3.5-alpine`, `tmrkz/keycloak:26.7.5-2`, `openfga/openfga:v1.8.16`, `osixia/openldap:1.5.0`, `nginx:1.28.3-alpine`, `nginx:1.27-alpine` |
-| Image file | `tmrkz-images-2026.11.20.1-linux-amd64.tar` — SHA-256 `<<IMAGES_SHA256>>` |
-| Folder package | `TMRKZ-2026.11.20.1-folder.zip` — SHA-256 `<<ZIP_SHA256>>` |
-| Built | `<<BUILT_AT>>` on the development Mac (Docker Desktop, `DOCKER_DEFAULT_PLATFORM=linux/amd64`) |
+| Image file | `tmrkz-images-2026.11.20.1-linux-amd64.tar` — SHA-256 `5a9fb08295900a118ac51456f649ce2207583b3da4d934c44e59a5c3db34ff16` |
+| Folder package | `TMRKZ-2026.11.20.1-folder.zip` — its SHA-256 is in `SHA256SUMS` beside it (the zip carries this file, so it cannot name its own checksum); built from the final `main` |
+| Built | 20 Nov 2026 (the exact time in `RELEASE-2026.11.20.1.json`) on the development Mac (Docker Desktop, `DOCKER_DEFAULT_PLATFORM=linux/amd64`) |
 | Map package expected on the server | `tmrkz-map-2026.11.2` with `terrain-3d` (content SHA-256 `5fde671f…`, archive `21e1558c…`, ADR-047) — **not** in this package |
 
 The deployment method is the folder installation (ADR-091, `RUN.md`): `docker-compose.yml` + `docker-compose.override.yml`
@@ -63,7 +63,7 @@ are covered by `partial-approval-roundtrip.mjs` (PA-01, PA-10, PA-11) and by the
 
 ## Source of truth and reconciliation (the owner's priority of 20 Nov)
 
-- `main` at `<<FINAL_SHA>>` is the application. The local Mac folder is a checkout of it (plus git-ignored `data/`, `.env`,
+- `main` (the release commit `9f12f4f9b3ece481e808518efdee5855960a5a66` plus this record) is the application. The local Mac folder is a checkout of it (plus git-ignored `data/`, `.env`,
   `tmrkz-images.tar`, `ops/*/.generated`). The VM folder was a copy of `85ee93d` with hand edits: the OIDC issuer and the return
   address in `docker-compose.override.yml`, relay keys in `.env`, an AD certificate chain under `ops/keycloak/truststores/`, an
   `https-certs/` folder, a `db.db` / `TMRKZ-database-backup.backup` file. **None of those edits is needed any more.** On the VM:
