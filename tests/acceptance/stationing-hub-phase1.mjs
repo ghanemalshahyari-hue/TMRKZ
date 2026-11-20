@@ -18,7 +18,7 @@ const login = await fetch(BASE + '/api/v1/auth/directory/login', { method: 'POST
 if (login.status !== 200) throw new Error('admin sign-in ' + login.status);
 const cookies = login.headers.getSetCookie().map((c) => c.split(';')[0]).map((c) => ({ name: c.slice(0, c.indexOf('=')), value: c.slice(c.indexOf('=') + 1), url: BASE }));
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH, headless: true } : { channel: 'msedge', headless: true });
 const external = [];
 const results = [];
 const ok = (pass, what, detail = '') => { results.push(pass); console.log(`${pass ? 'PASS' : 'FAIL'} ${what}${detail ? ' · ' + detail : ''}`); };

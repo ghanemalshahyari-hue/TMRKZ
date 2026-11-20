@@ -158,7 +158,18 @@ export function requestingUnitOf<U extends HubLike>(picked: readonly string[], u
   return null;
 }
 
-export type FlowState = { units: number; requester: boolean; site: unknown | null; primary: unknown | null; alternative: unknown | null };
+export type FlowKind = 'PERMANENT' | 'TEMPORARY';
+export type FlowState = {
+  units: number;
+  requester: boolean;
+  site: unknown | null;
+  primary: unknown | null;
+  alternative: unknown | null;
+  /** A temporary move (the same lifecycle as before: start, planned end, return, extension) needs both dates. */
+  kind?: FlowKind;
+  start?: string | null;
+  end?: string | null;
+};
 
 /** What stops moving to step `to` of this request («التالي» or a click on the strip); empty when nothing does. */
 export function flowStepProblem(purpose: FlowPurpose, s: FlowState, to: number): string {
@@ -167,10 +178,84 @@ export function flowStepProblem(purpose: FlowPurpose, s: FlowState, to: number):
   if (purpose === 'DEPLOYMENT_AREAS') return areaStepProblem({ unitId: s.units > 0 ? 'x' : null, primary: s.primary, alternative: s.alternative }, to as AreaStep);
   if (reaches('pick') && s.units === 0) return 'اختر الوحدة أو الوحدات التي تنتقل أولاً.';
   if (reaches('pick') && !s.requester) return 'اختر وحدات من فرع واحد: تقدّم الطلب الوحدة التي تضمها كلها.';
+  if (reaches('pick') && s.kind === 'TEMPORARY' && (!s.start || !s.end)) return 'حدد تاريخ بداية التمركز المؤقت وتاريخ نهايته.';
+  if (reaches('pick') && s.kind === 'TEMPORARY' && s.start && s.end && s.end <= s.start) return 'تاريخ نهاية التمركز المؤقت بعد تاريخ بدايته.';
   if (reaches('site') && !s.site) return 'حدد موقع التمركز الجديد أولاً: منه تُقاس الرئيسية.';
   if (reaches('primary') && !s.primary) return 'ضع منطقة الانتشار الرئيسية أولاً: منها تُقاس الفرعية.';
   if (reaches('alternative') && !s.alternative) return 'ضع منطقة الانتشار الفرعية أولاً.';
   return '';
+}
+
+// ---- an existing request in the map-first editor (release closure, 20 Nov 2026) ------------------------------------------
+
+/** The part of a saved request the map-first editor reads; the rest of its content is carried unchanged. */
+export type SavedRequestLike = {
+  purpose?: string | null;
+  content: {
+    kind: FlowKind;
+    start?: string | null;
+    end?: string | null;
+    scope: string[];
+    site?: { geometry: unknown; copiedFrom?: string | null; shape?: string | null } | null;
+    primary: unknown | null;
+    alternative: unknown | null;
+    reason: string;
+    occupants?: Record<string, unknown>;
+    exceptions?: Record<string, unknown>;
+    existingSite?: string | null;
+    siteInfo?: unknown | null;
+  };
+};
+
+export type LoadedFlow = {
+  purpose: FlowPurpose;
+  picked: string[];
+  kind: FlowKind;
+  start: string | null;
+  end: string | null;
+  site: unknown | null;
+  copiedFrom: string | null;
+  primary: unknown | null;
+  alternative: unknown | null;
+  reason: string;
+  /** Fields the old editor wrote that this screen has no control for: named to the person, saved back unchanged. */
+  legacy: string[];
+  /** The first step still to be completed (the review when everything is there). */
+  step: number;
+};
+
+/** Whether a saved request opens in the map-first editor: a re-stationing or a deployment-areas request. */
+export function isFlowPurpose(purpose: string | null | undefined): purpose is FlowPurpose {
+  return purpose === 'RESTATIONING' || purpose === 'DEPLOYMENT_AREAS';
+}
+
+/**
+ * A saved draft or returned request as the map-first editor takes it: its units, kind and dates, new site, areas and reason —
+ * nothing is changed by opening it. Content the old editor kept (occupants, exceptions, a site registration) is listed so
+ * the screen can say it is carried unchanged, never dropped.
+ */
+export function requestIntoFlow(r: SavedRequestLike): LoadedFlow {
+  const purpose: FlowPurpose = r.purpose === 'DEPLOYMENT_AREAS' ? 'DEPLOYMENT_AREAS' : 'RESTATIONING';
+  const c = r.content;
+  const legacy: string[] = [];
+  const occupants = Object.keys(c.occupants ?? {}).length;
+  const exceptions = Object.entries(c.exceptions ?? {}).filter(([, v]) => typeof v === 'string' && v.trim()).length;
+  if (occupants) legacy.push(occupants === 1 ? 'قرار شاغل واحد للموقع' : `قرارات ${occupants} شاغلين للموقع`);
+  if (exceptions) legacy.push(exceptions === 1 ? 'مبرر استثناء مسافة' : `${exceptions} مبررات استثناء مسافة`);
+  if (c.existingSite) legacy.push('موقع مسجل محدد');
+  if (c.siteInfo) legacy.push('بيانات تسجيل موقع');
+  const picked = [...(c.scope ?? [])];
+  const kind: FlowKind = c.kind === 'TEMPORARY' ? 'TEMPORARY' : 'PERMANENT';
+  const state: FlowState = { units: picked.length, requester: picked.length > 0, site: c.site?.geometry ?? null, primary: c.primary, alternative: c.alternative, kind, start: c.start ?? null, end: c.end ?? null };
+  const last = FLOW_STAGES[purpose].length;
+  let step = last;
+  for (let to = 2; to <= last; to++) {
+    if (flowStepProblem(purpose, state, to)) {
+      step = to - 1;
+      break;
+    }
+  }
+  return { purpose, picked, kind, start: c.start ?? null, end: c.end ?? null, site: c.site?.geometry ?? null, copiedFrom: c.site?.copiedFrom ?? null, primary: c.primary, alternative: c.alternative, reason: c.reason ?? '', legacy, step };
 }
 
 /** How the new site was made, as the server records it: a copy of the current site kept as is, edited, or drawn. */

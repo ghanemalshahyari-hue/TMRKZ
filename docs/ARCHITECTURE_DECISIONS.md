@@ -2420,3 +2420,92 @@ Addition: the stationing requester is displayed «مقدم الطلب»; MOVER's
 - Removed: `ops/local/up.sh`, `ops/local/offline.sh`, `ops/local/compose.{offline,local-directory,map-access,enterprise-manual}.yml` and `.env.example` (`ops/init-env.sh` writes `.env`). The enterprise-LDAP relay (ADR-070) is the `ldap-relay` service under the profile `enterprise-ldap`.
 
 **Consequences.** `RUN.md` is the procedure: transfer, first start, daily use, code changes, importing a database, the relay, the prompt for the VM's AI agent. Tools that name their Compose files with `-f` (`ops/test-env`, `ops/verify-migration-path.sh`, `ops/airgap-bundle.sh`) keep the image-built application. A machine whose data is still in the Docker volume `tmrkz-mover_db-data` starts with an empty `data/db`; `start.sh` says so and `RUN.md` section 6 moves it. Verified on a Docker-in-Docker machine with no network and no images, from the unzipped folder: the images loaded, every service healthy, six sign-in paths, `developer`, the maps with no external request. The enterprise LDAP relay is not tested in this layout.
+
+## ADR-092 «إعدادات التكامل»: the directory and the enterprise Keycloak entered in the application, as MOVER; one address everywhere (owner, 20 Nov 2026)
+
+**Owner.** From the VM: the sign-in against the enterprise directory failed on the relay's placeholder name, the OIDC issuer and
+return address had been edited by hand in `docker-compose.override.yml`, and the manual-LDAP settings lived in `.env`. «Make it
+everywhere the same in local, remote and so on so that I don't get confused»; «fix the issue for LDAP — you didn't use the same as
+how MOVER works»; «you didn't add in the UI that I can change these variables — I want the ability to change them»; «the
+Keycloak wasn't built the same as we want».
+
+**What MOVER does (read-only review of `~/Desktop/mover`, 20 Nov 2026).** The directory: `ldap3`, a direct connection to the
+AD host named as in its certificate, each person binds as `user@LDAP_DOMAIN` (no service account, no relay), the entry found on
+that connection by `userPrincipalName` under `LDAP_BASE_DN`, TLS verified against the CA file `LDAP_CA_CERT_PATH`, LDAPS or
+StartTLS. Keycloak: MOVER builds none; it is an OIDC client (authorization code + PKCE) of the organisation's Keycloak —
+`KEYCLOAK_SERVER_URL`, `_REALM`, `_CLIENT_ID`, `_CLIENT_SECRET`, `_INTERNAL_URL`, `_ISSUER` (default `<server>/realms/<realm>`),
+`_REDIRECT_URI`, `_CA_FILE`. An administrator page «إعدادات التكامل» edits both with «اختبار الاتصال» (the secured channel
+and an optional bind; the discovery document and its issuer), writing `.env`, applied at the next restart.
+
+**Decision.**
+- `integration_setting` (V54) keeps two sections, DIRECTORY and OIDC: the values as JSON, the secret (service-account
+  password, client secret) encrypted with TMRKZ's own key (`TMRKZ_HR_SETTINGS_KEY`, as the HR source), who saved and when.
+  `IntegrationSettingsService` turns the directory section (MOVER's fields: server, port, LDAPS/StartTLS, domain, base DN,
+  attributes, CA PEM, timeout) into `LdapProperties` — `{username}@domain` as the direct-bind pattern, or the service account
+  when no domain is given — and the Keycloak section into the automatic provider of `OidcProperties`
+  (`withAutomatic`; back channel = internal address or server address + `/realms/<realm>`; issuer as MOVER). Both are in force
+  the moment they are saved (a version counter renews the cached properties and the key caches) and take precedence over
+  `.env`; nothing saved, or a section switched off, leaves `.env` in force. The platform accounts' local Keycloak is never
+  changed by the screen: an enterprise issuer cannot become the platform issuer (ADR-071 holds).
+- `DirectoryAuthenticator` and `OidcClient` read the settings in force on every call. The trust is the CA folder plus the
+  pasted certificates (`Trust`): only those for the directory; the runtime's CAs as well for the HTTPS calls to Keycloak.
+  `test` / `probe` run with unsaved values: TLS handshake with host-name check, service bind or a person's own sign-in; the
+  discovery document, the issuer it states, the key set. Nothing typed for a test is stored; results and audit rows carry
+  no credential.
+- `IntegrationSettingsController` under `/settings/integration/{directory,oidc}` (GET, PUT, DELETE, POST `/test`), CONFIGURE
+  only. The screen `IntegrationSettings` in «إعدادات النظام»: both sections, the derived address and bind description, an
+  «Active Directory (كما في MOVER)» preset (`sAMAccountName`, `objectGUID`, `user`, `MilNumber`, `MilRankName`,
+  `MilOccupation`, `MilCurrentUnitName`), the `.env` values on request, «العودة إلى إعدادات ملف البيئة».
+- One address: `TMRKZ_PUBLIC_URL` (written by `start.sh` as `http://IP:PORT`, kept when `ops/tls/enable.sh` set `https://…`)
+  is the only source of Keycloak's hostname, the local issuer, the callback and the signed-out page in
+  `docker-compose.override.yml`. The backend joins `edge` and reaches the directory and the enterprise Keycloak directly, as
+  MOVER; the servers stay on the network with no route out. The relay (`ldap-relay`, `extra_hosts`,
+  `ops/keycloak/configure-manual-direct.py`, `TMRKZ_MANUAL_LDAP_*`) is removed: it was the placeholder name the VM failed on.
+- `.env` keys stay readable for installations configured before the screen (`LDAP_*`, `TMRKZ_ENTERPRISE_OIDC_*`).
+
+**Not done here.** The VM's own copy (hand-edited compose, relay keys in `.env`, the AD chain under `ops/keycloak/truststores`)
+is replaced by taking this version and entering the values on the screen; its empty home page after a bootstrap sign-in is a
+data state (the bootstrap registration was used once, then the people were deleted: no membership remains), not a code
+defect — register the login again (OPERATIONS «First administrator»). No real directory or enterprise Keycloak was reached
+from this machine.
+
+**Tests.** `IntegrationSettingsIT` INT-01 (the directory saved on the screen signs people in at once ahead of an unconfigured
+environment; tests of unsaved values: service bind, wrong password, untrusted CA, a person's sign-in; validation; blank
+password keeps the stored one; switched off → `.env`; cleared) and INT-02 (Keycloak: discovery probe, issuer mismatch,
+validation, saved → `/auth/status` configured and reachable, the automatic start goes to the saved realm, the platform
+issuer untouched, cleared); unchanged and passing: `DirectorySignInIT`, `DirectDirectorySignInIT`, `DualProviderSignInIT`,
+`EnterpriseSignInIT`, `SignInNotesIT`; frontend `integrationSettings.test.ts`.
+
+## ADR-093 One map-first editor for every normal re-stationing task; release closure (owner brief «FINAL RELEASE CLOSURE», 20 Nov 2026)
+
+**Owner.** Sections 3–9 of the closure brief: there must not be two substantially different experiences for the same normal
+re-stationing task; saved drafts, the site-page start and temporary moves still opened the old editor; existing requests are
+not editors; deployment-area drafts must open their own request; the old editor leaves normal navigation.
+
+**Decision.**
+- `DeploymentAreasRequest` (purpose RESTATIONING or DEPLOYMENT_AREAS) is the one editor. It takes `requestId` (a saved draft
+  or a returned request: read as saved through `requestIntoFlow`, opened at its first open step, nothing written by opening;
+  the content it has no control for — occupants, distance exceptions, a site registration — is named on the review step and
+  saved back unchanged) and `preselectSite` (a start from the Sites page: that site is the choice, its one eligible unit
+  ticked, the editor at «الموقع الجديد», nothing saved). The kind (دائم/مؤقت) is chosen with the units; a temporary move asks
+  for its start and planned end before «التالي» (`flowStepProblem`), and the server's lifecycle (ADR-034: start, planned end,
+  return, extension, cancellation, scheduler) is untouched. An untouched new site is saved with its recorded `copiedFrom` and
+  `shape`.
+- `RestationingPage`: a new RESTATIONING or DEPLOYMENT_AREAS request, with or without `?site=` / `?unit=`, opens the map-first
+  editor; «تعديل الطلب» on a draft or a returned request opens `OpenSavedRequest`, which reads the request once and opens the
+  map-first editor for those two purposes; a request address (`#restationing/<id>`, a link, a notification, the back button)
+  always opens the read-only workspace and leaves any editor; the hash handler now clears the editor (a deep link opened
+  while an editor was up used to stay in it).
+- `RestationingEditor` remains only for a legacy purpose: a new «طلب اعتماد موقع» (SITE_REGISTRATION, still creatable from
+  «طلب جديد») and the editing of a saved request of a legacy purpose (SITE_REGISTRATION; INITIAL_STATIONING made before
+  ADR-078). No RESTATIONING or DEPLOYMENT_AREAS path reaches it. Audit of every entry: `navigation.ts` (the administrator's
+  «＋ طلب جديد»), `stationingHub.ts` (the two tabs), `NewRequestPage` (the hub's cards and per-unit actions), the Sites page
+  (`newRequestFromSiteHash`), `RequestDrawer` «طلب جديد», `HomePage` and the drawer's request links (read-only workspace),
+  `RequestPanel` «تعديل الطلب».
+
+**Tests.** frontend `deploymentAreasFlow.test.ts` (18: the temporary rule, `requestIntoFlow`, `isFlowPurpose`);
+`tests/acceptance/editor-unification.mjs` 18/18 on :8088 (U-01…U-17: from a site; an old-way temporary draft with occupants
+and an exception opens as saved, opening writes nothing, a save changes only the reason; a deployment-areas draft; a request
+under review read-only); `tests/acceptance/partial-approval-roundtrip.mjs` (owner brief §16–§17, see STATUS);
+`restationing-phase4.mjs` 16/16 (`SAVE=0`), `deployment-areas-phase3.mjs`, `responsive-layout.mjs` 16/16,
+`stationing-hub-phase1.mjs` 6/6 after the change.

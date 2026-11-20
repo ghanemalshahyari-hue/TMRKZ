@@ -29,6 +29,7 @@ import { parseRestationingHash } from '../lib/restationingRoute';
 import { partsOf, siteArea } from '../lib/siteGeometry';
 import { HIERARCHY_CHANGED } from '../lib/stationingV3';
 import { decidesExcess, excessLines } from '../lib/workspace';
+import { isFlowPurpose } from '../lib/deploymentAreasFlow';
 import { RestationingEditor } from './RestationingEditor';
 import './restationing.css';
 
@@ -107,7 +108,11 @@ export function RestationingPage() {
   useEffect(() => {
     const onHash = () => {
       const id = idFromHash();
-      if (id) setSelected(id);
+      // a link, a notification or the back button naming a request opens it in the read-only workspace, leaving any editor
+      if (id) {
+        setSelected(id);
+        setEditing(null);
+      }
       const fresh = newFromHash();
       if (fresh) setEditing(fresh);
     };
@@ -168,26 +173,32 @@ export function RestationingPage() {
     </ActionRail>
   );
 
-  // a new «طلب مناطق انتشار» (owner brief §4, phase 3) and a new «طلب إعادة تمركز» (§5, phase 4): the map-first screen,
-  // starting from the unit's current site. A re-stationing opened towards a registered site keeps the request editor, as
-  // does every saved draft.
-  if (editing && !editing.id && (editing.purpose === 'DEPLOYMENT_AREAS' || (editing.purpose === 'RESTATIONING' && !editing.site))) {
+  // the one map-first editor (owner brief §4–§5; release closure, 20 Nov 2026): a new «طلب مناطق انتشار» or «طلب إعادة تمركز»,
+  // one opened from a site (the site preselected), and every saved draft or returned request of those two purposes.
+  // Only a legacy purpose (a site registration, an initial stationing made before ADR-078) still opens the old editor.
+  const closeEditor = (id?: string | null) => {
+    setEditing(null);
+    if (id) select(id);
+    else if (route().kind === 'new') history.replaceState(null, '', '#restationing');
+    reload();
+  };
+  if (editing && !editing.id && (editing.purpose === 'DEPLOYMENT_AREAS' || editing.purpose === 'RESTATIONING')) {
     return (
       <DeploymentAreasRequest
-        key={editing.purpose + ':' + (editing.unit ?? '')}
+        key={editing.purpose + ':' + (editing.unit ?? '') + ':' + (editing.site ?? '')}
         purpose={editing.purpose}
         preselectUnit={editing.unit ?? null}
-        onClose={() => {
-          setEditing(null);
-          if (route().kind === 'new') history.replaceState(null, '', '#restationing');
-          reload();
-        }}
+        preselectSite={editing.site ?? null}
+        onClose={() => closeEditor()}
       />
     );
   }
+  if (editing && editing.id) {
+    return <OpenSavedRequest key={editing.id} id={editing.id} historyOpen={historyOpen} setHistoryOpen={setHistoryOpen} onClose={closeEditor} />;
+  }
   if (editing) {
     return (
-      // the editor brings its own step panel on the left: the request list steps aside until it closes
+      // a legacy purpose only (a site registration): the old editor brings its own step panel on the left
       <RestationingEditor
         key={editing.id ?? 'new:' + (editing.purpose ?? '') + ':' + (editing.unit ?? '') + ':' + (editing.site ?? '')}
         requestId={editing.id}
@@ -228,6 +239,25 @@ export function RestationingPage() {
       }}
     />
   );
+}
+
+/**
+ * A saved request opened for editing (a draft, or one returned for changes): read once to know its purpose, then the map-first
+ * editor for a re-stationing or a deployment-areas request — as saved, nothing changed by opening — and the old editor only
+ * for a legacy purpose (a site registration, an initial stationing made before ADR-078). Reading it writes nothing.
+ */
+function OpenSavedRequest({ id, historyOpen, setHistoryOpen, onClose }: { id: string; historyOpen: boolean; setHistoryOpen: (o: boolean) => void; onClose: (id?: string | null) => void }) {
+  const [purpose, setPurpose] = useState<string | null | undefined>(undefined);
+  const [failed, setFailed] = useState<string | null>(null);
+  useEffect(() => {
+    api.restationingRequest(id).then((r) => setPurpose(r.purpose ?? 'RESTATIONING'), (e: Error) => setFailed(e.message));
+  }, [id]);
+  if (failed) return <section className="tz-mapframe tz-empty" data-testid="open-failed"><p>{failed}</p><button type="button" className="button" onClick={() => onClose()}>رجوع</button></section>;
+  if (purpose === undefined) return <section className="tz-mapframe tz-empty"><p>جارٍ فتح الطلب…</p></section>;
+  if (isFlowPurpose(purpose)) {
+    return <DeploymentAreasRequest purpose={purpose} requestId={id} onClose={() => onClose(id)} />;
+  }
+  return <RestationingEditor requestId={id} purpose={isPurpose(purpose) ? purpose : null} preselectUnit={null} preselectSite={null} historyOpen={historyOpen} setHistoryOpen={setHistoryOpen} onClose={(x) => onClose(x)} />;
 }
 
 /** «تحديد وحدات العلم»: after final approval, a holder chooses the units informed. Not a vote, and no lasting right (ADR-045). */

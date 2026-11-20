@@ -14,9 +14,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * and the same authenticated connection then finds their one entry under {@code usersDn}; without it, a read-only service account
  * ({@code bindDn}) finds exactly one entry and the person's own bind follows (ADR-016).
  *
- * <p>{@code manual} holds the backend-only TMRKZ_MANUAL_LDAP_* overrides: each one supplied replaces the shared LDAP_* value for
- * this authenticator only (Keycloak's federation keeps the shared values). When the manual URL points elsewhere, the shared
- * directory's service credential is never sent to it: the bind DN and credential then come from the manual values alone.
+ * <p>{@code caCertificatesPem} (ADR-092): the CA certificates pasted in «إعدادات التكامل», trusted together with the files of
+ * {@code caDir}; the settings saved there replace these environment values as a whole ({@link IntegrationSettingsService}).
  *
  * <p>The employment attributes (ADR-068: unit ID, unit name, main unit ID, rank, position) are the NAMES of the directory
  * attributes that carry them in this organisation (LDAP_ATTR_*). Empty means not read; nothing is assumed. A name that is not
@@ -46,21 +45,11 @@ public record LdapProperties(
         String rankAttribute,
         String positionAttribute,
         String directBindPattern,
-        Manual manual) {
+        String caCertificatesPem) {
 
     static final Pattern ATTRIBUTE = Pattern.compile("^[A-Za-z][A-Za-z0-9-]{0,63}$");
     /** The one place the login goes in a direct-bind pattern. */
     public static final String USERNAME_MARKER = "{username}";
-
-    /** TMRKZ_MANUAL_LDAP_*: overrides of the manual authenticator only; empty means "use the shared value". */
-    public record Manual(String url, Boolean startTls, String bindDn, String bindCredential, String usersDn, String usernameAttribute,
-                         String uuidAttribute, String employeeNumberAttribute, String userObjectClass, String directBindPattern) {
-
-        @Override
-        public String toString() {
-            return "Manual[" + url + "]"; // never the bind credential
-        }
-    }
 
     public LdapProperties {
         url = text(url);
@@ -68,25 +57,6 @@ public record LdapProperties(
         bindCredential = text(bindCredential);
         usersDn = text(usersDn);
         directBindPattern = text(directBindPattern);
-        if (manual != null) {
-            String manualUrl = text(manual.url());
-            if (manualUrl != null) {
-                url = manualUrl;
-                // another directory: never the shared directory's service account
-                bindDn = text(manual.bindDn());
-                bindCredential = text(manual.bindCredential());
-            } else {
-                bindDn = first(text(manual.bindDn()), bindDn);
-                bindCredential = first(text(manual.bindCredential()), bindCredential);
-            }
-            if (manual.startTls() != null) startTls = manual.startTls();
-            usersDn = first(text(manual.usersDn()), usersDn);
-            usernameAttribute = first(text(manual.usernameAttribute()), usernameAttribute);
-            uuidAttribute = first(text(manual.uuidAttribute()), uuidAttribute);
-            employeeNumberAttribute = first(text(manual.employeeNumberAttribute()), employeeNumberAttribute);
-            userObjectClass = first(text(manual.userObjectClass()), userObjectClass);
-            directBindPattern = first(text(manual.directBindPattern()), directBindPattern);
-        }
         if (usernameAttribute == null || usernameAttribute.isBlank()) usernameAttribute = "uid";
         if (uuidAttribute == null || uuidAttribute.isBlank()) uuidAttribute = "entryUUID";
         if (employeeNumberAttribute == null || employeeNumberAttribute.isBlank()) employeeNumberAttribute = "employeeNumber";
@@ -96,6 +66,7 @@ public record LdapProperties(
         employeeNumberAttribute = employeeNumberAttribute.trim();
         userObjectClass = userObjectClass.trim();
         if (caDir == null || caDir.isBlank()) caDir = "/etc/tmrkz/ldap-ca";
+        caCertificatesPem = text(caCertificatesPem);
         if (issuer == null || issuer.isBlank()) issuer = "urn:tmrkz:directory";
         if (connectTimeoutMs <= 0) connectTimeoutMs = 5000;
         if (readTimeoutMs <= 0) readTimeoutMs = 10000;

@@ -68,19 +68,28 @@ public class OidcClient {
 
     private final JdbcClient jdbc;
     private final Clock clock;
-    private final OidcProperties props;
+    private final IntegrationSettingsService settings;
     private final Json json;
-    private final HttpClient http;
     /** One key cache per provider: the platform verifier never sees the enterprise keys, and the reverse. */
     private final Map<Provider, JWKSource<SecurityContext>> keys = new EnumMap<>(Provider.class);
+    /** The settings version the key caches were built for (ADR-092): a saved Keycloak renews them. */
+    private long keysVersion = -1;
 
-    public OidcClient(JdbcClient jdbc, Clock clock, OidcProperties props, Json json) {
+    public OidcClient(JdbcClient jdbc, Clock clock, IntegrationSettingsService settings, Json json) {
         this.jdbc = jdbc;
         this.clock = clock;
-        this.props = props;
+        this.settings = settings;
         this.json = json;
-        this.http = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(props.httpTimeoutMs()))
-                .followRedirects(HttpClient.Redirect.NEVER).build();
+    }
+
+    /** The providers in force: the Keycloak saved in «إعدادات التكامل» as the automatic one, else the environment (ADR-092). */
+    private OidcProperties props() {
+        return settings.oidc();
+    }
+
+    /** The back channel's HTTP client, with the trust of the CA folder and the pasted certificates. */
+    private HttpClient http() {
+        return settings.http();
     }
 
     /** The provider an attempt or a session belongs to; its name is the namespace of the attempt's nonce. */
@@ -100,17 +109,17 @@ public class OidcClient {
     }
 
     private OidcProperties.Provider endpoints(Provider p) {
-        return p == Provider.PLATFORM ? props.platform() : props.automatic();
+        return p == Provider.PLATFORM ? props().platform() : props().automatic();
     }
 
     /** Automatic sign-in is configured. */
     public boolean configured() {
-        return props.configured();
+        return props().configured();
     }
 
     /** The manual form can sign in a lasting platform account (the platform-password client exists and accounts are named). */
     public boolean passwordConfigured() {
-        return props.passwordConfigured() && !props.platformAccounts().isEmpty();
+        return props().passwordConfigured() && !props().platformAccounts().isEmpty();
     }
 
     /**
@@ -118,7 +127,7 @@ public class OidcClient {
      * issued this session; otherwise the automatic one.
      */
     public Provider providerOf(String sessionIssuer) {
-        return props.separateProviders() && props.platformIssuer().equals(sessionIssuer) ? Provider.PLATFORM : Provider.ENTERPRISE;
+        return props().separateProviders() && props().platformIssuer().equals(sessionIssuer) ? Provider.PLATFORM : Provider.ENTERPRISE;
     }
 
     public record Started(String redirectUrl, String browserBinding) {
@@ -192,7 +201,7 @@ public class OidcClient {
             q.put("prompt", "login");
             q.put("max_age", "0");
         } else {
-            q.put("max_age", String.valueOf(props.loginMaxAgeSeconds()));
+            q.put("max_age", String.valueOf(props().loginMaxAgeSeconds()));
         }
         return new Started(p.authorizationEndpoint() + "?" + form(q), browser);
     }
@@ -254,20 +263,20 @@ public class OidcClient {
             throw new ApiException(ErrorCode.IDENTITY_PROVIDER_NOT_CONFIGURED, "دخول حسابات المنصة اليدوي غير مهيأ في هذه البيئة.");
         }
         String account = login == null ? null : login.trim().toLowerCase(Locale.ROOT);
-        if (account == null || !props.platformAccount(account)) {
+        if (account == null || !props().platformAccount(account)) {
             throw failed("اسم المستخدم أو كلمة المرور غير صحيحة.");
         }
         if (password == null || password.isEmpty() || password.length() > 1024) {
             throw new PasswordRejected();
         }
-        OidcProperties.Provider p = props.platform();
+        OidcProperties.Provider p = props().platform();
         Instant started = clock.instant();
         Map<String, String> body = new LinkedHashMap<>();
         body.put("grant_type", "password");
         body.put("username", account);
         body.put("password", password);
         body.put("scope", "openid profile");
-        HttpResponse<String> res = post(p.tokenEndpoint(), props.passwordClientId(), props.passwordClientSecret(), body);
+        HttpResponse<String> res = post(p.tokenEndpoint(), props().passwordClientId(), props().passwordClientSecret(), body);
         if (res.statusCode() >= 500) {
             log.warn("Platform password grant: provider answered HTTP {}", res.statusCode());
             throw new ApiException(ErrorCode.IDENTITY_PROVIDER_UNAVAILABLE, "تعذر الوصول إلى مزود الهوية؛ لا يوجد دخول بديل.");
@@ -284,15 +293,15 @@ public class OidcClient {
         if (idToken == null) {
             throw failed("لم يُرجع مزود الهوية رمز الهوية.");
         }
-        JWTClaimsSet claims = verify(Provider.PLATFORM, idToken, null, props.passwordClientId());
+        JWTClaimsSet claims = verify(Provider.PLATFORM, idToken, null, props().passwordClientId());
         try {
             String azp = claims.getStringClaim("azp");
-            if (azp != null && !props.passwordClientId().equals(azp)) {
+            if (azp != null && !props().passwordClientId().equals(azp)) {
                 throw failed("رمز الهوية صادر لتطبيق آخر.");
             }
             String username = claims.getStringClaim("preferred_username");
             String stated = username == null ? null : username.trim().toLowerCase(Locale.ROOT);
-            if (!account.equals(stated) || !props.platformAccount(stated)) {
+            if (!account.equals(stated) || !props().platformAccount(stated)) {
                 log.warn("Platform password grant refused: the ID token names another user");
                 throw failed("رمز الهوية لا يخص الحساب المُدخل.");
             }
@@ -313,14 +322,14 @@ public class OidcClient {
             throws java.text.ParseException {
         String name = claims.getStringClaim("name");
         String username = claims.getStringClaim("preferred_username");
-        Object key = "DOMAIN_ACCOUNT".equals(props.linkKey()) ? username : claims.getClaim(props.enterpriseKeyClaim());
+        Object key = "DOMAIN_ACCOUNT".equals(props().linkKey()) ? username : claims.getClaim(props().enterpriseKeyClaim());
         String enterpriseKey = key instanceof List<?> l ? (l.size() == 1 ? String.valueOf(l.get(0)) : null)
                 : key == null ? null : String.valueOf(key).trim();
         Object roles = claims.getClaim(OidcProperties.ROLES_CLAIM);
         boolean platform = roles instanceof List<?> r ? r.contains(OidcProperties.PLATFORM_ROLE) : OidcProperties.PLATFORM_ROLE.equals(roles);
-        DirectoryProfile profile = new DirectoryProfile(single(claims, props.enterpriseKeyClaim()), single(claims, props.rankClaim()),
-                single(claims, props.positionClaim()), single(claims, props.unitIdClaim()), single(claims, props.unitNameClaim()),
-                single(claims, props.mainUnitIdClaim()), props.employmentClaims());
+        DirectoryProfile profile = new DirectoryProfile(single(claims, props().enterpriseKeyClaim()), single(claims, props().rankClaim()),
+                single(claims, props().positionClaim()), single(claims, props().unitIdClaim()), single(claims, props().unitNameClaim()),
+                single(claims, props().mainUnitIdClaim()), props().employmentClaims());
         return new Identity(claims.getIssuer(), claims.getSubject(), enterpriseKey == null || enterpriseKey.isEmpty() ? null : enterpriseKey,
                 name, username, at, idToken, purpose, returnTo, sessionId, platform, profile);
     }
@@ -328,8 +337,8 @@ public class OidcClient {
     private HttpResponse<String> post(String endpoint, String clientId, String clientSecret, Map<String, String> body) {
         String basic = Base64.getEncoder().encodeToString((enc(clientId) + ":" + enc(clientSecret)).getBytes(StandardCharsets.UTF_8));
         try {
-            return http.send(HttpRequest.newBuilder(URI.create(endpoint))
-                    .timeout(Duration.ofMillis(props.httpTimeoutMs()))
+            return http().send(HttpRequest.newBuilder(URI.create(endpoint))
+                    .timeout(Duration.ofMillis(props().httpTimeoutMs()))
                     .header("Content-Type", "application/x-www-form-urlencoded").header("Authorization", "Basic " + basic)
                     .POST(HttpRequest.BodyPublishers.ofString(form(body))).build(), HttpResponse.BodyHandlers.ofString());
         } catch (java.io.IOException e) {
@@ -373,7 +382,7 @@ public class OidcClient {
         if (at.isAfter(now.plus(CLOCK_SKEW))) {
             throw failed("وقت المصادقة في رمز الهوية لاحق للوقت الحالي؛ رُفض الدخول.");
         }
-        Instant earliest = "REAUTH".equals(purpose) ? attemptStarted : now.minusSeconds(props.loginMaxAgeSeconds());
+        Instant earliest = "REAUTH".equals(purpose) ? attemptStarted : now.minusSeconds(props().loginMaxAgeSeconds());
         if (at.isBefore(earliest.minus(CLOCK_SKEW))) {
             throw failed("REAUTH".equals(purpose) ? "لم تُجرَ إعادة تحقق جديدة لدى مزود الهوية." : "انقضت مدة المصادقة المسموحة؛ سجّل الدخول من جديد.");
         }
@@ -446,13 +455,62 @@ public class OidcClient {
 
     private JWKSource<SecurityContext> keys(Provider provider) throws java.net.MalformedURLException {
         synchronized (keys) {
+            long v = settings.version();
+            if (v != keysVersion) {
+                keys.clear();
+                keysVersion = v;
+            }
             JWKSource<SecurityContext> k = keys.get(provider);
             if (k == null) {
-                k = JWKSourceBuilder.create(URI.create(endpoints(provider).jwksEndpoint()).toURL(),
-                        new DefaultResourceRetriever(props.httpTimeoutMs(), props.httpTimeoutMs(), 512 * 1024)).retrying(true).build();
+                DefaultResourceRetriever retriever = new DefaultResourceRetriever(props().httpTimeoutMs(), props().httpTimeoutMs(), 512 * 1024,
+                        true, settings.ssl().getSocketFactory());
+                k = JWKSourceBuilder.create(URI.create(endpoints(provider).jwksEndpoint()).toURL(), retriever).retrying(true).build();
                 keys.put(provider, k);
             }
             return k;
+        }
+    }
+
+    /** The outcome of a test of unsaved Keycloak values (ADR-092); never a secret. */
+    public record Probe(boolean ok, String step, String message, String issuer, Integer keys) {
+    }
+
+    /**
+     * A test of Keycloak settings before they are saved, as MOVER's «اختبار الاتصال»: the realm's discovery document over the
+     * back channel (TLS verified with the given trust), the issuer it states compared with the expected one, and the key set.
+     */
+    public Probe probe(OidcProperties.Provider p, javax.net.ssl.SSLContext ssl, int timeoutMs) {
+        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofMillis(timeoutMs)).followRedirects(HttpClient.Redirect.NEVER)
+                .sslContext(ssl).build();
+        try {
+            HttpResponse<String> d = client.send(HttpRequest.newBuilder(URI.create(p.backChannel() + "/.well-known/openid-configuration"))
+                    .timeout(Duration.ofMillis(timeoutMs)).GET().build(), HttpResponse.BodyHandlers.ofString());
+            if (d.statusCode() != 200) {
+                return new Probe(false, "DISCOVERY", "لم يُجب المجال عن وثيقة الاكتشاف (HTTP " + d.statusCode() + ").", null, null);
+            }
+            String stated = json.tree(d.body()).path("issuer").asText(null);
+            if (stated == null) {
+                return new Probe(false, "DISCOVERY", "وثيقة الاكتشاف لا تذكر المُصدر (issuer).", null, null);
+            }
+            if (!stated.equals(p.issuer())) {
+                return new Probe(false, "ISSUER", "المُصدر الذي يعلنه Keycloak يختلف عن المتوقع: " + stated, stated, null);
+            }
+            HttpResponse<String> k = client.send(HttpRequest.newBuilder(URI.create(p.jwksEndpoint())).timeout(Duration.ofMillis(timeoutMs))
+                    .GET().build(), HttpResponse.BodyHandlers.ofString());
+            if (k.statusCode() != 200) {
+                return new Probe(false, "KEYS", "لم تُقرأ مفاتيح التوقيع (HTTP " + k.statusCode() + ").", stated, null);
+            }
+            int n = json.tree(k.body()).path("keys").size();
+            return new Probe(true, "OK", "نجح الاتصال: المُصدر مطابق و" + n + " مفتاح توقيع.", stated, n);
+        } catch (javax.net.ssl.SSLException e) {
+            return new Probe(false, "TLS", "رُفض الاتصال المؤمَّن: الشهادة غير موثوقة أو اسم الخادم لا يطابقها — " + e.getMessage(), null, null);
+        } catch (java.io.IOException e) {
+            return new Probe(false, "UNREACHABLE", "تعذر الوصول إلى Keycloak: " + e.getMessage(), null, null);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new Probe(false, "UNREACHABLE", "انقطع الاتصال.", null, null);
+        } catch (RuntimeException e) {
+            return new Probe(false, "ERROR", "إجابة غير مفهومة: " + e.getMessage(), null, null);
         }
     }
 
@@ -471,8 +529,8 @@ public class OidcClient {
             return null;
         }
         // a platform session opened by the manual form holds the password client's token: that client ends it
-        String client = props.passwordClientId() != null && sessionIssuer.equals(props.platformIssuer())
-                && audience(idToken).contains(props.passwordClientId()) ? props.passwordClientId() : p.clientId();
+        String client = props().passwordClientId() != null && sessionIssuer.equals(props().platformIssuer())
+                && audience(idToken).contains(props().passwordClientId()) ? props().passwordClientId() : p.clientId();
         if (client == null) {
             return null;
         }
@@ -536,12 +594,12 @@ public class OidcClient {
 
     /** For the health of the automatic sign-in path: the provider's key set answers over the back channel. */
     public boolean reachable() {
-        if (!props.configured()) {
+        if (!props().configured()) {
             return false;
         }
         try {
-            HttpResponse<Void> r = http.send(HttpRequest.newBuilder(URI.create(props.jwksEndpoint()))
-                    .timeout(Duration.ofMillis(Math.min(3000, props.httpTimeoutMs()))).GET().build(), HttpResponse.BodyHandlers.discarding());
+            HttpResponse<Void> r = http().send(HttpRequest.newBuilder(URI.create(props().jwksEndpoint()))
+                    .timeout(Duration.ofMillis(Math.min(3000, props().httpTimeoutMs()))).GET().build(), HttpResponse.BodyHandlers.discarding());
             return r.statusCode() == 200;
         } catch (Exception e) {
             if (e instanceof InterruptedException) {

@@ -19,9 +19,11 @@ import {
   AREA_NAME, FLOW_STAGES, FLOW_STEPS, areaChip, areaVerdict, campTree, flowStepProblem, kmChip, measuredFrom, overReason, rangeText, requestingUnitOf,
   restationingChoices, siteShapeKind, startStep, unitChoices, unitForest, verdictOf,
   type AreaRole, type CampNode, type FlowPurpose, type UnitNode,
+  requestIntoFlow, type FlowKind,
 } from '../lib/deploymentAreasFlow';
 import { distanceM, type LatLng } from '../lib/geo';
 import { PURPOSE_WRITES } from '../lib/requestPurpose';
+import { ReturnedParts } from '../components/workspace/PartReviewPanel';
 import { anchorOf, partsOf, siteArea } from '../lib/siteGeometry';
 
 type PlaceShape = ShapeKind | 'COPY';
@@ -54,7 +56,19 @@ const SITE_NAME = 'موقع التمركز الجديد';
  * Each shape is placed ready-made by one click (circle, ellipse, square, rectangle, or a copy) or drawn (a double click
  * finishes), then handled like a shape in Word (§7). Its numbers are small chips with «ⓘ» for the details (§8).
  */
-export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', preselectUnit = null }: { onClose: () => void; purpose?: FlowPurpose; preselectUnit?: string | null }) {
+/** A date input's day of an ISO instant, and the instant a chosen day starts at (the application's time zone, as before). */
+const isoDay = (s?: string | null) => (s ? s.slice(0, 10) : '');
+const dayStart = (d: string) => (d ? new Date(d + 'T00:00:00+04:00').toISOString() : null);
+
+/**
+ * The one map-first editor of «طلب مناطق انتشار» and «طلب إعادة تمركز» (owner brief §4–§5; release closure, 20 Nov 2026):
+ * a new request, a new one opened from a site (the site preselected, nothing saved), a saved draft or a returned request
+ * (`requestId`: loaded as saved, nothing changed by opening it; content this screen has no control for is carried back
+ * unchanged and named). A temporary move keeps the same lifecycle: its dates are asked here when the kind is TEMPORARY.
+ */
+export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', preselectUnit = null, preselectSite = null, requestId = null }: {
+  onClose: () => void; purpose?: FlowPurpose; preselectUnit?: string | null; preselectSite?: string | null; requestId?: string | null;
+}) {
   const isRS = purpose === 'RESTATIONING';
   const stages = FLOW_STAGES[purpose];
   const steps = FLOW_STEPS[purpose];
@@ -80,8 +94,17 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
   const [tool, setTool] = useState<Tool>('select');
   const [info, setInfo] = useState<AreaRole | null>(null);
   const [reason, setReason] = useState('');
+  // permanent, or temporary with its start and planned end (the lifecycle of ADR-034 is the server's, unchanged)
+  const [kind, setKind] = useState<FlowKind>('PERMANENT');
+  const [start, setStart] = useState<string | null>(null);
+  const [end, setEnd] = useState<string | null>(null);
+  // the saved request this screen edits (a draft or a returned request), as the server holds it; null for a new one
+  const [loaded, setLoaded] = useState<RestationingRequest | null | undefined>(requestId ? undefined : null);
+  const [legacy, setLegacy] = useState<string[]>([]);
   // the request on the server: a draft, then sent through its route
   const [draft, setDraft] = useState<{ id: string; number: string; sent: boolean; requester: string } | null>(null);
+  // «حُفظت المسودة» is said for a save made here, not for a saved request merely opened
+  const [savedHere, setSavedHere] = useState(false);
   const [sendErr, setSendErr] = useState('');
   const [busy, setBusy] = useState(false);
   const [mode, setMode] = useState<BasemapMode>('street');
@@ -112,24 +135,57 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
     api.requestHub().then((h) => setUnits(h.units), () => setUnits([]));
     api.stationingPolicy().then((p) => setPolicy(p.inForce ? { version: p.inForce.version, values: p.inForce.values } : null), () => setPolicy(null));
   }, []);
+  // a saved request: read as saved; opening it writes nothing (only «حفظ كمسودة» and «إرسال للاعتماد» do)
+  useEffect(() => {
+    if (!requestId) return;
+    api.restationingRequest(requestId).then((r) => {
+      const f = requestIntoFlow(r);
+      setLoaded(r);
+      setLegacy(f.legacy);
+      setKind(f.kind);
+      setStart(f.start);
+      setEnd(f.end);
+      setReason(f.reason);
+      setAreas({ primary: f.primary as GeoPolygon | null, alternative: f.alternative as GeoPolygon | null });
+      setNewSite(isRS && f.site && isShape(f.site as SiteGeometry) ? (f.site as SiteGeometry) : null);
+      setCopied(f.copiedFrom ? { id: f.copiedFrom, area: r.currentSites.find((c) => c.site.id === f.copiedFrom)?.geometry && isShape(r.currentSites.find((c) => c.site.id === f.copiedFrom)!.geometry as SiteGeometry) ? areaOf(r.currentSites.find((c) => c.site.id === f.copiedFrom)!.geometry as SiteGeometry) : 0 } : null);
+      setDraft({ id: r.id, number: r.number, sent: false, requester: r.requestingUnit.id });
+    }, (e: Error) => setErr(e.message));
+  }, [requestId]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => editor.current?.destroy(), []);
 
   const choices = useMemo(() => (isRS ? restationingChoices(units ?? []) : unitChoices(units ?? [])), [units, isRS]);
   // the request starts by itself from the current site when the person may ask for one unit only (or the unit it was opened for)
   const started = useRef(false);
   useEffect(() => {
-    if (started.current || units === null) return;
+    if (started.current || units === null || loaded === undefined) return;
     started.current = true;
-    const pre = preselectUnit ? choices.find((c) => c.unit.id === preselectUnit && c.eligible) : undefined;
+    if (loaded) {
+      // a saved request: its units as saved, opened at its first open step, the map on its current site
+      const f = requestIntoFlow(loaded);
+      if (isRS) setPicked(f.picked);
+      else setUnitId(f.picked[0] ?? null);
+      setStep(f.step);
+      const site = loaded.currentSites[0]?.site.id ?? choices.find((c) => c.unit.id === f.picked[0])?.unit.site?.id ?? null;
+      setCampId(site);
+      if (site) setFocusReq({ siteId: site, key: 1 });
+      else setFitAll(true);
+      return;
+    }
+    // opened from a site (the Sites page): that site is the choice; its one eligible unit is chosen with it, nothing saved
+    const atSite = preselectSite ? choices.filter((c) => c.eligible && c.unit.site?.id === preselectSite) : [];
+    const pre = preselectUnit ? choices.find((c) => c.unit.id === preselectUnit && c.eligible) : atSite.length === 1 ? atSite[0] : undefined;
     const s = pre ? { step: 2, unitId: pre.unit.id } : startStep(choices);
     if (isRS) setPicked(s.unitId ? [s.unitId] : []);
     else setUnitId(s.unitId);
-    setStep(s.step);
-    const site = choices.find((c) => c.unit.id === s.unitId)?.unit.site?.id ?? null;
+    setStep(preselectSite && !pre ? 1 : s.step);
+    const site = choices.find((c) => c.unit.id === s.unitId)?.unit.site?.id ?? preselectSite ?? null;
     setCampId(site);
+    // the camps stay folded at first (owner); only the site the request was opened from is unfolded
+    if (site && preselectSite) setOpenCamps((c) => new Set(c).add(site));
     if (site) setFocusReq({ siteId: site, key: 1 });
     else setFitAll(true);
-  }, [units, choices]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [units, choices, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const siteRefs = useMemo(() => registered.sites.filter((x) => x.view !== 'CONTEXT').map((x) => ({ siteId: x.siteId, name: x.name, code: x.code, parentId: x.parentId ?? null })), [registered.sites]);
   const tree = useMemo(() => campTree(choices, siteRefs), [choices, siteRefs]);
@@ -137,7 +193,11 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
   // the units of the request: the one unit, or the units that move with the unit asking for them
   const scopeIds = isRS ? picked : unitId ? [unitId] : [];
   const scopeUnits = scopeIds.map(byId).filter((u): u is HubUnit => !!u);
-  const requester = isRS ? requestingUnitOf(picked, units ?? []) : byId(unitId);
+  const sameAsSaved = !!loaded && scopeIds.length === loaded.content.scope.length && scopeIds.every((id) => loaded.content.scope.includes(id));
+  // a saved request keeps its requesting unit while its units are as saved (the server checks again on every save)
+  const requester = isRS ? requestingUnitOf(picked, units ?? []) ?? (sameAsSaved && loaded ? ({ id: loaded.requestingUnit.id, name: loaded.requestingUnit.name } as HubUnit) : null) : byId(unitId) ?? (sameAsSaved && loaded ? ({ id: loaded.requestingUnit.id, name: loaded.requestingUnit.name } as HubUnit) : null);
+  const savedName = (id: string) => loaded?.units.find((u) => u.id === id)?.name ?? id;
+  const scopeNames = scopeIds.map((id) => byId(id)?.name ?? savedName(id));
   // «the current site shows by itself» (brief §5): the first unit's site is where distances start; every one is drawn
   const unit = scopeUnits[0] ?? null;
   const siteGeom = geometryOf(unit);
@@ -344,19 +404,24 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
 
   // the request as the map draws it: the current sites, the new site (unless it is being edited), the other areas
   const currentSites = isRS ? scopeUnits.filter((u, i, l) => u.site && l.findIndex((x) => x.site?.id === u.site?.id) === i) : unit ? [unit] : [];
+  // the current sites as the map draws them: from the hub, or, for a saved request whose units are beyond the hub, as saved
+  const currentSiteDraws = currentSites.length > 0 || !loaded
+    ? currentSites.flatMap((u) => (u.site && geometryOf(u) ? [{ unit: u.name, site: { id: u.site.id, name: u.site.name }, geometry: geometryOf(u)! }] : []))
+    : loaded.currentSites.flatMap((c) => (c.geometry ? [{ unit: c.unit, site: c.site, geometry: c.geometry }] : []));
+  const currentSiteNames = currentSites.length > 0 || !loaded ? currentSites.map((u) => u.site?.name) : loaded.currentSites.map((c) => c.site.name);
   const preview = useMemo<RestationingRequest>(() => ({
-    id: 'new', number: 'جديد', state: 'DRAFT', purpose, requestingUnit: requester ? { id: requester.id, name: requester.name } : { id: '', name: '' }, requester: { id: '', name: '' }, units: [],
-    currentSites: currentSites.flatMap((u) => (u.site && geometryOf(u) ? [{ unit: u.name, site: { id: u.site.id, name: u.site.name }, geometry: geometryOf(u)! }] : [])),
+    id: loaded?.id ?? 'new', number: loaded?.number ?? 'جديد', state: loaded?.state ?? 'DRAFT', purpose, requestingUnit: requester ? { id: requester.id, name: requester.name } : { id: '', name: '' }, requester: { id: '', name: '' }, units: [],
+    currentSites: currentSiteDraws,
     policyVersion: policy?.version ?? null, routeNo: 0, route: [], previousRoutes: [], revisions: [], returned: null, paused: null, finalApprover: null,
     can: { edit: true, submit: true, decide: false, activate: false },
     // the shape being edited is drawn by the editor; the others by the request map (the main area's leg starts at content.site)
     content: {
-      kind: 'PERMANENT', scope: [],
+      kind, scope: [],
       site: isRS ? (newSite && target !== 'site' ? { geometry: newSite, copiedFrom: null, shape: 'DRAWN' } : null) : siteGeom ? { geometry: siteGeom, copiedFrom: null, shape: 'DRAWN' } : null,
       primary: role === 'primary' ? null : areas.primary, alternative: role === 'alternative' ? null : areas.alternative, reason: '', exceptions: {}, occupants: {},
     },
     targetSite: null,
-  }) as unknown as RestationingRequest, [scopeIds.join(','), requester?.id, siteGeom, newSite, areas, target, policy?.version]); // eslint-disable-line react-hooks/exhaustive-deps
+  }) as unknown as RestationingRequest, [scopeIds.join(','), requester?.id, siteGeom, newSite, areas, target, policy?.version, kind, loaded?.id, currentSiteDraws.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * A unit chosen. «طلب مناطق انتشار»: it and its camp are the choice (its areas start again when the unit changes).
@@ -419,11 +484,21 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
   const toggleCamp = (id: string) => setOpenCamps((c) => { const x = new Set(c); if (!x.delete(id)) x.add(id); return x; });
   const toggleUnit = (id: string) => setOpenUnits((c) => { const x = new Set(c); if (!x.delete(id)) x.add(id); return x; });
 
+  // what is saved: the content as saved (so occupants, exceptions and a site registration are carried unchanged) under
+  // what this screen controls; a permanent move carries no dates
   const contentOf = () => ({
-    kind: 'PERMANENT' as const,
+    ...(loaded?.content ?? {}),
+    kind,
+    start: kind === 'TEMPORARY' ? start : null,
+    end: kind === 'TEMPORARY' ? end : null,
     scope: scopeIds,
-    site: isRS && newSite ? { geometry: newSite, copiedFrom: copied?.id ?? null, shape: siteShapeKind(copied?.area ?? null, areaOf(newSite)) } : null,
-    primary: areas.primary, alternative: areas.alternative, reason: reason.trim(), exceptions: {}, occupants: {},
+    // the new site as saved when it was not touched (its copiedFrom and shape stay as recorded), else as placed here
+    site: isRS && newSite
+      ? (loaded?.content.site && JSON.stringify(loaded.content.site.geometry) === JSON.stringify(newSite) ? loaded.content.site
+        : { geometry: newSite, copiedFrom: copied?.id ?? null, shape: siteShapeKind(copied?.area ?? null, areaOf(newSite)) })
+      : loaded?.content.site && !isRS ? loaded.content.site : null,
+    primary: areas.primary, alternative: areas.alternative, reason: reason.trim(),
+    exceptions: loaded?.content.exceptions ?? {}, occupants: loaded?.content.occupants ?? {},
   });
   /** «حفظ كمسودة» and «إرسال للاعتماد»: the draft is made once and its content kept current; sending submits it (the server checks again). */
   const save = async (send: boolean) => {
@@ -437,13 +512,14 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
       const r = draft ? await api.editRestationing(draft.id, content) : await api.createRestationing(requester.id, content, purpose);
       const sent = send ? await api.submitRestationing(r.id) : r;
       setDraft({ id: r.id, number: sent.number ?? r.number, sent: send, requester: requester.id });
+      setSavedHere(true);
     } catch (e) {
       setSendErr((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
-  const problemFor = (to: number) => flowStepProblem(purpose, { units: scopeIds.length, requester: !!requester, site: newSite, primary: areas.primary, alternative: areas.alternative }, to);
+  const problemFor = (to: number) => flowStepProblem(purpose, { units: scopeIds.length, requester: !!requester, site: newSite, primary: areas.primary, alternative: areas.alternative, kind, start, end }, to);
   const goStep = (to: number) => {
     const p = problemFor(to);
     if (p && to > step) return setErr(p);
@@ -453,13 +529,13 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
   };
 
   // ---- the panel -------------------------------------------------------------------------------------------------------
-  const contextLine = unit && (
+  const contextLine = (unit || (loaded && scopeIds.length > 0)) && (
     <div className="da-from" data-testid="request-from">
       <Icon name="tent" />
       {isRS ? (
-        <div><b>{currentSites.map((u) => u.site?.name).join('، ')}</b><small>{scopeUnits.length === 1 ? unit.name : scopeUnits.length + ' وحدات'} — الموقع الحالي، يظهر تلقائياً.</small></div>
+        <div><b>{currentSiteNames.join('، ')}</b><small>{scopeIds.length === 1 ? scopeNames[0] : scopeIds.length + ' وحدات'} — الموقع الحالي، يظهر تلقائياً.</small></div>
       ) : (
-        <div><b>{unit.site?.name}</b><small>{unit.name} — يبدأ الطلب من هذا الموقع، ولا يتغير.</small></div>
+        <div><b>{unit?.site?.name ?? currentSiteNames[0]}</b><small>{unit?.name ?? scopeNames[0]} — يبدأ الطلب من هذا الموقع، ولا يتغير.</small></div>
       )}
       {step > 1 && (isRS || choices.filter((c) => c.eligible).length > 1) && <button type="button" className="sw-link" onClick={() => goStep(1)}>تغيير</button>}
     </div>
@@ -539,6 +615,22 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
             <p className={requester ? 'sw-done' : 'sw-err'} data-testid="restation-scope">
               {requester ? <>✓ {picked.length === 1 ? 'وحدة واحدة تنتقل' : picked.length + ' وحدات تنتقل'} · تقدّم الطلب «{requester.name}».</> : 'الوحدات المختارة ليست في فرع واحد: اختر وحدات تضمها وحدة واحدة.'}
             </p>
+          )}
+          {isRS && (
+            <div className="da-kind" data-testid="kind-choice" role="radiogroup" aria-label="نوع إعادة التمركز">
+              <button type="button" role="radio" aria-checked={kind === 'PERMANENT'} className={'da-kind-card' + (kind === 'PERMANENT' ? ' on' : '')} data-testid="kind-permanent" onClick={() => { setKind('PERMANENT'); setErr(''); }}>
+                <b>دائم</b><small>تنتقل الوحدات إلى الموقع الجديد بعد الاعتماد والتفعيل.</small>
+              </button>
+              <button type="button" role="radio" aria-checked={kind === 'TEMPORARY'} className={'da-kind-card' + (kind === 'TEMPORARY' ? ' on' : '')} data-testid="kind-temporary" onClick={() => { setKind('TEMPORARY'); setErr(''); }}>
+                <b>مؤقت</b><small>لفترة بتاريخ بداية ونهاية، ثم تعود الوحدات إلى موقعها الدائم.</small>
+              </button>
+              {kind === 'TEMPORARY' && (
+                <div className="da-dates" data-testid="temporary-dates">
+                  <label><span>من</span><input type="date" aria-label="بداية التمركز المؤقت" value={isoDay(start)} onChange={(e) => setStart(dayStart(e.target.value))} /></label>
+                  <label><span>إلى</span><input type="date" aria-label="نهاية التمركز المؤقت" value={isoDay(end)} onChange={(e) => setEnd(dayStart(e.target.value))} /></label>
+                </div>
+              )}
+            </div>
           )}
         </>
       )}
@@ -665,9 +757,10 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
       <dl className="sw-sum" data-testid="areas-summary">
         {isRS ? (
           <>
-            <div><dt>الوحدات المنتقلة</dt><dd>{scopeUnits.map((u) => u.name).join('، ') || '—'}</dd></div>
+            <div><dt>الوحدات المنتقلة</dt><dd>{scopeNames.join('، ') || '—'}</dd></div>
             <div><dt>تقدّم الطلب</dt><dd>{requester?.name ?? '—'}</dd></div>
-            <div><dt>الموقع الحالي</dt><dd>{currentSites.map((u) => u.site?.name).join('، ') || '—'}</dd></div>
+            <div><dt>النوع</dt><dd data-testid="review-kind">{kind === 'TEMPORARY' ? `مؤقت${start ? ' · من ' + isoDay(start) : ''}${end ? ' إلى ' + isoDay(end) : ''}` : 'دائم'}</dd></div>
+            <div><dt>الموقع الحالي</dt><dd>{currentSiteNames.join('، ') || '—'}</dd></div>
             <div><dt>{SITE_NAME}</dt><dd data-testid="review-site">{siteMeasure ? `${siteMeasure.distance != null ? kmChip(siteMeasure.distance) + ' من الموقع الحالي · ' : ''}${areaChip(siteMeasure.area)}${siteOver ? ' · ! أكبر من الحد الأقصى: يقرر المعتمد النهائي' : ''}` : '—'}</dd></div>
           </>
         ) : (
@@ -684,6 +777,17 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
       <p className="sw-hint">{isRS
         ? 'يفحص الخادم الموقع الجديد والمسافتين مع طبيعة الأرض والأرض المشغولة قبل الإرسال، ثم يمر الطلب بمسار الاعتماد المعتاد حتى التفعيل.'
         : 'يفحص الخادم المسافتين مع طبيعة الأرض والأرض المشغولة قبل الإرسال، ثم يمر الطلب بمسار الاعتماد المعتاد حتى التفعيل.'}</p>
+      {loaded?.returned && (
+        <div className="sw-returned" data-testid="returned-note">
+          <b>أُعيد الطلب للتعديل</b> — {loaded.returned.byName} ({loaded.returned.stageLabel}): {loaded.returned.reason}
+          {loaded.parts && <ReturnedParts parts={loaded.parts} />}
+        </div>
+      )}
+      {legacy.length > 0 && (
+        <p className="sw-hint da-legacy" role="note" data-testid="legacy-note">
+          يحمل هذا الطلب، من محرره السابق، ما لا يُعدَّل هنا: {legacy.join('، ')}. يُحفظ كما هو مع الطلب ولا يُحذف؛ يراه المعتمدون في تفاصيل الطلب.
+        </p>
+      )}
       <label className="sw-f"><span className="sw-l">سبب الطلب</span>
         <textarea className="sw-input" rows={2} aria-label="سبب الطلب" value={reason} onChange={(e) => setReason(e.target.value)} />
       </label>
@@ -699,7 +803,7 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
         <>
           <button type="button" className="sw-go" data-testid="send-areas" disabled={busy || drawing} onClick={() => void save(true)}>{busy ? 'جارٍ الإرسال…' : 'إرسال للاعتماد'}</button>
           <button type="button" className="button da-draft" data-testid="save-draft" disabled={busy || drawing} onClick={() => void save(false)}>حفظ كمسودة</button>
-          {draft && !draft.sent && <p className="sw-hint" role="status" data-testid="draft-saved">✓ حُفظت المسودة <bdi>{draft.number}</bdi>. تُرسل من هنا أو من «الطلبات».</p>}
+          {draft && !draft.sent && savedHere && <p className="sw-hint" role="status" data-testid="draft-saved">✓ حُفظت المسودة <bdi>{draft.number}</bdi>. تُرسل من هنا أو من «الطلبات».</p>}
         </>
       )}
       {sendErr && <p className="sw-err" role="alert" data-testid="send-error">{sendErr}</p>}
@@ -707,7 +811,7 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
   );
 
   const nextProblem = step < last ? problemFor(step + 1) : '';
-  const title = isRS ? 'طلب إعادة تمركز' : 'طلب مناطق انتشار';
+  const title = (isRS ? 'طلب إعادة تمركز' : 'طلب مناطق انتشار') + (loaded ? ' ' + loaded.number : '');
   const panel = (
     <section className="sw-wizard da-wizard" data-testid={isRS ? 'restation-request' : 'areas-request'} data-step={step} data-stage={stage}>
       <div className="sw-top">

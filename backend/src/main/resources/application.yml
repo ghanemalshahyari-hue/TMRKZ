@@ -126,20 +126,6 @@ tmrkz:
     employee-number-attribute: ${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:employeeNumber}
     user-object-class: ${LDAP_USER_OBJECT_CLASS:inetOrgPerson}
     direct-bind-pattern: ${LDAP_DIRECT_BIND_PATTERN:}
-    # ADR-070: backend-only overrides of the manual authenticator. Each one supplied is taken before the shared value above
-    # (an empty one is not supplied; LdapProperties applies the choice, since a placeholder cannot skip an empty variable).
-    # A manual URL never receives the shared service account: its bind DN and credential come from these values alone.
-    manual:
-      url: ${TMRKZ_MANUAL_LDAP_URL:}
-      start-tls: ${TMRKZ_MANUAL_LDAP_START_TLS:}
-      bind-dn: ${TMRKZ_MANUAL_LDAP_BIND_DN:}
-      bind-credential: ${TMRKZ_MANUAL_LDAP_BIND_CREDENTIAL:}
-      users-dn: ${TMRKZ_MANUAL_LDAP_USERS_DN:}
-      username-attribute: ${TMRKZ_MANUAL_LDAP_USERNAME_ATTRIBUTE:}
-      uuid-attribute: ${TMRKZ_MANUAL_LDAP_UUID_ATTRIBUTE:}
-      employee-number-attribute: ${TMRKZ_MANUAL_LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:}
-      user-object-class: ${TMRKZ_MANUAL_LDAP_USER_OBJECT_CLASS:}
-      direct-bind-pattern: ${TMRKZ_MANUAL_LDAP_DIRECT_BIND_PATTERN:}
     ca-dir: ${TMRKZ_LDAP_CA_DIR:/etc/tmrkz/ldap-ca}
     # ADR-068: names of the directory attributes carrying the employment attributes in this organisation. Empty: not read.
     unit-id-attribute: ${LDAP_ATTR_UNIT_ID:}

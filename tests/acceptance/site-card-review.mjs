@@ -31,10 +31,12 @@ const sites = await apiGet(admin, '/sites');
 const parent = sites.find((s) => sites.some((k) => k.parentId === s.id));
 const kid = sites.find((k) => k.parentId === parent?.id);
 const stationed = (await apiGet(admin, '/stationing/current')).find((r) => !sites.some((k) => k.parentId === r.siteId));
-const otherSite = (await apiGet(other, '/request-hub')).units.find((u) => u.site)?.site;
+// the other person's unit whose site they set up (OTHER_UNIT names it when the person holds several units)
+const otherUnits = (await apiGet(other, '/request-hub')).units.filter((u) => u.site);
+const otherSite = (otherUnits.find((u) => u.name.includes(process.env.OTHER_UNIT ?? '\u0000')) ?? otherUnits[0])?.site;
 if (!parent || !kid || !stationed || !otherSite) throw new Error('needs a camp with an inside site, a stationed unit and a site of the other person\'s unit');
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH, headless: true } : { channel: 'msedge', headless: true });
 const external = [];
 const results = [];
 const ok = (pass, what, detail = '') => { results.push(pass); console.log(`${pass ? 'PASS' : 'FAIL'} ${what}${detail ? ' · ' + detail : ''}`); };
@@ -48,10 +50,18 @@ const open = async (cookies, theme, hash) => {
     return route.continue();
   });
   const page = await ctx.newPage();
+  lastPage = page;
   await page.goto(BASE + '/' + hash);
   await page.waitForSelector('main#main', { timeout: 30000 });
   return { ctx, page };
 };
+// a failure keeps the screen it happened on (release closure, 20 Nov 2026)
+let lastPage = null;
+process.on('uncaughtException', async (e) => {
+  console.error(String(e).split('\n').slice(0, 4).join('\n'));
+  try { await lastPage?.screenshot({ path: OUT + 'failure.png' }); console.error('screen: ' + OUT + 'failure.png · ' + lastPage?.url()); } catch {}
+  process.exit(1);
+});
 const text = async (loc) => (await loc.innerText()).replace(/\s+/g, ' ');
 
 for (const theme of ['light', 'dark']) {

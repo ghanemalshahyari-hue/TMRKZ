@@ -25,7 +25,7 @@ const requestsBefore = (await apiGet('/restationing-requests')).map((r) => r.id)
 const mine = (await apiGet('/request-hub')).units.find((u) => u.site && ['DEPLOYMENT_MISSING', 'DEPLOYMENT_COMPLETE'].includes(u.state));
 if (!mine) throw new Error(`${WHO} has no stationed unit to ask areas for`);
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH, headless: true } : { channel: 'msedge', headless: true });
 const external = [];
 const results = [];
 const ok = (pass, what, detail = '') => { results.push(pass); console.log(`${pass ? 'PASS' : 'FAIL'} ${what}${detail ? ' · ' + detail : ''}`); };

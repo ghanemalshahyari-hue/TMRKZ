@@ -1,10 +1,13 @@
 #!/usr/bin/env sh
 # TMRKZ on this machine, from this folder (owner, 19 Nov 2026). Asks for the address people will open — the IP address and
-# the port — writes them into .env, loads tmrkz-images.tar when its images are missing or newer, and starts everything.
+# the port — writes them into .env as TMRKZ_PUBLIC_URL=http://IP:PORT (the one address every sign-in address derives from,
+# ADR-092), loads tmrkz-images.tar when its images are missing or newer, and starts everything. An https address set by
+# ops/tls/enable.sh (TMRKZ_PUBLIC_URL=https://name) is kept: only the port is asked then.
 # The same by hand:  set TMRKZ_IP and TMRKZ_PORT in .env,  docker load -i tmrkz-images.tar,  docker compose up -d
 #   sh start.sh                                   asks
 #   TMRKZ_IP=10.1.2.3 TMRKZ_PORT=8088 sh start.sh  does not ask
 # On a new checkout it also creates .env (ops/init-env.sh) and the local directory's CA and password (ops/local/.generated).
+# The enterprise directory and the enterprise Keycloak are entered after sign-in, in «إعدادات النظام ← إعدادات التكامل».
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")"
@@ -60,9 +63,11 @@ fi
 # 1. the address
 IP="${TMRKZ_IP:-}"; PORT="${TMRKZ_PORT:-}"
 CUR_IP="$(value TMRKZ_IP)"; CUR_IP="${CUR_IP:-127.0.0.1}"; CUR_PORT="$(value TMRKZ_PORT)"; CUR_PORT="${CUR_PORT:-8088}"
+HTTPS="$(value TMRKZ_PUBLIC_URL)"; case "$HTTPS" in https://*) ;; *) HTTPS="";; esac
 if [ -z "$IP" ] || [ -z "$PORT" ]; then
   echo
   echo "  TMRKZ — the address people will open"
+  [ -n "$HTTPS" ] && echo "  https is on: people open $HTTPS (ops/tls); the IP address below is for the plain-http port only"
   echo "  IP addresses of this machine: $(addresses)(127.0.0.1: this machine only)"
 fi
 n=0
@@ -78,8 +83,9 @@ done
 busy="$(docker ps --format '{{.Names}} {{.Ports}}' | grep -v '^tmrkz-mover-' | grep -E ":$PORT->" | cut -d' ' -f1 | head -n 1 || true)"
 [ -z "$busy" ] || { echo "port $PORT is already used by the container $busy; choose another"; exit 2; }
 setenv TMRKZ_IP "$IP"; setenv TMRKZ_PORT "$PORT"
-# the same address for the tools of the image-built installation (ops/*.sh read these)
-setenv TMRKZ_PUBLIC_URL "http://$IP:$PORT"; setenv MOVER_HTTP_PORT "$PORT"
+# the one address every sign-in address derives from (docker-compose.override.yml, ops/*.sh); an https address is kept
+[ -n "$HTTPS" ] || setenv TMRKZ_PUBLIC_URL "http://$IP:$PORT"
+setenv MOVER_HTTP_PORT "$PORT"
 
 # 2. the images: loaded when one is missing or tmrkz-images.tar is newer than the last one loaded here
 LOADED=ops/local/.generated/images-loaded.sha256
@@ -97,7 +103,7 @@ fi
 
 # 3. start (the first start builds the backend and the web from the source: a few minutes)
 docker compose up -d
-URL="http://$IP:$PORT"; LOCAL="http://127.0.0.1:$PORT"
+URL="${HTTPS:-http://$IP:$PORT}"; LOCAL="http://127.0.0.1:$PORT"
 echo "  waiting for TMRKZ (logs: docker compose logs -f backend web-build) …"
 n=0
 until [ "$(code "$LOCAL/auth/realms/tmrkz/.well-known/openid-configuration")" = 200 ] && [ "$(code "$LOCAL/api/v1/auth/status")" = 200 ]; do
@@ -106,3 +112,4 @@ done
 echo
 echo "  TMRKZ is running: $URL"
 echo "  sign in as admin or developer (passwords: TMRKZ_PLATFORM_ADMIN_PASSWORD / TMRKZ_PLATFORM_DEVELOPER_PASSWORD in .env)"
+echo "  the enterprise directory and Keycloak: إعدادات النظام ← إعدادات التكامل (RUN.md section 7)"

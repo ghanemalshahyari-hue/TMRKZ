@@ -77,8 +77,7 @@ services:
       TMRKZ_AI_BASE_URL: ${TMRKZ_AI_BASE_URL:-http://host.docker.internal:11434/v1}
       TMRKZ_AI_MODEL: ${TMRKZ_AI_MODEL:-qwen2.5:7b}
       TMRKZ_AI_API_KEY: ${TMRKZ_AI_API_KEY:-}
-      # Manual sign-in: optional backend-only overrides let enterprise direct-bind coexist with local Keycloak users.
-      # Spring selects each TMRKZ_MANUAL_* value first, then the equivalent shared LDAP setting (ADR-070).
+      # Manual sign-in against the directory: these .env values apply until the directory is entered in «إعدادات التكامل» (ADR-092).
       LDAP_URL: ${LDAP_URL:-}
       LDAP_START_TLS: ${LDAP_START_TLS:-true}
       LDAP_BIND_DN: ${LDAP_BIND_DN:-}
@@ -89,16 +88,6 @@ services:
       LDAP_EMPLOYEE_NUMBER_ATTRIBUTE: ${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:-employeeNumber}
       LDAP_USER_OBJECT_CLASS: ${LDAP_USER_OBJECT_CLASS:-inetOrgPerson}
       LDAP_DIRECT_BIND_PATTERN: ${LDAP_DIRECT_BIND_PATTERN:-}
-      TMRKZ_MANUAL_LDAP_URL: ${TMRKZ_MANUAL_LDAP_URL:-}
-      TMRKZ_MANUAL_LDAP_START_TLS: ${TMRKZ_MANUAL_LDAP_START_TLS:-}
-      TMRKZ_MANUAL_LDAP_BIND_DN: ${TMRKZ_MANUAL_LDAP_BIND_DN:-}
-      TMRKZ_MANUAL_LDAP_BIND_CREDENTIAL: ${TMRKZ_MANUAL_LDAP_BIND_CREDENTIAL:-}
-      TMRKZ_MANUAL_LDAP_USERS_DN: ${TMRKZ_MANUAL_LDAP_USERS_DN:-}
-      TMRKZ_MANUAL_LDAP_USERNAME_ATTRIBUTE: ${TMRKZ_MANUAL_LDAP_USERNAME_ATTRIBUTE:-}
-      TMRKZ_MANUAL_LDAP_UUID_ATTRIBUTE: ${TMRKZ_MANUAL_LDAP_UUID_ATTRIBUTE:-}
-      TMRKZ_MANUAL_LDAP_EMPLOYEE_NUMBER_ATTRIBUTE: ${TMRKZ_MANUAL_LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:-}
-      TMRKZ_MANUAL_LDAP_USER_OBJECT_CLASS: ${TMRKZ_MANUAL_LDAP_USER_OBJECT_CLASS:-}
-      TMRKZ_MANUAL_LDAP_DIRECT_BIND_PATTERN: ${TMRKZ_MANUAL_LDAP_DIRECT_BIND_PATTERN:-}
       TMRKZ_LDAP_CA_DIR: /etc/tmrkz/ldap-ca
       # ADR-068: which directory attributes / ID-token claims carry unit ID, unit name, main unit ID, rank and position.
       # Empty: not read (the default). Keycloak's mappers: ops/keycloak/set-employment-attributes.sh.

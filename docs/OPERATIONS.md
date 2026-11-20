@@ -142,110 +142,77 @@ configuration changes never require data migration of in-flight requests.
 
 ## Sign-in (Keycloak + enterprise directory)
 
-- Fill in `.env`: `LDAP_URL` (`ldaps://…`, or `ldap://…` with `LDAP_START_TLS=true`), `LDAP_BIND_DN` and
-  `LDAP_BIND_CREDENTIAL` (a read-only service account), `LDAP_USERS_DN`, and optionally `LDAP_USERNAME_ATTRIBUTE`
-  (default `uid`; `sAMAccountName` for Active Directory with `LDAP_VENDOR=ad`, `LDAP_UUID_ATTRIBUTE=objectGUID`,
-  `LDAP_USER_OBJECT_CLASSES=person, organizationalPerson, user`). Put the organisation's CA certificates (PEM) in
-  `ops/keycloak/truststores/`. Certificate validation is never disabled.
-- `TMRKZ_PUBLIC_URL` is the address users open (https in production: `ops/tls/README.md`, which also sets
-  `MOVER_SECURE_COOKIE=true`). The realm is created from these values on the first start only; after the address changes,
-  `sh ops/keycloak/set-public-url.sh <project>` gives the client `tmrkz-web` the new sign-in and sign-out addresses, and `ops/keycloak/set-directory.sh` points the directory federation at the directory now in `.env` (ADR-052)
-  (`ops/tls/enable.sh` runs it).
-- Employment attributes before Oracle is in force (ADR-068): name the directory attributes that carry unit ID, unit
-  name, main unit ID, rank and position in `.env` (`LDAP_ATTR_*`; empty = not read), then
-  `sh ops/keycloak/set-employment-attributes.sh <project>` (shows the changes) and `CONFIRM=yes sh …` (applies; re-runnable)
-  for the identity provider's directory mappers, set the printed `TMRKZ_OIDC_CLAIM_*` names in `.env`, and restart the backend.
-- The administration console is not served through the web entry point. Reach it from the host only, for example
-  `docker compose exec keycloak /opt/keycloak/bin/kcadm.sh …`, or a temporary SSH tunnel to `keycloak:8080/auth/admin/`.
-  The bootstrap account `tmrkz-bootstrap` uses `TMRKZ_KEYCLOAK_ADMIN_PASSWORD`: replace it with a named administrator
-  after the first start.
+- **One address.** `TMRKZ_PUBLIC_URL` in `.env` is the address people open (`sh start.sh` writes `http://IP:PORT` from the IP
+  address and port it asks for; `ops/tls/enable.sh` writes `https://<name>` and `start.sh` then keeps it). Every sign-in
+  address derives from it: Keycloak's hostname, the local realm's issuer, the callback `/api/v1/auth/oidc/callback` and the
+  signed-out page. Nothing else names the address (ADR-092).
+- **«إعدادات النظام ← إعدادات التكامل» (ADR-092), as MOVER's integration settings page.** After signing in as `admin` or
+  `developer`, whoever holds CONFIGURE enters, tests and saves:
+  - *the enterprise directory* of the manual form — server (the DNS name the certificate was issued for), LDAPS or
+    StartTLS and the port, the sign-in domain (each person binds as `user@domain`, as MOVER; or, with no domain, a
+    read-only service account that finds the entry first), the search base, the attribute names (an «Active Directory»
+    preset fills MOVER's: `sAMAccountName`, `objectGUID`, `user`, `MilNumber`, `MilRankName`, `MilOccupation`,
+    `MilCurrentUnitName`), the organisation's CA certificate pasted as PEM, the timeout;
+  - *the Keycloak of the automatic button* — the server address the browser opens, the realm, TMRKZ's client ID and
+    secret, the internal address when the back channel differs, the issuer when it is not `<server>/realms/<realm>`,
+    the return address (empty: `TMRKZ_PUBLIC_URL` + callback), the CA certificate of an internal PKI.
+  «اختبار الاتصال» uses the values on the screen as they are, before any save: the protected channel with the certificate
+  chain and host name checked, the service bind or a person's own sign-in for the directory; the realm's discovery
+  document, the issuer it states and the key set for Keycloak. Nothing typed for a test is stored. A save is in force at
+  once (no restart), is audited, and the secrets are encrypted with `TMRKZ_HR_SETTINGS_KEY`, never shown again. A section
+  switched off, or «العودة إلى إعدادات ملف البيئة», puts the `.env` values back in force; the screen shows those too.
+  The backend reaches the directory and the enterprise Keycloak directly through the `edge` network (no relay); the
+  database, Keycloak, OpenFGA and the local directory stay on the network with no route out.
+- **`.env` still works** for an installation configured before the screen existed: `LDAP_URL` (`ldaps://…`, or `ldap://…`
+  with `LDAP_START_TLS=true`), `LDAP_USERS_DN`, `LDAP_DIRECT_BIND_PATTERN={username}@domain` or `LDAP_BIND_DN` +
+  `LDAP_BIND_CREDENTIAL`, `LDAP_USERNAME_ATTRIBUTE`, `LDAP_UUID_ATTRIBUTE`, `LDAP_USER_OBJECT_CLASS`, `LDAP_ATTR_*`,
+  CA files in `ops/keycloak/truststores/`; and `TMRKZ_ENTERPRISE_OIDC_ISSUER`, `_INTERNAL_URL`, `_CLIENT_ID`,
+  `_CLIENT_SECRET` for the enterprise Keycloak. The saved screen values take precedence over them.
+- **Keycloak's own federation** (`LDAP_*` read by the `keycloak` service, `ops/keycloak/set-directory.sh`) matters only
+  when TMRKZ's *local* Keycloak is the automatic provider. With the enterprise Keycloak entered on the screen, the
+  automatic button goes there, exactly as MOVER's button does, and the local Keycloak serves the two platform accounts only.
+- The administration console of the local Keycloak is not served through the web entry point. Reach it from the host only,
+  for example `docker compose exec keycloak /opt/keycloak/bin/kcadm.sh …`. The bootstrap account `tmrkz-bootstrap` uses
+  `TMRKZ_KEYCLOAK_ADMIN_PASSWORD`: replace it with a named administrator after the first start.
 - First sign-in links a person automatically only when the directory login equals exactly one active HR domain account
   (`TMRKZ_OIDC_LINK_KEY=DOMAIN_ACCOUNT`), or, with `EMPLOYEE_NUMBER`, when the directory attribute mapped to the
   `employee_number` claim equals the HR employee number. Anything else appears under «الهيكل التنظيمي» → sign-ins
   waiting for review, where a MANAGE_ACCESS holder links or dismisses it with a reason.
 - The sign-in page offers both paths, as in TNQL: automatic (Keycloak) and manual. Manual verifies the allow-listed
-  platform accounts through their dedicated Keycloak client (ADR-070) and every other login through the directory. With no
-  direct pattern, the backend uses service-search/user-bind with the shared `LDAP_*` values and CA folder. Five failed
-  manual attempts lock a login name for 15 minutes. A rejected platform password does not fall through to LDAP.
+  platform accounts through their dedicated local Keycloak client (ADR-070) and every other login through the directory.
+  Five failed manual attempts lock a login name for 15 minutes. A rejected platform password does not fall through to LDAP.
 - **First administrator of an empty installation:** run `sh ops/bootstrap-admin.sh <directory-login>` on the host
   within 24 hours of that person's first sign-in. It works only while no active system administrator exists. The
   person becomes a temporary administrator for 72 hours, enough to configure the HR source and grant rights. When the
   HR mirror contains them, their next sign-in moves to the HR record and the temporary grant ends. Business rights
-  otherwise come only from memberships and responsibility seats.
+  otherwise come only from memberships and responsibility seats. A used registration is not reused: if the people were
+  deleted afterwards, register the login again (or `update bootstrap_admin set used_at = null, expires_at = now() + interval '24 hours'`).
 - **Lasting platform accounts (ADR-037):** «admin» and «developer» are local Keycloak users with the realm role
-  `tmrkz-platform`. After the first start, run `sh ops/platform-accounts.sh [project]`. It reads
-  `TMRKZ_PLATFORM_ADMIN_PASSWORD` and `TMRKZ_PLATFORM_DEVELOPER_PASSWORD` from `.env`. Run it again after changing
-  either password. They sign in manually through the restricted client supplied by
-  `ops/keycloak/set-platform-password-client.sh` (in the folder installation, the `keycloak-setup` service does all three on
-  every start), with local Keycloak step-up/logout. A
-  single-provider development setup retains its ordinary automatic local flow too; after enterprise automatic cutover,
-  these platform accounts must use the local path. They hold every administrative right. HR and the
-  directory never disable them. To revoke one, remove its role in Keycloak or drop it from `TMRKZ_PLATFORM_ACCOUNTS`.
+  `tmrkz-platform`, set on every start by the `keycloak-setup` service of the folder installation from
+  `TMRKZ_PLATFORM_ADMIN_PASSWORD` and `TMRKZ_PLATFORM_DEVELOPER_PASSWORD` (image-built installation:
+  `sh ops/platform-accounts.sh [project]`). They sign in manually through the restricted client of
+  `ops/keycloak/set-platform-password-client.sh`, with local Keycloak step-up/logout, and hold every administrative
+  right. HR and the directory never disable them. To revoke one, remove its role in Keycloak or drop it from
+  `TMRKZ_PLATFORM_ACCOUNTS`.
 - **Single local installation (ADR-091):** `sh start.sh` asks for the IP address and the port and starts `tmrkz-mover`
-  from this folder (`docker-compose.override.yml`; data in `data/`; the procedure in `RUN.md`). Until `LDAP_*` point at the
-  enterprise directory, it uses a stand-in directory with no people; the platform accounts are set on every start.
+  from this folder (`docker-compose.override.yml`; data in `data/`; the procedure in `RUN.md`). Until a directory is
+  entered, it uses a stand-in directory with no people; the platform accounts are set on every start.
 
-### Manual direct LDAP on an isolated installation (ADR-070)
+### Registering TMRKZ's client in the enterprise Keycloak (ADR-071)
 
-For the TNQL/Duty-style direct user-bind profile, do **not** supply the person's password to setup tooling. Put only the
-approved endpoint metadata and the public CA in the protected local stage, and put the approved direct pattern in a
-separate protected file containing exactly one `{username}` marker. Then:
+As MOVER: TMRKZ is a client of the organisation's Keycloak; it never imports its realm there. Ask the Keycloak team for a
+**confidential authorization-code client** in the approved realm:
 
-```sh
-python3 ops/keycloak/configure-manual-direct.py \
-  --stage-file /path/to/protected-directory-stage.json \
-  --bind-pattern-file /path/to/protected-bind-pattern.txt
-# then COMPOSE_PROFILES=enterprise-ldap in .env, and:
-sh start.sh
-```
-
-The helper updates only the generated `TMRKZ_MANUAL_LDAP_*` and relay settings in `.env`, imports public CA files, and
-leaves the shared/federated configuration and user's password alone. The profile `enterprise-ldap` adds the `ldap-relay`
-service of `docker-compose.override.yml`: the existing internal network stays isolated; the backend resolves only the directory's
-DNS name to the internal bridge gateway; the gateway-only Nginx stream relays raw TLS to the fixed upstream without
-terminating TLS. Re-run the helper if the compose network is recreated and its gateway changes. Never replace the relay
-with a general outbound network merely because the endpoint is unreachable.
-
-The manual user enters their enterprise password only into the normal sign-in form. The service-bind mode remains
-available for configured production profiles. **Automatic enterprise sign-in is separate**: when the enterprise Keycloak
-already federates the account, use a new dedicated external TMRKZ client as in ADR-071 instead of giving TMRKZ another
-service bind. TMRKZ-local LDAP federation, if chosen instead, still needs its read-only bind and exact-account checks.
-Authentication grants no business or platform role; if a requested account lacks an HR match, an administrator must
-explicitly add that User ID without HR through the supported account flow.
-
-### Automatic enterprise Keycloak (ADR-071)
-
-Duty's model is external enterprise OIDC, not TMRKZ's local stand-in. Register a **new confidential authorization-code
-client** in that enterprise realm. Do not reuse Duty's `MNAWB` client secret and do not import TMRKZ's realm. Registration
-requirements:
-
-- exact `TMRKZ_PUBLIC_URL` callback `/api/v1/auth/oidc/callback` and post-logout `/?signed-out=1`;
-- standard flow enabled; implicit/direct grant/service accounts disabled; confidential Basic client authentication and
-  mandatory PKCE S256; `openid profile`;
-- signed ID tokens with `sub`, `iat`, `exp`, `nonce`, `auth_time`, `preferred_username` and optional approved employee or
+- exact callback `TMRKZ_PUBLIC_URL` + `/api/v1/auth/oidc/callback` and post-logout `TMRKZ_PUBLIC_URL` + `/?signed-out=1`
+  (the screen shows the callback it will use);
+- standard flow enabled; implicit/direct grant/service accounts disabled; client authentication by secret; PKCE S256;
+  `openid profile`;
+- signed ID tokens with `sub`, `iat`, `exp`, `nonce`, `auth_time`, `preferred_username` and the approved employee or
   employment claim mappings. Do **not** map `tmrkz_roles` onto the enterprise client.
 
-Supply the client metadata through the approved local secret channel, then set only these values (the client secret goes in
-`.env`, never source/evidence):
-
-```dotenv
-TMRKZ_ENTERPRISE_OIDC_ISSUER=https://<enterprise-keycloak>/realms/<approved-realm>
-TMRKZ_ENTERPRISE_OIDC_INTERNAL_URL=https://<approved-backchannel>/realms/<approved-realm>
-TMRKZ_ENTERPRISE_OIDC_CLIENT_ID=tmrkz-web
-TMRKZ_ENTERPRISE_OIDC_CLIENT_SECRET=<new-secret-from-the-local-secret-file>
-```
-
-The stable `TMRKZ_LOCAL_OIDC_*` inputs and optional `TMRKZ_PLATFORM_*` overrides retain local platform identities, keys,
-callbacks and privileges. Do not let external values replace these or turn the external issuer into the platform issuer.
-The automatic button's start, callback, graceful error handling and ID-token verification are shared; callback token/JWKS
-selection is tied to the server-stored attempt provider and a separate key cache.
-
-**External-network considerations.** Verify the browser issuer, backend back-channel/JWKS, Java trust, endpoint paths,
-required claims and `auth_time` before activation. When the internal network has no route, use a separately approved
-fixed TLS forwarding profile with the same destination restriction as the manual-LDAP relay; do not grant the backend
-broad external egress or bypass certificate/hostname checks. No such back-channel is active until a dedicated client is
-registered. localhost HTTP is development-only; issue and register the production HTTPS origin before production use.
-
+Then enter the server address, realm, client ID and secret (and the CA, if internal) in «إعدادات التكامل», press
+«اختبار الاتصال» (the discovery document must state the expected issuer) and save. The platform accounts' local Keycloak,
+keys, callbacks and privileges are untouched: an enterprise role never becomes a TMRKZ right.
 
 - Organisation structure comes from the HR mirror. The CSV import in «إعدادات النظام» remains for local organisations.
 

@@ -27,7 +27,7 @@ const api = async (method, path, body) => {
 const results = [];
 const external = [];
 const ok = (pass, what, detail = '') => { results.push(pass); console.log(`${pass ? 'PASS' : 'FAIL'} ${what}${detail ? ' · ' + detail : ''}`); };
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+const browser = await chromium.launch(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH, headless: true } : { channel: 'msedge', headless: true });
 const open = async (theme, hash, who = cookies) => {
   const ctx = await browser.newContext({ locale: 'ar-AE', timezoneId: 'Asia/Dubai', viewport: { width: 1440, height: 900 } });
   await ctx.addCookies(who);

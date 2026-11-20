@@ -31,11 +31,15 @@ if (!FREE_UNIT) throw new Error('no unit stationed nowhere is left in the synthe
 const SITE_NAME = 'موقع تمركز مبدئي — وهمي ' + Date.now().toString(36).slice(-4);
 console.log(`unit: ${FREE_UNIT} · site: ${SITE_NAME}`);
 
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+// a spot south of every registered site: the suite draws there, where no boundary can be overlapped
+const allSites = await (await fetch(BASE + '/api/v1/sites', { headers: { Cookie: cookies.map((c) => `${c.name}=${c.value}`).join('; '), 'X-Requested-With': 'mover' } })).json();
+const pts = allSites.map((s) => s.location).filter((l) => l && typeof l.lat === 'number');
+const FREE = { lat: Math.min(...pts.map((l) => l.lat)) - 0.25, lng: pts.reduce((a, l) => a + l.lng, 0) / pts.length };
+const browser = await chromium.launch(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH, headless: true } : { channel: 'msedge', headless: true });
 const external = [];
 const results = [];
 const ok = (pass, what, detail = '') => { results.push(pass); console.log(`${pass ? 'PASS' : 'FAIL'} ${what}${detail ? ' · ' + detail : ''}`); };
-const STATIONED_UNIT = 'مركز صحة واحد'; // stationed at the acceptance site
+const STATIONED_UNIT = process.env.STATIONED_UNIT ?? 'مركز صحة واحد'; // a unit stationed at an acceptance site (STATIONED_UNIT names another)
 
 async function pickUnit(page, name) {
   const search = page.getByLabel('البحث في الجهات');
@@ -127,6 +131,13 @@ for (const theme of ['dark', 'light']) {
   await page.getByTestId('wizard-next').click();
   await page.getByTestId('draw-site').waitFor({ timeout: 10000 });
   await page.getByTestId('draw-site').click();
+  // free ground: the acceptance batches occupy the default view now, so the map is moved south of every registered site
+  // (the dark run a little east of the light run's new site); the boundary must not overlap another site's (the server refuses)
+  await page.evaluate(([lng, lat]) => {
+    const el = Array.from(document.querySelectorAll('div')).find((d) => d.tmrkzMap);
+    el?.tmrkzMap.jumpTo({ center: [lng, lat], zoom: 14 });
+  }, [FREE.lng + (theme === 'dark' ? 0.06 : 0), FREE.lat]);
+  await page.waitForTimeout(1200);
   const box = await page.locator('.maplibregl-canvas').first().boundingBox();
   const cx = box.x + box.width * 0.45, cy = box.y + box.height * 0.5;
   for (const [dx, dy] of [[-70, -50], [60, -60], [80, 40], [-20, 70]]) { await page.mouse.click(cx + dx, cy + dy); await page.waitForTimeout(250); }
@@ -155,7 +166,12 @@ for (const theme of ['dark', 'light']) {
   if (theme === 'light') {
     // the save: the site, its boundary and the unit's initial stationing, in one audited act
     await page.getByTestId('save-initial').click();
-    await page.getByTestId('site-made').waitFor({ timeout: 20000 });
+    // the saved site, or the server's reason when the save is refused (named in the failure instead of a bare timeout)
+    const outcome = await Promise.race([
+      page.getByTestId('site-made').waitFor({ timeout: 45000 }).then(() => 'made'),
+      page.getByTestId('save-error').waitFor({ timeout: 45000 }).then(async () => 'error: ' + (await page.getByTestId('save-error').innerText())),
+    ]).catch((e) => 'timeout: ' + String(e).split('\n')[0]);
+    if (outcome !== 'made') throw new Error('the save did not complete — ' + outcome);
     const made = (await page.getByTestId('site-made').innerText()).replace(/\s+/g, ' ');
     ok(made.includes(SITE_NAME) && made.includes(FREE_UNIT) && made.includes('تمركزها المبدئي المعتمد'), 'the save answers: the site with its code, and the unit\'s initial stationing', made.slice(0, 220));
     // the list follows a moment later (the registered sites are read again after the save)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  AREA_NAME, RESTATION_STEPS, areaStepProblem, areaVerdict, campTree, flowStepProblem, measuredFrom, overReason, requestingUnitOf, restationingChoices, siteShapeKind, startStep, unitChoices, unitForest, verdictOf,
+  AREA_NAME, RESTATION_STEPS, areaStepProblem, areaVerdict, campTree, flowStepProblem, isFlowPurpose, measuredFrom, overReason, requestIntoFlow, requestingUnitOf, restationingChoices, siteShapeKind, startStep, unitChoices, unitForest, verdictOf,
 } from './deploymentAreasFlow';
 
 const unit = (id: string, state: string, site = true) => ({ id, name: 'وحدة ' + id, state, site: site ? { id: 's' + id, name: 'موقع ' + id } : null });
@@ -117,5 +117,59 @@ describe('«طلب إعادة تمركز», the simplified flow (owner brief §5
     expect(siteShapeKind(100_000, 100_200)).toBe('COPY');
     expect(siteShapeKind(100_000, 140_000)).toBe('EDITED');
     expect(siteShapeKind(null, 140_000)).toBe('DRAWN');
+  });
+});
+
+describe('a saved request in the map-first editor (release closure, 20 Nov 2026)', () => {
+  const site = { type: 'Polygon', coordinates: [] };
+  const base = { purpose: 'RESTATIONING', content: { kind: 'PERMANENT' as const, scope: ['u1', 'u2'], site: { geometry: site, copiedFrom: 's1', shape: 'COPY' }, primary: { p: 1 }, alternative: { a: 1 }, reason: 'why' } };
+
+  it('a temporary move needs both dates, in order, before leaving the units step', () => {
+    const s = { units: 1, requester: true, site: null, primary: null, alternative: null };
+    expect(flowStepProblem('RESTATIONING', { ...s, kind: 'TEMPORARY' }, 2)).toContain('تاريخ بداية');
+    expect(flowStepProblem('RESTATIONING', { ...s, kind: 'TEMPORARY', start: '2026-12-01', end: '2026-11-01' }, 2)).toContain('بعد تاريخ بدايته');
+    expect(flowStepProblem('RESTATIONING', { ...s, kind: 'TEMPORARY', start: '2026-11-01', end: '2026-12-01' }, 2)).toBe('');
+    expect(flowStepProblem('RESTATIONING', { ...s, kind: 'PERMANENT' }, 2)).toBe('');
+  });
+
+  it('loads a complete draft at its review step with everything the old editor saved, changing nothing', () => {
+    const f = requestIntoFlow(base);
+    expect(f.purpose).toBe('RESTATIONING');
+    expect(f.picked).toEqual(['u1', 'u2']);
+    expect(f.site).toBe(site);
+    expect(f.copiedFrom).toBe('s1');
+    expect(f.primary).toEqual({ p: 1 });
+    expect(f.alternative).toEqual({ a: 1 });
+    expect(f.reason).toBe('why');
+    expect(f.kind).toBe('PERMANENT');
+    expect(f.legacy).toEqual([]);
+    expect(f.step).toBe(5);
+  });
+
+  it('opens an incomplete draft at its first open step, a temporary one with its dates', () => {
+    expect(requestIntoFlow({ ...base, content: { ...base.content, primary: null, alternative: null } }).step).toBe(3);
+    expect(requestIntoFlow({ ...base, content: { ...base.content, site: null } }).step).toBe(2);
+    expect(requestIntoFlow({ ...base, content: { ...base.content, scope: [] } }).step).toBe(1);
+    const t = requestIntoFlow({ ...base, content: { ...base.content, kind: 'TEMPORARY', start: '2026-11-01T00:00:00Z', end: '2026-12-01T00:00:00Z' } });
+    expect(t.kind).toBe('TEMPORARY');
+    expect(t.start).toBe('2026-11-01T00:00:00Z');
+    expect(t.step).toBe(5);
+    expect(requestIntoFlow({ ...base, content: { ...base.content, kind: 'TEMPORARY' } }).step).toBe(1);
+  });
+
+  it('names the content it has no control for (occupants, exceptions, a site registration) instead of dropping it', () => {
+    const f = requestIntoFlow({ ...base, content: { ...base.content, occupants: { x: 'EXCLUDED', y: 'INCLUDED' }, exceptions: { primary: 'far' }, existingSite: 's9', siteInfo: { name: 'n' } } });
+    expect(f.legacy).toEqual(['قرارات 2 شاغلين للموقع', 'مبرر استثناء مسافة', 'موقع مسجل محدد', 'بيانات تسجيل موقع']);
+    expect(requestIntoFlow({ ...base, content: { ...base.content, exceptions: { primary: '  ' } } }).legacy).toEqual([]);
+  });
+
+  it('a deployment-areas draft opens as that request; only the two purposes open here', () => {
+    const f = requestIntoFlow({ purpose: 'DEPLOYMENT_AREAS', content: { kind: 'PERMANENT', scope: ['u1'], site: null, primary: { p: 1 }, alternative: null, reason: '' } });
+    expect(f.purpose).toBe('DEPLOYMENT_AREAS');
+    expect(f.step).toBe(3);
+    expect(isFlowPurpose('RESTATIONING')).toBe(true);
+    expect(isFlowPurpose('DEPLOYMENT_AREAS')).toBe(true);
+    expect(isFlowPurpose('SITE_REGISTRATION')).toBe(false);
+    expect(isFlowPurpose(undefined)).toBe(false);
   });
 });

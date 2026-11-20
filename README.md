@@ -18,8 +18,8 @@ cat ops/test-env/.generated/user-password
 لا يوجد في النظام وضع عرض ولا تبديل مستخدمين ولا دخول محلي بكلمة مرور: الدخول عبر Keycloak الذي يتحقق من كلمة المرور
 في الدليل المؤسسي (LDAP)، ثم يُربط الحساب بسجل الموارد البشرية. حسابات بيئة الاختبار الافتراضية (كلمة مرور واحدة مولدة
 محلياً) مدرجة في [`ops/test-env/README.md`](ops/test-env/README.md): ‎`t.requester`، ‎`t.facilities`، ‎`t.manager`،
-‎`t.approver`، ‎`t.admin`، ‎`t.limited`، ‎`t.auditor`… وفي بيئة الإنتاج تُضبط بيانات الدليل في ‎`.env`
-(انظر [`docs/OPERATIONS.md`](docs/OPERATIONS.md)).
+‎`t.approver`، ‎`t.admin`، ‎`t.limited`، ‎`t.auditor`… وفي بيئة الإنتاج يُدخل الدليل المؤسسي وKeycloak المؤسسي من داخل التطبيق:
+«إعدادات النظام ← إعدادات التكامل» كما في MOVER (ADR-092؛ انظر [`RUN.md`](RUN.md) §7 و[`docs/OPERATIONS.md`](docs/OPERATIONS.md)).
 
 رحلة مقترحة: من الخريطة اختر «مركز الخدمات» ← «طلب على هذا المرفق» ← أكمل الطلب وأرسله (يظهر برتقالياً دون حجز)
 ← `t.facilities` يوافق ← `t.manager` يرجع بسبب ← `t.requester` يعدل ويعيد التقديم ← `t.manager` يوافق ← `t.approver` يعتمد

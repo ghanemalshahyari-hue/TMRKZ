@@ -1,16 +1,10 @@
 package ae.mover.security;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.InetAddress;
 import java.net.Socket;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
-import java.security.KeyStore;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateFactory;
 import java.util.HexFormat;
 import java.util.Hashtable;
 import java.util.Locale;
@@ -38,7 +32,6 @@ import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
-import javax.net.ssl.TrustManagerFactory;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,10 +62,102 @@ public class DirectoryAuthenticator {
      */
     private static final Pattern DIRECT_LOGIN = Pattern.compile("^[\\p{L}\\p{N}][\\p{L}\\p{N}._-]{0,127}$");
 
-    private final LdapProperties props;
+    private final IntegrationSettingsService settings;
+    private final LdapProperties fixed;
+    /** The values of a connection test (ADR-092): unsaved settings, for this thread's test only. */
+    private static final ThreadLocal<LdapProperties> TESTING = new ThreadLocal<>();
 
-    public DirectoryAuthenticator(LdapProperties props) {
-        this.props = props;
+    @org.springframework.beans.factory.annotation.Autowired
+    public DirectoryAuthenticator(IntegrationSettingsService settings) {
+        this.settings = settings;
+        this.fixed = null;
+    }
+
+    /** An authenticator for one fixed directory (tests). */
+    public DirectoryAuthenticator(LdapProperties fixed) {
+        this.settings = null;
+        this.fixed = fixed;
+    }
+
+    /** The directory in force: the settings saved in «إعدادات التكامل» or the environment (ADR-092). */
+    private LdapProperties props() {
+        LdapProperties t = TESTING.get();
+        return t != null ? t : fixed != null ? fixed : settings.ldap();
+    }
+
+    /** The result of a connection test: what was reached, never a credential. */
+    public record TestResult(boolean ok, String step, String message, String dn, String displayName) {
+    }
+
+    /**
+     * A test of unsaved settings (ADR-092), as MOVER's «اختبار الاتصال»: the protected channel is opened with the given trust
+     * (certificate chain and host name checked); then, with a login and password, that person's own sign-in exactly as the
+     * manual form does it; or, with a service account, its bind; nothing is stored.
+     */
+    public TestResult test(LdapProperties p, String login, String password) {
+        TESTING.set(p);
+        try {
+            if (login != null && !login.isBlank() && password != null && !password.isEmpty()) {
+                DirectoryUser u = authenticate(login, password);
+                return new TestResult(true, "SIGN_IN", "نجح دخول المستخدم وقراءة سجله من الدليل.", u.dn(), u.displayName());
+            }
+            if (p.bindDn() != null && p.bindCredential() != null) {
+                close(connect(p.bindDn(), p.bindCredential(), false));
+                return new TestResult(true, "SERVICE_BIND", "نجح الاتصال المؤمَّن وربط حساب الخدمة.", p.bindDn(), null);
+            }
+            close(open(p, sslContext()));
+            return new TestResult(true, "TLS", "نجح الاتصال المؤمَّن بالدليل (الشهادة موثوقة واسم الخادم مطابق).", null, null);
+        } catch (DirectoryException e) {
+            String message = switch (e.failure()) {
+                case INVALID_CREDENTIALS -> "رفض الدليل اسم المستخدم أو كلمة المرور (الاتصال المؤمَّن نفسه نجح).";
+                case AMBIGUOUS -> "اسم المستخدم يطابق أكثر من سجل في الدليل.";
+                case TLS -> "رُفض الاتصال المؤمَّن: الشهادة غير موثوقة أو اسم الخادم لا يطابقها.";
+                case NOT_CONFIGURED -> "الإعدادات غير مكتملة.";
+                case UNAVAILABLE -> "تعذر الوصول إلى الدليل (العنوان، المنفذ أو الجدار الناري).";
+            };
+            String cause = e.getCause() == null ? null : e.getCause().getMessage();
+            return new TestResult(false, e.failure().name(), cause == null ? message : message + " — " + cause.replaceAll("[\\r\\n]+", " "), null, null);
+        } catch (NamingException e) {
+            return new TestResult(false, "ERROR", "خطأ من الدليل: " + e.getMessage(), null, null);
+        } finally {
+            TESTING.remove();
+        }
+    }
+
+    /** The protected channel with no credentials: LDAPS handshake, or StartTLS negotiated over the plain connection. */
+    private LdapContext open(LdapProperties p, SSLContext ssl) throws DirectoryException, NamingException {
+        String url = p.url().trim();
+        boolean ldaps = url.toLowerCase(Locale.ROOT).startsWith("ldaps://");
+        Hashtable<String, Object> env = new Hashtable<>();
+        env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
+        env.put(Context.PROVIDER_URL, url);
+        env.put(Context.REFERRAL, "ignore");
+        env.put("com.sun.jndi.ldap.connect.timeout", String.valueOf(p.connectTimeoutMs()));
+        env.put("com.sun.jndi.ldap.read.timeout", String.valueOf(p.readTimeoutMs()));
+        env.put("com.sun.jndi.ldap.connect.pool", "false");
+        env.put(Context.SECURITY_AUTHENTICATION, "none");
+        LdapContext ctx = null;
+        try {
+            if (ldaps) {
+                env.put("java.naming.ldap.factory.socket", TrustedSocketFactory.class.getName());
+                TrustedSocketFactory.CURRENT.set(ssl);
+                try {
+                    return new InitialLdapContext(env, null);
+                } finally {
+                    TrustedSocketFactory.CURRENT.remove();
+                }
+            }
+            ctx = new InitialLdapContext(env, null);
+            StartTlsResponse tls = (StartTlsResponse) ctx.extendedOperation(new StartTlsRequest());
+            tls.negotiate(new TrustedSocketFactory(ssl));
+            return ctx;
+        } catch (IOException e) {
+            close(ctx);
+            throw new DirectoryException(Failure.TLS, "TLS negotiation with the directory failed", e);
+        } catch (NamingException e) {
+            close(ctx);
+            throw translate(e);
+        }
     }
 
     public enum Failure { NOT_CONFIGURED, INVALID_CREDENTIALS, AMBIGUOUS, TLS, UNAVAILABLE }
@@ -103,11 +188,11 @@ public class DirectoryAuthenticator {
     }
 
     public boolean configured() {
-        return props.configured();
+        return props().configured();
     }
 
     public String issuer() {
-        return props.issuer();
+        return props().issuer();
     }
 
     /** Verifies the password of the entry whose login attribute equals {@code username}. */
@@ -115,10 +200,10 @@ public class DirectoryAuthenticator {
         if (username == null || username.isBlank() || username.length() > 128 || username.chars().anyMatch(c -> c < 0x20)) {
             throw invalid();
         }
-        if (props.direct()) {
+        if (props().direct()) {
             return direct(username.trim(), password);
         }
-        return verify(props.usernameAttribute(), username.trim(), password);
+        return verify(props().usernameAttribute(), username.trim(), password);
     }
 
     /**
@@ -130,7 +215,7 @@ public class DirectoryAuthenticator {
         if (uuid == null || uuid.isBlank()) {
             throw invalid();
         }
-        if (props.direct()) {
+        if (props().direct()) {
             if (login == null || login.isBlank() || login.length() > 128) {
                 throw invalid();
             }
@@ -141,7 +226,7 @@ public class DirectoryAuthenticator {
             }
             return user;
         }
-        return verify(props.uuidAttribute(), uuid, password);
+        return verify(props().uuidAttribute(), uuid, password);
     }
 
     /**
@@ -149,7 +234,7 @@ public class DirectoryAuthenticator {
      * connection, exactly one entry for the login under the users DN.
      */
     private DirectoryUser direct(String username, String password) throws DirectoryException {
-        if (!props.configured()) {
+        if (!props().configured()) {
             throw new DirectoryException(Failure.NOT_CONFIGURED, "directory not configured", null);
         }
         // An empty password would be an unauthenticated bind, which many directories accept: never attempted.
@@ -159,11 +244,11 @@ public class DirectoryAuthenticator {
         if (!DIRECT_LOGIN.matcher(username).matches()) {
             throw invalid();
         }
-        checkAttributes(props.usernameAttribute());
-        String principal = props.directBindPattern().replace(LdapProperties.USERNAME_MARKER, username);
+        checkAttributes(props().usernameAttribute());
+        String principal = props().directBindPattern().replace(LdapProperties.USERNAME_MARKER, username);
         LdapContext ctx = connect(principal, password, true);
         try {
-            SearchResult entry = unique(ctx, props.usernameAttribute(), username);
+            SearchResult entry = unique(ctx, props().usernameAttribute(), username);
             LdapName bound = dn(principal);
             if (bound != null && !bound.equals(dn(entry.getNameInNamespace()))) {
                 // a DN pattern: the entry found for the login must be the entry that has just authenticated
@@ -180,7 +265,7 @@ public class DirectoryAuthenticator {
 
     /** Service search (ADR-016): the read-only account finds exactly one entry, then the person binds as that entry. */
     private DirectoryUser verify(String attribute, String value, String password) throws DirectoryException {
-        if (!props.configured() || props.bindDn() == null || props.bindCredential() == null) {
+        if (!props().configured() || props().bindDn() == null || props().bindCredential() == null) {
             throw new DirectoryException(Failure.NOT_CONFIGURED, "directory not configured", null);
         }
         // An empty password would be an unauthenticated bind, which many directories accept: never allowed.
@@ -189,7 +274,7 @@ public class DirectoryAuthenticator {
         }
         checkAttributes(attribute);
         DirectoryUser user;
-        LdapContext service = connect(props.bindDn(), props.bindCredential(), false);
+        LdapContext service = connect(props().bindDn(), props().bindCredential(), false);
         try {
             user = user(unique(service, attribute, value));
         } catch (NamingException e) {
@@ -202,8 +287,8 @@ public class DirectoryAuthenticator {
     }
 
     private void checkAttributes(String attribute) throws DirectoryException {
-        for (String a : new String[]{attribute, props.userObjectClass(), props.uuidAttribute(), props.usernameAttribute(),
-                props.employeeNumberAttribute()}) {
+        for (String a : new String[]{attribute, props().userObjectClass(), props().uuidAttribute(), props().usernameAttribute(),
+                props().employeeNumberAttribute()}) {
             if (a == null || !ATTRIBUTE.matcher(a).matches()) {
                 throw new DirectoryException(Failure.NOT_CONFIGURED, "invalid directory attribute configuration", null);
             }
@@ -215,20 +300,20 @@ public class DirectoryAuthenticator {
         SearchControls controls = new SearchControls();
         controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
         controls.setCountLimit(2);
-        controls.setTimeLimit(props.readTimeoutMs());
-        java.util.List<String> returning = new java.util.ArrayList<>(java.util.List.of(props.uuidAttribute(), props.usernameAttribute(),
-                props.employeeNumberAttribute(), "displayName", "cn"));
-        returning.addAll(props.employmentAttributes());
+        controls.setTimeLimit(props().readTimeoutMs());
+        java.util.List<String> returning = new java.util.ArrayList<>(java.util.List.of(props().uuidAttribute(), props().usernameAttribute(),
+                props().employeeNumberAttribute(), "displayName", "cn"));
+        returning.addAll(props().employmentAttributes());
         controls.setReturningAttributes(returning.stream().distinct().toArray(String[]::new));
-        String filter = "(&(objectClass=" + props.userObjectClass() + ")(" + attribute + "={0}))";
+        String filter = "(&(objectClass=" + props().userObjectClass() + ")(" + attribute + "={0}))";
         // Active Directory's objectGUID is binary: it is kept as hex text and searched with its bytes.
         Object arg;
         try {
-            arg = binaryUuid() && attribute.equalsIgnoreCase(props.uuidAttribute()) ? HexFormat.of().parseHex(value) : value;
+            arg = binaryUuid() && attribute.equalsIgnoreCase(props().uuidAttribute()) ? HexFormat.of().parseHex(value) : value;
         } catch (IllegalArgumentException e) {
             throw invalid();
         }
-        NamingEnumeration<SearchResult> results = ctx.search(props.usersDn(), filter, new Object[]{arg}, controls);
+        NamingEnumeration<SearchResult> results = ctx.search(props().usersDn(), filter, new Object[]{arg}, controls);
         SearchResult first = null;
         int count = 0;
         try {
@@ -259,18 +344,18 @@ public class DirectoryAuthenticator {
     /** The verified person as the entry states them; an entry without its stable identifier or login is refused. */
     private DirectoryUser user(SearchResult entry) throws NamingException, DirectoryException {
         Attributes a = entry.getAttributes();
-        String uuid = text(a.get(props.uuidAttribute()));
+        String uuid = text(a.get(props().uuidAttribute()));
         if (uuid == null) {
             throw new DirectoryException(Failure.UNAVAILABLE, "directory entry has no stable identifier", null);
         }
-        String login = lower(text(a.get(props.usernameAttribute())));
+        String login = lower(text(a.get(props().usernameAttribute())));
         if (login == null) {
             throw new DirectoryException(Failure.UNAVAILABLE, "directory entry has no readable login", null);
         }
-        String employeeNumber = text(a.get(props.employeeNumberAttribute()));
-        DirectoryProfile profile = new DirectoryProfile(employeeNumber, optional(a, props.rankAttribute()),
-                optional(a, props.positionAttribute()), optional(a, props.unitIdAttribute()), optional(a, props.unitNameAttribute()),
-                optional(a, props.mainUnitIdAttribute()), !props.employmentAttributes().isEmpty());
+        String employeeNumber = text(a.get(props().employeeNumberAttribute()));
+        DirectoryProfile profile = new DirectoryProfile(employeeNumber, optional(a, props().rankAttribute()),
+                optional(a, props().positionAttribute()), optional(a, props().unitIdAttribute()), optional(a, props().unitNameAttribute()),
+                optional(a, props().mainUnitIdAttribute()), !props().employmentAttributes().isEmpty());
         return new DirectoryUser(entry.getNameInNamespace(), uuid, login, employeeNumber,
                 text(a.get("displayName")) != null ? text(a.get("displayName")) : text(a.get("cn")), profile);
     }
@@ -289,17 +374,17 @@ public class DirectoryAuthenticator {
 
     /** {@code person}: the bind is the person's own, so a name the directory does not hold is the uniform wrong-credentials answer. */
     private LdapContext connect(String principal, String credential, boolean person) throws DirectoryException {
-        String url = props.url().trim();
+        String url = props().url().trim();
         boolean ldaps = url.toLowerCase(Locale.ROOT).startsWith("ldaps://");
         Hashtable<String, Object> env = new Hashtable<>();
         env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
         env.put(Context.PROVIDER_URL, url);
         env.put(Context.REFERRAL, "ignore");
-        env.put("com.sun.jndi.ldap.connect.timeout", String.valueOf(props.connectTimeoutMs()));
-        env.put("com.sun.jndi.ldap.read.timeout", String.valueOf(props.readTimeoutMs()));
+        env.put("com.sun.jndi.ldap.connect.timeout", String.valueOf(props().connectTimeoutMs()));
+        env.put("com.sun.jndi.ldap.read.timeout", String.valueOf(props().readTimeoutMs()));
         env.put("com.sun.jndi.ldap.connect.pool", "false");
         if (binaryUuid()) {
-            env.put("java.naming.ldap.attributes.binary", props.uuidAttribute());
+            env.put("java.naming.ldap.attributes.binary", props().uuidAttribute());
         }
         LdapContext ctx = null;
         try {
@@ -365,37 +450,18 @@ public class DirectoryAuthenticator {
         return new DirectoryException(Failure.INVALID_CREDENTIALS, "invalid credentials", null);
     }
 
-    /** Trust exactly the PEM certificates in the CA folder; an empty folder trusts nothing. */
+    /** Trust exactly the PEM certificates of the CA folder and the pasted ones (ADR-092); nothing else. */
     private SSLContext sslContext() throws DirectoryException {
         try {
-            KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType());
-            store.load(null, null);
-            Path dir = Path.of(props.caDir());
-            int n = 0;
-            if (Files.isDirectory(dir)) {
-                CertificateFactory cf = CertificateFactory.getInstance("X.509");
-                try (DirectoryStream<Path> files = Files.newDirectoryStream(dir, "*.{pem,crt,cer}")) {
-                    for (Path f : files) {
-                        try (InputStream in = Files.newInputStream(f)) {
-                            for (Certificate c : cf.generateCertificates(in)) {
-                                store.setCertificateEntry("ca-" + (n++), c);
-                            }
-                        }
-                    }
-                }
-            }
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-            tmf.init(store);
-            SSLContext ctx = SSLContext.getInstance("TLS");
-            ctx.init(null, tmf.getTrustManagers(), null);
-            return ctx;
-        } catch (IOException | GeneralSecurityException e) {
+            LdapProperties p = props();
+            return Trust.only(Path.of(p.caDir()), p.caCertificatesPem());
+        } catch (IOException | GeneralSecurityException | IllegalArgumentException e) {
             throw new DirectoryException(Failure.TLS, "CA certificates could not be loaded", e);
         }
     }
 
     private boolean binaryUuid() {
-        return "objectGUID".equalsIgnoreCase(props.uuidAttribute());
+        return "objectGUID".equalsIgnoreCase(props().uuidAttribute());
     }
 
     private static String text(Attribute a) throws NamingException {

@@ -144,7 +144,7 @@ All commands run in the folder `C:\Users\ADMIN\Desktop\TMRKZ`. Use Git Bash, or 
      docker run --rm --entrypoint true -v tmrkz-m2:/root/.m2 tmrkz/folder-backend:1
      TMRKZ_TEST_MAVEN_IMAGE=tmrkz/folder-backend:1 TMRKZ_TEST_MAVEN_VOLUME=tmrkz-m2 sh ops/test-backend.sh OracleUnitImportIT
      ```
-4. **Database changes:** a new file in `backend/src/main/resources/db/migration` with the next number (now `V54__...sql`).
+4. **Database changes:** a new file in `backend/src/main/resources/db/migration` with the next number (now `V55__...sql`).
    Never edit an existing migration.
 
 ## 6. Bringing in your offline database
@@ -168,7 +168,7 @@ The database has no password, so passwords no longer need to match.
    ```
    docker compose up -d
    ```
-   - An older database (V53 or below) is upgraded automatically.
+   - An older database (V54 or below) is upgraded automatically.
    - `keycloak-setup` sets the `developer` and `admin` passwords from `.env`, the sign-in address, the local directory's password and the sign-in client's secret.
 4. **Check.** Sign in, look at the units and requests, and run `docker compose ps`.
 5. **The HR (Oracle) connection.** If its sync fails, enter the Oracle password again in «إعدادات النظام ← مصدر الموارد البشرية».
@@ -178,12 +178,24 @@ The database has no password, so passwords no longer need to match.
    rm -rf data/db.before
    ```
 
-## 7. Optional — manual sign-in against the enterprise directory
+## 7. The enterprise directory and the enterprise Keycloak — in the application, not in files
 
-This applies only on a machine that can reach the enterprise directory.
+As in MOVER's «إعدادات التكامل». Sign in as `admin` or `developer`, open **إعدادات النظام → إعدادات التكامل**:
 
-1. In `.env`, in the block `manual enterprise LDAP`, remove the leading `#` from `COMPOSE_PROFILES` and from every `TMRKZ_MANUAL_LDAP_` line.
-2. Run `docker compose up -d`.
+1. **الدليل المؤسسي (LDAP)** — the server's DNS name (the one its certificate was issued for), LDAPS 636 or StartTLS 389,
+   the sign-in domain (people sign in as `user@domain`), the search base (`DC=…,DC=…`), the attributes (press
+   «Active Directory (كما في MOVER)»), and the CA certificate pasted as PEM (get it with
+   `openssl s_client -connect <server>:636 -showcerts` on a machine that reaches it, and paste the CA certificates,
+   not the server's own). Press **اختبار الاتصال** — with a real username and password it tries that person's sign-in —
+   then **حفظ**. It is in force at once: no restart, nothing in `.env`.
+2. **الدخول الآلي (Keycloak)** — the enterprise Keycloak's address, realm, TMRKZ's client ID and secret (ask the
+   Keycloak team for a confidential client with the return address shown on the screen), the CA if internal.
+   **اختبار الاتصال**, then **حفظ**. The automatic button now goes there; `admin` and `developer` keep the local Keycloak.
+3. The address people open is one setting, `TMRKZ_PUBLIC_URL` in `.env` (written by `start.sh`, or `https://…` by
+   `ops/tls/enable.sh`): every sign-in address derives from it. Nothing in `docker-compose*.yml` is edited by hand.
+
+Nothing typed for a test is stored; saved secrets are encrypted and never shown again. «العودة إلى إعدادات ملف البيئة»
+removes the saved section and the `.env` values apply again.
 
 ## 8. A new library, or newer server images (a connected machine only)
 
@@ -228,7 +240,8 @@ When `backend/pom.xml` or `frontend/package-lock.json` gets a new dependency, th
    git restore <file>
    ```
 7. **Red flags.** Stop the agent if it:
-   - touches `data/`, `.env`, `docker-compose*.yml`, `start.sh`, `ops/local/workspace/` or an existing migration;
+   - touches `data/`, `.env`, `docker-compose*.yml`, `start.sh`, `ops/local/workspace/` or an existing migration
+     (the directory and Keycloak are entered in the application, section 7 — never by editing these files);
    - tries to download or install anything;
    - says "done" without a test or a browser check.
 
@@ -240,6 +253,7 @@ When `backend/pom.xml` or `frontend/package-lock.json` gets a new dependency, th
 | `BUILD FAILED` in the logs | the last saved change has an error; fix it — the previous version keeps running |
 | sign-in fails | `docker compose logs keycloak-setup` must end with `password client ready`; then `docker compose up -d` |
 | `db` restarts again and again | is the folder on a VirtualBox shared folder? Move it to the VM's own disk |
+| the backend logs `OpenFGA unreachable` (or another service's name) after a start that recreated a network | a container kept from before lost its name on the new network: `docker compose up -d --force-recreate` |
 | `TMRKZ_IP` error when starting | write `TMRKZ_IP` and `TMRKZ_PORT` at the top of `.env`, or run `sh start.sh` |
 | a port is already in use | run `sh start.sh` and choose another port |
 | the map is empty | `ls map-data/runtime/current` must list `basemap`, `terrain`, `styles` and `fonts` |
@@ -271,7 +285,7 @@ small, correct changes, check them, and report honestly. Reply to the owner in t
 - `data/db`: the PostgreSQL 17 database (NO password; rules in `ops/local/workspace/pg_hba.conf`).
   `data/files`: uploaded files. `data/ldap-data`, `data/ldap-config`: the local LDAP directory.
 - `map-data/runtime/current`: the offline map package, served at `/map-data/`. Never move or delete it.
-- `backend/`: Spring Boot 4, Java 25. Flyway migrations in `backend/src/main/resources/db/migration` (latest V53).
+- `backend/`: Spring Boot 4, Java 25. Flyway migrations in `backend/src/main/resources/db/migration` (latest V54).
   `frontend/`: React 19 + Vite + TypeScript, Arabic right-to-left UI.
 - **Code changes rebuild themselves.** Save a file → within ~25 s the container rebuilds it.
   Watch: `docker compose logs -f --since 1m backend web-build`
@@ -279,12 +293,14 @@ small, correct changes, check them, and report honestly. Reply to the owner in t
   - failure: `BUILD FAILED` — the old version keeps running; read the error and fix it.
 - Sign-in: `developer` or `admin`; their passwords are `TMRKZ_PLATFORM_DEVELOPER_PASSWORD` and
   `TMRKZ_PLATFORM_ADMIN_PASSWORD` in `.env` (use them, never print them).
-  The automatic button opens Keycloak's standard sign-in page (realm `tmrkz`, under `/auth`).
-  Keycloak reads the local LDAP directory. The manual form checks the directory directly.
-  The service `keycloak-setup` configures Keycloak on every `docker compose up -d`. Do NOT run
+  The automatic button opens Keycloak's standard sign-in page (the local realm `tmrkz` under `/auth`, or the
+  enterprise Keycloak when one is saved in «إعدادات التكامل»). The manual form checks the directory saved in
+  «إعدادات التكامل» directly (ADR-092); the address people open is `TMRKZ_PUBLIC_URL` in `.env`.
+  The service `keycloak-setup` configures the local Keycloak on every `docker compose up -d`. Do NOT run
   `ops/platform-accounts.sh`, `ops/keycloak/set-*.sh` or `ops/local/use-mover-sources.sh` — they are
-  for other setups.
-- Decisions are recorded in `docs/ARCHITECTURE_DECISIONS.md` (last: ADR-090, next: ADR-091);
+  for other setups. NEVER write directory or Keycloak settings into `.env` or a compose file: the owner
+  enters them on the screen.
+- Decisions are recorded in `docs/ARCHITECTURE_DECISIONS.md` (last: ADR-092, next: ADR-093);
   status in `docs/STATUS.md`.
 
 ## 2. NEVER (these broke the app before)

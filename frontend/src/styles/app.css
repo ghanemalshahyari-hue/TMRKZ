@@ -380,3 +380,16 @@ select.sw-input { appearance: auto; }
 .pr-kept { color: #2f9e6e; font-weight: 700; }
 .pr-returned { margin-top: 8px; }
 
+
+/* «إعدادات التكامل» (ADR-092): the directory and Keycloak sections */
+.int-settings textarea { width: 100%; font: 11px/1.5 ui-monospace, Menlo, monospace; direction: ltr; }
+.int-settings code { font: 11px ui-monospace, Menlo, monospace; }
+.int-more { margin: 6px 0 10px; }
+.int-more > summary { cursor: pointer; font-weight: 600; margin-bottom: 4px; }
+.int-test { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 10px; }
+.int-test > b { display: block; }
+.int-test > small { display: block; margin-bottom: 6px; }
+.int-env { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 14px; margin: 0; }
+.int-env div { display: flex; gap: 8px; align-items: baseline; }
+.int-env dt { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.int-env dd { margin: 0; font: 11px ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }

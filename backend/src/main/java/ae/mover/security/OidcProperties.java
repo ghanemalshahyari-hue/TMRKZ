@@ -217,6 +217,19 @@ public record OidcProperties(
         }
     }
 
+    /**
+     * These properties with another automatic provider (ADR-092: the Keycloak saved in «إعدادات التكامل»), every other value
+     * unchanged; the normalisation of the canonical constructor applies again, so the platform provider stays the local one.
+     */
+    public OidcProperties withAutomatic(String issuer, String internalBaseUrl, String clientId, String clientSecret, String redirectUri,
+                                        String postLogoutRedirectUri) {
+        return new OidcProperties(issuer, internalBaseUrl, clientId, clientSecret, redirectUri, postLogoutRedirectUri, linkKey,
+                enterpriseKeyClaim, reauthMaxAgeSeconds, loginMaxAgeSeconds, httpTimeoutMs, platformAccounts, unitIdClaim, unitNameClaim,
+                mainUnitIdClaim, rankClaim, positionClaim, localIssuer, localInternalBaseUrl, localClientId, localClientSecret,
+                localRedirectUri, localPostLogoutRedirectUri, platformIssuer, platformInternalBaseUrl, platformClientId,
+                platformClientSecret, platformRedirectUri, platformPostLogoutRedirectUri, passwordClientId, passwordClientSecret);
+    }
+
     /** The automatic (employee) provider: external enterprise Keycloak when supplied, else the local one. */
     public Provider automatic() {
         return new Provider(issuer, internalBaseUrl, clientId, clientSecret, redirectUri, postLogoutRedirectUri);

@@ -903,6 +903,21 @@ export type HrMappingVersion = {
   publishedAt: string | null;
   problems?: string[];
 };
+/** «إعدادات التكامل» (ADR-092): one section as the server returns it — what is saved (no secret), what .env holds, what is in force. */
+export type IntegrationView = {
+  keyConfigured: boolean;
+  source: 'SAVED' | 'ENV' | 'NONE';
+  saved: Record<string, unknown> | null;
+  env: Record<string, unknown>;
+  effective: Record<string, unknown>;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+  secretError?: string;
+  error?: string;
+};
+export type DirectoryTestResult = { ok: boolean; step: string; message: string; dn?: string | null; displayName?: string | null; url: string; direct: boolean; elapsedMs: number };
+export type OidcTestResult = { ok: boolean; step: string; message: string; issuer: string; statedIssuer?: string | null; keys?: number | null; redirectUri: string; elapsedMs: number };
+
 export type HrTestResult = { ok: boolean; databaseVersion?: string; unitColumns?: number; personColumns?: number; failure?: string; message?: string; elapsedMs: number };
 
 export type IdentityIssue = {

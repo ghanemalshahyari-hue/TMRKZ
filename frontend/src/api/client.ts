@@ -1,4 +1,5 @@
 import type { SignInBoard } from '../lib/signInNotes';
+import type { DirectoryForm, OidcForm } from '../lib/integrationSettings';
 import type {
   HierarchyLevel,
   SiteLinkRecord,
@@ -107,7 +108,7 @@ import type {
   Permission,
   Scope,
   RoutingLevelValue,
-} from './types';
+ IntegrationView, DirectoryTestResult, OidcTestResult } from './types';
 
 export const API_BASE = '/api/v1';
 
@@ -884,6 +885,16 @@ export const api = {
   hrStatus: () => get<HrStatus>('/hr/status'),
   hrRuns: (size = 10) => get<HrRun[]>('/hr/runs' + query({ size })),
   hrSync: (overrideReason?: string) => post<{ runId: string }>('/hr/sync', overrideReason ? { overrideReason } : {}),
+  // «إعدادات التكامل» (ADR-092): the directory and Keycloak sections, tested with the values on the screen, saved, cleared
+  integrationDirectory: () => get<IntegrationView>('/settings/integration/directory'),
+  saveIntegrationDirectory: (form: DirectoryForm) => put<IntegrationView>('/settings/integration/directory', form),
+  clearIntegrationDirectory: () => del<IntegrationView>('/settings/integration/directory'),
+  testIntegrationDirectory: (form: DirectoryForm, testLogin?: string, testPassword?: string) =>
+    post<DirectoryTestResult>('/settings/integration/directory/test', { settings: form, testLogin, testPassword }),
+  integrationOidc: () => get<IntegrationView>('/settings/integration/oidc'),
+  saveIntegrationOidc: (form: OidcForm) => put<IntegrationView>('/settings/integration/oidc', form),
+  clearIntegrationOidc: () => del<IntegrationView>('/settings/integration/oidc'),
+  testIntegrationOidc: (form: OidcForm) => post<OidcTestResult>('/settings/integration/oidc/test', form),
   hrSource: () => get<HrSource>('/hr/source'),
   saveHrSource: (input: HrSourceInput) => put<HrSource>('/hr/source', input),
   testHrSource: () => post<HrTestResult>('/hr/source/test'),

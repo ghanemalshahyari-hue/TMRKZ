@@ -4,6 +4,7 @@ import type { Integration, OrgImportPreview, PolicyVersion, Settings, SystemInfo
 import { Heading, KeyValue } from '../components/ui';
 import { HrSourcePanel } from '../components/HrSourcePanel';
 import { SignInNotesSettings } from '../components/SignInNotesSettings';
+import { IntegrationSettings } from '../components/IntegrationSettings';
 import { SiteSetupAccessSettings } from '../components/SiteSetupAccessSettings';
 import { useApp } from '../lib/app';
 import { formatBytes, fullTime } from '../lib/dates';
@@ -185,6 +186,7 @@ export function SettingsPage() {
             «غير مربوط» يعني أن الواجهة والعقد جاهزان دون اتصال فعلي؛ لا يعرض النظام اتصالاً وهمياً ناجحاً.
           </p>
         </section>
+        {app.can('CONFIGURE') && <IntegrationSettings />}
         {app.can('CONFIGURE') && <HrSourcePanel />}
         <section className="card padding">
           <h2>استيراد الهيكل التنظيمي</h2>

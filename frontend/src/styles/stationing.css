@@ -227,3 +227,14 @@
 .stw-sub{font-weight:700;font-size:12.5px;margin:10px 0 2px}
 .stw-field.inline{display:flex;align-items:center;gap:8px;margin:0}
 .stw-field.inline input{width:72px}
+
+/* the kind of a re-stationing in the map-first editor (release closure, 20 Nov 2026): two choices, the dates of a temporary move */
+.da-kind { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 2px; }
+.da-kind-card { text-align: start; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--paper); display: grid; gap: 2px; }
+.da-kind-card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.da-kind-card small { color: var(--muted); font-size: 10.5px; line-height: 1.5; }
+.da-dates { grid-column: 1 / -1; display: flex; gap: 10px; flex-wrap: wrap; }
+.da-dates label { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.da-dates input { padding: 6px 8px; }
+.sw-returned { margin: 8px 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--paper); font-size: 12px; line-height: 1.6; }
+.da-legacy { border: 1px dashed var(--line); border-radius: 10px; padding: 6px 10px; }

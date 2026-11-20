@@ -63,3 +63,6 @@ ops/hr-demo/.generated/
 /data/
 # the one image file of the folder (ops/local/workspace/pack-images.sh): docker load -i tmrkz-images.tar
 /tmrkz-images.tar*
+
+# release transfer packages (ops/release/pack-release.sh): large, outside Git
+release/
