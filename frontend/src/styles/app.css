@@ -522,6 +522,8 @@ button.tz-summary-row:disabled { cursor: not-allowed; opacity: 0.6; }
 .tz-summary-row:focus-visible { outline: 2px solid var(--accent, #8b5a2b); outline-offset: 1px; }
 .tz-summary-clear { width: 100%; background: transparent; border: 1px dashed var(--line, var(--tz-line, #e6dcc8)); border-radius: 8px; padding: 4px 8px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
 .tz-summary-clear:hover { color: var(--ink, var(--tz-text)); border-style: solid; }
+/* Small inline swatch that matches the map's dotted-ring for in-review requests (CommandMap.dottedRing uses #d97706). */
+.tz-dotted-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; border: 1.5px dashed #d97706; vertical-align: -1px; margin-inline-end: 4px; }
 .tz-site-actions { display: flex; flex-direction: column; gap: 6px; }
 .tz-site-actions .button { width: 100%; justify-content: center; }
 .tz-site-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }

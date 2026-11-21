@@ -111,11 +111,22 @@ export function HomePage() {
 
   // Ground-truth sets of site IDs: the sites a piece of work points to on the map (for highlight and warning).
   const oldReviewSites = useMemo<Set<string>>(() => new Set(), [requests]);
-  // Owner, 21 Nov 2026: the «ملخص الحالة» rows become filter buttons. The permanent/temporary site IDs come from the live
-  // stationing records; «طلبات قيد الاعتماد» has no direct site mapping on the list item, so its row stays a link to the
-  // full requests list where the owner can filter by state.
+  // Owner, 21 Nov 2026: the «ملخص الحالة» rows become filter buttons on the map.
+  //  - permanent/temporary: site IDs come straight from the live stationing records;
+  //  - طلبات قيد الاعتماد: the list item carries no siteId, so we take the requesting unit's current site. Those sites are
+  //    then styled with a dotted ring on the map so an in-review request reads at a glance (CommandMap `inReview` prop).
   const permanentSiteIds = useMemo(() => [...new Set((current ?? []).filter((c) => c.kind !== 'TEMPORARY').map((c) => c.siteId))], [current]);
   const temporarySiteIds = useMemo(() => [...new Set(temporary.map((c) => c.siteId))], [temporary]);
+  const reviewSiteIds = useMemo(() => {
+    const siteByUnit = new Map<string, string>();
+    for (const c of current ?? []) siteByUnit.set(c.orgId, c.siteId);
+    const ids = new Set<string>();
+    for (const r of requests ?? []) if (REVIEW.includes(r.state)) {
+      const siteId = siteByUnit.get(r.requestingUnit.id);
+      if (siteId) ids.add(siteId);
+    }
+    return [...ids];
+  }, [requests, current]);
   const needsAttentionSites = useMemo(
     () => new Set<string>([...nearReturnStations.map((c) => c.siteId), ...oldReviewSites]),
     [nearReturnStations, oldReviewSites],
@@ -155,6 +166,16 @@ export function HomePage() {
     } catch { /* cluster already expanded */ }
   };
   const clearHighlight = () => { setHighlight([]); setSelection({ kind: 'none' }); };
+  // Owner, 21 Nov 2026: «عرض الموقع» zooms to the selected site on the dashboard map and keeps it selected instead of
+  // navigating away to the Sites page. If the map isn't ready yet, the selection stays — opening the map later lands on it.
+  const showSiteOnMap = (siteId: string) => {
+    setSelection({ kind: 'site', siteId });
+    setHighlight([]);
+    const s = siteById.get(siteId);
+    const loc = s?.location;
+    const m = mapRef.current;
+    if (m && loc) m.easeTo({ center: [loc.lng, loc.lat], zoom: Math.max(m.getZoom(), 14), duration: 600 });
+  };
 
   // Empty installation: identity + guidance only (ADR-094).
   const empty = homeEmpty({ orgs: app.orgs.length, sites: app.sites.length, stationed: current, requests, cards: cards.length });
@@ -318,6 +339,7 @@ export function HomePage() {
                   current={current ?? []}
                   highlight={highlight}
                   warning={[...needsAttentionSites]}
+                  inReview={reviewSiteIds}
                   selection={selection.kind === 'request' ? { kind: 'none' } : selection}
                   onSelect={onSelect}
                   onMap={(m) => { mapRef.current = m; }}
@@ -359,6 +381,8 @@ export function HomePage() {
             activeHighlight={highlight}
             permanentSiteIds={permanentSiteIds}
             temporarySiteIds={temporarySiteIds}
+            reviewSiteIds={reviewSiteIds}
+            onShowOnMap={showSiteOnMap}
           />
         </aside>
       </div>
@@ -384,7 +408,7 @@ function DashHeader({ app, role }: { app: ReturnType<typeof useApp>; role: strin
 type DashSel = Selection | { kind: 'request'; requestId: string };
 
 /** The right panel that answers «what is it» and «what may I do about it» (owner §17–§21). */
-function ContextualPanel({ selection, siteById, requests, current, stationedUnits, review, temporary, sitesCount, needsAttentionSites, role, finalWaiting, overdueTasks, accessWaiting, myOpen, onExpandCluster, onClear, onFilter, activeHighlight, permanentSiteIds, temporarySiteIds }: {
+function ContextualPanel({ selection, siteById, requests, current, stationedUnits, review, temporary, sitesCount, needsAttentionSites, role, finalWaiting, overdueTasks, accessWaiting, myOpen, onExpandCluster, onClear, onFilter, activeHighlight, permanentSiteIds, temporarySiteIds, reviewSiteIds, onShowOnMap }: {
   selection: DashSel;
   siteById: Map<string, Site>;
   requests: RestationingListItem[];
@@ -405,6 +429,8 @@ function ContextualPanel({ selection, siteById, requests, current, stationedUnit
   activeHighlight: readonly string[];
   permanentSiteIds: string[];
   temporarySiteIds: string[];
+  reviewSiteIds: string[];
+  onShowOnMap: (siteId: string) => void;
 }) {
   const filterActive = (ids: string[]) => ids.length > 0 && ids.length === activeHighlight.length && ids.every((x) => activeHighlight.includes(x));
   if (selection.kind === 'site') {
@@ -438,7 +464,8 @@ function ContextualPanel({ selection, siteById, requests, current, stationedUnit
           </section>
           <section><h4>إجراءات سريعة</h4>
             <div className="tz-site-actions">
-              <a className="button primary" href={'#stationing?site=' + s.id}>عرض الموقع</a>
+              <button type="button" className="button primary" data-testid="site-show-on-map" onClick={() => onShowOnMap(s.id)}>عرض الموقع على الخريطة</button>
+              <a className="button" href={'#stationing?site=' + s.id}>فتح صفحة الموقع</a>
               {role.isRequester && <a className="button" href={'#restationing/new?site=' + s.id + '&purpose=RESTATIONING'}>إنشاء طلب إعادة تمركز</a>}
             </div>
           </section>
@@ -520,7 +547,11 @@ function ContextualPanel({ selection, siteById, requests, current, stationedUnit
               </button>
             </li>
             <li>
-              {review > 0 ? (
+              {review > 0 && reviewSiteIds.length > 0 ? (
+                <button type="button" className={'tz-summary-row' + (filterActive(reviewSiteIds) ? ' is-active' : '')} data-testid="summary-review" onClick={() => onFilter(reviewSiteIds)} title="تصفية الخريطة على مواقع الطلبات قيد الاعتماد (علامتها خط منقّط)">
+                  <span><i className="tz-dotted-dot" aria-hidden="true" /> طلبات قيد الاعتماد</span><span className="pill">{ar(review)}</span>
+                </button>
+              ) : review > 0 ? (
                 <a className="tz-summary-row" data-testid="summary-review" href="#allRequests" title="فتح الطلبات قيد الاعتماد">
                   <span>طلبات قيد الاعتماد</span><span className="pill">{ar(review)}</span>
                 </a>

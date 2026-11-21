@@ -9,6 +9,22 @@
   position: absolute;
   inset: 0;
 }
+/* Owner, 21 Nov 2026: the map follows the app theme — dark app ⇒ dark map — unless the person forces the map to stay
+   light with the toggle on the map toolbar (data-map-theme="light"). CSS filter is a pragmatic first pass; a proper
+   paint-property dark palette is a follow-up. */
+:root[data-theme='dark'] .ml-offline:not([data-map-theme='light']) .ml-offline-canvas {
+  filter: invert(0.88) hue-rotate(180deg) brightness(0.95) saturate(0.85);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) .ml-offline:not([data-map-theme='light']) .ml-offline-canvas {
+    filter: invert(0.88) hue-rotate(180deg) brightness(0.95) saturate(0.85);
+  }
+}
+/* keep the notice readable above the inverted canvas */
+:root[data-theme='dark'] .ml-offline:not([data-map-theme='light']) .ml-offline-notice {
+  background: rgba(20, 24, 30, 0.9);
+  color: #d4dbe3;
+}
 .ml-offline-notice {
   position: absolute;
   inset-inline-start: 8px;

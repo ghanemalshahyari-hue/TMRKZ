@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Map as MlMap, type LayerSpecification, type LngLatBoundsLike } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './offlineMap.css';
@@ -17,6 +17,36 @@ import {
 import { ensureOfflineMapSetup } from './setup';
 import { MAP_FONT_URL } from './mapPackage';
 import { drawGlyphsLeftToRight } from './glyphDirection';
+
+/**
+ * Owner, 21 Nov 2026: the map follows the app theme by default; the viewer may override and force it to stay light with
+ * «خريطة فاتحة» on the map toolbar. The override is stored per-browser (no server round-trip) and survives reloads. The
+ * value is either 'light' (force light) or null (follow the app theme).
+ */
+const MAP_THEME_KEY = 'tmrkz-map-theme';
+type MapThemeOverride = 'light' | null;
+const mapThemeListeners = new Set<() => void>();
+export function readMapThemeOverride(): MapThemeOverride {
+  try {
+    return localStorage.getItem(MAP_THEME_KEY) === 'light' ? 'light' : null;
+  } catch {
+    return null;
+  }
+}
+export function setMapThemeOverride(v: MapThemeOverride): void {
+  try {
+    if (v === 'light') localStorage.setItem(MAP_THEME_KEY, 'light');
+    else localStorage.removeItem(MAP_THEME_KEY);
+  } catch { /* storage refused */ }
+  mapThemeListeners.forEach((l) => l());
+}
+export function useMapThemeOverride(): MapThemeOverride {
+  return useSyncExternalStore(
+    (l) => (mapThemeListeners.add(l), () => mapThemeListeners.delete(l)),
+    () => readMapThemeOverride(),
+    () => null,
+  );
+}
 
 /**
  * The offline MapLibre map prepared for the Stationing V3 page (not wired into any page yet). It owns the background
@@ -60,6 +90,7 @@ export function OfflineMapLibre({
   const host = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const [ready, setReady] = useState(false);
+  const mapThemeOverride = useMapThemeOverride();
   const initial = useRef({ mode, labels, center, zoom });
 
   useEffect(() => {
@@ -120,7 +151,7 @@ export function OfflineMapLibre({
   }, [mode, ready]);
 
   return (
-    <div className={'ml-offline' + (className ? ' ' + className : '')} data-mode={mode}>
+    <div className={'ml-offline' + (className ? ' ' + className : '')} data-mode={mode} data-map-theme={mapThemeOverride ?? undefined}>
       <div ref={host} className="ml-offline-canvas" />
       <div className="ml-offline-notice" role="note" data-testid="map-source-notice">
         {mode === 'terrain' && !hillshade ? 'طبقة طبيعة الأرض غير مثبتة في هذه الحزمة' : MODE_NOTICE[mode]}

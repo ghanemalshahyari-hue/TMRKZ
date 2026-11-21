@@ -2,9 +2,32 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { BasemapMode } from '../map/maplibre/offlineStyle';
 import type { MapView } from '../map/maplibre/terrain3d';
 import { LABELS } from '../../lib/requestMap';
+import { setMapThemeOverride, useMapThemeOverride } from '../map/maplibre/OfflineMapLibre';
 import { Icon } from '../ui';
 // the 2D/3D switch below is styled here: a page without the terrain panel (the posture) must not lose it under the map
 import './terrain3d.css';
+
+/**
+ * «خريطة فاتحة» (owner, 21 Nov 2026): a per-browser override to keep the map light even when the app is in dark mode.
+ * When the toggle is off (default), the map follows the app theme. The preference is read from localStorage via
+ * `useMapThemeOverride` and written with `setMapThemeOverride`.
+ */
+function MapThemeToggle() {
+  const override = useMapThemeOverride();
+  const forced = override === 'light';
+  return (
+    <button
+      type="button"
+      className={'tz-tool' + (forced ? ' is-on' : '')}
+      aria-pressed={forced}
+      onClick={() => setMapThemeOverride(forced ? null : 'light')}
+      title={forced ? 'الخريطة تتبع المظهر (داكن في الوضع الداكن)' : 'إبقاء الخريطة فاتحة حتى في الوضع الداكن'}
+      data-testid="map-light-toggle"
+    >
+      <Icon name="eye" /> <span>{forced ? 'تتبع المظهر' : 'خريطة فاتحة'}</span>
+    </button>
+  );
+}
 
 /** «الشوارع» / «طبيعة الأرض»: the two backgrounds of the offline map (the terrain is the GLO-30 hillshade, display only). */
 export function MapModeSwitcher({ mode, setMode }: { mode: BasemapMode; setMode: (m: BasemapMode) => void }) {
@@ -111,6 +134,7 @@ export function MapFrame({ title, badge, tools, mode, setMode, onFit, legend, st
               <Icon name="target" /> <span>الحدود والمناطق</span>
             </button>
           )}
+          <MapThemeToggle />
           <MapModeSwitcher mode={mode} setMode={setMode} />
         </div>
       </div>
