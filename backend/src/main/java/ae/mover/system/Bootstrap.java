@@ -60,6 +60,12 @@ public class Bootstrap implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         tx.executeWithoutResult(s -> {
+            // Defensive singleton seed (ADR-097 post-mortem, 21 Nov 2026): V9 inserted the single
+            // authz_sync_state row; if an administrator TRUNCATEs the business DB without dropping it,
+            // AuthzSync.ready() fails because the row is missing. Re-seed on every startup is idempotent
+            // (id=1 primary key, on conflict do nothing) and lets a platform-account sign-in (V21) still
+            // succeed on an otherwise emptied database.
+            jdbc.sql("insert into authz_sync_state(id) values (1) on conflict (id) do nothing").update();
             policies.ensureInitial();
             seedRoles();
             seedRequestTypes();
