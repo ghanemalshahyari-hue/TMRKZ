@@ -30,6 +30,14 @@
 
 /* ---- application frame ------------------------------------------------------------------------------------------- */
 .tz-app { min-height: 100dvh; display: flex; flex-direction: column; }
+/* StationingShell takes the main area's height so its body is a flex column that owns its own scrolling (§7 scroll fix).
+   The wizard inside scrolls while its sticky nav row stays visible; the shell header never scrolls. */
+.tz-stationing-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.tz-stationing-shell-head { flex: none; }
+.tz-stationing-shell-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.tz-stationing-shell-body > .sw-wizard { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; padding: 10px 14px 70px; scrollbar-width: thin; }
+.tz-stationing-shell-body > .sw-wizard > .sw-nav { position: sticky; bottom: 0; background: linear-gradient(180deg, transparent 0, var(--tz-panel, var(--canvas, #fffcf6)) 30%); padding-top: 10px; margin-top: 6px; z-index: 2; }
+.tz-stationing-shell-body > .sw-wizard .sw-body .da-camps { flex: 1; min-height: 0; }
 .tz-app.is-console { background: radial-gradient(1200px 600px at 85% -10%, #12405040, transparent 60%), linear-gradient(180deg, var(--tz-bg-2), var(--tz-bg)); color: var(--tz-text); }
 .tz-app.is-page { background: var(--canvas); }
 .tz-main { flex: 1; min-width: 0; outline: none; }
@@ -755,6 +763,11 @@ textarea.sw-input { resize: vertical; min-height: 56px; }
 .sw-go { width: 100%; min-height: 36px; border: 0; border-radius: 10px; background: var(--sw-on); color: var(--sw-on-ink); font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
 .sw-go:disabled { opacity: .55; cursor: default; }
 .sw-nav { display: grid; gap: 4px; }
+/* Owner, 20 Nov 2026: the «التالي» button of a step was reachable only after scrolling past the full site list. Pin
+   the nav row to the bottom of every step panel so the primary action is always visible. */
+.sw-wizard > .sw-nav { position: sticky; bottom: 0; padding: 10px 0 2px; margin-top: 8px;
+  background: linear-gradient(180deg, transparent 0, var(--tz-panel, #fffcf6) 24%);
+  z-index: 2; }
 .sw-nav2 { display: flex; justify-content: space-between; }
 .sw-sum { display: grid; gap: 4px; margin: 0; font-size: 12.5px; }
 .sw-sum > div { display: grid; grid-template-columns: 95px 1fr; gap: 8px; }
@@ -986,3 +999,9 @@ a.tz-tile:hover { background: var(--tz-raise); border-color: var(--tz-line); }
 /* a work screen's context panel is as tall as what it holds (it scrolls when long), not a full-height empty box */
 .tz-col-context > .tz-context { height: auto; max-height: 100%; }
 
+
+/* ＋ إنشاء menu (owner UX consolidation §10) — one global entry point replaces the chooser page */
+.tz-create { position: relative; }
+.tz-create-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 14px; border-radius: 999px; background: var(--accent, #8b5a2b); color: #fff; border: 0; cursor: pointer; font: inherit; font-weight: 700; font-size: 13.5px; }
+.tz-create-btn:hover { filter: brightness(1.05); }
+.tz-create-menu { inset-inline-end: 0; margin-top: 6px; min-width: 240px; }

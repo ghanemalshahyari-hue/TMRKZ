@@ -79,9 +79,9 @@ export type NavLink = { view: View; label: string; icon: string; id?: string; hr
  */
 const PRIMARY: { label: string; icon: string; views: View[]; wayKey?: 'SITE_SETUP' | 'DEPLOYMENT_AREAS' | 'RESTATIONING' }[] = [
   { label: 'الرئيسية', icon: 'home', views: ['home'] },
-  // Owner, 20 Nov 2026: the top tab's label is «الموقف العملياتي» (replacing «مساحة التمركز»). It opens the operational
-  // posture page; a person without VIEW_OPERATIONAL_POSTURE falls back to the re-stationing editor landing.
-  { label: 'الموقف العملياتي', icon: 'map', views: ['posture', 'restationing'] },
+  // Owner, 21 Nov 2026 UI closure §2: the posture tab opens the posture or disappears. Falling back to the re-stationing
+  // editor was a semantic mismatch — a tab labelled «الموقف العملياتي» must never open «طلب إعادة تمركز».
+  { label: 'الموقف العملياتي', icon: 'map', views: ['posture'] },
   { label: 'تحديد مواقع التمركز المبدئية', icon: 'tent', views: ['siteSetup'], wayKey: 'SITE_SETUP' },
   { label: 'طلب مناطق انتشار', icon: 'layers', views: ['restationing'], wayKey: 'DEPLOYMENT_AREAS' },
   { label: 'طلب إعادة تمركز', icon: 'swap', views: ['restationing'], wayKey: 'RESTATIONING' },

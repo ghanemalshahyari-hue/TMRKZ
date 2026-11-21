@@ -213,7 +213,6 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
     t === 'site' || (t === 'primary' && !isRS) ? (siteGeom ? centreOf(siteGeom) : null)
       : t === 'primary' ? (newSite ? centreOf(newSite) : null)
         : areas.primary ? centreOf(areas.primary as unknown as SiteGeometry) : null;
-  const fromWords = (t: Target) => (t === 'site' ? 'من الموقع الحالي' : measuredFrom(purpose, t));
   const areaDefault: AreaDefault | null = resolveAreaDefault(policy?.values.deploymentAreaDefault ?? null).value;
   const measure = (r: AreaRole) => {
     const g = areas[r];
@@ -248,10 +247,12 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
       maxAreaM2: () => null,
       flyOnFinish: false,
       // the slope colours follow the area being drawn
-      onDrawShape: (shape) => roleRef.current && slopeRef.current?.update(roleRef.current, shape ? [[shape]] : null, true),
+      // Owner, 20 Nov 2026: the slope colour follows the shape being drawn live, whether it is a new site, a primary area
+      // or an alternative — the SlopeInside class carries all three shapes.
+      onDrawShape: (shape) => targetRef.current && slopeRef.current?.update(targetRef.current, shape ? [[shape]] : null, true),
       onChange: (live: SiteLive, final: boolean) => {
         setDrawing(live.mode === 'draw');
-        if (live.mode !== 'draw' && roleRef.current) slopeRef.current?.update(roleRef.current, live.geometry ? partsOf(live.geometry) : null, !final);
+        if (live.mode !== 'draw' && targetRef.current) slopeRef.current?.update(targetRef.current, live.geometry ? partsOf(live.geometry) : null, !final);
         if (!final) return;
         const t = targetRef.current;
         if (t === 'site') {
@@ -295,7 +296,9 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
         { type: 'Feature', properties: { part: 'head', tone }, geometry: { type: 'LineString', coordinates: [wing(1), [e.lngLat.lng, e.lngLat.lat], wing(-1)] } },
       ],
     });
-    tip.textContent = kmChip(d) + ' ' + fromWords(target) + (v ? ' · ' + v.text : '');
+    // Owner, 20 Nov 2026: a bare «5.3 كم» with no verdict was too wordy («من الموقع الحالي» repeated what the line already
+    // shows). Keep the short form when informational, add the verdict on its own when the area is in/out of policy range.
+    tip.textContent = v ? kmChip(d) + ' · ' + v.text : kmChip(d);
     tip.className = 'da-hover is-' + (v?.tone ?? 'none');
     tip.style.transform = `translate(${Math.round(e.point.x + 16)}px, ${Math.round(e.point.y + 18)}px)`;
     tip.hidden = false;
@@ -355,8 +358,10 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
     ed.setOrigin(o ? { at: o, label: null } : null);
     const leg = target === 'site' ? null : legOf(target);
     ed.setDistanceLabel((d: number) => {
+      // Owner, 20 Nov 2026: the chip on the measured line shows the number only. The line's two endpoints already show
+      // where the measurement is from and to; the verdict (in/out of range) is appended when a policy leg applies.
       const v = leg ? verdictOf(d, leg) : null;
-      return { text: kmChip(d) + (v ? ' · ' + v.text : target === 'site' ? ' من الموقع الحالي' : ''), tone: v?.tone ?? 'none' };
+      return { text: v ? kmChip(d) + ' · ' + v.text : kmChip(d), tone: v?.tone ?? 'none' };
     });
   }, [target, mapReady, unitId, picked.join(','), policy?.version]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -366,7 +371,9 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
   const slopeLimits = policy?.values.slopeDisplay ?? INITIAL_SLOPE_LIMITS;
   const [slopeInside, setSlopeInside] = useState<SlopeInside | null>(null);
   slopeRef.current = slopeInside;
-  const areasOn = step > stages.indexOf('primary');
+  // Owner, 20 Nov 2026: the slope colouring is live for EVERY area being drawn — site (restationing), primary and
+  // alternative — not only once primary is reached. The class carries all three shapes, so the previous one stays visible.
+  const areasOn = target !== null || !!newSite || !!areas.primary || !!areas.alternative;
   useEffect(() => {
     const m = mapRef.current;
     if (!m || !mapReady || !sampler || !slopeOn || !areasOn) return;
@@ -378,12 +385,15 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
     };
   }, [mapReady, sampler, JSON.stringify(slopeLimits), slopeOn, areasOn]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (role) slopeInside?.setActive(role);
-  }, [slopeInside, role]);
+    // Owner, 20 Nov 2026: the «active» shape (whose stats the legend speaks about) tracks the step — site, primary or alternative.
+    if (target) slopeInside?.setActive(target);
+  }, [slopeInside, target]);
   useEffect(() => {
+    // Every area's slope is maintained in parallel; a shape's class keeps the previous one visible while another is being drawn.
+    slopeInside?.update('site', newSite ? partsOf(newSite as unknown as SiteGeometry) : null, false);
     slopeInside?.update('primary', areas.primary ? partsOf(areas.primary as unknown as SiteGeometry) : null, false);
     slopeInside?.update('alternative', areas.alternative ? partsOf(areas.alternative as unknown as SiteGeometry) : null, false);
-  }, [slopeInside, areas]);
+  }, [slopeInside, areas, newSite]);
 
   const legChecks = useMemo(() => (policy ? ({
     legs: (['primary', 'alternative'] as const).map((leg) => ({ leg, effectiveMinM: policy.values[leg].minM, baseMaxM: policy.values[leg].maxM, effectiveMaxM: policy.values[leg].maxM, exceptionMaxM: null })),
@@ -881,7 +891,7 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
           {terrain3d !== undefined && (
             <RequestMap view={view} terrain3d={terrain3d} request={preview} checks={legChecks} mode={mode} fitMaxZoom={12} hideSite={!isRS} fit={false} onMap={onMap}
               referenceInteractive={step === 1 || (!placing && !drawing)} fitSites={fitAll} highlight={campId}
-              pick={placing || drawing || (isRS && stage !== 'pick') ? null : { selectedId: campId, onPick: (sid) => sid && chooseOnMap(sid) }}
+              pick={placing || drawing || (isRS && stage !== 'pick') ? null : { selectedId: campId, onPick: (sid) => { if (sid) chooseOnMap(sid); } }}
               focus={focusReq} />
           )}
           {mapReady && areasOn && <SlopeControl on={slopeOn} setOn={setSlopeOn} limits={slopeLimits} available={!!terrain3d} inside={slopeInside} />}

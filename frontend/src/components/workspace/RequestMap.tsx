@@ -120,7 +120,13 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
    * The current-site step of a new request: a click on a site picks it (the editor shows its card with the explicit
    * «بدء طلب إعادة تمركز من هذا الموقع»; a click alone starts nothing), and the picked or chosen site is highlighted.
    */
-  pick?: { selectedId: string | null; onPick: (siteId: string | null, here?: string[]) => void } | null;
+  /**
+   * Click-to-pick (owner, 21 Nov 2026 UI closure §6): `onPick` returns `true` when the click was handled (e.g. a posture
+   * unit was selected), `false`/`undefined` when the click should fall through to the normal information card instead.
+   * This lets the posture map select the person's units on a click AND still open a reference-site card for sites that
+   * have no posture unit.
+   */
+  pick?: { selectedId: string | null; onPick: (siteId: string | null, here?: string[]) => boolean | void } | null;
   /** Bring one site into view (a search result, a site chosen elsewhere); a new key flies again. */
   focus?: { siteId: string; key: number } | null;
   /** With nothing of the request to frame yet, frame every registered site once. */
@@ -142,7 +148,10 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
   const interactive = useRef(referenceInteractive);
   interactive.current = referenceInteractive;
   const onSite = useRef<(id: string | null, here?: string[]) => void>(setInfo);
-  onSite.current = pick ? pick.onPick : setInfo;
+  // §6: when a `pick` is given, try it first; if it returns false/undefined the click falls through to the info card.
+  onSite.current = pick
+    ? (id, here) => { if (!pick.onPick(id, here)) setInfo(id); }
+    : setInfo;
   useEffect(() => {
     if (!referenceInteractive) setInfo(null);
   }, [referenceInteractive]);
@@ -153,7 +162,9 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
     (map?.getSource('occ') as GeoJSONSource | undefined)?.setData(occupied ?? { type: 'FeatureCollection', features: [] });
   }, [map, occupied]);
   const wrap = useRef<HTMLDivElement>(null);
-  const pickedSite = !pick && info ? registered.all.find((x) => x.siteId === info) : undefined;
+  // the info card shows whenever `info` is set — whether we're in free-click mode (!pick) or in pick mode and the click
+  // fell through to the fallback (§6).
+  const pickedSite = info ? registered.all.find((x) => x.siteId === info) : undefined;
   // the selected (or chosen) site stays in view: near or beyond an edge, the map glides to it, keeping the zoom
   useEffect(() => {
     if (!map || !highlighted) return;

@@ -8,6 +8,7 @@ import { Icon } from '../components/ui';
 import { StatePill } from '../components/workspace/StatePill';
 import { useApp } from '../lib/app';
 import { restriction } from '../lib/navigation';
+import { rememberReturn } from '../lib/returnContext';
 import { STATIONING_V3_ENABLED } from '../lib/stationingV3';
 import type { Selection } from '../components/workspace/CommandMap';
 
@@ -455,18 +456,39 @@ function ContextualPanel({ selection, siteById, requests, current, stationedUnit
             <span><b>{ar(stations.length)}</b><small>الوحدات المتمركزة</small></span>
             <span><b>{ar(siteRequests.filter((r) => REVIEW.includes(r.state)).length)}</b><small>طلبات قيد الاعتماد</small></span>
           </div>
+          {/* Owner, 21 Nov 2026: the per-site «ملخص الحالة» rows are now filter buttons too — a click narrows the map to the
+             sites behind that status (not just this site), the same way as the no-selection summary. The current site stays
+             highlighted while the filter is on so the person keeps their bearings. */}
           <section><h4>ملخص الحالة</h4>
             <ul className="tz-site-rows">
-              <li><span>وحدات بتمركز دائم</span><span className="pill">{ar(permanent)}</span></li>
-              <li><span>وحدات بتمركز مؤقت</span><span className="pill">{ar(temp.length)}</span></li>
-              <li><span>طلبات إعادة تمركز نشطة</span><span className="pill">{siteRequests.filter((r) => REVIEW.includes(r.state)).length > 0 ? ar(siteRequests.filter((r) => REVIEW.includes(r.state)).length) : 'لا توجد'}</span></li>
+              <li>
+                <button type="button" className={'tz-summary-row' + (filterActive(permanentSiteIds) ? ' is-active' : '')} data-testid="site-summary-permanent" onClick={() => onFilter(permanentSiteIds)} disabled={permanentSiteIds.length === 0} title="تصفية الخريطة على مواقع التمركز الدائم">
+                  <span>وحدات بتمركز دائم</span><span className="pill">{ar(permanent)}</span>
+                </button>
+              </li>
+              <li>
+                <button type="button" className={'tz-summary-row' + (filterActive(temporarySiteIds) ? ' is-active' : '')} data-testid="site-summary-temporary" onClick={() => onFilter(temporarySiteIds)} disabled={temporarySiteIds.length === 0} title="تصفية الخريطة على مواقع التمركز المؤقت">
+                  <span>وحدات بتمركز مؤقت</span><span className="pill">{ar(temp.length)}</span>
+                </button>
+              </li>
+              <li>
+                {reviewSiteIds.length > 0 ? (
+                  <button type="button" className={'tz-summary-row' + (filterActive(reviewSiteIds) ? ' is-active' : '')} data-testid="site-summary-review" onClick={() => onFilter(reviewSiteIds)} title="تصفية الخريطة على مواقع الطلبات قيد الاعتماد (علامتها خط منقّط)">
+                    <span><i className="tz-dotted-dot" aria-hidden="true" /> طلبات إعادة تمركز نشطة</span>
+                    <span className="pill">{ar(siteRequests.filter((r) => REVIEW.includes(r.state)).length || reviewSiteIds.length)}</span>
+                  </button>
+                ) : (
+                  <span className="tz-summary-row is-plain"><span>طلبات إعادة تمركز نشطة</span><span className="pill">لا توجد</span></span>
+                )}
+              </li>
+              {activeHighlight.length > 0 && <li><button type="button" className="tz-summary-clear" onClick={onClear}>إلغاء التصفية على الخريطة</button></li>}
             </ul>
           </section>
           <section><h4>إجراءات سريعة</h4>
             <div className="tz-site-actions">
               <button type="button" className="button primary" data-testid="site-show-on-map" onClick={() => onShowOnMap(s.id)}>عرض الموقع على الخريطة</button>
-              <a className="button" href={'#stationing?site=' + s.id}>فتح صفحة الموقع</a>
-              {role.isRequester && <a className="button" href={'#restationing/new?site=' + s.id + '&purpose=RESTATIONING'}>إنشاء طلب إعادة تمركز</a>}
+              <a className="button" href={'#stationing/site/' + s.id} onClick={() => rememberReturn('#home')}>فتح صفحة الموقع</a>
+              {role.isRequester && <a className="button" href={'#restationing/new?purpose=RESTATIONING&site=' + s.id} onClick={() => rememberReturn('#home')}>إنشاء طلب إعادة تمركز</a>}
             </div>
           </section>
         </div>

@@ -85,10 +85,24 @@ export function PosturePage() {
       </section>
     </div>
   );
-  // Map-click selection was added briefly on 20 Nov 2026 and removed again: RequestMap's `pick` fully replaces the
-  // info-card fallback, which left clicks on reference sites (no posture unit) silently inert. A follow-up change will
-  // either wrap the info card with a «اختر هذه الوحدة» action or add a dual-callback shape to RequestMap. For now the
-  // unit tree in the right rail remains the only reliable selector, and the map still highlights the selected site.
+  // Owner, 21 Nov 2026 UI closure §6: a click on a posture unit's site selects it on the posture; a click on a reference
+  // site that has no posture unit falls through to the normal information card (RequestMap `pick.onPick` return value).
+  const siteToUnits = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const u of units ?? []) if (u.site) {
+      const bucket = m.get(u.site.id);
+      if (bucket) bucket.push(u.id);
+      else m.set(u.site.id, [u.id]);
+    }
+    return m;
+  }, [units]);
+  const pickUnitBySite = (siteId: string | null): boolean => {
+    if (!siteId) return false;
+    const unitIds = siteToUnits.get(siteId);
+    if (!unitIds || unitIds.length === 0) return false;
+    setSelected(unitIds[0]);
+    return true;
+  };
   const context = (
     <aside className="tz-context" aria-label="موقف الوحدة">
       <div className="tz-context-body" data-testid="posture-details">
@@ -132,7 +146,7 @@ export function PosturePage() {
           onFit={() => setFit((k) => k + 1)}
           legend={<MapLegend stage="full" fold />}
         >
-          {terrain3d !== undefined && req && <RequestMap view={view} terrain3d={terrain3d} request={req} checks={null} mode={mode} fitMaxZoom={13} hideSite fit fitKey={fit} referenceInteractive onMap={setMap} highlight={unit?.site?.id ?? null} fitSites />}
+          {terrain3d !== undefined && req && <RequestMap view={view} terrain3d={terrain3d} request={req} checks={null} mode={mode} fitMaxZoom={13} hideSite fit fitKey={fit} referenceInteractive onMap={setMap} highlight={unit?.site?.id ?? null} fitSites pick={{ selectedId: unit?.site?.id ?? null, onPick: (siteId) => pickUnitBySite(siteId) }} />}
         </MapFrame>
       )}
     />
