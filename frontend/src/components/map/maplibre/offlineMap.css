@@ -9,10 +9,22 @@
   position: absolute;
   inset: 0;
 }
-/* Owner, 21 Nov 2026 (revised): the earlier dark-mode CSS filter on the map canvas caused a per-frame recomposite over
-   MapLibre's WebGL layer — on many machines that looked like shimmer/flicker during flyTo/easeTo and panels redraws.
-   Rolled back to no runtime filter; a proper dark palette for `offlineStyle.ts` is the right follow-up. The map stays
-   its natural colour in both themes. */
+/* Owner, 21 Nov 2026 (re-restored): the map follows the app theme — dark app ⇒ dark map — unless the person forces the
+   map to stay light with «خريطة فاتحة» on the map toolbar (`data-map-theme="light"`). The initial flicker was a React
+   state-loop between two sync useEffects in PosturePage, not this filter; fixed separately. The filter stays as the
+   pragmatic MVP until a proper per-layer dark palette is added to `offlineStyle.ts`. */
+:root[data-theme='dark'] .ml-offline:not([data-map-theme='light']) .ml-offline-canvas {
+  filter: invert(0.88) hue-rotate(180deg) brightness(0.95) saturate(0.85);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) .ml-offline:not([data-map-theme='light']) .ml-offline-canvas {
+    filter: invert(0.88) hue-rotate(180deg) brightness(0.95) saturate(0.85);
+  }
+}
+:root[data-theme='dark'] .ml-offline:not([data-map-theme='light']) .ml-offline-notice {
+  background: rgba(20, 24, 30, 0.9);
+  color: #d4dbe3;
+}
 .ml-offline-notice {
   position: absolute;
   inset-inline-start: 8px;

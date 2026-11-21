@@ -692,8 +692,14 @@ button.tz-summary-row:disabled { cursor: not-allowed; opacity: 0.6; }
 .tz-posture3-detail-body dt .icon { width: 13px; height: 13px; }
 .tz-posture3-detail-body dd { margin: 0; font-weight: 600; color: var(--ink, var(--tz-text)); text-align: end; }
 
-/* -- Map controls bottom-left (physical LEFT) --------------------------------------------------------------------- */
-.tz-posture3-mapctl { position: absolute; bottom: 14px; left: 14px; z-index: 5; display: flex; flex-direction: column; gap: 8px; }
+/* -- Map controls bottom-left (physical LEFT), raised so it clears the FloatingAssist corner buttons --------------- */
+.tz-posture3-mapctl { position: absolute; bottom: 82px; left: 14px; z-index: 5; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+/* The 2D/3D ViewSwitcher ships with its own `position:absolute; top:12px; left:12px` from terrain3d.css. Force it to join
+   the mapctl flex column so it stops overlapping the layers panel and the map-mode switcher. Same for `.tz-segment`. */
+.tz-posture3-mapctl .tz-view-switch, .tz-posture3-mapctl .tz-segment { position: static; top: auto; left: auto; right: auto; background: color-mix(in srgb, var(--tz-panel, var(--canvas, #fff)) 92%, transparent); border: 1px solid var(--tz-line); box-shadow: 0 4px 12px rgb(0 0 0 / 0.15); }
+/* The MapLegend's root `.tz-legend` also ships with its own absolute bottom-left positioning. Inside the posture page it
+   belongs INSIDE our wrapper (`.tz-posture3-legend`), so neutralise its own positioning. */
+.tz-posture3-legend .tz-legend { position: static; bottom: auto; left: auto; right: auto; max-width: 320px; }
 .tz-posture3-mapctl .tz-segment, .tz-posture3-mapctl .tz-view-switch { background: color-mix(in srgb, var(--tz-panel, var(--canvas, #fff)) 92%, transparent); border: 1px solid var(--tz-line); border-radius: 10px; padding: 3px; }
 .tz-posture3-mapctl-btn { width: 36px; height: 36px; background: color-mix(in srgb, var(--tz-panel, var(--canvas, #fff)) 92%, transparent); border: 1px solid var(--tz-line); border-radius: 10px; color: var(--ink, var(--tz-text)); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .tz-posture3-mapctl-btn:hover { border-color: var(--accent, #8b5a2b); color: var(--accent, #8b5a2b); }
