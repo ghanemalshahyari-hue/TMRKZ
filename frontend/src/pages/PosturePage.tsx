@@ -29,11 +29,17 @@ function asMapRequest(u: PostureUnit): RestationingRequest {
   } as unknown as RestationingRequest;
 }
 
-type Cohort = 'all' | 'stationed' | 'noStationing';
+/**
+ * Owner, 21 Nov 2026 operational-posture model: the right rail is organised by camp (الموقع), not by flat unit. Four
+ * tabs — the first two group units UNDER their camps (so the rail reads «موقع → وحدات داخل الموقع»), «غير متمركزة» lists
+ * organisational hierarchy under its top unit, and «طلبات» is split into two groups (stationing vs deployment).
+ */
+type Cohort = 'stationed' | 'incomplete' | 'noStationing' | 'requests';
 const COHORTS: readonly [Cohort, string][] = [
-  ['all', 'الكل'],
-  ['stationed', 'داخل الموقع'],
-  ['noStationing', 'خارج الموقع'],
+  ['stationed', 'الوحدات المتمركزة'],
+  ['incomplete', 'وحدات بدون مناطق انتشار'],
+  ['noStationing', 'وحدات غير متمركزة'],
+  ['requests', 'طلبات التمركز والانتشار'],
 ];
 
 type LayerState = {
@@ -54,7 +60,11 @@ export function PosturePage() {
   const [units, setUnits] = useState<PostureUnit[] | null>(null);
   const [selection, setSelection] = useState<Selection>(null);
   const [q, setQ] = useState('');
-  const [cohort, setCohort] = useState<Cohort>('all');
+  const [cohort, setCohort] = useState<Cohort>('stationed');
+  const [openCamp, setOpenCamp] = useState<Set<string>>(new Set());
+  const [openOrg, setOpenOrg] = useState<Set<string>>(new Set());
+  const toggleCamp = (id: string) => setOpenCamp((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleOrg = (id: string) => setOpenOrg((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [mode, setMode] = useState<BasemapMode>('terrain');
   const [view, setView] = useState<MapView>('2d');
@@ -219,23 +229,62 @@ export function PosturePage() {
   }, [map, layers, areaOpacity, selected]);
 
   const counts = useMemo(() => {
-    const all = units?.length ?? 0;
-    const stationed = units?.filter((u) => !!u.site).length ?? 0;
-    const temporary = units?.filter((u) => u.kind === 'TEMPORARY').length ?? 0;
-    const noStationing = all - stationed;
-    const sites = new Set((units ?? []).filter((u) => u.site).map((u) => u.site!.id)).size;
-    const withPrimary = (units ?? []).filter((u) => !!u.primary).length;
-    const withSub = (units ?? []).filter((u) => !!u.alternative).length;
-    const withBoth = (units ?? []).filter((u) => !!u.primary && !!u.alternative).length;
-    return { all, stationed, noStationing, temporary, sites, withPrimary, withSub, withBoth };
+    const list = units ?? [];
+    const all = list.length;
+    const stationed = list.filter((u) => !!u.site && !!u.primary && !!u.alternative).length;
+    const incomplete = list.filter((u) => !!u.site && (!u.primary || !u.alternative)).length;
+    const noStationing = list.filter((u) => !u.site).length;
+    const requests = list.filter((u) => !!u.request).length;
+    const temporary = list.filter((u) => u.kind === 'TEMPORARY').length;
+    const sites = new Set(list.filter((u) => u.site).map((u) => u.site!.id)).size;
+    const withPrimary = list.filter((u) => !!u.primary).length;
+    const withSub = list.filter((u) => !!u.alternative).length;
+    return { all, stationed, incomplete, noStationing, requests, temporary, sites, withPrimary, withSub };
   }, [units]);
 
-  const filtered = useMemo(() => {
+  // Search is applied across every cohort — it narrows the pool before grouping.
+  const matches = useMemo(() => {
     const low = q.trim().toLowerCase();
-    return (units ?? [])
-      .filter((u) => cohort === 'all' ? true : cohort === 'stationed' ? !!u.site : !u.site)
-      .filter((u) => !low || u.code.toLowerCase().includes(low) || u.name.toLowerCase().includes(low) || (u.site?.name ?? '').toLowerCase().includes(low));
-  }, [units, cohort, q]);
+    return (units ?? []).filter((u) => !low || u.code.toLowerCase().includes(low) || u.name.toLowerCase().includes(low) || (u.site?.name ?? '').toLowerCase().includes(low));
+  }, [units, q]);
+
+  // Group units UNDER their camp/site (tabs 1 and 2).
+  type Camp = { siteId: string; siteName: string; units: PostureUnit[] };
+  const byCamp = (list: PostureUnit[]): Camp[] => {
+    const m = new Map<string, Camp>();
+    for (const u of list) if (u.site) {
+      const c = m.get(u.site.id) ?? { siteId: u.site.id, siteName: u.site.name, units: [] };
+      c.units.push(u);
+      m.set(u.site.id, c);
+    }
+    return [...m.values()].sort((a, b) => a.siteName.localeCompare(b.siteName, 'ar'));
+  };
+  const stationedCamps = useMemo(() => byCamp(matches.filter((u) => !!u.site && !!u.primary && !!u.alternative)), [matches]);
+  const incompleteCamps = useMemo(() => byCamp(matches.filter((u) => !!u.site && (!u.primary || !u.alternative))), [matches]);
+
+  // «غير متمركزة»: build a shallow org-tree from the unit list's parentId → children.
+  type OrgNode = { unit: PostureUnit; children: OrgNode[] };
+  const noStationingTree = useMemo<OrgNode[]>(() => {
+    const noSite = matches.filter((u) => !u.site);
+    const inPool = new Set(noSite.map((u) => u.id));
+    const byId = new Map(noSite.map((u) => [u.id, { unit: u, children: [] as OrgNode[] }]));
+    const roots: OrgNode[] = [];
+    for (const n of byId.values()) {
+      const parentId = n.unit.parentId;
+      if (parentId && inPool.has(parentId) && byId.get(parentId)) byId.get(parentId)!.children.push(n);
+      else roots.push(n);
+    }
+    const sortTree = (list: OrgNode[]) => { list.sort((a, b) => a.unit.name.localeCompare(b.unit.name, 'ar')); for (const n of list) sortTree(n.children); };
+    sortTree(roots);
+    return roots;
+  }, [matches]);
+
+  // «طلبات التمركز والانتشار» — split per purpose (stationing vs deployment areas) and group by unit.
+  const requestsByPurpose = useMemo(() => {
+    const rs = matches.filter((u) => u.request?.purpose === 'RESTATIONING');
+    const da = matches.filter((u) => u.request?.purpose === 'DEPLOYMENT_AREAS');
+    return { rs, da };
+  }, [matches]);
 
   const siteInfoCard = useMemo(() => {
     if (!siteInfoId) return null;
@@ -312,49 +361,64 @@ export function PosturePage() {
             <input type="search" aria-label="بحث عن وحدة" placeholder="بحث عن وحدة…" value={q} onChange={(e) => setQ(e.target.value)} />
           </div>
           <div className="tz-posture3-units-tabs" role="tablist">
-            {COHORTS.map(([k, label]) => (
-              <button
-                key={k}
-                type="button"
-                role="tab"
-                aria-selected={cohort === k}
-                data-testid={'cohort-' + k}
-                className={'tz-posture3-tab' + (cohort === k ? ' is-active' : '')}
-                onClick={() => setCohort(k)}
-              >
-                {label} <span>({(k === 'all' ? counts.all : k === 'stationed' ? counts.stationed : counts.noStationing).toLocaleString('ar-AE')})</span>
-              </button>
-            ))}
-            <button type="button" className="tz-posture3-browse" onClick={() => setDrawerOpen(true)} data-testid="posture-browse" title="استعراض الوحدات حسب الهيكل">
+            {COHORTS.map(([k, label]) => {
+              const n = k === 'stationed' ? counts.stationed : k === 'incomplete' ? counts.incomplete : k === 'noStationing' ? counts.noStationing : counts.requests;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  role="tab"
+                  aria-selected={cohort === k}
+                  data-testid={'cohort-' + k}
+                  className={'tz-posture3-tab' + (cohort === k ? ' is-active' : '')}
+                  onClick={() => setCohort(k)}
+                >
+                  {label} <span>({n.toLocaleString('ar-AE')})</span>
+                </button>
+              );
+            })}
+            <button type="button" className="tz-posture3-browse" onClick={() => setDrawerOpen(true)} data-testid="posture-browse" title="استعراض الوحدات حسب الهيكل الكامل">
               <Icon name="tree" />
             </button>
           </div>
-          <ul className="tz-posture3-units-list" role="listbox" aria-label="الوحدات">
-            {!units && <li className="tz-posture3-empty-row">جارٍ التحميل…</li>}
-            {units && filtered.length === 0 && <li className="tz-posture3-empty-row">لا وحدات مطابقة.</li>}
-            {filtered.slice(0, 500).map((u) => (
-              <li key={u.id}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={selected === u.id}
-                  data-testid="posture-unit"
-                  data-unit={u.id}
-                  className={'tz-posture3-unit-row' + (selected === u.id ? ' is-selected' : '')}
-                  onClick={() => selectUnit(u.id)}
-                  title={u.site?.name ?? 'بلا تمركز معتمد'}
-                >
-                  <span className="tz-posture3-unit-icon"><Icon name="pin" /></span>
-                  <span className="tz-posture3-unit-meta">
-                    <b>{u.code || u.name}</b>
-                    <small>{u.name}</small>
-                  </span>
-                  <span className={'tz-posture3-unit-state ' + (u.site ? (u.kind === 'TEMPORARY' ? 'temp' : 'on') : 'off')} aria-hidden>●</span>
-                </button>
-              </li>
+          {/* Hierarchical rail bodies — one per cohort. Camps for stationed/incomplete, org-tree for unstationed, split
+             groups for requests. */}
+          <div className="tz-posture3-camps" role="listbox" aria-label={(COHORTS.find(([k]) => k === cohort) ?? [,''])[1]}>
+            {!units && <div className="tz-posture3-empty-row">جارٍ التحميل…</div>}
+
+            {units && cohort === 'stationed' && stationedCamps.length === 0 && <div className="tz-posture3-empty-row">لا توجد وحدات متمركزة مطابقة.</div>}
+            {units && cohort === 'stationed' && stationedCamps.map((c) => (
+              <CampGroup key={c.siteId} camp={c} open={openCamp.has(c.siteId)} onToggle={() => toggleCamp(c.siteId)} selected={selected} onPick={(uid) => selectUnit(uid)} />
             ))}
-            {filtered.length > 500 && <li className="tz-posture3-empty-row">يُعرض ٥٠٠ من {filtered.length.toLocaleString('ar-AE')} — استخدم البحث أو «استعراض الوحدات».</li>}
-          </ul>
+
+            {units && cohort === 'incomplete' && incompleteCamps.length === 0 && <div className="tz-posture3-empty-row">لا توجد وحدات بدون مناطق انتشار.</div>}
+            {units && cohort === 'incomplete' && incompleteCamps.map((c) => (
+              <CampGroup key={c.siteId} camp={c} open={openCamp.has(c.siteId)} onToggle={() => toggleCamp(c.siteId)} selected={selected} onPick={(uid) => selectUnit(uid)} missing />
+            ))}
+
+            {units && cohort === 'noStationing' && noStationingTree.length === 0 && <div className="tz-posture3-empty-row">لا توجد وحدات غير متمركزة.</div>}
+            {units && cohort === 'noStationing' && noStationingTree.map((n) => (
+              <OrgBranch key={n.unit.id} node={n} open={openOrg} onToggle={toggleOrg} selected={selected} onPick={(uid) => selectUnit(uid)} />
+            ))}
+
+            {units && cohort === 'requests' && (requestsByPurpose.rs.length + requestsByPurpose.da.length) === 0 && <div className="tz-posture3-empty-row">لا توجد طلبات جارية.</div>}
+            {units && cohort === 'requests' && (
+              <>
+                {requestsByPurpose.rs.length > 0 && (
+                  <section className="tz-posture3-reqgroup">
+                    <header><Icon name="swap" /> <b>طلبات إعادة التمركز</b> <em>({requestsByPurpose.rs.length.toLocaleString('ar-AE')})</em></header>
+                    <ul>{requestsByPurpose.rs.map((u) => <RequestRow key={u.id} unit={u} selected={selected} onPick={(uid) => selectUnit(uid)} />)}</ul>
+                  </section>
+                )}
+                {requestsByPurpose.da.length > 0 && (
+                  <section className="tz-posture3-reqgroup">
+                    <header><Icon name="layers" /> <b>طلبات مناطق الانتشار</b> <em>({requestsByPurpose.da.length.toLocaleString('ar-AE')})</em></header>
+                    <ul>{requestsByPurpose.da.map((u) => <RequestRow key={u.id} unit={u} selected={selected} onPick={(uid) => selectUnit(uid)} />)}</ul>
+                  </section>
+                )}
+              </>
+            )}
+          </div>
         </aside>
 
         {/* ONE context card at a time (brief §12/§18): either the selected unit OR a reference site, never both. */}
@@ -469,6 +533,105 @@ export function PosturePage() {
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Rail sub-components (owner, 21 Nov 2026 posture-rail rebuild): camps + org branches + request rows.
+// ---------------------------------------------------------------------------------------------------------------------
+
+function CampGroup({ camp, open, onToggle, selected, onPick, missing = false }: { camp: { siteId: string; siteName: string; units: PostureUnit[] }; open: boolean; onToggle: () => void; selected: string | null; onPick: (unitId: string) => void; missing?: boolean }) {
+  return (
+    <section className={'tz-posture3-camp' + (open ? ' is-open' : '')} data-testid="posture-camp" data-site={camp.siteId}>
+      <button type="button" className="tz-posture3-camp-head" aria-expanded={open} onClick={onToggle}>
+        <span className="tz-posture3-camp-twist" aria-hidden>{open ? '▾' : '◂'}</span>
+        <span className="tz-posture3-camp-icon"><Icon name="pin" /></span>
+        <span className="tz-posture3-camp-meta">
+          <b>{camp.siteName}</b>
+          <small>{camp.units.length.toLocaleString('ar-AE') + ' ' + (camp.units.length === 1 ? 'وحدة' : 'وحدات')}{missing ? ' · ينقص ' + (camp.units.filter((u) => !u.primary).length > 0 ? 'الرئيسية' : '') + (camp.units.filter((u) => !u.primary).length > 0 && camp.units.filter((u) => !u.alternative).length > 0 ? ' / ' : '') + (camp.units.filter((u) => !u.alternative).length > 0 ? 'الفرعية' : '') : ''}</small>
+        </span>
+      </button>
+      {open && (
+        <ul className="tz-posture3-camp-units">
+          {camp.units.map((u) => (
+            <li key={u.id}>
+              <button
+                type="button"
+                data-testid="posture-unit"
+                data-unit={u.id}
+                className={'tz-posture3-unit-row' + (selected === u.id ? ' is-selected' : '')}
+                onClick={() => onPick(u.id)}
+                title={u.site?.name ?? ''}
+              >
+                <span className="tz-posture3-unit-icon"><Icon name="building" /></span>
+                <span className="tz-posture3-unit-meta">
+                  <b>{u.code || u.name}</b>
+                  <small>{u.name}</small>
+                </span>
+                <span className={'tz-posture3-unit-state ' + (u.kind === 'TEMPORARY' ? 'temp' : missing ? 'warn' : 'on')} aria-hidden>●</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function OrgBranch({ node, open, onToggle, selected, onPick, depth = 0 }: { node: { unit: PostureUnit; children: { unit: PostureUnit; children: unknown[] }[] }; open: Set<string>; onToggle: (id: string) => void; selected: string | null; onPick: (unitId: string) => void; depth?: number }) {
+  const has = node.children.length > 0;
+  const isOpen = has && open.has(node.unit.id);
+  return (
+    <div className="tz-posture3-org-node" style={{ ['--d' as never]: depth }}>
+      <button
+        type="button"
+        data-testid="posture-unit"
+        data-unit={node.unit.id}
+        className={'tz-posture3-unit-row' + (selected === node.unit.id ? ' is-selected' : '')}
+        onClick={() => onPick(node.unit.id)}
+      >
+        {has ? (
+          <span className="tz-posture3-camp-twist" aria-hidden onClick={(e) => { e.stopPropagation(); onToggle(node.unit.id); }}>{isOpen ? '▾' : '◂'}</span>
+        ) : (
+          <span className="tz-posture3-camp-twist" aria-hidden>·</span>
+        )}
+        <span className="tz-posture3-unit-icon"><Icon name="tree" /></span>
+        <span className="tz-posture3-unit-meta">
+          <b>{node.unit.code || node.unit.name}</b>
+          <small>{node.unit.name}</small>
+        </span>
+        <span className="tz-posture3-unit-state off" aria-hidden>●</span>
+      </button>
+      {isOpen && (
+        <div className="tz-posture3-org-kids">
+          {node.children.map((c) => (
+            <OrgBranch key={c.unit.id} node={c as never} open={open} onToggle={onToggle} selected={selected} onPick={onPick} depth={depth + 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RequestRow({ unit, selected, onPick }: { unit: PostureUnit; selected: string | null; onPick: (unitId: string) => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        data-testid="posture-unit"
+        data-unit={unit.id}
+        className={'tz-posture3-unit-row' + (selected === unit.id ? ' is-selected' : '')}
+        onClick={() => onPick(unit.id)}
+        title={unit.request?.state ?? ''}
+      >
+        <span className="tz-posture3-unit-icon"><Icon name="file" /></span>
+        <span className="tz-posture3-unit-meta">
+          <b>{unit.code || unit.name}</b>
+          <small>{unit.name}{unit.request ? ' · ' + unit.request.state : ''}</small>
+        </span>
+        <span className="tz-posture3-unit-state warn" aria-hidden>●</span>
+      </button>
+    </li>
   );
 }
 

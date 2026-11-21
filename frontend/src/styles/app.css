@@ -656,6 +656,29 @@ button.tz-summary-row:disabled { cursor: not-allowed; opacity: 0.6; }
 .tz-posture3-browse { margin-inline-start: auto; background: transparent; border: 1px solid var(--tz-line); border-radius: 8px; width: 28px; height: 24px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted, var(--tz-muted)); cursor: pointer; }
 .tz-posture3-browse:hover { border-color: var(--accent, #8b5a2b); color: var(--accent, #8b5a2b); }
 .tz-posture3-units-list { list-style: none; margin: 0; padding: 0 6px 10px; overflow: auto; flex: 1; min-height: 0; scrollbar-width: thin; }
+/* Owner, 21 Nov 2026: hierarchical rail — camps on top, units nested inside; org-tree for unstationed; two groups for requests. */
+.tz-posture3-camps { flex: 1; min-height: 0; overflow: auto; padding: 4px 6px 10px; scrollbar-width: thin; display: flex; flex-direction: column; gap: 4px; }
+.tz-posture3-camp { border: 1px solid transparent; border-radius: 10px; }
+.tz-posture3-camp-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 7px 8px; background: transparent; border: 0; border-radius: 10px; font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
+.tz-posture3-camp-head:hover { background: color-mix(in srgb, var(--accent, #8b5a2b) 7%, transparent); }
+.tz-posture3-camp.is-open > .tz-posture3-camp-head { background: color-mix(in srgb, var(--accent, #8b5a2b) 10%, transparent); font-weight: 600; }
+.tz-posture3-camp-twist { width: 14px; display: inline-flex; justify-content: center; color: var(--muted, var(--tz-muted)); font-size: 10px; flex: none; }
+.tz-posture3-camp-icon { width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--accent, #8b5a2b) 10%, var(--paper, #fff)); color: var(--accent, #8b5a2b); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.tz-posture3-camp-icon .icon { width: 14px; height: 14px; }
+.tz-posture3-camp-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.15; }
+.tz-posture3-camp-meta b { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tz-posture3-camp-meta small { font-size: 11px; color: var(--muted, var(--tz-muted)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tz-posture3-camp-units { list-style: none; margin: 2px 0 6px; padding: 0 0 0 10px; border-inline-start: 2px solid var(--tz-line); }
+.tz-posture3-camp-units li { padding-top: 3px; }
+.tz-posture3-camp-units .tz-posture3-unit-row { padding: 6px 8px; }
+.tz-posture3-unit-state.warn { color: var(--orange, var(--tz-orange, #d9822b)); }
+.tz-posture3-org-node { display: flex; flex-direction: column; margin-inline-start: calc(var(--d, 0) * 10px); }
+.tz-posture3-org-kids { padding-inline-start: 10px; border-inline-start: 2px dashed var(--tz-line); margin-inline-start: 6px; }
+.tz-posture3-reqgroup { border: 1px solid var(--tz-line); border-radius: 10px; margin: 2px 0 6px; overflow: hidden; }
+.tz-posture3-reqgroup > header { display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: color-mix(in srgb, var(--tz-panel-2, var(--canvas, #fff)) 60%, transparent); border-bottom: 1px solid var(--tz-line); font-size: 12.5px; }
+.tz-posture3-reqgroup > header .icon { width: 13px; height: 13px; color: var(--accent, #8b5a2b); }
+.tz-posture3-reqgroup > header em { font-style: normal; color: var(--muted, var(--tz-muted)); margin-inline-start: auto; font-weight: 600; }
+.tz-posture3-reqgroup ul { list-style: none; margin: 0; padding: 4px; }
 .tz-posture3-empty-row { padding: 10px 12px; color: var(--muted, var(--tz-muted)); font-size: 12px; }
 .tz-posture3-unit-row { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 4px; background: transparent; border: 1px solid transparent; border-radius: 10px; font: inherit; color: inherit; cursor: pointer; text-align: inherit; }
 .tz-posture3-unit-row:hover:not(.is-selected) { background: color-mix(in srgb, var(--accent, #8b5a2b) 7%, transparent); border-color: var(--tz-line); }
