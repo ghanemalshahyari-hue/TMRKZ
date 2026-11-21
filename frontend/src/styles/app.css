@@ -599,6 +599,88 @@ button.tz-summary-row:disabled { cursor: not-allowed; opacity: 0.6; }
    editor's own shell renders, so the way tabs don't feel like a brief image appears. */
 .tz-suspense-pane { flex: 1; min-height: 240px; }
 
+/* «الموقف العملياتي» Design 2 shell (owner, 21 Nov 2026 UI closure Phase 1): title + subtitle, horizontal unit selector
+   with search, cohort chips and «استعراض الوحدات», a dominant map in the centre, a side details panel and a scoped
+   posture summary along the bottom. The hierarchy is secondary and lives in a drawer. */
+.tz-posture2 { display: grid; grid-template-rows: auto auto 1fr auto; min-height: 0; flex: 1; background: var(--tz-panel, var(--canvas, #fffcf6)); overflow: hidden; }
+.tz-posture2.tz-posture2-empty { display: flex; align-items: center; justify-content: center; }
+
+.tz-posture2-title { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 12px 18px 8px; border-bottom: 1px solid var(--tz-line); }
+.tz-posture2-titles h1 { margin: 0; font-size: 19px; font-weight: 700; color: var(--ink, var(--tz-text)); }
+.tz-posture2-titles p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted, var(--tz-muted)); }
+.tz-posture2-titlecounts { display: flex; gap: 14px; flex-wrap: wrap; }
+.tz-posture2-titlecounts span { display: flex; flex-direction: column; align-items: flex-end; min-width: 86px; }
+.tz-posture2-titlecounts b { font-size: 17px; color: var(--ink, var(--tz-text)); font-weight: 700; }
+.tz-posture2-titlecounts small { color: var(--muted, var(--tz-muted)); font-size: 11.5px; }
+
+.tz-posture2-selector { display: grid; grid-template-columns: minmax(220px, 300px) auto 1fr; gap: 10px; align-items: center; padding: 8px 18px; border-bottom: 1px solid var(--tz-line); background: var(--tz-panel-2, color-mix(in srgb, var(--canvas, #fff) 90%, transparent)); }
+.tz-posture2-search { display: inline-flex; align-items: center; gap: 6px; background: var(--paper, #fff); border: 1px solid var(--tz-line); border-radius: 999px; padding: 4px 10px; color: var(--muted, var(--tz-muted)); }
+.tz-posture2-search .icon { width: 14px; height: 14px; }
+.tz-posture2-search input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; color: var(--ink, var(--tz-text)); min-width: 0; }
+.tz-posture2-tabs { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tz-posture2-tab { display: inline-flex; align-items: center; gap: 4px; background: var(--paper, #fff); border: 1px solid var(--tz-line); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12.5px; color: var(--ink, var(--tz-text)); cursor: pointer; }
+.tz-posture2-tab.is-active { background: var(--accent, #8b5a2b); color: #fff; border-color: var(--accent, #8b5a2b); }
+.tz-posture2-tab-num { opacity: .75; font-size: 11px; }
+.tz-posture2-browse { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px dashed var(--tz-line); border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12.5px; color: var(--accent, #8b5a2b); cursor: pointer; }
+.tz-posture2-browse:hover { background: color-mix(in srgb, var(--accent, #8b5a2b) 8%, transparent); border-style: solid; }
+.tz-posture2-browse .icon { width: 13px; height: 13px; }
+
+.tz-posture2-strip { display: inline-flex; gap: 8px; overflow-x: auto; scroll-snap-type: x proximity; padding: 2px 0; min-width: 0; scrollbar-width: thin; }
+.tz-posture2-strip::-webkit-scrollbar { height: 6px; }
+.tz-posture2-strip::-webkit-scrollbar-thumb { background: var(--tz-line); border-radius: 999px; }
+.tz-posture2-chip { display: inline-flex; align-items: center; gap: 8px; scroll-snap-align: start; background: var(--paper, #fff); border: 1px solid var(--tz-line); border-radius: 12px; padding: 6px 10px; font: inherit; font-size: 12.5px; color: var(--ink, var(--tz-text)); cursor: pointer; white-space: nowrap; flex: none; max-width: 240px; }
+.tz-posture2-chip:hover:not(.is-muted) { border-color: color-mix(in srgb, var(--accent, #8b5a2b) 40%, var(--tz-line)); }
+.tz-posture2-chip.is-muted { color: var(--muted, var(--tz-muted)); cursor: default; }
+.tz-posture2-chip.is-more { color: var(--accent, #8b5a2b); background: color-mix(in srgb, var(--accent, #8b5a2b) 8%, var(--paper, #fff)); border-color: color-mix(in srgb, var(--accent, #8b5a2b) 25%, var(--tz-line)); }
+.tz-posture2-chip.is-selected { background: var(--accent, #8b5a2b); color: #fff; border-color: var(--accent, #8b5a2b); box-shadow: 0 1px 3px rgb(0 0 0 / 0.15); }
+.tz-posture2-chip-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--muted, var(--tz-muted)); flex: none; }
+.tz-posture2-chip.is-stationed .tz-posture2-chip-dot { background: var(--green, var(--tz-green, #4b6b47)); }
+.tz-posture2-chip.is-temporary .tz-posture2-chip-dot { background: var(--orange, var(--tz-orange, #d9822b)); }
+.tz-posture2-chip.is-empty .tz-posture2-chip-dot { background: color-mix(in srgb, var(--red, var(--tz-red, #9a2a22)) 60%, var(--muted, var(--tz-muted))); }
+.tz-posture2-chip.is-selected .tz-posture2-chip-dot { background: #fff; }
+.tz-posture2-chip-text { display: inline-flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.tz-posture2-chip-text b { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+.tz-posture2-chip-text small { font-size: 11px; opacity: .8; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.tz-posture2-chip.is-selected .tz-posture2-chip-text small { color: #ffe7cf; opacity: 1; }
+
+.tz-posture2-main { display: grid; grid-template-columns: 1fr minmax(280px, 340px); min-height: 0; gap: 0; }
+.tz-posture2-centre { position: relative; min-height: 0; display: flex; }
+.tz-posture2-centre .tz-mapframe { flex: 1; min-height: 0; }
+.tz-posture2-side { border-inline-start: 1px solid var(--tz-line); background: var(--tz-panel, var(--canvas, #fffcf6)); padding: 14px; overflow: auto; min-height: 0; }
+
+.tz-posture2-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.tz-posture2-head-icon { width: 36px; height: 36px; border-radius: 10px; background: color-mix(in srgb, var(--accent, #8b5a2b) 15%, var(--tz-panel-2, var(--canvas, #fff))); color: var(--accent, #8b5a2b); display: inline-flex; align-items: center; justify-content: center; }
+
+.tz-posture2-strip-bot { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 10px 18px; background: var(--tz-panel-2, color-mix(in srgb, var(--canvas, #fff) 90%, transparent)); border-top: 1px solid var(--tz-line); font-size: 12.5px; }
+.tz-posture2-strip-bot span { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.tz-posture2-strip-bot b { font-size: 18px; color: var(--ink, var(--tz-text)); font-weight: 700; }
+.tz-posture2-strip-bot small { color: var(--muted, var(--tz-muted)); }
+
+.tz-posture2-drawer, .tz-posture2-chooser { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: flex-start; }
+.tz-posture2-drawer-shade, .tz-posture2-chooser-shade { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.35); }
+.tz-posture2-drawer-panel { position: relative; height: 100%; width: min(420px, 94vw); background: var(--tz-panel, var(--canvas, #fffcf6)); border-inline-end: 1px solid var(--tz-line); box-shadow: 4px 0 24px rgb(0 0 0 / 0.18); display: flex; flex-direction: column; }
+.tz-posture2-drawer-head, .tz-posture2-chooser-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--tz-line); gap: 8px; }
+.tz-posture2-drawer-head b, .tz-posture2-chooser-head b { font-size: 14px; }
+.tz-posture2-chooser-head small { color: var(--muted, var(--tz-muted)); font-size: 11.5px; margin-inline-end: auto; margin-inline-start: 8px; }
+.tz-posture2-drawer-body { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
+
+.tz-posture2-chooser { align-items: center; justify-content: center; }
+.tz-posture2-chooser-panel { position: relative; width: min(420px, 94vw); max-height: 70vh; background: var(--tz-panel, var(--canvas, #fffcf6)); border: 1px solid var(--tz-line); border-radius: 12px; box-shadow: 0 10px 40px rgb(0 0 0 / 0.25); display: flex; flex-direction: column; }
+.tz-posture2-chooser-list { list-style: none; margin: 0; padding: 6px; overflow: auto; }
+.tz-posture2-chooser-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: transparent; border: 1px solid transparent; border-radius: 10px; font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
+.tz-posture2-chooser-item:hover { background: color-mix(in srgb, var(--accent, #8b5a2b) 8%, transparent); border-color: var(--tz-line); }
+.tz-posture2-chooser-icon { width: 32px; height: 32px; border-radius: 10px; background: color-mix(in srgb, var(--accent, #8b5a2b) 15%, var(--tz-panel-2, var(--canvas, #fff))); color: var(--accent, #8b5a2b); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.tz-posture2-chooser-meta { display: flex; flex-direction: column; min-width: 0; }
+.tz-posture2-chooser-meta b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tz-posture2-chooser-meta small { font-size: 11.5px; color: var(--muted, var(--tz-muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+@media (max-width: 1100px) {
+  .tz-posture2-main { grid-template-columns: 1fr; }
+  .tz-posture2-side { border-inline-start: 0; border-top: 1px solid var(--tz-line); max-height: 40vh; }
+  .tz-posture2-selector { grid-template-columns: 1fr; }
+  .tz-posture2-strip-bot { grid-template-columns: repeat(3, 1fr); }
+}
+
 /* «الموقف العملياتي» rail head — a clean section header (not a toggle), so the tree reads properly (owner, 20 Nov 2026) */
 .tz-posture-rail2 .tz-posture-railhead { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--tz-line); }
 .tz-posture-rail2 .tz-posture-railhead .icon { width: 16px; color: var(--tz-teal, var(--accent)); flex: none; }
