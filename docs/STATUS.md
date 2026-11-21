@@ -1350,3 +1350,9 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
   - `OVERVIEW-1366x768.png` ✓ — small-screen overview with clusters and site hubs only.
 - **Local checks.** Backend `StationingNextIT` 14/14 (unchanged backend). Frontend `npx vitest run` → 55 files /
   398 tests passing. `tsc` clean. `npm run build` clean.
+
+## Migration Center: MOVER SQLite units import (21 Nov 2026; ADR-097)
+
+- **Shipped.** «الإعدادات → ترحيل البيانات → استيراد وحدات MOVER من SQLite». An administrator with `CONFIGURE` uploads a MOVER SQLite file from their own computer (no VM required), sees a per-unit preview (new / existing / code-conflict) and commits. The import is idempotent: the pair (`organization.source='MOVER', source_external_id=<MOVER unit id>`) is the identity, so re-running the same file creates nothing new. V65 extends `organization.source` to `(LOCAL, HR, MOVER)`. 4/4 ITs green in `MoverUnitImportIT`.
+- **Not shipped (deferred).** Oracle `.dmp` file upload, mentioned by the owner at the same time: requires a dedicated staging Oracle container plus `impdp` operational privileges. Documented as stage-2 in ADR-097. A `.dmp` upload is refused today by the magic-bytes check (returns `kind=UNKNOWN`).
+- **Scope note.** Only `units` is read from the MOVER SQLite. People, grants, requests and transport rows are NOT imported; that was explicitly out of scope by the owner's 21 Nov 2026 direction («only we will import the unit»). A unit's `manager_id`, `is_final_command` and `unit_operations_approval_unit_id` are read for the preview but are NOT written to `organization` because TMRKZ represents those through the access workspace (ADR-013/095), not through columns on `organization`.

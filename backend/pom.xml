@@ -65,6 +65,13 @@
       <artifactId>postgresql</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <!-- SQLite JDBC driver (ADR-097): reads an uploaded MOVER SQLite database read-only to import units into TMRKZ's
+         organization tree. Apache-2.0. -->
+    <dependency>
+      <groupId>org.xerial</groupId>
+      <artifactId>sqlite-jdbc</artifactId>
+      <version>3.47.1.0</version>
+    </dependency>
     <!-- Verifies OpenID Connect ID tokens (signature from the provider's published keys, issuer, audience, nonce). -->
     <dependency>
       <groupId>com.nimbusds</groupId>

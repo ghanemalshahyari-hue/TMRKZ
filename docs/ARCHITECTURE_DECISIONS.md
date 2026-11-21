@@ -2704,3 +2704,59 @@ STATIONING_ACTIVATOR. `RestationingTestBase.approvedPermanent` asserts `ACTIVATE
 APPROVE. The remaining stationing ITs (`RestationingWorkflowIT`, `RestationingLifecycleIT`, `RestationingHrSyncIT`,
 `StationingNextIT`) still carry the pre-ADR-095 two-step assertions and are being migrated as part of this change
 (tracked in STATUS.md).
+
+## ADR-097 Migration Center accepts MOVER SQLite and imports its units into the organization tree (owner, 21 Nov 2026)
+
+**Decision.** The owner asked (21 Nov 2026, after reviewing the Full Real Acceptance report) to extend
+«مركز ترحيل قاعدة البيانات» so an administrator can upload a MOVER SQLite file (the old legacy app's database)
+and bring the MOVER units into TMRKZ's `organization` tree in one pass. This augments ADR-094: the pg_dump path
+for an older TMRKZ stays as it was; a new, focused SQLite path lives beside it and only imports units.
+
+**Scope.** Exactly one MOVER table is read: `units(id, name, parent_unit_id, level, hr_unit_id, hr_source, hr_status,
+manager_id, is_final_command, unit_operations_approval_unit_id, display_alias)`. Nothing else is read, nothing is
+written back to the SQLite file (opened with `PRAGMA query_only = true`). Rows that already exist in TMRKZ are left
+ALONE (owner rule A from ADR-094: the current record is never changed).
+
+**Mapping (MOVER → TMRKZ).**
+- `units.id` → `organization.source_external_id` (as text); `source = 'MOVER'`. The pair is unique per source
+  and is the identity for idempotent re-import.
+- `units.hr_unit_id` → part of `organization.code`: `MOVER-HR-<hr_unit_id>` when present, else `MOVER-U-<id>`.
+- `units.name` → `organization.name` verbatim.
+- `units.parent_unit_id` → `organization.parent_id` via the same (`source`, `source_external_id`) lookup; a parent
+  that was not imported in this pass is left NULL so the administrator can rewire manually (no fabricated parents).
+- `units.hr_status = 1` → `ACTIVE`; otherwise `RETIRED`.
+- Everything else (`manager_id`, `is_final_command`, `unit_operations_approval_unit_id`, `display_alias`, `level`)
+  is read for the preview UI but not written: TMRKZ represents managers and operations seats through the access
+  workspace (ADR-013/095), not through columns on `organization`.
+
+**Isolation and safety.** The sqlite-jdbc driver (`org.xerial:sqlite-jdbc:3.47.1.0`, Apache-2.0) opens the inbox file
+with `PRAGMA query_only = true`, so no WAL is written and no row of the SQLite file is modified. The import runs in a
+Spring transaction so either every chosen row lands or none does. The caller needs `CONFIGURE` (today: `SYSTEM_ADMIN`).
+The inbox folder is the same size-limited folder the pg_dump path already uses.
+
+**Data changes (V65).** `organization.source` check extended from `(LOCAL, HR)` to `(LOCAL, HR, MOVER)`. No row is
+created by the migration itself. Rollback is a check-constraint change only; the data rows a successful import creates
+stay as regular `organization` rows that can be retired through the normal path.
+
+**Audit.** Each run writes one `MOVER_UNITS_IMPORTED` event (file name, SHA-256, counts). Each code-conflict row
+writes one `MOVER_UNIT_CONFLICT_SKIPPED`. Both are system events (the actor is the signed-in administrator).
+
+**API.**
+- `POST /api/v1/settings/db-migration/mover-units/preview { "file": "<inbox filename>" }` → verdict per unit (NEW /
+  EXISTING / CODE_CONFLICT). No writes.
+- `POST /api/v1/settings/db-migration/mover-units/commit { "file": "<inbox filename>" }` → inserts every NEW row, in
+  parent-before-child order. Returns created / existing / skipped / conflicts.
+
+**UI.** A new section «استيراد وحدات MOVER من SQLite» renders under `CONFIGURE` in the Settings page, below the
+existing Migration Center. File picker reads from the browser's local disk (not a VM). The preview shows a per-row
+table with Arabic pills (جديدة / موجودة مسبقاً / تعارض رمز) before the administrator commits.
+
+**Oracle .dmp is deferred.** The owner asked for Oracle file upload too. Oracle data-pump `.dmp` files are not
+self-describing: importing one requires `impdp` running inside an Oracle instance with the DATA_PUMP_DIR directory
+privilege, an impdp-compatible target schema and, usually, the same Oracle major version as the source. Doing that
+safely in TMRKZ needs a dedicated staging Oracle container (licensed image) and a different set of magic-bytes checks.
+It is tracked as a stage-2 follow-up; this ADR covers SQLite only.
+
+**Tests.** `MoverUnitImportIT` 4/4 green on real PostgreSQL + OpenFGA: imports a synthesised MOVER SQLite into an
+empty organization tree, verifies codes and parent chain, re-imports as a no-op, rejects a pg_dump file, rejects a
+SQLite that lacks a `units` table, and rejects a caller without `CONFIGURE`.

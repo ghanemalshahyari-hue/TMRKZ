@@ -46,7 +46,11 @@ public class DbMigrationDump {
     private static final Pattern FILE_NAME = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]{0,200}$");
     private static final Pattern DATASOURCE_URL = Pattern.compile("^jdbc:postgresql://([^/:?,]+)(?::(\\d+))?/([^?;]+)");
     private static final byte[] MAGIC = "PGDMP".getBytes(StandardCharsets.US_ASCII);
+    private static final byte[] SQLITE_MAGIC = "SQLite format 3\0".getBytes(StandardCharsets.US_ASCII);
     static final String STAGING_PREFIX = "tmrkz_staging_";
+
+    /** The format detected from a file's leading bytes (ADR-097). */
+    public enum Kind { PGDMP, SQLITE, UNKNOWN }
 
     /** The application's own datasource as the folder or image installation configured it. */
     public record Datasource(String host, int port, String database, String username, String password) {
@@ -57,14 +61,25 @@ public class DbMigrationDump {
         }
     }
 
-    /** What a file in the inbox is: its size, SHA-256 and whether it starts with the custom-format magic. */
-    public record Info(String file, long size, String sha256, boolean pgdmp) {
+    /**
+     * What a file in the inbox is: its size, SHA-256, the detected format (ADR-097), and the legacy {@code pgdmp}
+     * flag kept for backward compatibility with the TMRKZ pg_dump migration path.
+     */
+    public record Info(String file, long size, String sha256, Kind kind) {
+        public boolean pgdmp() {
+            return kind == Kind.PGDMP;
+        }
+        public boolean sqlite() {
+            return kind == Kind.SQLITE;
+        }
         public Map<String, Object> asMap() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("file", file);
             m.put("size", size);
             m.put("sha256", sha256);
-            m.put("pgdmp", pgdmp);
+            m.put("pgdmp", pgdmp());
+            m.put("sqlite", sqlite());
+            m.put("kind", kind.name());
             return m;
         }
     }
@@ -165,7 +180,7 @@ public class DbMigrationDump {
         return out;
     }
 
-    /** The magic of a {@code pg_dump -Fc} archive (PGDMP) and the file's SHA-256, read once in a stream. */
+    /** The leading magic ({@link Kind#PGDMP} or {@link Kind#SQLITE}) and the file's SHA-256, read once in a stream. */
     public static Info inspect(Path p) throws IOException {
         MessageDigest md;
         try {
@@ -173,7 +188,8 @@ public class DbMigrationDump {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
-        byte[] head = new byte[MAGIC.length];
+        int headLen = Math.max(MAGIC.length, SQLITE_MAGIC.length);
+        byte[] head = new byte[headLen];
         int got = 0;
         long size = 0;
         try (InputStream in = Files.newInputStream(p)) {
@@ -189,8 +205,22 @@ public class DbMigrationDump {
                 size += n;
             }
         }
-        boolean pgdmp = got == head.length && java.util.Arrays.equals(head, MAGIC);
-        return new Info(p.getFileName().toString(), size, HexFormat.of().formatHex(md.digest()), pgdmp);
+        Kind kind;
+        if (got >= MAGIC.length && startsWith(head, MAGIC)) {
+            kind = Kind.PGDMP;
+        } else if (got >= SQLITE_MAGIC.length && startsWith(head, SQLITE_MAGIC)) {
+            kind = Kind.SQLITE;
+        } else {
+            kind = Kind.UNKNOWN;
+        }
+        return new Info(p.getFileName().toString(), size, HexFormat.of().formatHex(md.digest()), kind);
+    }
+
+    private static boolean startsWith(byte[] head, byte[] prefix) {
+        for (int i = 0; i < prefix.length; i++) {
+            if (head[i] != prefix[i]) return false;
+        }
+        return true;
     }
 
     static String stagingName(UUID id) {

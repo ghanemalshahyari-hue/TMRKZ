@@ -7,6 +7,7 @@ import { SignInNotesSettings } from '../components/SignInNotesSettings';
 import { IntegrationSettings } from '../components/IntegrationSettings';
 import { SiteSetupAccessSettings } from '../components/SiteSetupAccessSettings';
 import { DbMigrationCenter } from '../components/DbMigrationCenter';
+import { MoverUnitImport } from '../components/MoverUnitImport';
 import { useApp } from '../lib/app';
 import { formatBytes, fullTime } from '../lib/dates';
 import { INTEGRATION_STATUS } from '../lib/labels';
@@ -223,6 +224,7 @@ export function SettingsPage() {
           )}
         </section>
         {app.can('CONFIGURE') && <DbMigrationCenter />}
+        {app.can('CONFIGURE') && <MoverUnitImport />}
       </div>
     </>
   );

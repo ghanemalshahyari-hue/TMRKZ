@@ -1535,8 +1535,43 @@ export type DbMigrationListItem = {
   createdBy: string | null;
   finishedAt: string | null;
 };
-export type DbMigrationDumpInfo = { file: string; size: number; sha256: string; pgdmp: boolean };
+export type DbMigrationDumpKind = 'PGDMP' | 'SQLITE' | 'UNKNOWN';
+export type DbMigrationDumpInfo = {
+  file: string;
+  size: number;
+  sha256: string;
+  pgdmp: boolean;
+  sqlite?: boolean;
+  kind?: DbMigrationDumpKind;
+};
 export type DbMigrationInbox = { folder: string; maxUploadBytes: number; files: DbMigrationDumpInfo[] };
+
+// ADR-097 «استيراد وحدات MOVER»: upload a MOVER SQLite file and import its units table into TMRKZ's organization tree.
+export type MoverUnitCategory = 'NEW' | 'EXISTING' | 'CODE_CONFLICT';
+export type MoverUnitVerdict = {
+  moverId: number;
+  code: string;
+  name: string;
+  parentMoverId: number | null;
+  level: number;
+  status: 'ACTIVE' | 'RETIRED';
+  category: MoverUnitCategory;
+};
+export type MoverUnitPreview = {
+  file: string;
+  total: number;
+  newCount: number;
+  existingCount: number;
+  conflictCount: number;
+  rows: MoverUnitVerdict[];
+};
+export type MoverUnitCommit = {
+  file: string;
+  created: number;
+  skipped: number;
+  existing: number;
+  conflicts: string[];
+};
 
 /** ADR «صحة الطلبات» (20 Nov 2026): the diagnostic shapes read by the system-administrator page and the home widget. */
 export type RequestHealthSummary = {
