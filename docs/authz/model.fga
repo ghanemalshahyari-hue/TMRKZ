@@ -46,16 +46,12 @@ type system
     define replay_stationing_events_any: [grant#holder]
     define create_restationing: [grant#holder]
     define create_restationing_any: [grant#holder]
-    define activate_stationing: [grant#holder]
-    define activate_stationing_any: [grant#holder]
     define request_site_registration: [grant#holder]
     define request_site_registration_any: [grant#holder]
     define decide_unit_operations: [grant#holder]
     define decide_unit_operations_any: [grant#holder]
     define final_approve_stationing: [grant#holder]
     define final_approve_stationing_any: [grant#holder]
-    define manage_fyi_distribution: [grant#holder]
-    define manage_fyi_distribution_any: [grant#holder]
     define view_operational_posture: [grant#holder]
     define view_operational_posture_any: [grant#holder]
     define approve_hierarchy: [grant#holder]
@@ -138,10 +134,6 @@ type organization
     define create_restationing_tree: [grant#holder]
     define create_restationing_inh: create_restationing_tree or create_restationing_inh from parent
     define create_restationing: create_restationing_here or create_restationing_inh or create_restationing from system
-    define activate_stationing_here: [grant#holder]
-    define activate_stationing_tree: [grant#holder]
-    define activate_stationing_inh: activate_stationing_tree or activate_stationing_inh from parent
-    define activate_stationing: activate_stationing_here or activate_stationing_inh or activate_stationing from system
     define request_site_registration_here: [grant#holder]
     define request_site_registration_tree: [grant#holder]
     define request_site_registration_inh: request_site_registration_tree or request_site_registration_inh from parent
@@ -154,10 +146,6 @@ type organization
     define final_approve_stationing_tree: [grant#holder]
     define final_approve_stationing_inh: final_approve_stationing_tree or final_approve_stationing_inh from parent
     define final_approve_stationing: final_approve_stationing_here or final_approve_stationing_inh or final_approve_stationing from system
-    define manage_fyi_distribution_here: [grant#holder]
-    define manage_fyi_distribution_tree: [grant#holder]
-    define manage_fyi_distribution_inh: manage_fyi_distribution_tree or manage_fyi_distribution_inh from parent
-    define manage_fyi_distribution: manage_fyi_distribution_here or manage_fyi_distribution_inh or manage_fyi_distribution from system
     define view_operational_posture_here: [grant#holder]
     define view_operational_posture_tree: [grant#holder]
     define view_operational_posture_inh: view_operational_posture_tree or view_operational_posture_inh from parent
@@ -298,13 +286,6 @@ type site
     define create_restationing_direct: create_restationing_here or create_restationing_inh
     define create_restationing_req: create_restationing_direct or create_restationing from responsible
     define create_restationing: create_restationing_req or create_restationing_contains or create_restationing from system
-    define activate_stationing_here: [grant#holder]
-    define activate_stationing_tree: [grant#holder]
-    define activate_stationing_contains: [grant#holder]
-    define activate_stationing_inh: activate_stationing_tree or activate_stationing_inh from parent
-    define activate_stationing_direct: activate_stationing_here or activate_stationing_inh
-    define activate_stationing_req: activate_stationing_direct or activate_stationing from responsible
-    define activate_stationing: activate_stationing_req or activate_stationing_contains or activate_stationing from system
     define request_site_registration_here: [grant#holder]
     define request_site_registration_tree: [grant#holder]
     define request_site_registration_contains: [grant#holder]
@@ -326,13 +307,6 @@ type site
     define final_approve_stationing_direct: final_approve_stationing_here or final_approve_stationing_inh
     define final_approve_stationing_req: final_approve_stationing_direct or final_approve_stationing from responsible
     define final_approve_stationing: final_approve_stationing_req or final_approve_stationing_contains or final_approve_stationing from system
-    define manage_fyi_distribution_here: [grant#holder]
-    define manage_fyi_distribution_tree: [grant#holder]
-    define manage_fyi_distribution_contains: [grant#holder]
-    define manage_fyi_distribution_inh: manage_fyi_distribution_tree or manage_fyi_distribution_inh from parent
-    define manage_fyi_distribution_direct: manage_fyi_distribution_here or manage_fyi_distribution_inh
-    define manage_fyi_distribution_req: manage_fyi_distribution_direct or manage_fyi_distribution from responsible
-    define manage_fyi_distribution: manage_fyi_distribution_req or manage_fyi_distribution_contains or manage_fyi_distribution from system
     define view_operational_posture_here: [grant#holder]
     define view_operational_posture_tree: [grant#holder]
     define view_operational_posture_contains: [grant#holder]
@@ -387,16 +361,12 @@ type resource
     define replay_stationing_events: replay_stationing_events_here or replay_stationing_events from system
     define create_restationing_here: [grant#holder]
     define create_restationing: create_restationing_here or create_restationing from system
-    define activate_stationing_here: [grant#holder]
-    define activate_stationing: activate_stationing_here or activate_stationing from system
     define request_site_registration_here: [grant#holder]
     define request_site_registration: request_site_registration_here or request_site_registration from system
     define decide_unit_operations_here: [grant#holder]
     define decide_unit_operations: decide_unit_operations_here or decide_unit_operations from system
     define final_approve_stationing_here: [grant#holder]
     define final_approve_stationing: final_approve_stationing_here or final_approve_stationing from system
-    define manage_fyi_distribution_here: [grant#holder]
-    define manage_fyi_distribution: manage_fyi_distribution_here or manage_fyi_distribution from system
     define view_operational_posture_here: [grant#holder]
     define view_operational_posture: view_operational_posture_here or view_operational_posture from system
     define approve_hierarchy_here: [grant#holder]
@@ -446,16 +416,12 @@ type request
     define replay_stationing_events_task: replay_stationing_events from related_org or replay_stationing_events_direct from site or replay_stationing_events from resource or replay_stationing_events from system
     define create_restationing: create_restationing from related_org or create_restationing_req from site or create_restationing from resource or create_restationing from system
     define create_restationing_task: create_restationing from related_org or create_restationing_direct from site or create_restationing from resource or create_restationing from system
-    define activate_stationing: activate_stationing from related_org or activate_stationing_req from site or activate_stationing from resource or activate_stationing from system
-    define activate_stationing_task: activate_stationing from related_org or activate_stationing_direct from site or activate_stationing from resource or activate_stationing from system
     define request_site_registration: request_site_registration from related_org or request_site_registration_req from site or request_site_registration from resource or request_site_registration from system
     define request_site_registration_task: request_site_registration from related_org or request_site_registration_direct from site or request_site_registration from resource or request_site_registration from system
     define decide_unit_operations: decide_unit_operations from related_org or decide_unit_operations_req from site or decide_unit_operations from resource or decide_unit_operations from system
     define decide_unit_operations_task: decide_unit_operations from related_org or decide_unit_operations_direct from site or decide_unit_operations from resource or decide_unit_operations from system
     define final_approve_stationing: final_approve_stationing from related_org or final_approve_stationing_req from site or final_approve_stationing from resource or final_approve_stationing from system
     define final_approve_stationing_task: final_approve_stationing from related_org or final_approve_stationing_direct from site or final_approve_stationing from resource or final_approve_stationing from system
-    define manage_fyi_distribution: manage_fyi_distribution from related_org or manage_fyi_distribution_req from site or manage_fyi_distribution from resource or manage_fyi_distribution from system
-    define manage_fyi_distribution_task: manage_fyi_distribution from related_org or manage_fyi_distribution_direct from site or manage_fyi_distribution from resource or manage_fyi_distribution from system
     define view_operational_posture: view_operational_posture from related_org or view_operational_posture_req from site or view_operational_posture from resource or view_operational_posture from system
     define view_operational_posture_task: view_operational_posture from related_org or view_operational_posture_direct from site or view_operational_posture from resource or view_operational_posture from system
     define approve_hierarchy: approve_hierarchy from related_org or approve_hierarchy_req from site or approve_hierarchy from resource or approve_hierarchy from system
