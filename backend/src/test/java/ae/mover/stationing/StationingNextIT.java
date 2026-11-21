@@ -477,9 +477,9 @@ class StationingNextIT extends RestationingTestBase {
         UUID adminId = person("platformAdmin", "SYSTEM_ADMIN", top);
         Api admin = login("platformAdmin");
         String perms = admin.get("/me").body().path("permissions").toString();
-        assertThat(perms).as("one request right, no reading or deciding; re-sending failed events (ADR-078)")
+        assertThat(perms).as("one request right, no reading or deciding; re-sending failed events")
                 .contains("CREATE_RESTATIONING", "CONFIGURE", "MANAGE_ACCESS", "REPLAY_STATIONING_EVENTS")
-                .doesNotContain("\"VIEW\"", "APPROVE", "CREATE_INITIAL_STATIONING", "CREATE_DEPLOYMENT_REQUEST", "REQUEST_SITE_REGISTRATION");
+                .doesNotContain("\"VIEW\"", "APPROVE", "REQUEST_SITE_REGISTRATION");
         Res units = admin.get("/restationing-requests/units");
         assertThat(units.status()).as(units.toString()).isEqualTo(200);
         assertThat(units.body().toString()).as("every unit, in every branch").contains(sec.toString(), team.toString(), otherSec.toString());

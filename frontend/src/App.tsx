@@ -6,6 +6,7 @@ import { TopNavigation } from './components/shell/TopNavigation';
 import { NoAccess, ScreenBoundary } from './components/ui';
 import { AppContext, NAV, flattenOrgs, type AppContextValue, type View, type WizardRequest } from './lib/app';
 import { todayDubai } from './lib/dates';
+import { startVisibilityPoll } from './lib/visibilityPoll';
 import { clearMapContexts } from './lib/mapState';
 import { moreNav, primaryNav, restriction } from './lib/navigation';
 import { AccessInboxPage } from './pages/AccessInboxPage';
@@ -162,7 +163,9 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     api.systemState().then(setState).catch(() => setState(null));
   }, [revision, me.id]);
 
-  // short polling for counts; every call is scoped server-side, so revoked access stops updates immediately
+  // short polling for counts; every call is scoped server-side, so revoked access stops updates immediately.
+  // Visibility-aware: paused while the tab is hidden, one refresh on wake-up (ADR-094 Gate 2 §N). The poller
+  // itself lives in `lib/visibilityPoll` so it can be unit-tested with a fake document.
   useEffect(() => {
     let live = true;
     const load = () => {
@@ -171,11 +174,10 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
         me.summaryOnly ? Promise.resolve(0) : api.requests({ status: 'SUBMITTED', size: 1 }).then((p) => p.total).catch(() => 0),
       ]).then(([tasks, submitted]) => live && setCounts({ tasks, submitted }));
     };
-    load();
-    const t = window.setInterval(load, POLL_MS);
+    const stop = startVisibilityPoll({ load, intervalMs: POLL_MS });
     return () => {
       live = false;
-      window.clearInterval(t);
+      stop();
     };
   }, [revision, me, can]);
 

@@ -1,6 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, type PostureUnit, type PosturePending } from '../api/client';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  api,
+  type PostureUnit,
+  type PosturePending,
+  type PostureOverview,
+  type PostureSiteDetail,
+  type PostureUnitDetail,
+  type PostureRequestGeometry,
+} from '../api/client';
 import type { GeoPolygon, RestationingRequest, SiteGeometry } from '../api/types';
+import { startVisibilityPoll } from '../lib/visibilityPoll';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent } from 'maplibre-gl';
 import { PITCH_3D, addOverlayLayer, installedTerrain3d, type MapView } from '../components/map/maplibre';
 import { MAP_COLOURS } from '../components/workspace/RequestMap';
@@ -30,7 +39,6 @@ import {
 import {
   hubAttention,
   hubsForFilter,
-  operationalSiteHubs,
   type SiteHub,
 } from '../lib/operationalSiteHubs';
 
@@ -101,7 +109,7 @@ const PENDING_STAGE_AR: Record<string, string> = {
   UNDER_REVIEW: 'قيد الاعتماد',
   RETURNED_FOR_CHANGES: 'مُعاد للتعديل',
   PAUSED_HIERARCHY_CHANGED: 'متوقف بسبب تغير الهيكل',
-  APPROVED_NOT_ACTIVATED: 'معتمد — بانتظار التفعيل',
+  APPROVED_NOT_ACTIVATED: 'نافذ',
   CANCELLATION_PENDING: 'إلغاء قيد الاعتماد',
   START_HELD_PENDING_CANCELLATION: 'بدء موقوف — إلغاء قيد الاعتماد',
 };
@@ -157,9 +165,96 @@ function areaKm2Of(g: GeomLike): number | null {
  * «الموقف العملياتي» — the clean overview is the default. Polygons appear only when a specific unit or request is
  * selected; filters narrow the population but never reveal the detail layers.
  */
+/** Convert the server's PostureSiteHub shape to the client's existing SiteHub shape (adapter, no recomputation). */
+function adaptServerHubs(overview: PostureOverview | null): SiteHub[] {
+  if (!overview) return [];
+  return overview.siteHubs.map((h) => ({
+    siteId: h.siteId,
+    siteName: h.siteName,
+    centroid: h.anchor.lng != null && h.anchor.lat != null ? ([h.anchor.lng, h.anchor.lat] as [number, number]) : null,
+    unitIds: [],                       // filled lazily from site detail; empty here keeps map/overview working
+    unitsTotal: h.unitsTotal,
+    filteredCount: h.unitsTotal,       // the server already answers "how many at this site"; filter is per-hub-attribute
+    completeCount: h.completeCount,
+    incompleteCount: h.incompleteCount,
+    temporaryCount: h.temporaryCount,
+    expiringCount: h.expiringCount,
+    pendingCount: h.pendingCount,
+    noGeometryCount: 0,
+    hasOutsideReach: false,
+  }));
+}
+
+/** Given a filter, return a per-hub attention count the hub label should carry. */
+function filteredCountFor(h: SiteHub, filter: PostureFilter): number {
+  switch (filter) {
+    case 'ALL': return h.unitsTotal;
+    case 'INCOMPLETE': return h.incompleteCount;
+    case 'NO_STATIONING': return 0;              // no-stationing units have no site hub by definition
+    case 'TEMPORARY': return h.temporaryCount;
+    case 'EXPIRING': return h.expiringCount;
+    case 'REQUESTS': return h.pendingCount;
+    default: return h.unitsTotal;
+  }
+}
+
+/** Synthesize a PostureUnit record from a server-side UnitDetail so existing per-unit code paths keep working. */
+function unitFromDetail(d: PostureUnitDetail, depth = 0): PostureUnit {
+  return {
+    id: d.id,
+    code: d.code ?? '',
+    name: d.name ?? '',
+    parentId: null,
+    depth,
+    state: d.state,
+    site: d.site ? { id: d.site.id, name: d.site.name, geometry: (d.site.geometry ?? null) as PostureUnit['site'] extends infer S ? S extends { geometry: infer G } ? G : never : never } : null,
+    kind: d.kind ?? undefined,
+    plannedEnd: d.plannedEnd ?? null,
+    primary: d.primary,
+    alternative: d.alternative,
+    otherUnitsAtSite: 0,
+    request: d.request ? { purpose: d.request.purpose, state: d.request.state } : null,
+  };
+}
+
+/** Synthesize a PosturePending projection from a server-side RequestGeometry so downstream code reads the same shape. */
+function pendingFromGeometry(g: PostureRequestGeometry, currentSiteId: string | null): PosturePending[] {
+  return g.scope.map((unitId) => ({
+    requestId: g.requestId,
+    requestNumber: g.requestNumber,
+    purpose: g.purpose,
+    state: g.state,
+    currentStage: null,
+    unitId,
+    unitCode: null,
+    unitName: null,
+    currentSiteId,
+    proposedSite: g.proposedSite,
+    proposedPrimary: g.proposedPrimary,
+    proposedSub: g.proposedSub,
+  }));
+}
+
+/** 30-second posture-overview poll — reuses the shared visibility-aware helper, so a hidden tab doesn't refresh. */
+const OVERVIEW_POLL_MS = 30_000;
+
 export function PosturePage() {
   const app = useApp();
-  const [units, setUnits] = useState<PostureUnit[] | null>(null);
+  // ADR-094 Gate 2.5 §1: PosturePage no longer loads the per-unit payload. The initial fetch is the compact
+  // Site-Hub overview; detail (units at a site, a unit's geometry, a request's proposal) is fetched lazily on
+  // selection and cached by dataRevision.
+  const [overview, setOverview] = useState<PostureOverview | null>(null);
+  const [overviewEtag, setOverviewEtag] = useState<string | null>(null);
+  // Lazily-filled per-detail caches, keyed by `${dataRevision}:${id}`. When overview.dataRevision changes, old
+  // entries stop matching and the next selection re-fetches; stale rows naturally fall out of view (brief §25).
+  const [siteDetails, setSiteDetails] = useState<Record<string, PostureSiteDetail>>({});
+  const [unitDetails, setUnitDetails] = useState<Record<string, PostureUnitDetail>>({});
+  const [requestGeoms, setRequestGeoms] = useState<Record<string, PostureRequestGeometry>>({});
+  // Synthetic per-unit list — populated as detail fetches land. Downstream code that still walks `units` sees
+  // this growing accumulator; nothing in the initial network needs it populated.
+  const [units, setUnits] = useState<PostureUnit[]>([]);
+  // Pending-request summaries — populated from each visited site's detail. Overview itself never carries pending
+  // rows (brief §F/§18): pending is a count + indicator until the operator opens a site, then rows.
   const [pendingAll, setPendingAll] = useState<PosturePending[]>([]);
   const [selection, setSelection] = useState<Selection>(null);
   const [q, setQ] = useState('');
@@ -200,23 +295,162 @@ export function PosturePage() {
   }, [map, view]);
   useEffect(() => {
     installedTerrain3d().then(setTerrain3d);
-    api.operationalPosture().then((p) => { setUnits(p.units); setPendingAll(p.pending ?? []); })
-      .catch((e: Error) => (setUnits([]), setPendingAll([]), app.toast(e.message)));
+  }, []);
+
+  // Initial + conditional refresh of the Site-Hub overview (brief §1-§2, §26-§28). The first call is a plain GET;
+  // every subsequent call sends `If-None-Match` with the last ETag. A 304 is silent — overview state and selection
+  // stay as they are (brief §27). A 200 updates the overview + ETag; if the data revision changed and the current
+  // selection is no longer in the siteHubs list, we clear it (brief §28).
+  useEffect(() => {
+    let liveController: AbortController | null = null;
+    const refresh = () => {
+      if (liveController) liveController.abort();
+      const c = new AbortController();
+      liveController = c;
+      api.postureOverviewConditional(overviewEtag, c.signal)
+        .then((r) => {
+          if (c.signal.aborted) return;
+          if (r.status === 304) return;                // silent — brief §27
+          setOverview(r.body);
+          if (r.etag) setOverviewEtag(r.etag);
+          // Detail caches are revision-scoped by key; when the revision moves, re-fetching the open selection is
+          // done by the lazy effects below reacting to overview.dataRevision. We do NOT wipe siteDetails here —
+          // entries just stop matching and fresh keys replace them.
+        })
+        .catch((e: Error) => {
+          if (c.signal.aborted) return;
+          if (!overview) {
+            app.toast(e.message);
+          }
+        });
+    };
+    refresh();
+    const stop = startVisibilityPoll({ load: refresh, intervalMs: OVERVIEW_POLL_MS });
+    return () => {
+      if (liveController) liveController.abort();
+      stop();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.revision]);
 
   const tree = useMemo(() => flatSource(units ?? []), [units]);
   const unit = units?.find((u) => u.id === revealedUnitId) ?? null;
 
-  // When a request row is picked (or a unit with a pending request), fetch the full request so the connector arrows
-  // can chain current → proposed site → primary → sub. The scoped `pendingAll` already carries the overview fields;
-  // this call fills in the stage label and any revision history for the detail card.
+  // Revision-scoped key helper for the detail cache (brief §25).
+  const dataRevision = overview?.dataRevision ?? '0';
+  const detailKey = useCallback((kind: 'site' | 'unit' | 'request', id: string) => `${dataRevision}:${kind}:${id}`, [dataRevision]);
+
+  /**
+   * Lazy site detail (brief §10-§12). Fired when a site is picked — either directly via `selection.kind === 'site'`
+   * OR implicitly when a unit/area/request is revealed and we need to know which units sit at that site. One
+   * AbortController per in-flight fetch so rapid Site A → Site B clicks never let A's late response clobber B
+   * (brief §13).
+   */
+  const siteDetailTarget = selection?.kind === 'site' ? selection.siteId : null;
+  useEffect(() => {
+    if (!siteDetailTarget) return;
+    const key = detailKey('site', siteDetailTarget);
+    if (siteDetails[key]) return;                      // cache hit for this revision (brief §25)
+    const c = new AbortController();
+    api.postureSite(siteDetailTarget, c.signal)
+      .then((d) => {
+        if (c.signal.aborted) return;
+        setSiteDetails((prev) => ({ ...prev, [key]: d }));
+        // Thread the site's compact units into the synthetic `units` list so downstream code reads them normally.
+        setUnits((prev) => {
+          const seen = new Set(prev.map((u) => u.id));
+          const added: PostureUnit[] = [];
+          for (const u of d.units) {
+            if (seen.has(u.id)) continue;
+            added.push({
+              id: u.id,
+              code: u.code ?? '',
+              name: u.name ?? '',
+              parentId: null,
+              depth: 0,
+              state: u.state,
+              site: { id: d.site.id, name: d.site.name, geometry: (d.site.geometry ?? null) as PostureUnit['site'] extends infer S ? S extends { geometry: infer G } ? G : never : never },
+              kind: u.kind ?? undefined,
+              plannedEnd: u.plannedEnd ?? null,
+              primary: null,
+              alternative: null,
+              otherUnitsAtSite: 0,
+              request: u.request ? { purpose: u.request.purpose, state: u.request.state } : null,
+            });
+          }
+          return added.length ? [...prev, ...added] : prev;
+        });
+      })
+      .catch(() => { /* aborted or error — nothing to toast on a background drill-down */ });
+    return () => c.abort();
+  }, [siteDetailTarget, detailKey, siteDetails]);
+
+  /**
+   * Lazy unit detail (brief §14-§16). The selection may put us on a unit directly OR via a site drill-down; either
+   * way the moment `revealedUnitId` has a value the geometry call fires. Abort on rapid changes.
+   */
+  useEffect(() => {
+    if (!revealedUnitId) return;
+    const key = detailKey('unit', revealedUnitId);
+    if (unitDetails[key]) {
+      // Cache hit — merge the cached geometry into the synthetic unit record so postureFC picks it up.
+      const d = unitDetails[key];
+      setUnits((prev) => {
+        const idx = prev.findIndex((u) => u.id === d.id);
+        if (idx === -1) return [...prev, unitFromDetail(d)];
+        const merged = { ...prev[idx], ...unitFromDetail(d, prev[idx].depth) };
+        const next = prev.slice();
+        next[idx] = merged;
+        return next;
+      });
+      return;
+    }
+    const c = new AbortController();
+    api.postureUnit(revealedUnitId, c.signal)
+      .then((d) => {
+        if (c.signal.aborted) return;
+        setUnitDetails((prev) => ({ ...prev, [key]: d }));
+        setUnits((prev) => {
+          const idx = prev.findIndex((u) => u.id === d.id);
+          if (idx === -1) return [...prev, unitFromDetail(d)];
+          const merged = { ...prev[idx], ...unitFromDetail(d, prev[idx].depth) };
+          const next = prev.slice();
+          next[idx] = merged;
+          return next;
+        });
+      })
+      .catch(() => { /* abort or error */ });
+    return () => c.abort();
+  }, [revealedUnitId, detailKey, unitDetails]);
+
+  /**
+   * Lazy request geometry (brief §19-§22). The overview deliberately carries no proposal polygons — they land here
+   * only when the operator selects a request. One in-flight controller per selection.
+   */
   useEffect(() => {
     if (!selectedRequestId) { setPendingReq(null); return; }
+    const key = detailKey('request', selectedRequestId);
     let live = true;
+    const c = new AbortController();
+    // Keep fetching the full request record for the detail card (stage label, revisions) in parallel with the
+    // compact geometry. Nothing on the map depends on this; it only populates the right-hand detail card.
     api.restationingRequest(selectedRequestId).then((r) => { if (live) setPendingReq(r); }).catch(() => { if (live) setPendingReq(null); });
-    return () => { live = false; };
-  }, [selectedRequestId]);
+    if (!requestGeoms[key]) {
+      api.postureRequest(selectedRequestId, c.signal)
+        .then((g) => {
+          if (!live || c.signal.aborted) return;
+          setRequestGeoms((prev) => ({ ...prev, [key]: g }));
+          // Fill the per-request pending projection for downstream map wiring, scoped to this revision only.
+          const anchor = units.find((u) => g.scope.includes(u.id));
+          setPendingAll((prev) => {
+            const kept = prev.filter((p) => p.requestId !== g.requestId);
+            return [...kept, ...pendingFromGeometry(g, anchor?.site?.id ?? null)];
+          });
+        })
+        .catch(() => { /* abort or error */ });
+    }
+    return () => { live = false; c.abort(); };
+  }, [selectedRequestId, detailKey, requestGeoms, units]);
 
   /** Per-request pending data as the SELECTED proposal — overview mode leaves this empty so no geometry draws. */
   const selectedPending = useMemo<PosturePending | null>(() => {
@@ -249,8 +483,29 @@ export function PosturePage() {
    * active filter so the hub label stays legible (brief §14). Attention (incomplete / pending / temporary /
    * expiring) is carried as separate properties so a single bad unit does not repaint a healthy site (brief §30).
    */
-  const siteHubs = useMemo<SiteHub[]>(() => operationalSiteHubs(units ?? [], pendingAll, filter), [units, pendingAll, filter]);
-  const visibleHubs = useMemo<SiteHub[]>(() => hubsForFilter(siteHubs, filter), [siteHubs, filter]);
+  // Site-Hub overview comes from the server (brief §5). No client-side projection from per-unit records — the
+  // server has already answered "how many sites, which hubs, which counts". The old
+  // operationalSiteHubs(units, pending) computation is retained in the codebase for tests but no longer runs here.
+  const siteHubs = useMemo<SiteHub[]>(() => adaptServerHubs(overview), [overview]);
+
+  // Brief §28: on a revision change, if the current site selection points at a hub that no longer exists, clear
+  // it. Unit and request selections are not directly validated against the compact overview (they carry no unit
+  // or request list); the lazy effects will re-fetch them under the new revision and the server will refuse the
+  // read with 404 if the person's reach no longer covers the target — the catch branch then clears nothing
+  // visually, which is safe: the operator's existing selection stays drawn until they pick something else.
+  useEffect(() => {
+    if (!overview) return;
+    if (selection?.kind === 'site') {
+      const stillThere = overview.siteHubs.some((h) => h.siteId === selection.siteId);
+      if (!stillThere) setSelection(null);
+    }
+  }, [overview, selection]);
+  const visibleHubs = useMemo<SiteHub[]>(() => {
+    const narrowed = hubsForFilter(siteHubs, filter);
+    // The adapter defaults `filteredCount` to `unitsTotal`; recompute it per filter so the hub label stays legible
+    // (incomplete/temporary/expiring/pending) without falling back to "every unit at the site".
+    return narrowed.map((h) => ({ ...h, filteredCount: filteredCountFor(h, filter) }));
+  }, [siteHubs, filter]);
   const siteHubsFC = useMemo<GeoJSON.FeatureCollection>(() => {
     const features: GeoJSON.Feature[] = [];
     for (const h of visibleHubs) {
@@ -1024,6 +1279,7 @@ export function PosturePage() {
               pick={{ selectedId: unit?.site?.id ?? null, onPick: (siteId) => clickSite(siteId) }}
               referenceBoundaries="SELECTED"
               referenceLabels="POSTURE"
+              registeredCatalogue="off"
             />
           )}
         </div>

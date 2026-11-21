@@ -766,16 +766,23 @@ function Manage({
                   }
                   if (col.mode === 'ASSIGN') {
                     const grant = p.grants.find((g) => g.role.code === col.code && g.active);
+                    const label = cellText(grant);
                     return (
                       <td key={col.code} className={'aw-cell' + tint} title={grant?.scopeText}>
                         {why ? (
                           <button className="aw-lock" aria-label={'مقفلة: ' + why} onClick={() => app.toast('🔒 ' + why)}>
                             <Icon name="lock" />
-                            {grant && <small>{cellText(grant)}</small>}
+                            {grant && (
+                              <small>
+                                {label.anchor}
+                                {label.mode && <><br />{label.mode}</>}
+                              </small>
+                            )}
                           </button>
                         ) : (
                           <button className={'button compact aw-assign' + (grant ? ' primary' : '')} data-cell={col.code} onClick={() => setEditing({ person: p, column: col, grant })}>
-                            {cellText(grant)}
+                            <span>{label.anchor}</span>
+                            {label.mode && <small className="aw-assign-mode">{label.mode}</small>}
                           </button>
                         )}
                         {marks}

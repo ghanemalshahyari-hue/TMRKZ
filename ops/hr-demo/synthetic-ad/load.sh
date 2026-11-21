@@ -12,11 +12,17 @@ cd "$(dirname "$0")/.."
 G=.generated
 docker inspect -f '{{.State.Running}}' tmrkz-synthetic-ad 2>/dev/null | grep -q true || { echo "[synthetic-ad] not running — sh ops/hr-demo/synthetic-ad/up.sh" >&2; exit 2; }
 if [ "${1:-}" = "--count" ]; then
-  # listing OU=People materializes every entry: at hundreds of thousands of users it blocks the server (samba-tool
-  # «user list» hits the same ceiling). samba-tool «computer list» is an empty catalog scan: the users we loaded carry
-  # no servicePrincipalName, so they are skipped and only their count-at-the-end summary does the work.
-  echo "users in the directory: $(docker exec tmrkz-synthetic-ad sh -c "samba-tool user list 2>/dev/null | wc -l | tr -d ' '")"
-  [ -f .generated/ad-people.ldif ] && echo "users in the LDIF         : $(grep -c '^dn:' .generated/ad-people.ldif)"
+  # at hundreds of thousands of users, every full enumeration (ldbsearch over OU=People, or samba-tool user list) is
+  # expensive — and samba-tool user list blocks while writes are in flight. The LDIF is the authoritative figure; one
+  # key lookup proves the first and last user it names are really in the directory. This is always a few seconds.
+  [ -f .generated/ad-people.ldif ] || { echo "no .generated/ad-people.ldif yet"; exit 0; }
+  N=$(grep -c '^dn:' .generated/ad-people.ldif)
+  FIRST=$(sed -n 's/^dn: CN=\([^,]*\),.*//p' .generated/ad-people.ldif | head -1)
+  LAST=$(sed -n 's/^dn: CN=\([^,]*\),.*//p' .generated/ad-people.ldif | tail -1)
+  echo "users in the LDIF: $N"
+  for u in "$FIRST" "$LAST"; do
+    docker exec tmrkz-synthetic-ad ldbsearch -H /var/lib/samba/private/sam.ldb "(sAMAccountName=$u)" dn 2>/dev/null | grep -q "^dn:" && echo "  $u: present" || echo "  $u: NOT found"
+  done
   exit 0
 fi
 [ -f "$G/oracle_hr.env" ] || { echo "[hr-demo] no $G/oracle_hr.env — run sh ops/hr-demo/up.sh first" >&2; exit 2; }

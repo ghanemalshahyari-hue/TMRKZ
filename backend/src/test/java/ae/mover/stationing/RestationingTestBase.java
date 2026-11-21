@@ -58,7 +58,9 @@ abstract class RestationingTestBase extends IntegrationTest {
         person("apDept", seat, dept);
         person("apTop", seat, top);
         person("apOther", seat, other);
-        person("activator", role("RSACT", "ORGANIZATION", "ACTIVATE_STATIONING", "VIEW"), top);
+        // ADR-095: there is no «مفعل التمركز». The person is kept only as a bystander with VIEW so tests
+        // asserting that a non-approver cannot see a request still have a valid login.
+        person("activator", role("RSACT", "ORGANIZATION", "VIEW"), top);
         person("sysadmin", role("RSPOL", "ALL", "CONFIGURE"), top);
         person("stranger", role("RSVIEW", "ORGANIZATION", "VIEW"), other);
         stationed(sec, sSec);
@@ -76,7 +78,10 @@ abstract class RestationingTestBase extends IntegrationTest {
         assertThat(submitted.status()).as(submitted.toString()).isEqualTo(200);
         decide("apSec", id, "APPROVE");
         decide("apDept", id, "APPROVE");
-        assertThat(decide("apTop", id, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        // ADR-095: the final approver's APPROVE activates in the same transaction. For a permanent restationing
+        // whose start is now this means ACTIVATED_PERMANENT; for a future-start temporary it would be
+        // TEMPORARY_SCHEDULED. The helper is used only for permanent scope: assert that shape.
+        assertThat(decide("apTop", id, "APPROVE").body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
         return id;
     }
 

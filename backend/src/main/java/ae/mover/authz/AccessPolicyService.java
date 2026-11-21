@@ -225,10 +225,7 @@ public class AccessPolicyService {
             out.add(new Problem("ERROR", r.code(), "نطاق الدور الافتراضي غير معروف."));
         }
         for (String p : r.permissions()) {
-            if (Permission.RETIRED.containsKey(p)) {
-                out.add(new Problem("ERROR", r.code(), "صلاحية أُلغيت بقرار المالك (ADR-078): " + p
-                        + Permission.RETIRED.get(p).map(x -> "؛ استخدم " + x.name()).orElse("")));
-            } else if (Permission.parse(p).isEmpty()) {
+            if (Permission.parse(p).isEmpty()) {
                 out.add(new Problem("ERROR", r.code(), "صلاحية غير معروفة: " + p));
             }
         }

@@ -97,7 +97,7 @@ function arrow(hex: string) {
 }
 
 /** The request on the offline map: current sites, the proposed site, the deployment areas, their bands and the move. */
-export function RequestMap({ request, checks, mode, view = '2d', terrain3d = null, selected = null, onMap, fitMaxZoom = 15, hideSite = false, fit = true, fitKey = 0, referenceInteractive = true, pick = null, focus = null, fitSites = false, highlight = null, occupied = null, referenceBoundaries = 'ALL', referenceLabels = 'NORMAL' }: {
+export function RequestMap({ request, checks, mode, view = '2d', terrain3d = null, selected = null, onMap, fitMaxZoom = 15, hideSite = false, fit = true, fitKey = 0, referenceInteractive = true, pick = null, focus = null, fitSites = false, highlight = null, occupied = null, referenceBoundaries = 'ALL', referenceLabels = 'NORMAL', registeredCatalogue = 'load' }: {
   request: RestationingRequest;
   checks: RestationingChecks | null;
   mode: BasemapMode;
@@ -116,6 +116,13 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
   /** The deployment area being placed: its band shows before the area exists (requestFeatures). */
   /** False while the editor places the proposed site or an area: the registered sites then take no click. */
   referenceInteractive?: boolean;
+  /**
+   * Whether to load the whole registered-sites catalogue (`/map/features` + `/stationing/current`). Pass
+   * {@code 'off'} on hosts that already carry the needed sites, like the Operational Posture page after
+   * ADR-094 Gate 2 §G: the Site-Hub summary already answers "which sites, where" so the whole-catalogue load
+   * is redundant. Defaults to {@code 'load'} to preserve current behaviour on every other host.
+   */
+  registeredCatalogue?: 'load' | 'off';
   /**
    * The current-site step of a new request: a click on a site picks it (the editor shows its card with the explicit
    * «بدء طلب إعادة تمركز من هذا الموقع»; a click alone starts nothing), and the picked or chosen site is highlighted.
@@ -157,7 +164,7 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
   const [map, setMap] = useState<MlMap | null>(null);
   // the registered sites as a reference layer below the request (owner decision of 5 Nov 2026, item 4): information on
   // a click, never a change to the request
-  const registered = useRegisteredSites();
+  const registered = useRegisteredSites({ enabled: registeredCatalogue !== 'off' });
   const [info, setInfo] = useState<string | null>(null);
   const highlighted = pick ? pick.selectedId : (info ?? highlight);
   // a request's current site is one object: the request draws its boundary, the registered layer its symbol and one name

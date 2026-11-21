@@ -170,9 +170,9 @@ export function UnitsDialog({ roleName, home, value, everything, finalApprover, 
                               {r.mode === 'LEVELS' && <option value="LEVELS" disabled>النطاق المحفوظ: مستويات محددة</option>}
                             </select>
                           ) : (
-                            <select aria-label={'نطاق الاعتماد ' + r.name} value={r.mode} onChange={(e) => patch(r.id, { mode: e.target.value as UnitChoice['mode'] })}>
-                              {!finalApprover && <option value="ONE">الوحدة فقط</option>}
-                              <option value="BRANCH">الوحدة مع جميع مستوياتها</option>
+                            <select aria-label={'نطاق الصلاحية ' + r.name} value={r.mode} onChange={(e) => patch(r.id, { mode: e.target.value as UnitChoice['mode'] })}>
+                              {!finalApprover && <option value="ONE">هذه الوحدة فقط</option>}
+                              <option value="BRANCH">هذه الوحدة وما دونها</option>
                               {!finalApprover && <option value="LEVELS">مستويات محددة</option>}
                             </select>
                           )}

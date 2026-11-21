@@ -218,6 +218,34 @@ async function call<T>(method: string, path: string, opts: RequestOptions = {}):
 }
 
 const get = <T>(path: string, opts?: RequestOptions) => call<T>('GET', path, opts);
+
+/**
+ * Conditional GET for ETag-enabled endpoints (ADR-094 Gate 2.5 §A, §26-§29).
+ * Returns `{ status: 304 }` when the server's current revision matches the client's `If-None-Match` — the
+ * caller must keep its last response in memory and reuse it. Returns `{ status: 200, body, etag }` on a miss.
+ */
+export type ConditionalResult<T> = { status: 304; etag: string | null } | { status: 200; body: T; etag: string | null };
+async function conditionalGet<T>(path: string, ifNoneMatch: string | null, signal?: AbortSignal): Promise<ConditionalResult<T>> {
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (ifNoneMatch) headers['If-None-Match'] = ifNoneMatch;
+  let res: Response;
+  try {
+    res = await fetch(API_BASE + path, { method: 'GET', headers, credentials: 'same-origin', signal });
+  } catch (e) {
+    if (signal?.aborted || (e instanceof DOMException && e.name === 'AbortError')) throw e;
+    throw new ApiError(0, { code: 'NETWORK', message: 'تعذر الوصول إلى الخادم. تحقق من الشبكة الداخلية.' });
+  }
+  const etag = res.headers.get('ETag');
+  if (res.status === 304) return { status: 304, etag };
+  const text = await res.text();
+  if (!res.ok) {
+    const err = parseApiError(res.status, text);
+    if (res.status === 401) unauthorizedListeners.forEach((fn) => fn());
+    throw err;
+  }
+  const body = (text ? JSON.parse(text) : undefined) as T;
+  return { status: 200, body, etag };
+}
 const post = <T>(path: string, body?: unknown, idempotencyKey?: string) => call<T>('POST', path, { body: body ?? {}, idempotencyKey });
 const put = <T>(path: string, body: unknown) => call<T>('PUT', path, { body });
 const patch = <T>(path: string, body: unknown) => call<T>('PATCH', path, { body });
@@ -387,6 +415,61 @@ export type PosturePending = {
   proposedSub: { type: string; coordinates: unknown } | null;
 };
 export type SiteOccupants = { stationed: { orgId: string; orgName: string }[]; linked: { id: string; orgId: string; orgName: string; reason: string }[]; otherStationed: number };
+
+/**
+ * Site-Hub overview response (ADR-094 Gate 2 §C). Compact aggregates per site; no per-unit records, no geometry.
+ * Drill into {@link PostureSiteDetail} on site click, {@link PostureUnitDetail} on unit click,
+ * {@link PostureRequestGeometry} on request click.
+ */
+export type PostureSiteHub = {
+  siteId: string;
+  siteCode: string;
+  siteName: string;
+  anchor: { lat: number | null; lng: number | null };
+  unitsTotal: number;
+  completeCount: number;
+  incompleteCount: number;
+  temporaryCount: number;
+  expiringCount: number;
+  pendingCount: number;
+};
+export type PostureSummary = { complete: number; incomplete: number; noStationing: number; temporary: number; expiring: number; pending: number };
+export type PostureOverview = {
+  dataRevision: string;
+  unitsTotal: number;
+  sitesTotal: number;
+  summary: PostureSummary;
+  siteHubs: PostureSiteHub[];
+  noStationingSummary: { count: number };
+};
+export type PostureSiteDetail = {
+  site: { id: string; code: string; name: string; lat: number | null; lng: number | null; geometry: unknown };
+  units: Array<{ id: string; code: string | null; name: string | null; state: string; kind?: string | null; plannedEnd?: string | null; request?: { purpose: string; state: string; number: string } | null }>;
+  pending: Array<{ requestId: string; requestNumber: string; purpose: string; state: string; currentStage: string | null; scopeUnitCount: number }>;
+};
+export type PostureUnitDetail = {
+  id: string;
+  code: string | null;
+  name: string | null;
+  state: string;
+  kind?: string | null;
+  plannedEnd?: string | null;
+  site?: { id: string; code: string; name: string; lat: number | null; lng: number | null; geometry: unknown } | null;
+  primary?: unknown;
+  alternative?: unknown;
+  request?: { purpose: string; state: string; number: string } | null;
+};
+export type PostureRequestGeometry = {
+  requestId: string;
+  requestNumber: string;
+  purpose: string;
+  state: string;
+  scope: string[];
+  proposedSite: { type: string; coordinates: unknown } | null;
+  proposedPrimary: { type: string; coordinates: unknown } | null;
+  proposedSub: { type: string; coordinates: unknown } | null;
+};
+
 export type AccessOfferRow = { code: string; name: string; audience: string | null; description?: string | null; scopeModes?: ScopeMode[] | null; defaultScope?: ScopeMode | null };
 export type ScopeMode = 'UNIT' | 'UNIT_TREE' | 'UNITS' | 'SITES';
 /** A role on the page to ask: its description and the scopes it may be asked with, set in «الصلاحيات المتاحة للطلب». */
@@ -751,7 +834,18 @@ export const api = {
   hubUnit: (id: string) => get<HubUnit>(`/request-hub/units/${id}`),
   requestOverview: (filter: string) => get<OverviewItem[]>('/request-hub/overview' + query({ filter })),
   homeCards: () => get<HomeCard[]>('/request-hub/home-cards'),
-  operationalPosture: () => get<{ units: PostureUnit[]; unitsTotal: number; pending: PosturePending[] }>('/operational-posture'),
+  // Legacy per-unit shape, kept available only as an escape hatch for tests; PosturePage no longer calls this
+  // path (ADR-094 Gate 2.5 — the posture UI is migrated to the Site-Hub summary + lazy detail endpoints below).
+  operationalPosture: (signal?: AbortSignal) => get<{ units: PostureUnit[]; unitsTotal: number; pending: PosturePending[]; dataRevision?: string }>('/operational-posture?view=UNITS', { signal }),
+  // Site-Hub summary — compact aggregates per site, no per-unit payload. Served with `Cache-Control: private,
+  // no-cache, must-revalidate` + a weak ETag; `postureOverviewConditional` sends `If-None-Match` so the server
+  // can answer 304 without touching the read model (brief §A).
+  postureOverview: (signal?: AbortSignal) => get<PostureOverview>('/operational-posture', { signal }),
+  postureOverviewConditional: (ifNoneMatch: string | null, signal?: AbortSignal) =>
+    conditionalGet<PostureOverview>('/operational-posture', ifNoneMatch, signal),
+  postureSite: (siteId: string, signal?: AbortSignal) => get<PostureSiteDetail>(`/operational-posture/sites/${siteId}`, { signal }),
+  postureUnit: (unitId: string, signal?: AbortSignal) => get<PostureUnitDetail>(`/operational-posture/units/${unitId}`, { signal }),
+  postureRequest: (requestId: string, signal?: AbortSignal) => get<PostureRequestGeometry>(`/operational-posture/requests/${requestId}`, { signal }),
   fyiOptions: (id: string) => get<RestationingUnit[]>(`/restationing-requests/${id}/fyi-options`),
   endFyi: (id: string, unit: string, reason: string) => post<RestationingRequest>(`/restationing-requests/${id}/fyi/${unit}/end`, { reason }),
   distributeFyi: (id: string, units: string[], note?: string) => post<RestationingRequest>(`/restationing-requests/${id}/fyi`, { units, note }),

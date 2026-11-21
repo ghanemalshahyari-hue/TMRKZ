@@ -40,17 +40,20 @@ Then the directory and its people:
 sh ops/hr-demo/synthetic-ad/up.sh                 # start, wait, apply the schema, print the values for «إعدادات التكامل»
 sh ops/hr-demo/synthetic-ad/load.sh               # the first 20,000 people (PRS_ID order)
 sh ops/hr-demo/synthetic-ad/load.sh --limit 500   # a quick subset
-sh ops/hr-demo/synthetic-ad/load.sh --all         # every person: 200,000 in under five minutes
+sh ops/hr-demo/synthetic-ad/load.sh --all         # every person: 200,000 fit in under an hour
 sh ops/hr-demo/synthetic-ad/load.sh --count       # users in OU=People
 sh ops/hr-demo/synthetic-ad/down.sh [--wipe]      # stop; --wipe also removes the directory's data
 ```
 
 `load.sh` reads the people from the demo Oracle into `.generated/ad-people.ldif` and adds them to `sam.ldb` with
-`ldbadd` in batches of 5,000, the password as its NT hash with Samba's bypass control (measured: ~770 users/s against
-~60/s the clear-text way; a simple LDAPS bind checks the NT hash, Kerberos keys are absent and never used). Users
-already there are skipped. Every account has the same test password, `.generated/ad-people-password`. Nothing here
-touches TMRKZ's database. `TEST_IDENTITIES.md` names the people for acceptance; `transfer_person.sh` moves one person
-to another unit in both sources.
+`ldbadd` in batches of 5,000, the password written as its NT hash under Samba's bypass control (DSDB password-hash
+bypass, as Samba's own join writes an account; measured ~670 users/s against ~60/s the clear-text way, where Samba
+derives Kerberos keys per user). A simple LDAPS bind still checks the NT hash, so sign-in works and a wrong password
+is refused; only Kerberos keys are absent, and TMRKZ never uses them. Only `MilNumber` is indexed (one entry per
+unique number); indexing `MilUnitId` / `MilMainUnitId` instead grew their lists to hundreds of entries per unit and
+batch times climbed from seconds to hours. Users already there are skipped. Every account has the same test password,
+`.generated/ad-people-password`. Nothing here touches TMRKZ's database. `TEST_IDENTITIES.md` names the people for
+acceptance; `transfer_person.sh` moves one person to another unit in both sources.
 
 ## The large profile (`--large`)
 

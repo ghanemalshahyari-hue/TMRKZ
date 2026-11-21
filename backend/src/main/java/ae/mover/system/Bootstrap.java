@@ -82,32 +82,24 @@ public class Bootstrap implements ApplicationRunner {
         for (Object[] r : roles) {
             insertRole(r);
         }
-        for (Object[] r : legacyFacilityRoles ? LEGACY_FACILITY_ROLES : RETIRED_FACILITY_ROLES) {
-            insertRole(r);
+        // ADR-095 Q3 (owner, 21 Nov 2026): on production (legacy-facility-roles=false, the default) the legacy MOVER
+        // facility roles are permanently deleted — V64 removes them from the database and Bootstrap does not seed them
+        // back. The test environment and the fictional acceptance stack still use MOVER's facilities reservation engine
+        // and therefore keep the flag true: the roles are seeded again here so the facility workflow can be published.
+        if (legacyFacilityRoles) {
+            for (Object[] r : LEGACY_FACILITY_ROLES) {
+                insertRole(r);
+            }
         }
     }
 
-    /**
-     * MOVER's facilities roles as they were seeded until ADR-078. Only where {@code tmrkz.access.legacy-facility-roles} is set:
-     * the backend tests and the fictional acceptance environment, which still exercise MOVER's facilities reservation engine.
-     */
+    /** MOVER's facilities roles as seeded only in the test environment (owner Q3, 21 Nov 2026; ADR-095). */
     private static final Object[][] LEGACY_FACILITY_ROLES = {
             {"REQUESTER", "مقدم الطلب", "VIEW,CREATE,EDIT,EXECUTE", "ORGANIZATION", false, false, 2},
             {"FACILITIES_REVIEWER", "مراجع المرافق", "VIEW,REVIEW,EXPORT,EXECUTE,CLOSE", "ALL", false, false, 3},
             {"ORG_MANAGER", "مدير الجهة", "VIEW,CREATE,EDIT,REVIEW,EXPORT", "ORGANIZATION", false, false, 4},
             {"APPROVER", "صاحب الاعتماد", "VIEW,REVIEW,APPROVE,EXPORT", "ALL", false, false, 5},
             {"LIMITED_VIEWER", "اطلاع محدود", "VIEW_SUMMARY", "SITE", true, false, 6}};
-
-    /**
-     * The same roles on every other installation (owner, 17 Nov 2026; ADR-078): emptied and named so they are not mistaken for
-     * the roles in use — «مقدم الطلب» is the stationing requester. V49 does the same on an installation that already had them.
-     */
-    private static final Object[][] RETIRED_FACILITY_ROLES = {
-            {"REQUESTER", "مقدم الطلب (مرافق — غير مستخدم)", "", "ORGANIZATION", false, false, 2},
-            {"FACILITIES_REVIEWER", "مراجع المرافق (مرافق — غير مستخدم)", "", "ALL", false, false, 3},
-            {"ORG_MANAGER", "مدير الجهة (مرافق — غير مستخدم)", "", "ORGANIZATION", false, false, 4},
-            {"APPROVER", "صاحب الاعتماد (مرافق — غير مستخدم)", "", "ALL", false, false, 5},
-            {"LIMITED_VIEWER", "اطلاع محدود (مرافق — غير مستخدم)", "", "SITE", true, false, 6}};
 
     private void insertRole(Object[] r) {
         jdbc.sql("""

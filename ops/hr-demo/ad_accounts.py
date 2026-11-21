@@ -25,9 +25,10 @@ objectGUID, set by the directory, is the stable UUID TMRKZ reads (preset «Activ
 
 The password goes in as its NT hash (MD4 of UTF-16LE) with Samba's bypass_password_hash control (OID
 1.3.6.1.4.1.7165.4.3.12, the way Samba's own join/replication writes accounts) and an explicit pwdLastSet. Measured on
-20 Nov 2026: the clear-text way (Samba deriving Kerberos keys per user) gives ~60 users/s, 55 minutes for 200,000; the
-hash way ~770 users/s, under 5 minutes. A simple bind over LDAPS checks the NT hash, so sign-in works and a wrong password
-is refused (error 49); only Kerberos keys are absent, which TMRKZ never uses. Demo only.
+21 Nov 2026 on an Apple Silicon Mac: the clear-text way (Samba deriving Kerberos keys per user) gives ~60 users/s, over
+an hour for 200,000; the hash way starts near 870/s and keeps 200,000 users under an hour. A simple bind over LDAPS still
+checks the NT hash, so sign-in works and a wrong password is refused (error 49); Kerberos keys are absent and TMRKZ
+never uses them. Demo only.
 """
 import argparse
 import base64

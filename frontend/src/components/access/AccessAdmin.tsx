@@ -16,6 +16,8 @@ import { useApp } from '../../lib/app';
 import { dubaiISO, fullDate, todayDubai } from '../../lib/dates';
 import { Dialog, DialogHead, Icon } from '../ui';
 import { AVAILABILITY_LABEL, PERMIT_STATE, accountAction, availabilityState, canActivate, defaultRights, departmentName, rightsText } from './adminText';
+import { existingUnits } from './assign';
+import { UnitsDialog, type UnitChoice } from './UnitsDialog';
 
 type Unit = { id: string; name: string };
 
@@ -53,8 +55,13 @@ export function AccessAdminDialog({
   onSaved: () => void;
 }) {
   const app = useApp();
-  const named = grant?.targets.find((t) => t.kind === 'ORGANIZATION');
-  const [branch, setBranch] = useState(grant ? (named ? named.includeDescendants : true) : true);
+  // The initial scope comes from the existing grant through the same helper the ASSIGN cells use; a new grant starts
+  // on the current unit with «هذه الوحدة وما دونها» (BRANCH), matching the prior default.
+  const initial: UnitChoice[] = grant
+    ? existingUnits(grant)
+    : [{ id: unit.id, name: unit.name, mode: 'BRANCH', levels: [] }];
+  const [units, setUnits] = useState<UnitChoice[]>(initial);
+  const [picker, setPicker] = useState(false);
   const [rights, setRights] = useState<string[]>(() => (grant ? grant.rights ?? catalogue.map((r) => r.key) : defaultRights(catalogue)));
   const [until, setUntil] = useState(grant?.validTo ? grant.validTo.slice(0, 10) : '');
   const [busy, setBusy] = useState(false);
@@ -64,6 +71,10 @@ export function AccessAdminDialog({
   }, [catalogue]);
   const flip = (key: string) => setRights((r) => (r.includes(key) ? r.filter((x) => x !== key) : [...r, key]));
   const save = async () => {
+    if (!units.length) {
+      app.toast('اختر وحدة واحدة على الأقل.');
+      return;
+    }
     setBusy(true);
     const body: GrantBody = {
       personId: person.id,
@@ -71,7 +82,16 @@ export function AccessAdminDialog({
       roleCode: column.code,
       validFrom: dubaiISO(todayDubai()),
       validTo: until ? dubaiISO(until) : null,
-      scope: { mode: 'CUSTOM', all: false, targets: [{ kind: 'ORGANIZATION', id: unit.id, includeDescendants: branch }] },
+      scope: {
+        mode: 'CUSTOM',
+        all: false,
+        targets: units.map((u) => ({
+          kind: 'ORGANIZATION',
+          id: u.id,
+          includeDescendants: u.mode !== 'ONE',
+          levels: u.mode === 'LEVELS' ? u.levels : undefined,
+        })),
+      },
       rights,
     };
     try {
@@ -105,8 +125,25 @@ export function AccessAdminDialog({
       <div className="dialog-content aa-form" data-testid="access-admin-dialog">
         <fieldset className="aa-scope">
           <legend>النطاق</legend>
-          <label><input type="radio" checked={!branch} onChange={() => setBranch(false)} /> هذه الوحدة فقط</label>
-          <label><input type="radio" checked={branch} onChange={() => setBranch(true)} /> هذه الوحدة والوحدات التابعة</label>
+          {units.length === 0 ? (
+            <p className="aw-muted">لم تُحدد أي وحدة بعد.</p>
+          ) : (
+            <ul className="scope-targets" aria-label="الوحدات المحددة">
+              {units.map((u) => (
+                <li key={u.id}>
+                  <b>{u.name}</b>
+                  {' — '}
+                  <span>
+                    {u.mode === 'ONE' ? 'هذه الوحدة فقط' : u.mode === 'BRANCH' ? 'هذه الوحدة وما دونها' : 'مستويات محددة'}
+                  </span>
+                  {u.mode === 'LEVELS' && u.levels.length > 0 && <small> ({u.levels.join('، ')})</small>}
+                </li>
+              ))}
+            </ul>
+          )}
+          <button type="button" className="button compact" onClick={() => setPicker(true)} data-testid="aa-pick-units">
+            <Icon name="tree" /> اختر الوحدات والمستويات
+          </button>
         </fieldset>
         <fieldset className="aa-rights">
           <legend>الحقوق ({rightsText(rights, catalogue.length)})</legend>
@@ -127,6 +164,21 @@ export function AccessAdminDialog({
         {grant && <button className="button danger" onClick={withdraw}>سحب المنحة</button>}
         <button className="button" onClick={onClose}>إلغاء</button>
       </div>
+      {picker && (
+        <UnitsDialog
+          roleName={column.name}
+          home={unit}
+          person={person.displayName}
+          finalApprover={false}
+          everything={false}
+          value={units}
+          onSave={(next) => {
+            setUnits(next);
+            setPicker(false);
+          }}
+          onClose={() => setPicker(false)}
+        />
+      )}
     </Dialog>
   );
 }

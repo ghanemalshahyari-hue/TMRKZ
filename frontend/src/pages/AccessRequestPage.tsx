@@ -10,25 +10,17 @@ import { KeyValue, Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
 
-/**
- * What each permission means, in plain words. The facilities roles of the movement programme and the partial duplicates were
- * emptied (owner, 17 Nov 2026; ADR-078) and are offered to nobody: they have no description here.
- */
+/** What each current role means, in plain words. */
 export const ROLE_MEANING: Record<string, string> = {
+  STATIONING_REQUESTER: 'مقدم الطلب: يقدّم طلبات التمركز لوحدته — إعادة التمركز ومناطق الانتشار واعتماد المواقع — ويتابعها.',
   CHAIN_APPROVER: 'يوافق على طلبات وحدته عندما تصل إليها وهي تصعد في المستويات.',
   UNIT_OPERATIONS_APPROVER: 'يعتمد طلبات الوحدات المعيّنة له بعد انتهاء المستويات، ويدير مرافقها وروابط وحداتها بالمواقع.',
-  FYI_RECEIVER: 'يطّلع على الطلبات بعد اعتمادها النهائي، بدون قرار.',
   FINAL_APPROVER: 'يعطي الموافقة النهائية على الطلبات في نطاقه، ويقرر فيها ما يتجاوز المسموح وإلغاءها وعودتها المبكرة.',
-  RESTATIONING_REQUESTER: 'يقدّم طلبات إعادة التمركز ومناطق الانتشار لوحدته.',
-  STATIONING_ACTIVATOR: 'يفعّل التمركز بعد اعتماده.',
-  STATIONING_REGISTER_OFFICER: 'يصحّح سجل التمركز ويدير روابط المواقع.',
-  POSTURE_VIEWER: 'يتابع على الخريطة تمركز وحدته وما يتبعها ومناطق انتشارها، عرضاً فقط.',
-  STATIONING_REQUESTER: 'مقدم الطلب: يقدّم طلبات التمركز لوحدته — إعادة التمركز ومناطق الانتشار واعتماد المواقع — ويتابعها.',
-  SITE_ADMINISTRATOR: 'يدير سجل المواقع وحدودها.',
-  STATIONING_UNIT_APPROVER: 'يعتمد طلبات وحدته في مرحلتها من التسلسل الهرمي.',
-  STATIONING_OPS_APPROVER: 'يعتمد عمليات الوحدة في طلبات نطاقه.',
-  STATIONING_FINAL_APPROVER: 'يعطي الاعتماد النهائي لطلبات نطاقه.',
   FYI_DISTRIBUTOR: 'يحدد الوحدات التي تعلم بالطلب بعد الاعتماد النهائي.',
+  FYI_RECEIVER: 'يطّلع على الطلبات بعد اعتمادها النهائي، بدون قرار.',
+  STATIONING_ACTIVATOR: 'يفعّل التمركز بعد اعتماده.',
+  POSTURE_VIEWER: 'يتابع على الخريطة تمركز وحدته وما يتبعها ومناطق انتشارها، عرضاً فقط.',
+  SITE_ADMINISTRATOR: 'يدير سجل المواقع وحدودها.',
 };
 
 const STATUS: Record<string, string> = { SUBMITTED: 'قيد المراجعة', APPROVED: 'فُعّلت', REJECTED: 'رُفض', RETURNED: 'أُعيد' };

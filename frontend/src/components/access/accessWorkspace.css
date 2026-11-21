@@ -163,7 +163,8 @@ body:has(.aw-divider.dragging) { user-select: none; cursor: col-resize; }
 .aw-mark.tmp { color: var(--orange); }
 .aw-lock { border: 0; background: transparent; color: var(--muted); cursor: help; display: inline-flex; align-items: center; gap: 3px; padding: 2px; font: inherit; }
 .aw-lock .icon { width: 14px; height: 14px; }
-.aw-assign { min-width: 0; padding: 3px 8px; font-size: 11px; min-height: 0; }
+.aw-assign { min-width: 0; padding: 3px 8px; font-size: 11px; min-height: 0; display: inline-flex; flex-direction: column; gap: 1px; line-height: 1.25; }
+.aw-assign .aw-assign-mode { font-size: 10px; font-weight: 500; opacity: .85; }
 
 .aw-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10px; color: var(--ink); }
 .aw-legend span { display: inline-flex; align-items: center; gap: 5px; }

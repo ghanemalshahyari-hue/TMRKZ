@@ -108,10 +108,20 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
   const returnTo = '/' + (window.location.hash.startsWith('#auth-error') ? '' : window.location.hash);
 
   useEffect(() => {
+    // Always land on the manual login form when the environment has neither automatic (Keycloak) nor a configured
+    // manual directory — asking the operator to "notify the administrator" is worse than showing the form, since
+    // this environment may still accept a local/platform account and the submit will surface the real server
+    // answer either way. The explicit `?mode=manual` URL hint also wins.
     api
       .authStatus()
-      .then(setStatus)
-      .catch(() => setStatus({ provider: 'OIDC', configured: false, reachable: false, manual: false }));
+      .then((s) => {
+        setStatus(s);
+        if (!s.configured && !s.manual) setManual(true);
+      })
+      .catch(() => {
+        setStatus({ provider: 'OIDC', configured: false, reachable: false, manual: false });
+        setManual(true);
+      });
     if (window.location.hash.startsWith('#auth-error') || window.location.search) history.replaceState(null, '', '/');
   }, []);
 
@@ -198,11 +208,6 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
                     {Icon.user}
                     <span>إدخال رقم الـــــ U وكلمة المرور يدويا</span>
                   </button>
-                )}
-                {!status.configured && !status.manual && (
-                  <div className="tm-alert tm-alert-warning">
-                    <span>لم تُهيأ خدمات الدخول في هذه البيئة. أبلغ مدير النظام.</span>
-                  </div>
                 )}
               </div>
             )}

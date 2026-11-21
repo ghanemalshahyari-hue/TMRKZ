@@ -53,35 +53,33 @@ insert into affiliation(id, person_id, organization_id, valid_from)
 select md5('t:aff:' || uid)::uuid, md5('t:person:' || uid)::uuid, md5('t:org:' || unit)::uuid, '2026-01-01T00:00:00Z' from n_people on conflict do nothing;
 update hr_source set last_success_at = now() where id = md5('t:source')::uuid;
 
--- ---- capabilities: what a person sees is an Arabic name; the permissions behind it stay on the server ---------------
+-- ---- capabilities: the canonical 10 unit-matrix roles (+ system-only SITE_SETUP_ADMIN). What a person sees is an
+--      Arabic name; the permissions behind it stay on the server.
 insert into role_def(code, name, permissions, scope, summary_only, sort_order, grantable_roles) values
-  ('POSTURE_VIEWER', 'متابعة الموقف العملياتي', '{VIEW_OPERATIONAL_POSTURE}', 'ORGANIZATION', false, 100, '{}'),
-  -- ADR-078: «مقدم الطلب» asks for re-stationing and deployment areas with one right; the partial duplicates are empty
-  ('STATIONING_REQUESTER', 'مقدم الطلب', '{VIEW,CREATE_RESTATIONING,REQUEST_SITE_REGISTRATION}', 'ORGANIZATION', false, 101, '{}'),
-  ('DEPLOYMENT_REQUESTER', 'إنشاء طلب منطقة انتشار (مكرر — غير مستخدم)', '{}', 'ORGANIZATION', false, 102, '{}'),
-  ('SITE_REGISTRATION_REQUESTER', 'طلب اعتماد موقع (مكرر — غير مستخدم)', '{}', 'ORGANIZATION', false, 103, '{}'),
-  ('STATIONING_UNIT_APPROVER', 'اعتماد طلبات الوحدة', '{VIEW,APPROVE}', 'ORGANIZATION', false, 104, '{}'),
-  ('STATIONING_OPS_APPROVER', 'اعتماد عمليات الوحدة', '{VIEW,DECIDE_UNIT_OPERATIONS}', 'ORGANIZATION', false, 105, '{}'),
-  ('STATIONING_FINAL_APPROVER', 'الاعتماد النهائي للتمركز', '{VIEW,FINAL_APPROVE_STATIONING}', 'ORGANIZATION', false, 106, '{}'),
-  ('FYI_DISTRIBUTOR', 'تحديد وحدات العلم', '{VIEW,MANAGE_FYI_DISTRIBUTION}', 'ORGANIZATION', false, 107, '{}'),
-  ('STATIONING_ACTIVATOR_NEXT', 'تفعيل التمركز', '{VIEW,ACTIVATE_STATIONING}', 'ORGANIZATION', false, 108, '{}'),
-  ('SITE_LINK_MANAGER', 'ربط الوحدات بالمواقع (مكرر — غير مستخدم)', '{}', 'ORGANIZATION', false, 109, '{}'),
-  ('SITE_SETUP_ADMIN', 'تهيئة المواقع والتمركز', '{VIEW,MANAGE_FACILITIES,MANAGE_SITE_LINKS,CORRECT_STATIONING}', 'ALL', false, 110, '{}'),
-  ('UNIT_ACCESS_MANAGER', 'مدير صلاحيات الوحدة', '{MANAGE_ACCESS,REVIEW}', 'ORGANIZATION', false, 111, '{POSTURE_VIEWER,STATIONING_REQUESTER}'),
-  ('ACCESS_FINAL_APPROVER', 'معتمد طلبات الصلاحية', '{REVIEW,APPROVE}', 'ALL', false, 112, '{}')
+  ('STATIONING_REQUESTER', 'مقدم الطلب', '{VIEW,CREATE_RESTATIONING,REQUEST_SITE_REGISTRATION}', 'ORGANIZATION', false, 100, '{}'),
+  ('CHAIN_APPROVER', 'معتمد السلسلة الهرمية', '{VIEW,APPROVE_HIERARCHY}', 'ORGANIZATION', false, 101, '{}'),
+  ('UNIT_OPERATIONS_APPROVER', 'معتمد عمليات الوحدة', '{VIEW,DECIDE_UNIT_OPERATIONS,MANAGE_FACILITIES,MANAGE_SITE_LINKS}', 'ORGANIZATION', false, 102, '{}'),
+  ('FINAL_APPROVER', 'المعتمد النهائي', '{VIEW,FINAL_APPROVE_STATIONING}', 'ORGANIZATION', false, 103, '{}'),
+  ('FYI_DISTRIBUTOR', 'تحديد وحدات العلم', '{VIEW,MANAGE_FYI_DISTRIBUTION}', 'ORGANIZATION', false, 104, '{}'),
+  ('FYI_RECEIVER', 'للعلم', '{VIEW}', 'ORGANIZATION', false, 105, '{}'),
+  ('STATIONING_ACTIVATOR', 'تفعيل التمركز', '{VIEW,ACTIVATE_STATIONING}', 'ORGANIZATION', false, 106, '{}'),
+  ('POSTURE_VIEWER', 'متابعة الموقف العملياتي', '{VIEW_OPERATIONAL_POSTURE}', 'ORGANIZATION', false, 107, '{}'),
+  ('UNIT_ACCESS_MANAGER', 'مدير صلاحيات الوحدة', '{MANAGE_ACCESS,REVIEW}', 'ORGANIZATION', false, 108, '{POSTURE_VIEWER,STATIONING_REQUESTER}'),
+  ('ACCESS_FINAL_APPROVER', 'معتمد طلبات الصلاحية', '{REVIEW,APPROVE}', 'ALL', false, 109, '{}'),
+  ('SITE_SETUP_ADMIN', 'تهيئة المواقع والتمركز', '{VIEW,MANAGE_FACILITIES,MANAGE_SITE_LINKS,CORRECT_STATIONING}', 'ALL', false, 110, '{}')
 on conflict (code) do nothing;
 delete from access_request_offer;
 insert into access_request_offer(role_code, audience) values
   ('POSTURE_VIEWER', 'EVERYONE'), ('STATIONING_REQUESTER', 'EVERYONE'),
-  ('STATIONING_UNIT_APPROVER', 'MANAGER');
+  ('CHAIN_APPROVER', 'MANAGER');
 
 -- ---- TEST holders: nobody below is an administrator except P14 --------------------------------------------------------
 insert into membership(id, person_id, organization_id, role_code, valid_from)
 select md5('t:m:' || uid || ':' || unit || ':' || role)::uuid, md5('t:person:' || uid)::uuid, md5('t:org:' || unit)::uuid, role, '2026-01-01T00:00:00Z'
   from (values ('p02.access', 'N-A', 'UNIT_ACCESS_MANAGER'), ('p03.final', 'N-A', 'ACCESS_FINAL_APPROVER'), ('p04.sites', 'N-A', 'SITE_SETUP_ADMIN'),
-               ('p05.req', 'N-A11', 'STATIONING_REQUESTER'), ('p06.h1', 'N-A11', 'STATIONING_UNIT_APPROVER'), ('p07.h2', 'N-A1', 'STATIONING_UNIT_APPROVER'),
-               ('p08.ops', 'N-A', 'STATIONING_OPS_APPROVER'), ('p09.fin', 'N-A', 'STATIONING_FINAL_APPROVER'), ('p10.fyi', 'N-A', 'FYI_DISTRIBUTOR'), ('p10.fyi', 'N-B', 'FYI_DISTRIBUTOR'),
-               ('p11.act', 'N-A', 'STATIONING_ACTIVATOR_NEXT'), ('p12.view', 'N-A11', 'POSTURE_VIEWER'), ('p13.other', 'N-B1', 'POSTURE_VIEWER'),
+               ('p05.req', 'N-A11', 'STATIONING_REQUESTER'), ('p06.h1', 'N-A11', 'CHAIN_APPROVER'), ('p07.h2', 'N-A1', 'CHAIN_APPROVER'),
+               ('p08.ops', 'N-A', 'UNIT_OPERATIONS_APPROVER'), ('p09.fin', 'N-A', 'FINAL_APPROVER'), ('p10.fyi', 'N-A', 'FYI_DISTRIBUTOR'), ('p10.fyi', 'N-B', 'FYI_DISTRIBUTOR'),
+               ('p11.act', 'N-A', 'STATIONING_ACTIVATOR'), ('p12.view', 'N-A11', 'POSTURE_VIEWER'), ('p13.other', 'N-B1', 'POSTURE_VIEWER'),
                ('p14.admin', 'N-A', 'SYSTEM_ADMIN')) v(uid, unit, role)
 on conflict do nothing;
 

@@ -44,10 +44,11 @@ public class AccessWorkspaceService {
 
     /**
      * The roles of a request's journey come first, in its order (as in the matrix of the movement programme), then who acts after
-     * the approval and who manages access (owner, 17 Nov 2026; ADR-078). Any other unit role follows.
+     * the approval and who manages access (owner, 21 Nov 2026; ADR-095 reduces the set to eight canonical roles — FYI is a
+     * per-unit configuration and activation is part of final approval).
      */
     private static final List<String> FIRST = List.of("STATIONING_REQUESTER", "CHAIN_APPROVER", "UNIT_OPERATIONS_APPROVER", "FINAL_APPROVER",
-            "FYI_DISTRIBUTOR", "FYI_RECEIVER", "STATIONING_ACTIVATOR", "POSTURE_VIEWER", "UNIT_ACCESS_MANAGER", "ACCESS_FINAL_APPROVER");
+            "FYI_RECEIVER", "POSTURE_VIEWER", "UNIT_ACCESS_MANAGER", "ACCESS_FINAL_APPROVER");
 
     /**
      * Actions that are only ever exercised over the whole system — configuration, audit, source identifiers, stationing
@@ -92,8 +93,11 @@ public class AccessWorkspaceService {
         }
 
         boolean assign() {
-            // «معتمد السلسلة الهرمية» too since 16 Nov 2026 (ADR-061): a «تعيين» cell with its levels, saved at once, as TNQL's
-            return permissions.contains(Permission.REVIEW) || permissions.contains(Permission.APPROVE) || "FYI_RECEIVER".equals(code);
+            // «معتمد السلسلة الهرمية» since 16 Nov 2026 (ADR-061): a «تعيين» cell with its levels.
+            // «مقدم الطلب» and «متابعة الموقف العملياتي» since 21 Nov 2026 (ADR-095 follow-up): every unit-scoped role that
+            // honours «هذه الوحدة فقط / هذه الوحدة وما دونها / مستويات محددة» uses the same «تعيين» pattern as the others.
+            return permissions.contains(Permission.REVIEW) || permissions.contains(Permission.APPROVE)
+                    || "FYI_RECEIVER".equals(code) || "STATIONING_REQUESTER".equals(code) || "POSTURE_VIEWER".equals(code);
         }
 
         boolean unitGrantable() {

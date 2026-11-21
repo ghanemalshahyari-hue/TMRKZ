@@ -45,7 +45,7 @@ public class GrantAdminService {
     private static final Set<Permission> SYSTEM_ACTIONS = EnumSet.of(Permission.CONFIGURE, Permission.VIEW_SOURCE_IDENTIFIERS);
 
     /** Final approval is given and taken by a global access manager only, as in the movement programme (ADR-058). */
-    public static final Set<String> FINAL_ROLES = Set.of("FINAL_APPROVER", "ACCESS_FINAL_APPROVER", "STATIONING_FINAL_APPROVER");
+    public static final Set<String> FINAL_ROLES = Set.of("FINAL_APPROVER", "ACCESS_FINAL_APPROVER");
 
     public record TargetInput(String kind, String id, Boolean includeDescendants, List<Integer> levels) {
     }

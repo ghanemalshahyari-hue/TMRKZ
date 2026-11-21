@@ -69,7 +69,7 @@ export function AllRequestsPage() {
                     <td>{i.type === 'ACCESS' ? 'طلب صلاحية' : isPurpose(i.type) ? PURPOSE_TITLE[i.type] : i.type}</td>
                     <td>{i.requestingUnit?.name ?? '—'}{i.person ? ' · ' + i.person : ''}</td>
                     <td>{i.stateLabel ?? <StatePill state={i.state as never} />}</td>
-                    <td>{i.currentStage ?? '—'}{i.myTurn ? ' — بانتظارك' : ''}{i.fyiPending ? ' — تحديد وحدات العلم بانتظارك' : ''}{i.activatable ? ' — التفعيل بانتظارك' : ''}{i.exceedsPolicy && <> <span className="pill orange" data-exceeds>{EXCEEDS_CHIP}</span></>}</td>
+                    <td>{i.currentStage ?? '—'}{i.myTurn ? ' — بانتظارك' : ''}{i.exceedsPolicy && <> <span className="pill orange" data-exceeds>{EXCEEDS_CHIP}</span></>}</td>
                     <td>{i.updatedAt ? fullDate(i.updatedAt) : '—'}</td>
                   </tr>
                 ))}
@@ -94,10 +94,9 @@ export function AllRequestsPage() {
                     <Icon name="map" /> فتح في مساحة التمركز
                   </button>
                 </div>
-                {(selected.myTurn || selected.activatable || selected.exceedsPolicy) && (
+                {(selected.myTurn || selected.exceedsPolicy) && (
                   <p className="note orange" style={{ marginTop: 10 }}>
                     {selected.myTurn && 'بانتظار قرارك. '}
-                    {selected.activatable && 'التفعيل بانتظارك. '}
                     {selected.exceedsPolicy && EXCEEDS_CHIP + '. '}
                   </p>
                 )}

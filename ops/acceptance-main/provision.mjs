@@ -49,7 +49,7 @@ manifest.roots = {
   hrUnits: psql(`select external_id from hr_unit where external_id like '${prefix}%'`).split('\n'),
   hrPeople: psql(`select external_id from hr_person where external_id like '${prefix}%'`).split('\n'),
   snapshot: psql(`select id from hr_snapshot where status = 'PUBLISHED'`),
-  offersAdded: ['POSTURE_VIEWER', 'STATIONING_UNIT_APPROVER'],
+  offersAdded: ['POSTURE_VIEWER', 'CHAIN_APPROVER'],
   ldap: USERS.map((u) => `uid=${u},ou=people,dc=tmrkz,dc=local`),
   usernames: USERS,
 };

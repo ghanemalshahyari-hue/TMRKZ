@@ -101,7 +101,11 @@ public class RestationingController {
         return view(ctx, id);
     }
 
-    /** Activation of an approved request, or of an approved extension (its own right, D10). */
+    /**
+     * ADR-095 compatibility: activation is part of final approval. The endpoint is retained so an older client does not 404,
+     * but it no longer progresses state. A still-pending APPROVED_NOT_ACTIVATED request is a transient state inside the
+     * final-approval transaction; the call returns the request's current view.
+     */
     @PostMapping("/{id}/activate")
     public Map<String, Object> activate(Actor actor, @PathVariable UUID id, @RequestBody(required = false) RestationingService.ReasonInput in) {
         var ctx = access.context(actor);
@@ -110,26 +114,6 @@ public class RestationingController {
     }
 
     // ---- lifecycle (ADR-034) --------------------------------------------------------------------------------
-
-    /** D9/D16: ask to cancel a request before its activation. */
-    @GetMapping("/{id}/fyi-options")
-    public List<Map<String, Object>> fyiOptions(Actor actor, @PathVariable UUID id) {
-        return service.fyiOptions(access.context(actor), id);
-    }
-
-    @PostMapping("/{id}/fyi")
-    public Map<String, Object> distributeFyi(Actor actor, @PathVariable UUID id, @RequestBody RestationingService.FyiInput in) {
-        var ctx = access.context(actor);
-        service.distributeFyi(ctx, id, in, clock.instant());
-        return view(ctx, id);
-    }
-
-    @PostMapping("/{id}/fyi/{unit}/end")
-    public Map<String, Object> endFyi(Actor actor, @PathVariable UUID id, @PathVariable UUID unit, @RequestBody RestationingService.ReasonInput in) {
-        var ctx = access.context(actor);
-        service.endFyi(ctx, id, unit, in, clock.instant());
-        return view(ctx, id);
-    }
 
     @PostMapping("/{id}/cancellation")
     public Map<String, Object> askCancellation(Actor actor, @PathVariable UUID id, @RequestBody RestationingLifecycle.AskInput in) {

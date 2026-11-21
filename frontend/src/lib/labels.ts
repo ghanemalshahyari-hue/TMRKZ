@@ -38,11 +38,9 @@ export const PERMISSIONS: Permission[] = [
   'MANAGE_SITE_LINKS',
   'REPLAY_STATIONING_EVENTS',
   'CREATE_RESTATIONING',
-  'ACTIVATE_STATIONING',
   'REQUEST_SITE_REGISTRATION',
   'DECIDE_UNIT_OPERATIONS',
   'FINAL_APPROVE_STATIONING',
-  'MANAGE_FYI_DISTRIBUTION',
   'VIEW_OPERATIONAL_POSTURE',
   'APPROVE_HIERARCHY',
 ];
@@ -67,11 +65,9 @@ export const PERMISSION_NAMES: Record<Permission, string> = {
   CREATE_RESTATIONING: 'طلب إعادة التمركز ومناطق الانتشار',
   REQUEST_SITE_REGISTRATION: 'طلب اعتماد موقع',
   DECIDE_UNIT_OPERATIONS: 'اعتماد عمليات الوحدة',
-  FINAL_APPROVE_STATIONING: 'الاعتماد النهائي للتمركز',
+  FINAL_APPROVE_STATIONING: 'اعتماد نهائي',
   APPROVE_HIERARCHY: 'اعتماد مستوى في السلسلة الهرمية',
-  MANAGE_FYI_DISTRIBUTION: 'تحديد وحدات العلم',
   VIEW_OPERATIONAL_POSTURE: 'متابعة الموقف العملياتي',
-  ACTIVATE_STATIONING: 'تفعيل التمركز',
 };
 
 /** The Arabic name of an action, or its code when it is not one of today's (an action removed by ADR-078, in a version's history). */

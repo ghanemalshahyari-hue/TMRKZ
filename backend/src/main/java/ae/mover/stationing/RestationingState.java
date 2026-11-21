@@ -18,7 +18,14 @@ public enum RestationingState {
     TEMPORARY_CANCELLED_BEFORE_START,
     TEMPORARY_WINDOW_EXPIRED_WITHOUT_START,
     EXTENSION_ACTIVATED,
-    LAPSED_NOT_ACTIVATED;
+    LAPSED_NOT_ACTIVATED,
+    /**
+     * ADR-095 D5b: a request that reached final approval under the old two-step contract (APPROVED_NOT_ACTIVATED → activate)
+     * and was never activated before the owner's 21 Nov 2026 change. The one-transaction final-approval flow never writes this
+     * state; V64 marks every legacy row with it so an administrator reviews each case manually instead of the server replaying
+     * an old decision against today's register.
+     */
+    MIGRATION_REQUIRED;
 
     /** O-10 / O-16: a hierarchy change of the requesting unit pauses a request in these states. */
     public boolean pausesOnHierarchyChange() {

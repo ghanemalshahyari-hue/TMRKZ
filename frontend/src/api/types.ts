@@ -23,9 +23,7 @@ export type Permission =
   | 'DECIDE_UNIT_OPERATIONS'
   | 'FINAL_APPROVE_STATIONING'
   | 'APPROVE_HIERARCHY'
-  | 'MANAGE_FYI_DISTRIBUTION'
-  | 'VIEW_OPERATIONAL_POSTURE'
-  | 'ACTIVATE_STATIONING';
+  | 'VIEW_OPERATIONAL_POSTURE';
 export type Scope = 'ALL' | 'ORGANIZATION' | 'SITE' | 'ORGANIZATION_AND_SITE';
 export type Ref = { id: string; name: string; code?: string };
 export type Period = { start: string; end: string | null };
@@ -1148,7 +1146,8 @@ export type RestationingState =
   | 'TEMPORARY_CANCELLED_BEFORE_START'
   | 'TEMPORARY_WINDOW_EXPIRED_WITHOUT_START'
   | 'EXTENSION_ACTIVATED'
-  | 'LAPSED_NOT_ACTIVATED';
+  | 'LAPSED_NOT_ACTIVATED'
+  | 'MIGRATION_REQUIRED';
 /** A lifecycle action (ADR-034): asked by one human, decided by another holding its own right. */
 export type RestationingAction = {
   id: string;

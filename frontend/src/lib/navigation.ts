@@ -11,8 +11,8 @@ import { hubWays, mayByRule } from './stationingHub';
 // one right opens re-stationing and deployment-area requests; initial stationing is set up in «تهيئة المواقع» only (ADR-078)
 const STATIONING_REQUEST_RIGHTS: Permission[] = ['CREATE_RESTATIONING', 'REQUEST_SITE_REGISTRATION'];
 // the final approver also decides a request's lifecycle actions and what exceeds the policy (ADR-078): no separate rights
-const STATIONING_RIGHTS: Permission[] = [...STATIONING_REQUEST_RIGHTS, 'VIEW', 'APPROVE', 'APPROVE_HIERARCHY', 'ACTIVATE_STATIONING', 'DECIDE_UNIT_OPERATIONS',
-  'FINAL_APPROVE_STATIONING', 'MANAGE_FYI_DISTRIBUTION'];
+const STATIONING_RIGHTS: Permission[] = [...STATIONING_REQUEST_RIGHTS, 'VIEW', 'APPROVE', 'APPROVE_HIERARCHY', 'DECIDE_UNIT_OPERATIONS',
+  'FINAL_APPROVE_STATIONING'];
 
 let supportSeat: string | null = null;
 /** «لوحة الدعم» opens for a support seat (ADR-053), which is not a permission: the shell tells navigation who holds one. */

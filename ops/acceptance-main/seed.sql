@@ -65,14 +65,14 @@ select md5('__NS__:aff:' || uid)::uuid, md5('__NS__:person:' || uid)::uuid, md5(
 
 -- ---- offers: the four shown to new people are the owner's and stay as they are. Manager extras are added for this run only. ---
 insert into access_request_offer(role_code, audience) values
-  ('POSTURE_VIEWER', 'MANAGER'), ('STATIONING_UNIT_APPROVER', 'MANAGER') on conflict do nothing;
+  ('POSTURE_VIEWER', 'MANAGER'), ('CHAIN_APPROVER', 'MANAGER') on conflict do nothing;
 
 -- ---- TEST holders: nobody below is an administrator except P14 --------------------------------------------------------
 insert into membership(id, person_id, organization_id, role_code, valid_from)
 select md5('__NS__:m:' || uid || ':' || unit || ':' || role)::uuid, md5('__NS__:person:' || uid)::uuid, md5('__NS__:org:' || unit)::uuid, role, '2026-01-01T00:00:00Z'
   from (values ('p02.access', 'N-A', 'UNIT_ACCESS_MANAGER'), ('p03.final', 'N-A', 'ACCESS_FINAL_APPROVER'), ('p04.sites', 'N-A', 'SITE_SETUP_ADMIN'),
-               ('p05.req', 'N-A11', 'STATIONING_REQUESTER'), ('p06.h1', 'N-A11', 'STATIONING_UNIT_APPROVER'), ('p07.h2', 'N-A1', 'STATIONING_UNIT_APPROVER'),
-               ('p08.ops', 'N-A', 'STATIONING_OPS_APPROVER'), ('p09.fin', 'N-A', 'STATIONING_FINAL_APPROVER'), ('p10.fyi', 'N-A', 'FYI_DISTRIBUTOR'), ('p10.fyi', 'N-B', 'FYI_DISTRIBUTOR'),
+               ('p05.req', 'N-A11', 'STATIONING_REQUESTER'), ('p06.h1', 'N-A11', 'CHAIN_APPROVER'), ('p07.h2', 'N-A1', 'CHAIN_APPROVER'),
+               ('p08.ops', 'N-A', 'UNIT_OPERATIONS_APPROVER'), ('p09.fin', 'N-A', 'FINAL_APPROVER'), ('p10.fyi', 'N-A', 'FYI_DISTRIBUTOR'), ('p10.fyi', 'N-B', 'FYI_DISTRIBUTOR'),
                ('p11.act', 'N-A', 'STATIONING_ACTIVATOR'), ('p12.view', 'N-A11', 'POSTURE_VIEWER'), ('p13.other', 'N-B1', 'POSTURE_VIEWER'),
                ('p14.admin', 'N-A', 'SYSTEM_ADMIN')) v(uid, unit, role)
 on conflict do nothing;

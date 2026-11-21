@@ -39,15 +39,17 @@ public class RequestHubService {
     private final RestationingService requests;
     private final StationingRegister register;
     private final AccessRequestService access;
+    private final OperationalPostureReadModel posture;
 
     public RequestHubService(JdbcClient jdbc, Json json, RestationingChecks checks, RestationingService requests, StationingRegister register,
-                             AccessRequestService access) {
+                             AccessRequestService access, OperationalPostureReadModel posture) {
         this.jdbc = jdbc;
         this.json = json;
         this.checks = checks;
         this.requests = requests;
         this.register = register;
         this.access = access;
+        this.posture = posture;
     }
 
     // ---- eligibility -------------------------------------------------------------------------------------------
@@ -73,17 +75,16 @@ public class RequestHubService {
     }
 
     /** What this person may ask for one unit now, each with its reason when not. A right the person lacks reads NOT_AUTHORISED. */
-    private List<Map<String, Object>> unitActions(AccessContext ctx, UUID unit, String state, Instant now) {
+    private List<Map<String, Object>> unitActions(AccessContext ctx, UUID unit, String state, String openDeploymentNumber) {
         List<Map<String, Object>> out = new ArrayList<>();
         // «طلب إعادة التمركز ومناطق الانتشار» opens both (ADR-078)
         if (ctx.canFor(Permission.CREATE_RESTATIONING, unit)) {
-            String open = requests.openRequest(RestationingChecks.DEPLOYMENT_AREAS, unit, null);
             String why = switch (state) {
                 case "NO_STATIONING" -> NOT_STATIONED;
                 case "DEPLOYMENT_COMPLETE" -> "للوحدة منطقتا انتشار نافذتان.";
                 default -> "يوجد طلب منطقة انتشار مفتوح لهذه الوحدة.";
             };
-            out.add(action("DEPLOYMENT_AREAS", "DEPLOYMENT_MISSING".equals(state), why, open));
+            out.add(action("DEPLOYMENT_AREAS", "DEPLOYMENT_MISSING".equals(state), why, openDeploymentNumber));
             out.add(action("RESTATIONING", !"NO_STATIONING".equals(state), NOT_STATIONED, null));
         }
         if (ctx.canFor(Permission.REQUEST_SITE_REGISTRATION, unit)) {
@@ -96,15 +97,36 @@ public class RequestHubService {
     public Map<String, Object> hub(AccessContext ctx, Instant now) {
         Set<UUID> reach = new HashSet<>();
         CREATE.forEach(p -> reach.addAll(requests.reach(ctx, p)));
-        List<Map<String, Object>> units = new ArrayList<>();
         List<Map<String, Object>> all = requests.unitTree(reach);
-        for (Map<String, Object> u : all.stream().limit(300).toList()) {
+        List<Map<String, Object>> capped = all.stream().limit(300).toList();
+        // Bulk the per-unit state, site reference and open-DEPLOYMENT_AREAS request in three fixed queries, instead
+        // of running up to five statements per unit inside the loop (ADR-094).
+        java.util.LinkedHashSet<UUID> unitIds = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> u : capped) {
+            unitIds.add(UUID.fromString(u.get("id").toString()));
+        }
+        Map<UUID, OperationalPostureReadModel.UnitRow> state = posture.unitState(unitIds, now);
+        java.util.LinkedHashSet<UUID> siteIds = new java.util.LinkedHashSet<>();
+        for (OperationalPostureReadModel.UnitRow r : state.values()) {
+            if (r.siteId() != null) {
+                siteIds.add(r.siteId());
+            }
+        }
+        Map<UUID, OperationalPostureReadModel.SiteRef> sites = posture.siteRefs(siteIds);
+        Map<UUID, OperationalPostureReadModel.UnitOpenRequest> openDeploy =
+                posture.openRequestByUnit(unitIds, OperationalPostureReadModel.HUB_OPEN_STATES,
+                        List.of(RestationingChecks.DEPLOYMENT_AREAS));
+        List<Map<String, Object>> units = new ArrayList<>(capped.size());
+        for (Map<String, Object> u : capped) {
             UUID id = UUID.fromString(u.get("id").toString());
-            String state = deploymentState(id, now);
+            OperationalPostureReadModel.UnitRow row = state.get(id);
+            OperationalPostureReadModel.UnitOpenRequest open = openDeploy.get(id);
+            String stateLabel = row == null ? "NO_STATIONING" : row.deploymentState(open != null);
             Map<String, Object> m = new LinkedHashMap<>(u);
-            m.put("state", state);
-            m.put("site", currentSite(id, now));
-            m.put("actions", unitActions(ctx, id, state, now));
+            m.put("state", stateLabel);
+            OperationalPostureReadModel.SiteRef site = row == null || row.siteId() == null ? null : sites.get(row.siteId());
+            m.put("site", site == null ? null : site.asMap());
+            m.put("actions", unitActions(ctx, id, stateLabel, open == null ? null : open.number()));
             units.add(m);
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -165,7 +187,8 @@ public class RequestHubService {
         m.put("name", jdbc.sql("select name from organization where id = :id").param("id", unit).query(String.class).single());
         m.put("state", state);
         m.put("site", currentSite(unit, now));
-        m.put("actions", unitActions(ctx, unit, state, now));
+        String openDeployNumber = requests.openRequest(RestationingChecks.DEPLOYMENT_AREAS, unit, null);
+        m.put("actions", unitActions(ctx, unit, state, openDeployNumber));
         return m;
     }
 
@@ -231,91 +254,35 @@ public class RequestHubService {
         }
         Set<UUID> reach = requests.reach(ctx, Permission.VIEW_OPERATIONAL_POSTURE);
         List<Map<String, Object>> tree = requests.unitTree(reach);
-        List<Map<String, Object>> units = new ArrayList<>();
-        for (Map<String, Object> u : tree.stream().limit(500).toList()) {
-            UUID id = UUID.fromString(u.get("id").toString());
-            Map<String, Object> m = new LinkedHashMap<>(u);
-            UUID record = checks.effectiveStationing(id, now);
-            m.put("state", deploymentState(id, now));
-            if (record != null) {
-                Map<String, Object> st = jdbc.sql("select site_id, kind, planned_end from org_stationing where id = :id").param("id", record).query().singleRow();
-                UUID site = (UUID) st.get("site_id");
-                m.put("site", siteRef(site));
-                m.put("kind", st.get("kind"));
-                m.put("plannedEnd", st.get("planned_end") == null ? null : Db.toInstant(st.get("planned_end")).toString());
-                Map<String, Object> areas = new LinkedHashMap<>();
-                jdbc.sql("select role, ST_AsGeoJSON(geom) as g from deployment_area where stationing_id = :s and state = 'ACTIVE'").param("s", record)
-                        .query((rs, n) -> areas.put(rs.getString("role"), json.map(rs.getString("g")))).list();
-                m.put("primary", areas.get("PRIMARY"));
-                m.put("alternative", areas.get("ALTERNATIVE"));
-                long others = jdbc.sql("""
-                        select count(distinct organization_id) from org_stationing where site_id = :s and valid_from <= :now and (valid_to is null or valid_to > :now)
-                           and not organization_id = any(string_to_array(:mine, ',')::uuid[])""")
-                        .param("s", site).param("now", Db.ts(now)).param("mine", Db.ids(List.copyOf(reach))).query(Long.class).single();
-                m.put("otherUnitsAtSite", others);
-            }
-            m.put("request", jdbc.sql("""
-                    select purpose, state from restationing_request where jsonb_exists(content->'scope', :u)
-                       and state in ('UNDER_REVIEW', 'RETURNED_FOR_CHANGES', 'PAUSED_HIERARCHY_CHANGED', 'APPROVED_NOT_ACTIVATED', 'CANCELLATION_PENDING')
-                     order by updated_at desc limit 1""").param("u", id.toString()).query((rs, n) -> {
-                Map<String, Object> r = new LinkedHashMap<>();
-                r.put("purpose", rs.getString("purpose"));
-                r.put("state", rs.getString("state"));
-                return r;
-            }).optional().orElse(null));
-            units.add(m);
+        // Bulk read-model behind the posture (ADR-094): a small fixed set of SQL statements that does not grow with
+        // the authorised unit count. The previous per-unit loop (~8 queries per unit × up to 500 units) is gone.
+        return posture.posture(ctx, now, reach, tree, requests);
+    }
+
+    /**
+     * Site-Hub summary overview (ADR-094 Gate 2 §C): compact aggregates per site, a one-line summary and totals.
+     * No per-unit records in the response — the operator drills in to lazy endpoints for details.
+     */
+    public Map<String, Object> postureOverview(AccessContext ctx, Instant now) {
+        if (!ctx.has(Permission.VIEW_OPERATIONAL_POSTURE)) {
+            throw ApiException.forbidden("يحتاج صلاحية «متابعة الموقف العملياتي».");
         }
-        // Scoped pending proposals (owner, 21 Nov 2026 operational-posture meaning-layer brief §10-§14): every request this
-        // person may read, in a state the operator should see as a proposed change, projected to the operational-map fields
-        // only. Each record is stitched by the SAME `visible(ctx, r)` rule that the request list uses: the right
-        // VIEW_OPERATIONAL_POSTURE alone does NOT reveal every proposal — the request must be one this person can see.
-        List<Map<String, Object>> pending = new ArrayList<>();
-        List<String> pendingStates = List.of(
-                "UNDER_REVIEW", "RETURNED_FOR_CHANGES", "PAUSED_HIERARCHY_CHANGED",
-                "APPROVED_NOT_ACTIVATED", "CANCELLATION_PENDING", "START_HELD_PENDING_CANCELLATION");
-        List<UUID> pendingIds = jdbc.sql("""
-                select id from restationing_request
-                 where state = any(string_to_array(:states, ',')::text[])
-                   and purpose in ('RESTATIONING', 'DEPLOYMENT_AREAS')
-                 order by updated_at desc limit 500""")
-                .param("states", String.join(",", pendingStates))
-                .query(UUID.class).list();
-        for (UUID rid : pendingIds) {
-            requests.load(rid).ifPresent(r -> {
-                if (!requests.visible(ctx, r)) return;
-                String stage = jdbc.sql("""
-                        select label from restationing_stage where request_id = :id and route_no = :r and mark is null
-                         order by position limit 1""")
-                        .param("id", r.id()).param("r", r.routeNo()).query(String.class).optional().orElse(null);
-                RestationingContent c = r.content();
-                for (UUID scopeUnit : c.scope()) {
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("requestId", r.id().toString());
-                    row.put("requestNumber", r.number());
-                    row.put("purpose", r.purpose());
-                    row.put("state", r.state());
-                    row.put("currentStage", stage);
-                    row.put("unitId", scopeUnit.toString());
-                    jdbc.sql("select code, name from organization where id = :id")
-                            .param("id", scopeUnit).query((rs, n) -> {
-                                row.put("unitCode", rs.getString("code"));
-                                row.put("unitName", rs.getString("name"));
-                                return null;
-                            }).optional();
-                    UUID currentSite = checks.currentSites(List.of(scopeUnit), now).get(scopeUnit);
-                    row.put("currentSiteId", currentSite == null ? null : currentSite.toString());
-                    row.put("proposedSite", c.site() == null ? null : c.site().geometry());
-                    row.put("proposedPrimary", c.primary());
-                    row.put("proposedSub", c.alternative());
-                    pending.add(row);
-                }
-            });
-        }
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("units", units);
-        out.put("unitsTotal", tree.size());
-        out.put("pending", pending);
-        return out;
+        return posture.overview(ctx, now, requests.reach(ctx, Permission.VIEW_OPERATIONAL_POSTURE));
+    }
+
+    /** One site's units + compact statuses + visible pending summaries (ADR-094 Gate 2 §D). */
+    public Map<String, Object> postureSite(AccessContext ctx, UUID siteId, Instant now) {
+        return posture.siteDetail(ctx, siteId, now, requests.reach(ctx, Permission.VIEW_OPERATIONAL_POSTURE), requests);
+    }
+
+    /** One unit's full posture — site geometry + areas + open request (ADR-094 Gate 2 §E). */
+    public Map<String, Object> postureUnit(AccessContext ctx, UUID unitId, Instant now) {
+        return posture.unitDetail(ctx, unitId, now);
+    }
+
+    /** One pending request's proposal geometry (ADR-094 Gate 2 §F). */
+    public Map<String, Object> postureRequest(AccessContext ctx, UUID requestId) {
+        return posture.requestGeometry(ctx, requestId, requests);
     }
 
     // ---- one list, and the counts of the home page --------------------------------------------------------------

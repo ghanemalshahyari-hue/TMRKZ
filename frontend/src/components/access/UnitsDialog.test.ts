@@ -18,13 +18,23 @@ describe('what a chosen unit covers', () => {
   });
 });
 
-describe('how a grant reads in its matrix cell', () => {
+describe('how a grant reads in its matrix cell (anchor + mode, ADR-094 §22)', () => {
   const grant = (over: object) => ({ all: false, targets: [], ...over }) as never;
-  it('none, every unit, its own unit, or a count', () => {
-    expect(cellText(undefined)).toBe('تعيين');
-    expect(cellText(grant({ all: true }))).toBe('كل الوحدات');
-    expect(cellText(grant({}))).toBe('وحدته');
-    expect(cellText(grant({ targets: [{ kind: 'ORGANIZATION' }, { kind: 'ORGANIZATION' }] }))).toBe('وحدتان');
+  it('none, every unit, its own unit, or a count — each with its mode', () => {
+    expect(cellText(undefined)).toEqual({ anchor: 'تعيين', mode: null });
+    expect(cellText(grant({ all: true }))).toEqual({ anchor: 'كل الوحدات', mode: null });
+    expect(cellText(grant({}))).toEqual({ anchor: 'وحدته', mode: null });
+    const multi = cellText(grant({ targets: [{ kind: 'ORGANIZATION' }, { kind: 'ORGANIZATION' }] }));
+    expect(multi.anchor).toContain('2');
+    expect(multi.mode).toBeNull();
+  });
+  it('one target reads the anchor and the mode («الوحدة وما دونها» / «هذه الوحدة فقط» / «مستويات محددة»)', () => {
+    expect(cellText(grant({ targets: [{ kind: 'ORGANIZATION', name: 'جناح 1', includeDescendants: true }] })))
+      .toEqual({ anchor: 'جناح 1', mode: 'الوحدة وما دونها' });
+    expect(cellText(grant({ targets: [{ kind: 'ORGANIZATION', name: 'قسم 2', includeDescendants: false }] })))
+      .toEqual({ anchor: 'قسم 2', mode: 'هذه الوحدة فقط' });
+    expect(cellText(grant({ targets: [{ kind: 'ORGANIZATION', name: 'جناح 1', includeDescendants: true, levels: [3] }] })))
+      .toEqual({ anchor: 'جناح 1', mode: 'مستويات محددة' });
   });
 });
 

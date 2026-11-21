@@ -190,7 +190,7 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
     - a return re-takes only the affected decisions; a hierarchy change pauses the request and rebuilds the route;
     - activation is independent, with an atomic occupancy re-check; the temporary lifecycle is automatic;
     - outbox events throughout.
-  - **New permissions:** CREATE_RESTATIONING, ACTIVATE_STATIONING, APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION.
+  - **New permissions:** CREATE_RESTATIONING, ACTIVATE_STATIONING, «(صلاحية مُلغاة — يقررها المعتمد النهائي)».
   - **Page «إعادة التمركز»:** request list and detail on the offline MapLibre map, route, checks, decide, activate,
     submit, and a first editor. Shown only with `VITE_STATIONING_V3=true`.
   - **Development environment:** `tmrkz-v3dev` on :8097 (`ops/test-env/dev-v3.sh`), fictional data and illustrative
@@ -608,6 +608,37 @@ earlier data, and 17 frontend tests — see `TRACEABILITY.md`.
   - So this data is development only: `map-runtime/current/manifest.json` is a labelled stand-in
     (`DEV-UNVERIFIED-local-rebuild-not-a-release`). `tmrkz-map-2026.11.2` was
     not rebuilt; its release rebuild stays open, and must decide which build host defines the record.
+
+## 21 Nov 2026 — Activation merged into final approval; FYI becomes a per-unit configuration (ADR-095)
+
+The owner's correction on 21 Nov 2026 removes the two moving parts the ten-role matrix carried beyond the natural
+approval chain. FYI_DISTRIBUTOR and STATIONING_ACTIVATOR are DELETED outright; the actions they carried
+(MANAGE_FYI_DISTRIBUTION, ACTIVATE_STATIONING) are REMOVED from the application and pruned from every stored policy
+version. The administrative matrix now exposes EIGHT canonical roles — مقدم الطلب, معتمد السلسلة الهرمية, معتمد
+عمليات الوحدة, المعتمد النهائي, للعلم, متابعة الموقف العملياتي, مدير صلاحيات الوحدة, معتمد طلبات الصلاحية.
+
+- *Final approval → activation inside the same transaction.* The final approver's APPROVE on the last stage triggers
+  the same server checks a standalone activation used to apply (hierarchy drift refusal, geography re-check, atomic
+  conflict prevention) and records the activated stationing. A request moves from UNDER_REVIEW directly to
+  ACTIVATED_PERMANENT / TEMPORARY_SCHEDULED / ACTIVE_TEMPORARY — APPROVED_NOT_ACTIVATED no longer surfaces to any UI.
+- *FYI from a per-unit configuration.* A new table `unit_fyi_target(owning_unit_id, target_unit_id,
+  include_descendants)` holds the FYI recipients per owning unit, maintained by the unit's access manager. After
+  activation the service reads this list, expands `include_descendants`, writes the `restationing_fyi` rows and
+  notifies the recipients — all inside the same transaction.
+- *API compatibility.* `POST /restationing-requests/{id}/activate` is an idempotent no-op so an older client does not
+  404. The three FYI endpoints (`/fyi-options`, `/fyi`, `/fyi/{unit}/end`) are REMOVED.
+
+**Delivered.** Permission enum reduced, RestationingService refactored (`performActivation`, `performExtensionActivation`,
+`autoFyi` inline in the final-approval transaction), V62 migration deletes the two role_def rows and ends every live
+grant pointing at them, strips the retired permissions from every stored policy version, creates `unit_fyi_target` and
+writes one audit event naming everything removed. ADR-095 recorded. `MatrixColumnsIT` moved to the 8-role invariant.
+`RestationingTestBase.approvedPermanent` asserts `ACTIVATED_PERMANENT` directly.
+
+**Open follow-ups.** `RestationingWorkflowIT`, `RestationingLifecycleIT`, `RestationingHrSyncIT` and
+`StationingNextIT` still carry pre-ADR-095 two-step assertions (checking `state == APPROVED_NOT_ACTIVATED` and the
+`activator` login's `/activate` call). They need to be migrated to the one-transaction contract; none of this blocks
+production use of the eight-role matrix today. A UI for the per-unit FYI target configuration is the next frontend
+step — today the configuration is editable only through the database until the access workspace exposes it.
 
 ## Known limitations
 

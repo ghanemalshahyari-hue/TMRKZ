@@ -206,9 +206,18 @@ public abstract class IntegrationTest {
 
     // ---- HTTP client --------------------------------------------------------------------------------
 
-    public record Res(int status, JsonNode body, byte[] raw) {
+    public record Res(int status, JsonNode body, byte[] raw, java.net.http.HttpHeaders headers) {
+        public Res(int status, JsonNode body, byte[] raw) {
+            this(status, body, raw, null);
+        }
+
         public String code() {
             return body == null ? null : body.path("code").asText(null);
+        }
+
+        /** The value of a single response header (case-insensitive), or {@code null}. Useful for ETag assertions. */
+        public String header(String name) {
+            return headers == null ? null : headers.firstValue(name).orElse(null);
         }
 
         @Override
@@ -242,6 +251,13 @@ public abstract class IntegrationTest {
 
         public Res get(String path) {
             return send(HttpRequest.newBuilder(URI.create(url(path))).GET());
+        }
+
+        /** GET with extra request headers (used e.g. for {@code If-None-Match} on endpoints that support ETags). */
+        public Res get(String path, Map<String, String> extraHeaders) {
+            HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url(path))).GET();
+            extraHeaders.forEach(b::header);
+            return send(b);
         }
 
         public Res post(String path, Object body) {
@@ -294,7 +310,7 @@ public abstract class IntegrationTest {
                 if (ct.contains("json") && r.body().length > 0) {
                     body = JSON.readTree(r.body());
                 }
-                return new Res(r.statusCode(), body, r.body());
+                return new Res(r.statusCode(), body, r.body(), r.headers());
             } catch (Exception e) {
                 throw new IllegalStateException(e);
             }

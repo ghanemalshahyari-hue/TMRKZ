@@ -468,7 +468,7 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
           </div>
           <div>
             <dt>{c.kind === 'TEMPORARY' ? 'المدة' : 'النفاذ'}</dt>
-            <dd>{c.kind === 'TEMPORARY' ? `${fullDate(c.start ?? '')} ← ${fullDate(c.end ?? '')}` : 'عند التفعيل المستقل'}</dd>
+            <dd>{c.kind === 'TEMPORARY' ? `${fullDate(c.start ?? '')} ← ${fullDate(c.end ?? '')}` : 'فور الاعتماد النهائي'}</dd>
           </div>
           <div>
             <dt>نسخة السياسة</dt>
@@ -480,9 +480,9 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
           </div>
           {r.activation && (
             <div>
-              <dt>التفعيل</dt>
+              <dt>النفاذ</dt>
               <dd>
-                {r.activation.by.name} · {fullDate(r.activation.at)} · {r.activation.site.name}
+                {fullDate(r.activation.at)} · {r.activation.site.name}
               </dd>
             </div>
           )}
@@ -498,20 +498,20 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
           ['الوحدات', r.units.map((u) => u.name).join('، ') || '—'],
           ['الموقع الحالي', r.currentSites.map((x) => x.site.name).join('، ') || '—'],
           ['الموقع المطلوب', r.purpose === 'INITIAL_STATIONING' ? r.targetSite?.name ?? '—' : r.purpose === 'SITE_REGISTRATION' ? c.siteInfo?.name ?? '—' : r.purpose === 'DEPLOYMENT_AREAS' ? 'منطقتا الانتشار فقط' : proposedSite(r)],
-          [c.kind === 'TEMPORARY' ? 'المدة' : 'النفاذ', c.kind === 'TEMPORARY' ? `${fullDate(c.start ?? '')} ← ${fullDate(c.end ?? '')}` : 'عند التفعيل المستقل'],
+          [c.kind === 'TEMPORARY' ? 'المدة' : 'النفاذ', c.kind === 'TEMPORARY' ? `${fullDate(c.start ?? '')} ← ${fullDate(c.end ?? '')}` : 'فور الاعتماد النهائي'],
           ['مقدم الطلب', r.requester.name],
           ['السبب', c.reason],
         ]}
       />
 
-      {(r.can.edit || r.can.submit || r.can.decide || r.can.activate || !hasLifecycle(r)) && (
+      {(r.can.edit || r.can.submit || r.can.decide || !hasLifecycle(r)) && (
       <section className="tz-card rs-actions" aria-label="الإجراءات">
         {r.can.edit && (
           <button className="button" onClick={onEdit} disabled={busy}>
             <Icon name="file" /> تعديل الطلب
           </button>
         )}
-        {(r.can.submit || r.can.decide || r.can.activate) && (
+        {(r.can.submit || r.can.decide) && (
           <textarea
             className="rs-reason"
             placeholder={r.can.decide ? 'سبب القرار (مطلوب للإرجاع والرفض)' : resubmit ? 'ما الذي عدّلته أو أكّدته (مطلوب)' : 'ملاحظة (اختيارية)'}
@@ -544,12 +544,8 @@ function RequestPanel({ r, checks, busy, act, reason, setReason, onEdit, onOpen 
             </button>
           </>
         )}
-        {r.can.activate && (
-          <button className="button primary" disabled={busy} onClick={() => act(() => api.activateRestationing(r.id, reason), r.requestKind === 'EXTENSION' ? 'فُعّل التمديد' : 'فُعّل الطلب')}>
-            {r.requestKind === 'EXTENSION' ? 'تفعيل التمديد (إجراء مستقل)' : 'تفعيل'}
-          </button>
-        )}
-        {!r.can.edit && !r.can.submit && !r.can.decide && !r.can.activate && !hasLifecycle(r) && (
+        {/* ADR-095: activation is part of final approval — no separate activate button in the UI. */}
+        {!r.can.edit && !r.can.submit && !r.can.decide && !hasLifecycle(r) && (
           <span className="tz-muted">لا إجراء لك على هذا الطلب في حالته الحالية — الخادم يقرر من يرى ويقرر.</span>
         )}
       </section>

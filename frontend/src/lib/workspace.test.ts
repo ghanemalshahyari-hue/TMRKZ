@@ -136,9 +136,10 @@ describe('permission-hidden navigation (§4, §14)', () => {
     expect(restriction('permissions', auditor, false)).toBe(true);
     const admin = can('MANAGE_ACCESS', 'CONFIGURE');
     expect(moreNav(admin, false).map((l) => l.view)).toContain('permissions');
-    // a single-action holder sees no list page it cannot open
-    const activator = can('ACTIVATE_STATIONING');
-    expect(primaryNav(activator, false).map((l) => l.view)).toEqual(['home']);
+    // a summary-only holder opens الرئيسية and the compact calendar («التقارير») — no list page they cannot act on
+    // (ADR-095 retired ACTIVATE_STATIONING; VIEW_SUMMARY is the narrow read-only right left in the catalogue).
+    const summaryOnly = can('VIEW_SUMMARY');
+    expect(primaryNav(summaryOnly, false).map((l) => l.view)).toEqual(['home', 'calendar']);
   });
 });
 

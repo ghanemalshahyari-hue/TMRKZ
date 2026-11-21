@@ -117,7 +117,7 @@ try {
   ok(nav === 'طلب صلاحية', 'ACCESS-02', 'القائمة لا تحوي غيرها', nav);
   await p01.locator('[data-role]').first().waitFor({ timeout: 10000 });
   const offered = await p01.locator('[data-role]').evaluateAll((l) => l.map((e) => e.getAttribute('data-role')));
-  ok(offered.includes(ASK) && !offered.includes('SITE_SETUP_ADMIN') && !offered.includes('STATIONING_UNIT_APPROVER'), 'ACCESS-03', 'يختار مما يعرضه مدير النظام، بأسماء عربية', offered.join());
+  ok(offered.includes(ASK) && !offered.includes('SITE_SETUP_ADMIN'), 'ACCESS-03', 'يختار مما يعرضه مدير النظام، بأسماء عربية', offered.join());
   ok(!(await p01.locator('[data-role]').first().evaluate((e) => e.closest('label').innerText)).includes('VIEW'), 'ACCESS-04', 'لا تظهر أسماء داخلية');
   ok((await p01.locator('[data-scope=ALL]').count()) === 0, 'ACCESS-05', 'النظام بالكامل ليس خياراً');
   await p01.locator(`[data-role=${ASK}]`).check();

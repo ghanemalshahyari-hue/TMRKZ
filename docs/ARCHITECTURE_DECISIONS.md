@@ -1129,7 +1129,7 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
 - **Decision — decisions.**
   - A hierarchy or cross-branch stage is decided through APPROVE held in that unit's own approver seat: a grant anchored
     at the unit, not an ALL or ancestor grant. The exception stage is decided through
-    APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION acting for the requesting unit. Both are confirmed by OpenFGA.
+    «(صلاحية مُلغاة — يقررها المعتمد النهائي)» acting for the requesting unit. Both are confirmed by OpenFGA.
   - Never the requester's human, nor a grant delegated by them. One human decides at most one stage of the current
     route, which also gives O-03b independence.
   - Return and reject need a reason. A return keeps the request; resubmission needs a reason and takes again only the
@@ -1156,12 +1156,12 @@ Owner brief of 30 Oct 2026 (map as the main work surface; choose an organisation
   - up to the setting's `exception.maxExtra`; beyond that it is refused;
   - with a written reason, recorded in the revision and in the submission audit;
   - through a separate stage before the final stage, decided only by a holder of
-    APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION, with the same separation of duties.
+    «(صلاحية مُلغاة — يقررها المعتمد النهائي)», with the same separation of duties.
 
   It stays off unless the System Administrator enables `exception.allowed` in the policy. The question was raised
   because the model document (§7, §8) and the prototype carried the exception while §13.1 did not list it.
 - **Permissions / OpenFGA.** New actions CREATE_RESTATIONING, ACTIVATE_STATIONING and
-  APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION. The generated model gains their relations (`docs/authz/model.fga` regenerated;
+  «(صلاحية مُلغاة — يقررها المعتمد النهائي)». The generated model gains their relations (`docs/authz/model.fga` regenerated;
   additions only).
 - **API.** `GET|POST /restationing-requests`, `GET /restationing-requests/{id}`, `PUT …/{id}/content`, `GET …/{id}/checks`,
   `POST …/{id}/submit`, `POST …/{id}/decision`, `POST …/{id}/activate` (`docs/api/openapi.json` regenerated: 164
@@ -1296,8 +1296,8 @@ D12, D16, A4, A5, A6). Plan: `docs/audit/stationing-v3-production/LIFECYCLE_PLAN
     reason);
   - the table `restationing_action`, with at most one open action per request;
   - `org_stationing.start_held_at`, and the end reason WINDOW_EXPIRED.
-- **Four separate rights, granted to no existing role:** DECIDE_PRE_ACTIVATION_CANCELLATION,
-  ACTIVATE_TEMPORARY_EXTENSION, DECIDE_EARLY_RETURN, DECIDE_BEFORE_START_CANCELLATION.
+- **Four separate rights, granted to no existing role:** «(صلاحية مُلغاة)»,
+  «(صلاحية مُلغاة — يُفعَّل بتفعيل التمركز)», «(صلاحية مُلغاة)», «(صلاحية مُلغاة)».
   - The last is the model's DECIDE_TEMPORARY_BEFORE_START_CANCELLATION, shortened because OpenFGA limits a relation
     name to 50 bytes: the generated `…_contains` relation would have 51.
   - The OpenFGA model is regenerated; its longest relation is 46 bytes.
@@ -1761,7 +1761,7 @@ for narrow steep ground: `docs/evidence/terrain-3d/slope-inside/README.md`.
 
 **Decision.**
 - **One engine.** `restationing_request.purpose` carries RESTATIONING, INITIAL_STATIONING, DEPLOYMENT_AREAS and SITE_REGISTRATION through the same revisions, return, selective re-approval, hierarchy drift, route and activation. The same editor serves all four. No second workflow.
-- **Separate permissions for separate requests.** `CREATE_INITIAL_STATIONING`, `CREATE_DEPLOYMENT_REQUEST`, `REQUEST_SITE_REGISTRATION`, `DECIDE_UNIT_OPERATIONS`, `FINAL_APPROVE_STATIONING`, `MANAGE_FYI_DISTRIBUTION`, `VIEW_OPERATIONAL_POSTURE`. Existing ones are reused otherwise (`docs/PERMISSION_MATRIX_STATIONING_AR.md`). No new OpenFGA structure: the generator adds relations per permission.
+- **Separate permissions for separate requests.** «(صلاحية مُلغاة)», `CREATE_RESTATIONING`, `REQUEST_SITE_REGISTRATION`, `DECIDE_UNIT_OPERATIONS`, `FINAL_APPROVE_STATIONING`, `MANAGE_FYI_DISTRIBUTION`, `VIEW_OPERATIONAL_POSTURE`. Existing ones are reused otherwise (`docs/STATIONING_REQUESTER_AUDIT.md`). No new OpenFGA structure: the generator adds relations per permission.
 - **Stages are policy, holders are grants.** `StationingPolicy.approvalStages` (`unitOperations`, `finalByPermission`, `fyiBeforeActivation`), null on every earlier version, so a request stays on the rules of its pinned version. No level, person or holder is named in code.
 - **Deployment areas belong to a unit's stationing record.** `deployment_area.organization_id` and `stationing_id`, one row per unit. Two units sharing a site hold different areas; approving one never touches the other. A permanent move and a correction retire the areas with the record; an extension carries them forward.
 - **Eligibility is the server's.** `GET /request-hub`: NO_STATIONING, DEPLOYMENT_MISSING, DEPLOYMENT_REQUEST_PENDING, DEPLOYMENT_COMPLETE per unit, with each action's reason. A right the person lacks yields no action. Every operation checks again.
@@ -1912,7 +1912,7 @@ for narrow steep ground: `docs/evidence/terrain-3d/slope-inside/README.md`.
 
 **The approver of a station (`Stations`).** One rule for every step going to a unit — a chart's climbing approval, its other unit steps, and a re-stationing hierarchy seat: (1) the station's own approvers: a grant of the role at the unit (its home when it names no unit, a unit it names, a level it names reaching it), a position seat there, their delegates; (2) only when it has none, the nearest unit above it, below the main unit, whose approver's grant covers its branch («هذا المستوى ومع أبنائه»). Own and inherited are never mixed, so a higher approver cannot sign early where a level has its own (TNQL's cursor-exact gate), and the main unit is never a station nor inherited from. The approver who inherits a vacant level signs it in his own name and then signs his own level; in re-stationing that one case is excepted from "one human decides one stage" (`RestationingService.inheritedBy`), every other separation stays. A level nobody approves, not even from above, keeps TMRKZ's outcomes (refused before sending, skipped when the flow says so, open to the role). Not taken from TNQL: a holder over everything signing any station — TMRKZ's ALL-reach roles were never held at other units' steps, and its «open to the role» already covers the empty case. The studio simulation names the inherited approver ("— يعتمدها معتمد «X»"); the stationing path simulator counts it.
 
-**Final approval** (`FINAL_APPROVER`, `ACCESS_FINAL_APPROVER`, `STATIONING_FINAL_APPROVER`) is given and taken by a global access manager only, whatever a scoped role's grantable list says (`GrantAdminService.FINAL_ROLES`).
+**Final approval** (`FINAL_APPROVER`, `ACCESS_FINAL_APPROVER`, `FINAL_APPROVER`) is given and taken by a global access manager only, whatever a scoped role's grantable list says (`GrantAdminService.FINAL_ROLES`).
 
 **Roles given to a unit (V36 `unit_grant`, «موروثة من الوحدة»).** Every current and future member (HR posting or «إضافة مستخدم») holds the role at the unit while both last; `GrantSource` reads it like a seat, so the decision service follows (triggers on `unit_grant` and `unit_member`). Only roles that decide and manage nothing (requesting, reading, the requester's own steps: VIEW, VIEW_SUMMARY, CREATE, EDIT, EXECUTE, CLOSE and the request-creating stationing actions); approvals are always a named person's grant. Ended, never deleted; audited `UNIT_GRANT_ADDED/ENDED`.
 
@@ -1977,7 +1977,7 @@ for narrow steep ground: `docs/evidence/terrain-3d/slope-inside/README.md`.
 
 **Found.** The stationing engine found a hierarchy level's approver by the generic `APPROVE`, held by «المعتمد النهائي» (granted over every unit on this installation), «صاحب الاعتماد» and «معتمد طلبات الصلاحية» — so a final approver became the inherited approver of every level and no level could ever be skipped — while «معتمد السلسلة الهرمية» (VIEW, REVIEW) signed none, and «معتمد عمليات الوحدة» lacked `DECIDE_UNIT_OPERATIONS`. The unpublished stationing draft (ADR-045) duplicated the three approval roles.
 
-**Decision (owner: «MOVER-style roles»).** The MOVER-style roles drive the stationing path: «معتمد السلسلة الهرمية» signs hierarchy levels only, through the new action `APPROVE_HIERARCHY` (stationing stages `HIERARCHY` and `CROSS_BRANCH`; OpenFGA relations generated, `docs/authz/model.fga` regenerated); «معتمد عمليات الوحدة» gains `DECIDE_UNIT_OPERATIONS`; «المعتمد النهائي» gains `FINAL_APPROVE_STATIONING`. A final approver is never a hierarchy approver. The draft's three duplicate approval roles (`STATIONING_UNIT_APPROVER`, `STATIONING_OPS_APPROVER`, `STATIONING_FINAL_APPROVER`) are removed; its other roles are published together with «تفعيل التمركز» (`STATIONING_ACTIVATOR`, the activation right had no role): role-policy version 3, published 16 Nov 2026 (nobody receives a role by publishing). «مدير صلاحيات الوحدة» may also give the three stationing request roles and «متابعة الموقف العملياتي».
+**Decision (owner: «MOVER-style roles»).** The MOVER-style roles drive the stationing path: «معتمد السلسلة الهرمية» signs hierarchy levels only, through the new action `APPROVE_HIERARCHY` (stationing stages `HIERARCHY` and `CROSS_BRANCH`; OpenFGA relations generated, `docs/authz/model.fga` regenerated); «معتمد عمليات الوحدة» gains `DECIDE_UNIT_OPERATIONS`; «المعتمد النهائي» gains `FINAL_APPROVE_STATIONING`. A final approver is never a hierarchy approver. The draft's three duplicate approval roles (`CHAIN_APPROVER`, `UNIT_OPERATIONS_APPROVER`, `FINAL_APPROVER`) are removed; its other roles are published together with «تفعيل التمركز» (`STATIONING_ACTIVATOR`, the activation right had no role): role-policy version 3, published 16 Nov 2026 (nobody receives a role by publishing). «مدير صلاحيات الوحدة» may also give the three stationing request roles and «متابعة الموقف العملياتي».
 
 **Same day, smaller.** «＋ موقع داخل «المعسكر»» on the chosen camp (row and card) opens «موقع جديد» with «يقع داخل» it and the map on it; a double click finishes a free drawing (the two clicks of a double click no longer add a near-duplicate corner); one shared units tree on every page (`components/tree/UnitTree.tsx`); the empty unit-symbol label no longer wraps word by word.
 
@@ -2253,7 +2253,7 @@ for narrow steep ground: `docs/evidence/terrain-3d/slope-inside/README.md`.
 8. «إنشاء طلبات التمركز» holds VIEW, CREATE_RESTATIONING and REQUEST_SITE_REGISTRATION.
 Addition: the stationing requester is displayed «مقدم الطلب»; MOVER's facilities roles («مقدم الطلب» REQUESTER, «مراجع المرافق», «مدير الجهة», «صاحب الاعتماد», «اطلاع محدود») and the partial duplicates («إنشاء طلب منطقة انتشار», «طلب اعتماد موقع», «ربط الوحدات بالمواقع») are emptied, renamed so they cannot be confused, their grants ended with a recorded reason, no longer offered; the access-workspace matrix shows only unit roles that give something, in the owner's order, never «مدير النظام», «مدقق السجلات» or «تهيئة المواقع والتمركز»; empty roles leave the other role pickers too.
 
-**Actions (`Permission`).** Removed: `CREATE_INITIAL_STATIONING`, `CREATE_DEPLOYMENT_REQUEST`, `APPROVE_DEPLOYMENT_DISTANCE_EXCEPTION`, `DECIDE_PRE_ACTIVATION_CANCELLATION`, `ACTIVATE_TEMPORARY_EXTENSION`, `DECIDE_EARLY_RETURN`, `DECIDE_BEFORE_START_CANCELLATION` (25 actions remain; the OpenFGA model is generated from the list, so its 119 relations of those seven go with them — `docs/authz/model.fga` regenerated, `AuthorizationIT` compares it with the generator). `Permission.RETIRED` names each removed action and what replaced it (only `CREATE_DEPLOYMENT_REQUEST` → `CREATE_RESTATIONING`); `Permission.parse` and `Permission.current` read stored names without ever failing. `STAGE_DECISIONS` keeps approve, recommend, hierarchy, unit operations, final, FYI and activation.
+**Actions (`Permission`).** Removed: «(صلاحية مُلغاة)», `CREATE_RESTATIONING`, «(صلاحية مُلغاة — يقررها المعتمد النهائي)», «(صلاحية مُلغاة)», «(صلاحية مُلغاة — يُفعَّل بتفعيل التمركز)», «(صلاحية مُلغاة)», «(صلاحية مُلغاة)» (25 actions remain; the OpenFGA model is generated from the list, so its 119 relations of those seven go with them — `docs/authz/model.fga` regenerated, `AuthorizationIT` compares it with the generator). `Permission.RETIRED` names each removed action and what replaced it (only `CREATE_RESTATIONING` → `CREATE_RESTATIONING`); `Permission.parse` and `Permission.current` read stored names without ever failing. `STAGE_DECISIONS` keeps approve, recommend, hierarchy, unit operations, final, FYI and activation.
 
 **Requests.**
 - `POST /restationing-requests` with purpose `INITIAL_STATIONING` is refused for everyone (400, «طلب التمركز الأولي أُلغي بقرار المالك: يُسجَّل التمركز الأولي للوحدة مع موقعها من «تهيئة المواقع».»); an old one is still read, checked and cancelled, never edited or sent again (`can.edit`/`can.submit` false). `GET /request-hub/units/{id}/sites` (its site picker) is removed. «طلب جديد» offers re-stationing, deployment areas and site registration; a unit stationed nowhere reads «لا تمركز حالي للوحدة؛ يُسجَّل تمركزها الأولي من «تهيئة المواقع».». «مسار الموافقات» sets a path for those three types.
@@ -2266,7 +2266,7 @@ Addition: the stationing requester is displayed «مقدم الطلب»; MOVER's
 **A new installation.** Bootstrap seeds «مدير النظام» and «مدقق السجلات», and MOVER's five facilities roles emptied with their new names. `tmrkz.access.legacy-facility-roles` (`TMRKZ_LEGACY_FACILITY_ROLES`, default false) seeds them with their old actions instead: set for the backend tests, which still exercise MOVER's facilities reservation engine with them, and the fictional acceptance environment (`ops/test-env/compose.data.yml`). It changes nothing on a database that already has the roles.
 
 **An existing installation (V49, `V49__stationing_permissions_simplified.sql`).** One transaction; on a new database every statement finds nothing.
-1. Every role (`role_def`): the removed actions dropped, `CREATE_DEPLOYMENT_REQUEST` turned into `CREATE_RESTATIONING` (so a role the administrator built keeps the deployment request); the role-specific definitions above; the eight roles emptied and renamed; grantable lists without them, «مقدم الطلب» in the facilities requester's place.
+1. Every role (`role_def`): the removed actions dropped, `CREATE_RESTATIONING` turned into `CREATE_RESTATIONING` (so a role the administrator built keeps the deployment request); the role-specific definitions above; the eight roles emptied and renamed; grantable lists without them, «مقدم الطلب» in the facilities requester's place.
 2. Their grants end with «أُفرغ الدور بقرار المالك (ADR-078، ترحيل V49)…»: memberships (`valid_to`, `ended_reason`), the delegations of those memberships (`revoked_at`, `revoke_reason`), unit grants and duty permits (their `ended_by` must name a person, so it is the one who gave them, and the reason says the migration ended them), position seats made inactive.
 3. Offers: «مقدم الطلب» takes the facilities requester's audience if it had none; the eight roles are no longer offered.
 4. When a policy version is published and a role changed: a new PUBLISHED version holding the roles now in force («تبسيط صلاحيات التمركز وتقليص الأدوار بقرار المالك (ADR-078، ترحيل V49)», based on the one it supersedes, no publisher — as version 1), the previous one SUPERSEDED, `role_def.policy_version` set; an open draft keeps its place after it (renumbered, based on it) and its roles get the same changes, so its impact keeps comparing like with like. Published versions are immutable and keep the names they were published with.
@@ -2639,3 +2639,68 @@ matched when HR answers; the toggle off refuses as before), OD-04 (the preview w
 and states six units, four main units, a duplicate and an orphan; the status states source against local; the person
 refresh period saved as 0; `/system/state` and `/me/hr-refresh` answer); `HrSyncAcceptanceIT`, `HrLinkedPeopleIT`, `DirectorySignInIT`,
 `EnterpriseSignInIT`, `AccessAcceptanceIT`, `UnitMemberIT`, `EmploymentContextIT` unchanged; frontend `homeEmpty.test.ts`.
+
+
+## ADR-095 Activation is part of final approval; FYI is a per-unit configuration; the matrix drops to eight roles (owner, 21 Nov 2026)
+
+**Decision.** The owner's correction on 21 Nov 2026 removes two moving parts from the stationing lifecycle and replaces
+«تحديد وحدات العلم» as a per-request human action with «تحديد وحدات العلم» as a per-unit configuration under the owning
+unit's access manager. The administrative matrix now exposes EIGHT canonical roles — not ten:
+
+1. مقدم الطلب (STATIONING_REQUESTER)
+2. معتمد السلسلة الهرمية (CHAIN_APPROVER)
+3. معتمد عمليات الوحدة (UNIT_OPERATIONS_APPROVER)
+4. المعتمد النهائي (FINAL_APPROVER)
+5. للعلم (FYI_RECEIVER)
+6. متابعة الموقف العملياتي (POSTURE_VIEWER)
+7. مدير صلاحيات الوحدة (UNIT_ACCESS_MANAGER)
+8. معتمد طلبات الصلاحية (ACCESS_FINAL_APPROVER)
+
+FYI_DISTRIBUTOR and STATIONING_ACTIVATOR are DELETED outright. The permissions they used to carry
+(MANAGE_FYI_DISTRIBUTION, ACTIVATE_STATIONING) are REMOVED from the application and pruned from every
+stored access_policy_version so a restore cannot bring either back.
+
+**Why.** The two deleted roles never surfaced a decision anyone could refuse: the activator could not decline a
+finally-approved request without breaking the owner's rule that approval is the gate; the FYI distributor merely picked
+recipients from a list anyone with access could enumerate from the organisation tree. Collapsing both into the natural
+places they belong (final approval and unit configuration) removes an entire step from the operator's day without
+losing audit shape — every former event still writes the same `RESTATIONING_ACTIVATED` and `RESTATIONING_FYI_DISTRIBUTED`
+audits, just carried by the final approver's transaction rather than a separate human action.
+
+**How it works now.**
+
+- *Final approval → activation.* The final approver's APPROVE on the last stage triggers the same server checks that a
+  standalone activation used to apply — hierarchy drift refusal, geography re-check, atomic conflict prevention — and
+  records the activated stationing INSIDE THE SAME TRANSACTION. The request moves from UNDER_REVIEW directly to
+  ACTIVATED_PERMANENT (or TEMPORARY_SCHEDULED / ACTIVE_TEMPORARY for a temporary purpose) without ever surfacing
+  APPROVED_NOT_ACTIVATED to any UI. An approved extension's activation runs the same way inside the final approver's
+  transaction (D10).
+- *FYI → unit configuration.* A new table `unit_fyi_target(owning_unit_id, target_unit_id, include_descendants)` holds
+  the FYI recipients per owning unit, maintained by the unit's access manager («مدير صلاحيات الوحدة») through the access
+  workspace. After activation the service reads this list, expands `include_descendants` to the subtree, writes the
+  `restationing_fyi` rows and notifies the recipients — all inside the same transaction. The notification shape and the
+  `RESTATIONING_FYI_DISTRIBUTED` audit are unchanged; only the trigger and the chooser moved.
+
+**Separation of duties.** Final approval still obeys SOD against the hierarchy stages and the requester, as before. The
+previous D1 rule — «the final approver cannot activate» — is retired by construction: activation is the final approver's
+own act. The requester is excluded from activating by the same flow.
+
+**Data changes (V62 migration).** The migration ENDS every live grant pointing at FYI_DISTRIBUTOR or STATIONING_ACTIVATOR,
+strips MANAGE_FYI_DISTRIBUTION and ACTIVATE_STATIONING from every remaining role's permissions and from every stored
+access_policy_version, DELETES the two role_def rows, creates `unit_fyi_target`, and writes one audit event naming
+everything removed. An `authz_change` notice makes every holder's decisions be reconsidered on the next request.
+
+**API compatibility.** `POST /restationing-requests/{id}/activate` is retained as an idempotent no-op: a client that
+still calls it after a final approval receives the request's current view without side effects. The three FYI endpoints
+(`GET /fyi-options`, `POST /fyi`, `POST /fyi/{unit}/end`) are REMOVED: the configuration lives under the unit, not the
+request.
+
+**Not changed.** The eight canonical roles' columns stay in the same order the owner approved. The approval chain
+climbs the hierarchy as before. The posture read model, the map workspace, the access workspace («إدارة الصلاحيات
+والوحدات»), the audit trail and the sign-in paths are unchanged.
+
+**Tests.** `MatrixColumnsIT` is updated to the EIGHT-role invariant and BANNED now includes FYI_DISTRIBUTOR and
+STATIONING_ACTIVATOR. `RestationingTestBase.approvedPermanent` asserts `ACTIVATED_PERMANENT` directly after the final
+APPROVE. The remaining stationing ITs (`RestationingWorkflowIT`, `RestationingLifecycleIT`, `RestationingHrSyncIT`,
+`StationingNextIT`) still carry the pre-ADR-095 two-step assertions and are being migrated as part of this change
+(tracked in STATUS.md).

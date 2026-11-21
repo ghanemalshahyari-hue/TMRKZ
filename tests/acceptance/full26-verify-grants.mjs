@@ -12,8 +12,8 @@ const U = (n) => `${B} · ${n}`;
 const OTHER = 'وحدة إضافية 3';
 // persona, action, unit inside, unit outside
 const CHECKS = [
-  [1, 'CREATE_INITIAL_STATIONING', U('م10-1'), U('م10-2')],
-  [1, 'CREATE_INITIAL_STATIONING', U('م10-3'), U('م9-1')],
+  [1, 'CREATE_RESTATIONING', U('م10-1'), U('م10-2')],
+  [1, 'CREATE_RESTATIONING', U('م10-3'), U('م9-1')],
   [2, 'APPROVE_HIERARCHY', U('م9-3'), U('م8-5')],
   [2, 'APPROVE_HIERARCHY', U('م9-1'), U('م9-4')],
   [3, 'DECIDE_UNIT_OPERATIONS', U('م10-1'), OTHER],

@@ -239,10 +239,8 @@ public class StationingRoutes {
                 }
                 stages.add(m);
             }
-            if (Boolean.TRUE.equals(in.stages().fyiBeforeActivation())) {
-                out.put("fyiHolders", holders("MANAGE_FYI_DISTRIBUTION", ids));
-            }
-            out.put("activators", holders("ACTIVATE_STATIONING", ids));
+            // ADR-095: no separate «توزيع للعلم» human step and no separate activator. The units informed are read from
+            // the requesting unit's configured FYI target list; activation is part of the final approver's decision.
         }
         out.put("stages", stages);
         out.put("complete", complete);

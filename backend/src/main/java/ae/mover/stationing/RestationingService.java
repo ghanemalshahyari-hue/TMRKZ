@@ -628,7 +628,17 @@ public class RestationingService {
                        version = version + 1 where id = :id""")
                 .param("fa", last).param("now", Db.ts(now)).param("id", id).update();
         audit.recordAs(ctx.actor(), "RESTATIONING_FINAL_APPROVAL", "RESTATIONING_REQUEST", id.toString(), number,
-                Map.of("finalApprover", last == null ? "" : last.toString(), "awaiting", "تفعيل مستقل"), null);
+                Map.of("finalApprover", last == null ? "" : last.toString(), "nextStep", "تفعيل مباشر ضمن الاعتماد (ADR-095)"), null);
+        // Owner, 21 Nov 2026 (ADR-095): activation is part of final approval — no separate human «مفعل التمركز». Inside this
+        // same transaction the server runs the same checks a standalone activation used to apply (every unit visible,
+        // geography re-check, atomic conflict prevention) and records the activated stationing. The units informed afterwards
+        // are read from the requesting unit's configured FYI target list, not from a per-request human choice.
+        Req r = lock(id);
+        if (r.extension()) {
+            applyApprovedExtensionDecision(ctx, r, now);
+        } else {
+            applyApprovedDecision(ctx, r, now);
+        }
     }
 
     // ---- hierarchy drift ------------------------------------------------------------------------------------
@@ -680,110 +690,118 @@ public class RestationingService {
 
     // ---- activation -----------------------------------------------------------------------------------------
 
+    /**
+     * Owner, 21 Nov 2026 (ADR-095): activation is part of final approval. This endpoint is kept as an idempotent no-op so a
+     * client that still calls it (or retries a final approval) receives the same request back without side effects. It never
+     * progresses a request on its own — the state transition happens in {@link #settle}.
+     */
     public void activate(AccessContext ctx, UUID id, ReasonInput in, Instant now) {
-        if (pauseIfDrifted(id, now)) {
-            throw ApiException.validation(HierarchyDrift.MESSAGE + " — التفعيل ممنوع حتى إعادة التأكيد وإعادة الاعتماد.");
+        Req r = load(id).orElseThrow(ApiException::notFound);
+        requireVisible(ctx, r);
+        if ("APPROVED_NOT_ACTIVATED".equals(r.state())) {
+            throw ApiException.validation("التفعيل يتم تلقائياً مع الاعتماد النهائي (ADR-095)؛ أعد تحميل الطلب.");
         }
-        if (load(id).map(Req::extension).orElse(false)) {
-            activateExtension(ctx, id, in, now);
+    }
+
+    /**
+     * ADR-095 D1: the final-approval body for a non-extension request. Invoked inside {@link #settle} in the same transaction
+     * as the final approver's decision and never exposed as its own endpoint — no separation-of-duties guard, no FYI gate.
+     * The units informed are read afterwards from the organisation-wide {@code fyi_designation} table (ADR-095 B2, matches
+     * MOVER's «الجهات الرئيسية للعلم»).
+     */
+    void applyApprovedDecision(AccessContext ctx, Req r, Instant now) {
+        UUID id = r.id();
+        Optional<String> refusal = HierarchyDrift.activationRefusal(RestationingState.valueOf(r.state()), r.snapshot(), hierarchy);
+        if (refusal.isPresent()) {
+            throw ApiException.validation(refusal.get());
+        }
+        RestationingContent c = r.content();
+        // atomic conflict prevention: activations are serialised and the geography is checked again now
+        jdbc.sql("select pg_advisory_xact_lock(hashtext('tmrkz.restationing.activation'))").query().singleRow();
+        if (!RestationingChecks.RESTATIONING.equals(r.purpose())) {
+            activatePurpose(ctx, r, null, now);
+            autoFyi(ctx, r, now);
             return;
         }
-        tx.executeWithoutResult(s -> {
-            Req r = lock(id);
-            requireVisible(ctx, r);
-            Optional<String> refusal = HierarchyDrift.activationRefusal(RestationingState.valueOf(r.state()), r.snapshot(), hierarchy);
-            if (refusal.isPresent()) {
-                throw ApiException.validation(refusal.get());
-            }
-            RestationingContent c = r.content();
-            requireActivator(ctx, r, Permission.ACTIVATE_STATIONING, "التفعيل يحتاج صلاحية «تفعيل التمركز» على كل الوحدات المنتقلة.");
-            if (fyiPending(r)) {
-                throw ApiException.validation("حدد وحدات العلم أولاً: تشترط السياسة تسجيلها قبل التفعيل.");
-            }
-            // atomic conflict prevention: activations are serialised and the geography is checked again now
-            jdbc.sql("select pg_advisory_xact_lock(hashtext('tmrkz.restationing.activation'))").query().singleRow();
-            if (!RestationingChecks.RESTATIONING.equals(r.purpose())) {
-                activatePurpose(ctx, r, in, now);
-                return;
-            }
-            String siteGeo = json.write(c.site().geometry());
-            List<String> taken = new ArrayList<>(checks.occupiedIntersecting(siteGeo, c.scope(), now));
-            for (Map<String, Object> area : areas(c)) {
-                taken.addAll(checks.occupiedIntersecting(json.write(area), c.scope(), now));
-            }
-            if (!taken.isEmpty()) {
-                throw ApiException.validation("تغيّر إشغال الأرض منذ الاعتماد: " + String.join("، ", new java.util.LinkedHashSet<>(taken))
-                        + " — لا يُفعّل الطلب.");
-            }
-            Instant from = c.temporary() && c.start().isAfter(now) ? c.start() : now;
-            if (c.temporary() && !c.end().isAfter(from)) {
-                throw ApiException.validation("انتهت مدة التمركز المؤقت قبل التفعيل.");
-            }
-            UUID site = registerSite(ctx, r, siteGeo, now);
-            String sourceVersion = "policy-" + r.policyVersion() + "/rev-" + revisions(id);
-            String ref = "restationing:" + r.number();
-            Map<UUID, UUID> records = new LinkedHashMap<>();
-            try {
-                for (UUID unit : c.scope()) {
-                    UUID record = UUID.randomUUID();
-                    records.put(unit, record);
-                    if (c.temporary()) {
-                        UUID base = checks.permanentSite(unit, now);
-                        if (base == null) {
-                            throw ApiException.validation("لا تمركز دائم حالياً لإحدى الوحدات؛ لا يُحفظ أصل للمؤقت.");
-                        }
-                        jdbc.sql("""
-                                insert into org_stationing(id, organization_id, site_id, kind, base_id, valid_from, planned_end, origin,
-                                                           request_id, reason, reference, recorded_by, recorded_at)
-                                values (:id, :org, :site, 'TEMPORARY', :base, :from, :end, 'REQUEST', :req, :reason, :ref, :by, :now)""")
-                                .param("id", record).param("org", unit).param("site", site).param("base", base)
-                                .param("from", Db.ts(from)).param("end", Db.ts(c.end())).param("req", id).param("reason", c.reason().trim())
-                                .param("ref", r.number()).param("by", ctx.personId()).param("now", Db.ts(now)).update();
-                        outbox.enqueue(from.isAfter(now) ? StationingEvent.Type.TEMPORARY_STATIONING_SCHEDULED
-                                : StationingEvent.Type.TEMPORARY_STATIONING_STARTED, unit, site, from, now, sourceVersion, ref);
-                    } else {
-                        retireUnitAreas(unit, now);
-                        jdbc.sql("""
-                                update org_stationing set valid_to = :now, end_reason = 'SUPERSEDED', ended_by = :by, ended_at = :now
-                                 where organization_id = :org and valid_to is null and valid_from <= :now""")
-                                .param("now", Db.ts(now)).param("by", ctx.personId()).param("org", unit).update();
-                        // a temporary scheduled for later never starts after a permanent move
-                        jdbc.sql("""
-                                update org_stationing set valid_to = valid_from, end_reason = 'CANCELLED', ended_by = :by, ended_at = :now
-                                 where organization_id = :org and valid_to is null and valid_from > :now""")
-                                .param("now", Db.ts(now)).param("by", ctx.personId()).param("org", unit).update();
-                        jdbc.sql("""
-                                insert into org_stationing(id, organization_id, site_id, kind, valid_from, origin, request_id, reason,
-                                                           reference, recorded_by, recorded_at)
-                                values (:id, :org, :site, 'PERMANENT', :now, 'REQUEST', :req, :reason, :ref, :by, :now)""")
-                                .param("id", record).param("org", unit).param("site", site).param("now", Db.ts(now))
-                                .param("req", id).param("reason", c.reason().trim()).param("ref", r.number()).param("by", ctx.personId())
-                                .update();
-                        outbox.enqueue(StationingEvent.Type.STATIONING_ACTIVATED, unit, site, now, now, sourceVersion, ref);
+        String siteGeo = json.write(c.site().geometry());
+        List<String> taken = new ArrayList<>(checks.occupiedIntersecting(siteGeo, c.scope(), now));
+        for (Map<String, Object> area : areas(c)) {
+            taken.addAll(checks.occupiedIntersecting(json.write(area), c.scope(), now));
+        }
+        if (!taken.isEmpty()) {
+            throw ApiException.validation("تغيّر إشغال الأرض منذ الاعتماد: " + String.join("، ", new java.util.LinkedHashSet<>(taken))
+                    + " — لا يُفعّل الطلب.");
+        }
+        Instant from = c.temporary() && c.start().isAfter(now) ? c.start() : now;
+        if (c.temporary() && !c.end().isAfter(from)) {
+            throw ApiException.validation("انتهت مدة التمركز المؤقت قبل التفعيل.");
+        }
+        UUID site = registerSite(ctx, r, siteGeo, now);
+        String sourceVersion = "policy-" + r.policyVersion() + "/rev-" + revisions(id);
+        String ref = "restationing:" + r.number();
+        Map<UUID, UUID> records = new LinkedHashMap<>();
+        try {
+            for (UUID unit : c.scope()) {
+                UUID record = UUID.randomUUID();
+                records.put(unit, record);
+                if (c.temporary()) {
+                    UUID base = checks.permanentSite(unit, now);
+                    if (base == null) {
+                        throw ApiException.validation("لا تمركز دائم حالياً لإحدى الوحدات؛ لا يُحفظ أصل للمؤقت.");
                     }
+                    jdbc.sql("""
+                            insert into org_stationing(id, organization_id, site_id, kind, base_id, valid_from, planned_end, origin,
+                                                       request_id, reason, reference, recorded_by, recorded_at)
+                            values (:id, :org, :site, 'TEMPORARY', :base, :from, :end, 'REQUEST', :req, :reason, :ref, :by, :now)""")
+                            .param("id", record).param("org", unit).param("site", site).param("base", base)
+                            .param("from", Db.ts(from)).param("end", Db.ts(c.end())).param("req", id).param("reason", c.reason().trim())
+                            .param("ref", r.number()).param("by", ctx.personId()).param("now", Db.ts(now)).update();
+                    outbox.enqueue(from.isAfter(now) ? StationingEvent.Type.TEMPORARY_STATIONING_SCHEDULED
+                            : StationingEvent.Type.TEMPORARY_STATIONING_STARTED, unit, site, from, now, sourceVersion, ref);
+                } else {
+                    retireUnitAreas(unit, now);
+                    jdbc.sql("""
+                            update org_stationing set valid_to = :now, end_reason = 'SUPERSEDED', ended_by = :by, ended_at = :now
+                             where organization_id = :org and valid_to is null and valid_from <= :now""")
+                            .param("now", Db.ts(now)).param("by", ctx.personId()).param("org", unit).update();
+                    // a temporary scheduled for later never starts after a permanent move
+                    jdbc.sql("""
+                            update org_stationing set valid_to = valid_from, end_reason = 'CANCELLED', ended_by = :by, ended_at = :now
+                             where organization_id = :org and valid_to is null and valid_from > :now""")
+                            .param("now", Db.ts(now)).param("by", ctx.personId()).param("org", unit).update();
+                    jdbc.sql("""
+                            insert into org_stationing(id, organization_id, site_id, kind, valid_from, origin, request_id, reason,
+                                                       reference, recorded_by, recorded_at)
+                            values (:id, :org, :site, 'PERMANENT', :now, 'REQUEST', :req, :reason, :ref, :by, :now)""")
+                            .param("id", record).param("org", unit).param("site", site).param("now", Db.ts(now))
+                            .param("req", id).param("reason", c.reason().trim()).param("ref", r.number()).param("by", ctx.personId())
+                            .update();
+                    outbox.enqueue(StationingEvent.Type.STATIONING_ACTIVATED, unit, site, now, now, sourceVersion, ref);
                 }
-            } catch (DataAccessException e) {
-                if (Db.isExclusionViolation(e)) {
-                    throw ApiException.validation("يتداخل التفعيل مع تمركز مسجل لإحدى الوحدات في الفترة نفسها.");
-                }
-                throw e;
             }
-            records.forEach((unit, record) -> insertAreas(r, unit, record, site, from));
-            String state = !c.temporary() ? "ACTIVATED_PERMANENT" : from.isAfter(now) ? "TEMPORARY_SCHEDULED" : "ACTIVE_TEMPORARY";
-            jdbc.sql("""
-                    update restationing_request set state = :st, activated_by = :by, activated_at = :now, site_id = :site, updated_at = :now,
-                           version = version + 1 where id = :id""")
-                    .param("st", state).param("by", ctx.personId()).param("now", Db.ts(now)).param("site", site).param("id", id).update();
-            Map<String, Object> detail = new LinkedHashMap<>();
-            detail.put("state", state);
-            detail.put("siteId", site.toString());
-            detail.put("units", c.scope().size());
-            detail.put("from", from.toString());
-            detail.put("siteLinks", "لم تتغير روابط المواقع ولا المسؤولية عن المرافق (O-14)");
-            audit.recordAs(ctx.actor(), "RESTATIONING_ACTIVATED", "RESTATIONING_REQUEST", id.toString(), r.number(), detail,
-                    in == null ? null : in.reason());
-            placeInfo.noticeStationed(c.scope(), site, r.number()); // for information: who is now here, and their main unit (ADR-042)
-        });
+        } catch (DataAccessException e) {
+            if (Db.isExclusionViolation(e)) {
+                throw ApiException.validation("يتداخل التفعيل مع تمركز مسجل لإحدى الوحدات في الفترة نفسها.");
+            }
+            throw e;
+        }
+        Instant stationedFrom = from;
+        records.forEach((unit, record) -> insertAreas(r, unit, record, site, stationedFrom));
+        String state = !c.temporary() ? "ACTIVATED_PERMANENT" : from.isAfter(now) ? "TEMPORARY_SCHEDULED" : "ACTIVE_TEMPORARY";
+        jdbc.sql("""
+                update restationing_request set state = :st, activated_by = :by, activated_at = :now, site_id = :site, updated_at = :now,
+                       version = version + 1 where id = :id""")
+                .param("st", state).param("by", ctx.personId()).param("now", Db.ts(now)).param("site", site).param("id", id).update();
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("state", state);
+        detail.put("siteId", site.toString());
+        detail.put("units", c.scope().size());
+        detail.put("from", from.toString());
+        detail.put("siteLinks", "لم تتغير روابط المواقع ولا المسؤولية عن المرافق (O-14)");
+        detail.put("activation", "تلقائي ضمن الاعتماد النهائي (ADR-095)");
+        audit.recordAs(ctx.actor(), "RESTATIONING_ACTIVATED", "RESTATIONING_REQUEST", id.toString(), r.number(), detail, null);
+        placeInfo.noticeStationed(c.scope(), site, r.number()); // for information: who is now here, and their main unit (ADR-042)
+        autoFyi(ctx, r, now);
     }
 
     /** The deployment areas of a request for one unit, on that unit's stationing record (ADR-045): another unit's stay as they are. */
@@ -807,19 +825,6 @@ public class RestationingService {
                   from org_stationing s
                  where s.id = a.stationing_id and a.organization_id = :org and a.state = 'ACTIVE' and s.kind = 'PERMANENT'""")
                 .param("now", Db.ts(now)).param("org", unit).update();
-    }
-
-    /** Whether the policy version this request is pinned to wants FYI units chosen before activation, and they were not. */
-    boolean fyiPending(Req r) {
-        if (r.policyVersion() == null || !"APPROVED_NOT_ACTIVATED".equals(r.state()) || r.extension()) {
-            return false;
-        }
-        StationingRoutes.RouteRule path = pathOf(r);
-        var stages = path != null ? path.stages() : policies.byVersion(r.policyVersion()).map(v -> v.values().approvalStages()).orElse(null);
-        if (stages == null || !stages.fyiBeforeActivation()) {
-            return false;
-        }
-        return jdbc.sql("select count(*) from restationing_request where id = :id and fyi_done_at is null").param("id", r.id()).query(Long.class).single() > 0;
     }
 
     /**
@@ -900,100 +905,67 @@ public class RestationingService {
         audit.recordAs(ctx.actor(), action, "RESTATIONING_REQUEST", id.toString(), r.number(), detail, in == null ? null : in.reason());
     }
 
-    // ---- FYI distribution -------------------------------------------------------------------------------------
-
-    /** The units this holder may inform: what their right reaches, never the whole organisation by default. */
-    public List<Map<String, Object>> fyiOptions(AccessContext ctx, UUID id) {
-        Req r = load(id).orElseThrow(ApiException::notFound);
-        requireVisible(ctx, r);
-        if (!ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit())) {
-            throw ApiException.forbidden("تحديد وحدات العلم يحتاج صلاحيته للوحدة الطالبة.");
-        }
-        return unitTree(reach(ctx, Permission.MANAGE_FYI_DISTRIBUTION));
-    }
+    // ---- FYI distribution (ADR-095 unit configuration) ---------------------------------------------------------
 
     /**
-     * «تحديد وحدات العلم» after final approval. Not a vote: it opens this one request, read-only, to the people of the chosen
-     * units and tells them so. It writes no grant, and nobody gains a lasting right from it.
+     * Owner, 21 Nov 2026 (ADR-095 B2): the units informed after final approval are read from the organisation-wide
+     * {@code fyi_designation} table, which matches MOVER's «الجهات الرئيسية للعلم» shape: a flat list of
+     * {@code (unit_id, include_descendants)} pairs. The effective FYI set is the union of every row's unit plus
+     * (when {@code include_descendants} is true) its active descendant units at the moment of distribution.
+     * {@link #applyApprovedDecision} and {@link #applyApprovedExtensionDecision} call this inside the same transaction
+     * as the activation, so the recipients are written atomically with the stationing.
      */
-    public void distributeFyi(AccessContext ctx, UUID id, FyiInput in, Instant now) {
-        tx.executeWithoutResult(s -> {
-            Req r = lock(id);
-            requireVisible(ctx, r);
-            if (!ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit())) {
-                throw ApiException.forbidden("تحديد وحدات العلم يحتاج صلاحيته للوحدة الطالبة.");
-            }
-            if (!Set.of("APPROVED_NOT_ACTIVATED", "ACTIVATED_PERMANENT", "TEMPORARY_SCHEDULED", "ACTIVE_TEMPORARY").contains(r.state())) {
-                throw ApiException.validation("تُحدد وحدات العلم بعد الاعتماد النهائي.");
-            }
-            List<UUID> units = in == null || in.units() == null ? List.of() : in.units().stream().distinct().toList();
-            Set<UUID> allowed = reach(ctx, Permission.MANAGE_FYI_DISTRIBUTION);
-            if (!allowed.containsAll(units)) {
-                throw ApiException.forbidden("وحدة خارج نطاق صلاحيتك في توزيع العلم.");
-            }
-            for (UUID unit : units) {
-                jdbc.sql("""
-                        insert into restationing_fyi(request_id, organization_id, selected_by, selected_at)
-                        values (:r, :o, :by, :now)
-                        on conflict (request_id, organization_id) do update
-                           set selected_by = :by, selected_at = :now, ended_at = null, ended_by = null, end_reason = null
-                         where restationing_fyi.ended_at is not null""")
-                        .param("r", id).param("o", unit).param("by", ctx.personId()).param("now", Db.ts(now)).update();
-            }
-            String note = in == null || in.note() == null ? null : in.note().trim();
-            jdbc.sql("update restationing_request set fyi_done_at = :now, fyi_done_by = :by, fyi_note = :note, updated_at = :now, version = version + 1 where id = :id")
-                    .param("now", Db.ts(now)).param("by", ctx.personId()).param("note", note).param("id", id).update();
-            List<UUID> recipients = new ArrayList<>();
-            if (!units.isEmpty()) {
-                recipients = jdbc.sql("""
-                        select distinct a.person_id from (select person_id, organization_id from affiliation where valid_to is null union select person_id, organization_id from unit_member where ended_at is null) a where a.organization_id = any(string_to_array(:u, ',')::uuid[])""")
-                        .param("u", Db.ids(units)).query(UUID.class).list();
-                for (UUID person : recipients) {
-                    jdbc.sql("""
-                            insert into notification(id, person_id, kind, title, body, created_at)
-                            values (:id, :p, 'INFO_COPY', :t, :b, :now)""")
-                            .param("id", UUID.randomUUID()).param("p", person).param("t", "للعلم: الطلب " + r.number())
-                            .param("b", "#restationing/" + id + (note == null || note.isBlank() ? "" : " — " + note)).param("now", Db.ts(now)).update();
-                }
-            }
-            Map<String, Object> detail = new LinkedHashMap<>();
-            detail.put("units", units.stream().map(UUID::toString).toList());
-            detail.put("recipients", recipients.stream().map(UUID::toString).toList());
-            detail.put("access", "قراءة هذا الطلب فقط");
-            detail.put("purpose", r.purpose());
-            audit.recordAs(ctx.actor(), "RESTATIONING_FYI_DISTRIBUTED", "RESTATIONING_REQUEST", id.toString(), r.number(), detail, note);
-        });
-    }
-
-    /**
-     * Ends one unit's read access to this one request, with a reason (ADR-045). The record stays, and choosing the unit again
-     * opens it again. Nothing else the people of that unit hold changes.
-     */
-    public void endFyi(AccessContext ctx, UUID id, UUID unit, ReasonInput in, Instant now) {
-        String reason = in == null || in.reason() == null ? "" : in.reason().trim();
-        if (reason.length() < 5) {
-            throw ApiException.validation("اكتب سبب إنهاء الاطلاع (5 أحرف على الأقل).");
+    void autoFyi(AccessContext ctx, Req r, Instant now) {
+        List<UUID> units = jdbc.sql("""
+                with recursive descendants as (
+                  select d.unit_id as uid, d.include_descendants, d.unit_id as source from fyi_designation d
+                  union all
+                  select o.id as uid, true, dd.source
+                    from organization o join descendants dd on o.parent_id = dd.uid
+                   where dd.include_descendants = true and o.status = 'ACTIVE')
+                select distinct uid from descendants""")
+                .query(UUID.class).list();
+        if (units.isEmpty()) {
+            jdbc.sql("""
+                    update restationing_request set fyi_done_at = :now, fyi_done_by = :by, fyi_note = :note,
+                           updated_at = :now, version = version + 1 where id = :id""")
+                    .param("now", Db.ts(now)).param("by", ctx.personId())
+                    .param("note", "لا وحدات علم مهيأة للوحدة الطالبة (ADR-095).").param("id", r.id()).update();
+            return;
         }
-        tx.executeWithoutResult(s -> {
-            Req r = lock(id);
-            requireVisible(ctx, r);
-            if (!ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit()) || !reach(ctx, Permission.MANAGE_FYI_DISTRIBUTION).contains(unit)) {
-                throw ApiException.forbidden("إنهاء الاطلاع يحتاج صلاحية توزيع العلم لهذه الوحدة.");
-            }
-            int n = jdbc.sql("""
-                    update restationing_fyi set ended_at = :now, ended_by = :by, end_reason = :why
-                     where request_id = :r and organization_id = :o and ended_at is null""")
-                    .param("now", Db.ts(now)).param("by", ctx.personId()).param("why", reason).param("r", id).param("o", unit).update();
-            if (n == 0) {
-                throw ApiException.notFound();
-            }
-            List<String> recipients = jdbc.sql("select distinct a.person_id::text from (select person_id, organization_id from affiliation where valid_to is null union select person_id, organization_id from unit_member where ended_at is null) a where a.organization_id = :o")
-                    .param("o", unit).query(String.class).list();
-            Map<String, Object> detail = new LinkedHashMap<>();
-            detail.put("unit", unit.toString());
-            detail.put("recipients", recipients);
-            audit.recordAs(ctx.actor(), "RESTATIONING_FYI_ACCESS_ENDED", "RESTATIONING_REQUEST", id.toString(), r.number(), detail, reason);
-        });
+        for (UUID unit : units) {
+            jdbc.sql("""
+                    insert into restationing_fyi(request_id, organization_id, selected_by, selected_at)
+                    values (:r, :o, :by, :now)
+                    on conflict (request_id, organization_id) do update
+                       set selected_by = :by, selected_at = :now, ended_at = null, ended_by = null, end_reason = null
+                     where restationing_fyi.ended_at is not null""")
+                    .param("r", r.id()).param("o", unit).param("by", ctx.personId()).param("now", Db.ts(now)).update();
+        }
+        List<UUID> recipients = jdbc.sql("""
+                select distinct a.person_id from (select person_id, organization_id from affiliation where valid_to is null
+                  union select person_id, organization_id from unit_member where ended_at is null) a
+                 where a.organization_id = any(string_to_array(:u, ',')::uuid[])""")
+                .param("u", Db.ids(units)).query(UUID.class).list();
+        for (UUID person : recipients) {
+            jdbc.sql("""
+                    insert into notification(id, person_id, kind, title, body, created_at)
+                    values (:id, :p, 'INFO_COPY', :t, :b, :now)""")
+                    .param("id", UUID.randomUUID()).param("p", person).param("t", "للعلم: الطلب " + r.number())
+                    .param("b", "#restationing/" + r.id()).param("now", Db.ts(now)).update();
+        }
+        jdbc.sql("""
+                update restationing_request set fyi_done_at = :now, fyi_done_by = :by, fyi_note = :note,
+                       updated_at = :now, version = version + 1 where id = :id""")
+                .param("now", Db.ts(now)).param("by", ctx.personId())
+                .param("note", "موزّع تلقائياً من وحدات العلم المهيأة للوحدة الطالبة (ADR-095).").param("id", r.id()).update();
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("units", units.stream().map(UUID::toString).toList());
+        detail.put("recipients", recipients.stream().map(UUID::toString).toList());
+        detail.put("access", "قراءة هذا الطلب فقط");
+        detail.put("purpose", r.purpose());
+        detail.put("source", "unit_fyi_target configuration (ADR-095)");
+        audit.recordAs(ctx.actor(), "RESTATIONING_FYI_DISTRIBUTED", "RESTATIONING_REQUEST", r.id().toString(), r.number(), detail, null);
     }
 
     /**
@@ -1010,85 +982,55 @@ public class RestationingService {
                 .param("r", request).param("p", ctx.personId()).query(Long.class).single() > 0);
     }
 
-    /** D1/D10: neither the requester nor the final approver activates, and the activator's right covers every unit. */
-    private void requireActivator(AccessContext ctx, Req r, Permission p, String missing) {
-        Set<UUID> actor = humans(ctx.personId());
-        Set<UUID> requester = requesters(r);
-        Set<UUID> finalApprover = r.finalApprover() == null ? Set.of() : humans(r.finalApprover());
-        if (intersects(actor, requester)) {
-            throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES, "مقدم الطلب لا يفعّل طلبه.", Map.of());
-        }
-        if (intersects(actor, finalApprover)) {
-            throw new ApiException(ErrorCode.SEPARATION_OF_DUTIES, "صاحب الاعتماد النهائي لا يفعّل (D1).", Map.of());
-        }
-        Set<UUID> excluded = new HashSet<>(requester);
-        excluded.addAll(finalApprover);
-        Map<UUID, UUID> delegators = delegators(ctx);
-        for (UUID unit : r.content().scope()) {
-            boolean held = ctx.grants().stream().anyMatch(g -> g.has(p) && g.actsFor(unit)
-                    && (g.delegationId() == null || !excluded.contains(delegators.get(g.delegationId()))));
-            if (!held || !ctx.canFor(p, unit)) {
-                throw ApiException.forbidden(missing);
-            }
-        }
-    }
-
     /**
-     * D10: an approved extension opens the following validity period of its temporary stationing. The open temporary
-     * record ends at the current effective end (SUPERSEDED) and a following record runs to the new end; no earlier date
-     * is edited. Activated apart, with the activation right (ACTIVATE_STATIONING, ADR-078), never by the extension's requester or
-     * final approver.
+     * D10 (ADR-095): an approved extension opens the following validity period of its temporary stationing within the same
+     * transaction as the final approval. The open temporary record ends at the current effective end (SUPERSEDED) and a
+     * following record runs to the new end; no earlier date is edited. No separate activator and no FYI gate since ADR-095.
      */
-    private void activateExtension(AccessContext ctx, UUID id, ReasonInput in, Instant now) {
-        tx.executeWithoutResult(s -> {
-            Req e = lock(id);
-            requireVisible(ctx, e);
-            if (!"APPROVED_NOT_ACTIVATED".equals(e.state())) {
-                throw ApiException.validation("التفعيل بعد الاعتماد النهائي فقط");
-            }
-            Req parent = lock(e.parentId());
-            Instant end = effectiveEnd(parent.id());
-            if (!Set.of("TEMPORARY_SCHEDULED", "ACTIVE_TEMPORARY").contains(parent.state()) || end == null || !end.isAfter(now)) {
-                throw ApiException.validation("التمركز المؤقت " + parent.number() + " لم يعد مجدولاً أو نافذاً؛ لا يُفعَّل التمديد.");
-            }
-            if (!e.content().end().isAfter(end)) {
-                throw ApiException.validation("نهاية التمديد ليست بعد النهاية الفعالة الحالية.");
-            }
-            requireActivator(ctx, e, Permission.ACTIVATE_STATIONING, "تفعيل التمديد يحتاج صلاحية «تفعيل التمركز» على كل الوحدات.");
-            String ref = "restationing:" + e.number();
-            List<Map<String, Object>> open = jdbc.sql("""
-                    update org_stationing set valid_to = planned_end, end_reason = 'SUPERSEDED', ended_by = :by, ended_at = :now
-                     where request_id = any(string_to_array(:chain, ',')::uuid[]) and kind = 'TEMPORARY' and valid_to is null
-                    returning id, organization_id, site_id, base_id, planned_end""")
-                    .param("by", ctx.personId()).param("now", Db.ts(now)).param("chain", Db.ids(chain(parent.id()))).query().listOfRows();
-            for (Map<String, Object> o : open) {
-                Instant from = Db.toInstant(o.get("planned_end"));
-                UUID following = UUID.randomUUID();
-                jdbc.sql("""
-                        insert into org_stationing(id, organization_id, site_id, kind, base_id, valid_from, planned_end, origin,
-                                                   request_id, reason, reference, recorded_by, recorded_at)
-                        values (:id, :org, :site, 'TEMPORARY', :base, :from, :end, 'REQUEST', :req, :reason, :ref, :by, :now)""")
-                        .param("id", following).param("org", o.get("organization_id")).param("site", o.get("site_id"))
-                        .param("base", o.get("base_id")).param("from", Db.ts(from)).param("end", Db.ts(e.content().end()))
-                        .param("req", e.id()).param("reason", e.content().reason().trim()).param("ref", e.number())
-                        .param("by", ctx.personId()).param("now", Db.ts(now)).update();
-                // the unit's deployment areas follow its stationing into the following period
-                jdbc.sql("update deployment_area set stationing_id = :next where stationing_id = :prev").param("next", following).param("prev", o.get("id")).update();
-                outbox.enqueue(StationingEvent.Type.TEMPORARY_STATIONING_SCHEDULED, (UUID) o.get("organization_id"), (UUID) o.get("site_id"),
-                        from, now, "extension", ref);
-            }
+    void applyApprovedExtensionDecision(AccessContext ctx, Req e, Instant now) {
+        UUID id = e.id();
+        Req parent = lock(e.parentId());
+        Instant end = effectiveEnd(parent.id());
+        if (!Set.of("TEMPORARY_SCHEDULED", "ACTIVE_TEMPORARY").contains(parent.state()) || end == null || !end.isAfter(now)) {
+            throw ApiException.validation("التمركز المؤقت " + parent.number() + " لم يعد مجدولاً أو نافذاً؛ لا يُفعَّل التمديد.");
+        }
+        if (!e.content().end().isAfter(end)) {
+            throw ApiException.validation("نهاية التمديد ليست بعد النهاية الفعالة الحالية.");
+        }
+        String ref = "restationing:" + e.number();
+        List<Map<String, Object>> open = jdbc.sql("""
+                update org_stationing set valid_to = planned_end, end_reason = 'SUPERSEDED', ended_by = :by, ended_at = :now
+                 where request_id = any(string_to_array(:chain, ',')::uuid[]) and kind = 'TEMPORARY' and valid_to is null
+                returning id, organization_id, site_id, base_id, planned_end""")
+                .param("by", ctx.personId()).param("now", Db.ts(now)).param("chain", Db.ids(chain(parent.id()))).query().listOfRows();
+        for (Map<String, Object> o : open) {
+            Instant from = Db.toInstant(o.get("planned_end"));
+            UUID following = UUID.randomUUID();
             jdbc.sql("""
-                    update restationing_request set state = 'EXTENSION_ACTIVATED', activated_by = :by, activated_at = :now, site_id = :site,
-                           updated_at = :now, version = version + 1 where id = :id""")
-                    .param("by", ctx.personId()).param("now", Db.ts(now)).param("site", parent.siteId()).param("id", id).update();
-            Map<String, Object> detail = new LinkedHashMap<>();
-            detail.put("parent", parent.number());
-            detail.put("previousEnd", end.toString());
-            detail.put("newEnd", e.content().end().toString());
-            detail.put("units", open.size());
-            audit.recordAs(ctx.actor(), "RESTATIONING_EXTENSION_ACTIVATED", "RESTATIONING_REQUEST", id.toString(), e.number(), detail,
-                    in == null ? null : in.reason());
-        });
+                    insert into org_stationing(id, organization_id, site_id, kind, base_id, valid_from, planned_end, origin,
+                                               request_id, reason, reference, recorded_by, recorded_at)
+                    values (:id, :org, :site, 'TEMPORARY', :base, :from, :end, 'REQUEST', :req, :reason, :ref, :by, :now)""")
+                    .param("id", following).param("org", o.get("organization_id")).param("site", o.get("site_id"))
+                    .param("base", o.get("base_id")).param("from", Db.ts(from)).param("end", Db.ts(e.content().end()))
+                    .param("req", e.id()).param("reason", e.content().reason().trim()).param("ref", e.number())
+                    .param("by", ctx.personId()).param("now", Db.ts(now)).update();
+            // the unit's deployment areas follow its stationing into the following period
+            jdbc.sql("update deployment_area set stationing_id = :next where stationing_id = :prev").param("next", following).param("prev", o.get("id")).update();
+            outbox.enqueue(StationingEvent.Type.TEMPORARY_STATIONING_SCHEDULED, (UUID) o.get("organization_id"), (UUID) o.get("site_id"),
+                    from, now, "extension", ref);
+        }
+        jdbc.sql("""
+                update restationing_request set state = 'EXTENSION_ACTIVATED', activated_by = :by, activated_at = :now, site_id = :site,
+                       updated_at = :now, version = version + 1 where id = :id""")
+                .param("by", ctx.personId()).param("now", Db.ts(now)).param("site", parent.siteId()).param("id", id).update();
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("parent", parent.number());
+        detail.put("previousEnd", end.toString());
+        detail.put("newEnd", e.content().end().toString());
+        detail.put("units", open.size());
+        detail.put("activation", "تلقائي ضمن الاعتماد النهائي (ADR-095)");
+        audit.recordAs(ctx.actor(), "RESTATIONING_EXTENSION_ACTIVATED", "RESTATIONING_REQUEST", id.toString(), e.number(), detail, null);
+        autoFyi(ctx, e, now);
     }
 
     /** An extension is checked against its temporary stationing, which must still be scheduled or in force. */
@@ -1439,8 +1381,8 @@ public class RestationingService {
             });
             m.put("mine", r.requester().equals(ctx.personId()));
             m.put("fyi", fyiReader(ctx, r.id()));
-            m.put("fyiPending", fyiPending(r) && ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit()));
-            m.put("activatable", "APPROVED_NOT_ACTIVATED".equals(r.state()) && !fyiPending(r) && mayActivate(ctx, r));
+            m.put("fyiPending", false);   // ADR-095: FYI is auto-distributed from the requesting unit's configuration
+            m.put("activatable", false);  // ADR-095: activation is part of final approval, never surfaced as a separate step
             m.put("exceedsPolicy", !exceeds(r).isEmpty());
             out.add(m);
         }
@@ -1567,15 +1509,14 @@ public class RestationingService {
         can.put("submit", owner && askable && EDITABLE.contains(r.state()));
         can.put("decide", current != null && mayDecide(ctx, r, current, route));
         can.put("decideAs", current == null ? null : decisionLabel(current));
-        can.put("activate", "APPROVED_NOT_ACTIVATED".equals(r.state()) && !fyiPending(r) && mayActivate(ctx, r));
-        can.put("fyi", Set.of("APPROVED_NOT_ACTIVATED", "ACTIVATED_PERMANENT", "TEMPORARY_SCHEDULED", "ACTIVE_TEMPORARY").contains(r.state())
-                && ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit()));
+        can.put("activate", false); // ADR-095: activation is part of final approval, never a separate action
+        can.put("fyi", false);      // ADR-095: FYI is auto-distributed from the requesting unit's configuration
         m.put("can", can);
         Map<String, Object> fyi = new LinkedHashMap<>();
         Map<String, Object> done = jdbc.sql("""
                 select q.fyi_done_at, p.display_name, q.fyi_note from restationing_request q left join person p on p.id = q.fyi_done_by where q.id = :id""")
                 .param("id", id).query().singleRow();
-        fyi.put("required", fyiPending(r));
+        fyi.put("required", false);
         fyi.put("doneAt", done.get("fyi_done_at") == null ? null : Db.toInstant(done.get("fyi_done_at")).toString());
         fyi.put("doneBy", done.get("display_name"));
         fyi.put("note", done.get("fyi_note"));
@@ -1591,7 +1532,7 @@ public class RestationingService {
 
     /** Whether any right other than a chosen unit's reading reaches this request. */
     private boolean mayAct(AccessContext ctx, Req r) {
-        return ctx.canFor(Permission.VIEW, r.unit()) || ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit())
+        return ctx.canFor(Permission.VIEW, r.unit())
                 || ctx.canFor(Permission.DECIDE_UNIT_OPERATIONS, r.unit()) || ctx.canFor(Permission.FINAL_APPROVE_STATIONING, r.unit());
     }
 
@@ -1612,14 +1553,6 @@ public class RestationingService {
         } catch (ApiException e) {
             return false;
         }
-    }
-
-    private boolean mayActivate(AccessContext ctx, Req r) {
-        Set<UUID> actor = humans(ctx.personId());
-        if (intersects(actor, requesters(r)) || r.finalApprover() != null && intersects(actor, humans(r.finalApprover()))) {
-            return false;
-        }
-        return r.content().scope().stream().allMatch(u -> ctx.canFor(Permission.ACTIVATE_STATIONING, u));
     }
 
     private Map<String, Object> stageView(StageRow x, StageRow current) {
@@ -1650,15 +1583,14 @@ public class RestationingService {
         // the final approver of the requesting unit also decides its excess and its lifecycle actions (ADR-078)
         if (ctx.canFor(Permission.VIEW, r.unit()) || ctx.canFor(Permission.CREATE_RESTATIONING, r.unit())
                 || ctx.canFor(createPermission(r.purpose()), r.unit())
-                || ctx.canFor(Permission.DECIDE_UNIT_OPERATIONS, r.unit()) || ctx.canFor(Permission.FINAL_APPROVE_STATIONING, r.unit())
-                || ctx.canFor(Permission.MANAGE_FYI_DISTRIBUTION, r.unit())) {
+                || ctx.canFor(Permission.DECIDE_UNIT_OPERATIONS, r.unit()) || ctx.canFor(Permission.FINAL_APPROVE_STATIONING, r.unit())) {
             return true;
         }
         if (fyiReader(ctx, r.id())) {
             return true;
         }
         for (UUID u : r.content().scope()) {
-            if (ctx.canFor(Permission.VIEW, u) || ctx.canFor(Permission.ACTIVATE_STATIONING, u)) {
+            if (ctx.canFor(Permission.VIEW, u)) {
                 return true;
             }
         }
