@@ -512,6 +512,16 @@ a.tz-stat:hover { border-color: var(--tz-line-2); transform: translateY(-1px); }
 .tz-site h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .tz-site-rows { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .tz-site-rows li { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--ink); }
+/* Owner, 21 Nov 2026: «ملخص الحالة» rows become clickable filters on the map. A button row looks identical to a plain row
+   until it is hovered, focused or active; the two map-filter rows are buttons, the non-mappable rows stay plain. */
+.tz-summary-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 13px; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 4px 8px; text-align: inherit; font: inherit; cursor: pointer; text-decoration: none; }
+.tz-summary-row.is-plain { cursor: default; padding-inline: 0; }
+a.tz-summary-row:hover, button.tz-summary-row:hover:not(:disabled) { border-color: var(--line, var(--tz-line, #e6dcc8)); background: color-mix(in srgb, var(--accent, #8b5a2b) 6%, transparent); }
+button.tz-summary-row:disabled { cursor: not-allowed; opacity: 0.6; }
+.tz-summary-row.is-active { border-color: var(--accent, #8b5a2b); background: color-mix(in srgb, var(--accent, #8b5a2b) 12%, transparent); font-weight: 600; }
+.tz-summary-row:focus-visible { outline: 2px solid var(--accent, #8b5a2b); outline-offset: 1px; }
+.tz-summary-clear { width: 100%; background: transparent; border: 1px dashed var(--line, var(--tz-line, #e6dcc8)); border-radius: 8px; padding: 4px 8px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; }
+.tz-summary-clear:hover { color: var(--ink, var(--tz-text)); border-style: solid; }
 .tz-site-actions { display: flex; flex-direction: column; gap: 6px; }
 .tz-site-actions .button { width: 100%; justify-content: center; }
 .tz-site-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
