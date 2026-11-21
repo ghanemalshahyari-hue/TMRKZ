@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, onUnauthorized } from './api/client';
-import type { Me, OrgNode, Permission, RequestType, Settings, Site } from './api/types';
+import type { SystemState, Me, OrgNode, Permission, RequestType, Settings, Site } from './api/types';
 import { RequestWizard } from './components/RequestWizard';
 import { TopNavigation } from './components/shell/TopNavigation';
 import { NoAccess, ScreenBoundary } from './components/ui';
@@ -23,6 +23,7 @@ import { PermissionsPage } from './pages/PermissionsPage';
 import { RequestsPage } from './pages/RequestsPage';
 import { ReviewPage } from './pages/ReviewPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { RequestHealthPage } from './pages/RequestHealthPage';
 import { SitesPage } from './pages/SitesPage';
 import { WorkflowStudio } from './pages/WorkflowStudio';
 import { clearDesktopUser, startDesktopNotifications } from './lib/desktopNotifications';
@@ -89,6 +90,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [mapDate, setMapDate] = useState(() => todayDubai());
   const [sites, setSites] = useState<Site[]>([]);
+  const [state, setState] = useState<SystemState | null>(null);
   const [requestTypes, setRequestTypes] = useState<RequestType[]>([]);
   const [orgTree, setOrgTree] = useState<OrgNode[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -157,6 +159,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
       .policy()
       .then((p) => setSettings(p.settings))
       .catch(() => setSettings(null));
+    api.systemState().then(setState).catch(() => setState(null));
   }, [revision, me.id]);
 
   // short polling for counts; every call is scoped server-side, so revoked access stops updates immediately
@@ -203,6 +206,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     mapDate,
     setMapDate,
     sites,
+    state,
     requestTypes,
     orgs,
     settings,
@@ -217,24 +221,26 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     home: () => <HomePage />,
     stationing: () => <SitesPage />,
     stationingPolicy: () => (
-      <Suspense fallback={<div className="empty">جارٍ التحميل…</div>}>
+      <Suspense fallback={<div className="tz-suspense-pane" aria-busy="true" />}>
         <StationingPolicyPage />
       </Suspense>
     ),
+    // Owner, 20 Nov 2026: Suspense fallback is an invisible pane (not a centred text), so the way tabs don't flash a
+    // «جارٍ تحميل الخريطة…» box before the editor shell renders — the editor shows its own loading state once mounted.
     restationing: () => (
-      <Suspense fallback={<div className="empty">جارٍ تحميل الخريطة…</div>}>
+      <Suspense fallback={<div className="tz-suspense-pane" aria-busy="true" />}>
         <RestationingPage />
       </Suspense>
     ),
     newRequest: () => <NewRequestPage />,
     allRequests: () => <AllRequestsPage />,
     posture: () => (
-      <Suspense fallback={<div className="empty">جارٍ تحميل الخريطة…</div>}>
+      <Suspense fallback={<div className="tz-suspense-pane" aria-busy="true" />}>
         <PosturePage />
       </Suspense>
     ),
     siteSetup: () => (
-      <Suspense fallback={<div className="empty">جارٍ تحميل الخريطة…</div>}>
+      <Suspense fallback={<div className="tz-suspense-pane" aria-busy="true" />}>
         <SiteSetupPage />
       </Suspense>
     ),
@@ -246,6 +252,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     forms: () => <FormStudio />,
     permissions: () => <PermissionsPage />,
     settings: () => <SettingsPage />,
+    requestHealth: () => <RequestHealthPage />,
     audit: () => <AuditPage />,
     docs: () => <DocsPage />,
     requestAccess: () => <AccessRequestPage />,
@@ -263,6 +270,9 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     [can, me.summaryOnly, noAccess],
   );
   const more = useMemo(() => (noAccess ? [] : moreNav(can, me.summaryOnly)), [can, me.summaryOnly, noAccess]);
+  // Owner, 20 Nov 2026: the global «＋ إنشاء» button is removed from the top bar. The three way tabs on top handle their
+  // requests; other requests (SITE_REGISTRATION, ACCESS) open through «المزيد → طلب جديد / طلب صلاحية» and context actions.
+  const create: { id: string; label: string; href: string; icon: string }[] = [];
   // the operational views fill the screen below the top bar; every other page keeps its own layout inside the shell
   const console = shownView === 'home' || shownView === 'restationing' || shownView === 'stationing' || shownView === 'posture' || shownView === 'siteSetup';
   const logout = async () => {
@@ -280,7 +290,7 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     <AppContext.Provider value={ctx}>
       <div className={'tz-app' + (console ? ' is-console' : ' is-page')} data-view={shownView}>
         <a className="tz-skip" href="#main">تخطي إلى المحتوى</a>
-        <TopNavigation me={me} view={shownView} links={links} more={more} onLogout={logout} navOpen={navOpen} setNavOpen={setNavOpen} />
+        <TopNavigation me={me} view={shownView} links={links} more={more} create={create} onLogout={logout} navOpen={navOpen} setNavOpen={setNavOpen} />
         <button id="navShade" className="nav-shade" aria-label="إغلاق القائمة" onClick={() => setNavOpen(false)} hidden={!navOpen} />
         <main id="main" className="tz-main" tabIndex={-1}>
           <ScreenBoundary resetKey={shownView}>{restriction(shownView, can, me.summaryOnly) ? <NoAccess /> : pages[shownView]()}</ScreenBoundary>

@@ -324,11 +324,18 @@ select.sw-input { appearance: auto; }
 .da-unit.on { box-shadow: 0 0 0 2px var(--accent) inset; }
 .da-unit.is-plain { display: block; padding: 6px 10px; border-style: dashed; color: var(--muted); cursor: default; }
 .da-campnote { margin: 4px 30px 0 0; }
-/* the distance under the pointer while an area is placed or drawn */
-.da-hover { position: absolute; left: 0; top: 0; z-index: 6; pointer-events: none; padding: 4px 10px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 800; white-space: nowrap; direction: rtl; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22); }
-.da-hover.is-ok { border-color: #2f9e6e; color: #2f9e6e; }
-.da-hover.is-warn { border-color: #c98a1b; color: #c98a1b; }
-.da-hover.is-bad { border-color: #c0392b; color: #c0392b; }
+/* the distance under the pointer while an area is placed or drawn. Owner, 20 Nov 2026: solid high-contrast background
+   with the status colour on the BORDER (not the text) so it stays readable in light and dark themes alike. */
+.da-hover { position: absolute; left: 0; top: 0; z-index: 6; pointer-events: none; padding: 5px 12px; border-radius: 999px; border: 2px solid var(--tz-line-2, var(--line)); background: var(--tz-panel, var(--paper)); color: var(--ink); font-size: 13.5px; font-weight: 700; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22); white-space: nowrap; letter-spacing: 0.1px;te-space: nowrap; direction: rtl; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22); }
+/* Status lives on the BORDER only; the number and units stay in --ink so the chip is readable at a glance. */
+.da-hover.is-ok { border-color: #2f9e6e; }
+.da-hover.is-warn { border-color: #c98a1b; }
+.da-hover.is-bad { border-color: #c0392b; }
+/* Dark-theme reset: the generated theme used to tint the TEXT with the status colour (gold on navy = low contrast).
+   Owner, 20 Nov 2026: keep the text in --ink both themes; the border carries the status. */
+:root[data-theme="dark"] .da-hover.is-ok,
+:root[data-theme="dark"] .da-hover.is-warn,
+:root[data-theme="dark"] .da-hover.is-bad { color: var(--ink); }
 /* the area's shapes, as Word's: square, circle, free drawing, and the sub-area as the main area's copy */
 .da-glyph { display: block; width: 22px; height: 22px; margin: 0 auto 4px; border: 2.5px solid var(--accent); }
 .da-glyph-square { border-radius: 3px; }
@@ -393,3 +400,220 @@ select.sw-input { appearance: auto; }
 .int-env div { display: flex; gap: 8px; align-items: baseline; }
 .int-env dt { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .int-env dd { margin: 0; font: 11px ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+
+/* the empty system (ADR-094) */
+.tz-empty-system { margin: 24px auto; max-width: 640px; text-align: center; padding: 28px 20px; }
+.tz-empty-system p { margin: 0 0 8px; }
+
+/* ADR-094: settings grouped «السياسات والبيئة» / «الهوية والدخول» / «مصدر الموارد البشرية» / «ترحيل البيانات» */
+.settings-grid > .settings-group { grid-column: 1 / -1; margin: 10px 0 -6px; font-size: 15px; color: var(--ink-2, #555); border-bottom: 1px solid var(--line, #e3e3e3); padding-bottom: 4px; }
+/* ADR-094: the middle of an operational screen in an empty installation — no map is created */
+.tz-empty-centre { height: 100%; min-height: 320px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: var(--ink-2, #555); text-align: center; padding: 24px; }
+.tz-empty-centre svg { width: 40px; height: 40px; opacity: 0.5; }
+.tz-empty-centre p { margin: 0; max-width: 420px; }
+/* the person's own unit in the scope tree */
+.ut-current > .ut-row { background: var(--selected-bg, #eef4ff); border-radius: 6px; }
+
+/* ========================================================================================================
+ * Dashboard reference (owner, 20 Nov 2026): the «الرئيسية» landing matches the uploaded mock exactly —
+ * a mountain-range hero, a six-card KPI row, and a three-column layout with the attention panel, the
+ * map and the site details card. Values come from the same APIs the earlier home used.
+ * ======================================================================================================== */
+:root {
+  --home-accent: #4b6b47;
+  --home-attn: #c88a1e;
+  --home-hero: linear-gradient(180deg, #faf4e6 0%, #f3ead1 100%);
+}
+:root[data-theme='dark'] { --home-hero: linear-gradient(180deg, #2a2420 0%, #322a22 100%); }
+
+.tz-dash { display: flex; flex-direction: column; gap: 14px; padding: 0 0 24px; }
+.tz-dash-hero { position: relative; background: var(--home-hero); border: 1px solid var(--tz-line); border-radius: 14px; padding: 18px 20px; min-height: 92px; overflow: hidden; }
+.tz-dash-hero-bg {
+  position: absolute; inset: 0; pointer-events: none; opacity: .7;
+  background:
+    radial-gradient(60px 20px at 18% 85%, color-mix(in srgb, var(--home-accent) 55%, transparent), transparent 70%),
+    radial-gradient(120px 50px at 40% 90%, color-mix(in srgb, var(--tz-teal-2) 45%, transparent), transparent 75%),
+    radial-gradient(160px 80px at 72% 92%, color-mix(in srgb, var(--accent) 42%, transparent), transparent 75%);
+  -webkit-mask: linear-gradient(180deg, transparent 0 20%, #000 60% 100%);
+          mask: linear-gradient(180deg, transparent 0 20%, #000 60% 100%);
+}
+.tz-dash-hero-title { position: relative; display: flex; align-items: center; gap: 14px; }
+.tz-dash-hero-title h1 { margin: 0; font-size: 20px; color: var(--ink); }
+.tz-dash-hero-title p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+
+/* ---- the six stat cards (one row, equal width) ------------------------------------------------------- */
+.tz-dash-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.tz-stat { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--tz-panel); border: 1px solid var(--tz-line); border-radius: 12px; color: var(--ink); text-decoration: none; box-shadow: var(--tz-raise) 0 2px 0; }
+a.tz-stat { transition: border-color .15s, transform .15s; }
+a.tz-stat:hover { border-color: var(--tz-line-2); transform: translateY(-1px); }
+.tz-stat-icon { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 10px; background: color-mix(in srgb, var(--home-accent) 15%, var(--tz-panel-2)); color: var(--home-accent); }
+.tz-stat-icon.amber { background: color-mix(in srgb, var(--home-attn) 20%, var(--tz-panel-2)); color: var(--home-attn); }
+.tz-stat-text { display: flex; flex-direction: column; min-width: 0; }
+.tz-stat-text b { font-size: 24px; line-height: 1.15; color: var(--ink); font-weight: 700; }
+.tz-stat-text span { font-size: 12.5px; color: var(--muted); }
+@media (max-width: 1200px) { .tz-dash-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .tz-dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ---- three-column grid: attention · map · details --------------------------------------------------- */
+.tz-dash-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr) minmax(300px, 1fr); gap: 14px; align-items: stretch; }
+@media (max-width: 1200px) { .tz-dash-grid { grid-template-columns: 1fr; } }
+.tz-dash-side { display: flex; flex-direction: column; gap: 12px; }
+.tz-dash-card { background: var(--tz-panel); border: 1px solid var(--tz-line); border-radius: 12px; padding: 14px 16px; }
+.tz-dash-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.tz-dash-card-head h3 { margin: 0; font-size: 14.5px; color: var(--ink); }
+.tz-dash-side-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: var(--muted); font-weight: 600; font-size: 13px; }
+.tz-link { color: var(--accent); font-size: 12.5px; text-decoration: none; }
+.tz-link:hover { text-decoration: underline; }
+
+/* ---- the attention panel (the yellow strip of the reference) ---------------------------------------- */
+.tz-attn { border-color: color-mix(in srgb, var(--home-attn) 45%, var(--tz-line)); background: color-mix(in srgb, var(--home-attn) 10%, var(--tz-panel)); }
+.tz-attn header { display: flex; align-items: center; gap: 8px; color: var(--home-attn); font-weight: 700; margin-bottom: 8px; }
+.tz-attn ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.tz-attn li { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink); }
+.tz-attn-badge { display: inline-flex; min-width: 28px; justify-content: center; align-items: center; height: 24px; padding: 0 8px; border-radius: 6px; background: var(--home-attn); color: #fff; font-style: normal; font-weight: 700; font-size: 12px; }
+
+/* ---- recent requests list -------------------------------------------------------------------------- */
+.tz-reqs, .tz-alerts { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.tz-reqs li a { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; text-decoration: none; color: var(--ink); }
+.tz-reqs li a:hover { border-color: var(--tz-line-2); }
+.tz-req-head { display: flex; align-items: center; justify-content: space-between; }
+.tz-req-head small { font-size: 11px; }
+.tz-alerts li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; }
+.tz-alerts li .icon { color: var(--home-attn); flex: none; margin-top: 2px; }
+.tz-alerts li div { display: flex; flex-direction: column; gap: 2px; }
+
+/* ---- the map in the centre ------------------------------------------------------------------------- */
+.tz-dash-centre { display: flex; flex-direction: column; gap: 10px; background: var(--tz-panel); border: 1px solid var(--tz-line); border-radius: 12px; padding: 10px 12px; min-height: 520px; }
+.tz-dash-maptool { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tz-dash-maptool .tz-mapbtn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--tz-line); background: var(--tz-panel); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.tz-dash-maptool .tz-mapbtn:hover { color: var(--ink); border-color: var(--tz-line-2); }
+.tz-mapcluster { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink); background: var(--tz-panel-2); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--tz-line); }
+.tz-mapselect { margin-inline-start: auto; height: 32px; border-radius: 8px; border: 1px solid var(--tz-line); background: var(--tz-panel); padding: 0 10px; color: var(--ink); font-size: 12.5px; }
+.tz-dash-mapbox { flex: 1; min-height: 420px; border-radius: 10px; overflow: hidden; border: 1px solid var(--tz-line); background: var(--tz-panel-2); position: relative; }
+.tz-dash-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); padding-top: 4px; }
+.tz-dash-legend b { color: var(--ink); font-weight: 600; margin-inline-end: 6px; }
+.tz-dash-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.tz-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; }
+.tz-swatch-cluster { background: color-mix(in srgb, var(--home-accent) 70%, #fff); border: 2px solid var(--home-accent); }
+.tz-swatch-selected { background: var(--accent); box-shadow: 0 0 0 2px rgba(139, 90, 43, 0.3); }
+
+/* ---- the site details card ------------------------------------------------------------------------- */
+.tz-dash-details { }
+.tz-site { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.tz-site-cover { height: 110px; border-radius: 10px; background: linear-gradient(135deg, var(--tz-panel-2) 0%, color-mix(in srgb, var(--home-accent) 15%, var(--tz-panel-2)) 100%); display: flex; align-items: center; justify-content: center; color: color-mix(in srgb, var(--home-accent) 70%, var(--muted)); }
+.tz-site-cover .icon { width: 32px; height: 32px; }
+.tz-site-head { display: flex; flex-direction: column; gap: 4px; }
+.tz-site-head b { font-size: 16px; color: var(--ink); }
+.tz-site-head .pill.green { background: color-mix(in srgb, var(--home-accent) 20%, var(--tz-panel-2)); color: var(--home-accent); }
+.tz-site-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tz-site-chips span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 6px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; }
+.tz-site-chips b { font-size: 16px; color: var(--ink); }
+.tz-site-chips small { font-size: 11px; color: var(--muted); }
+.tz-site h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.tz-site-rows { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.tz-site-rows li { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--ink); }
+.tz-site-actions { display: flex; flex-direction: column; gap: 6px; }
+.tz-site-actions .button { width: 100%; justify-content: center; }
+.tz-site-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tz-site-kpis span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 6px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; }
+.tz-site-kpis b { font-size: 15px; color: var(--home-accent); font-weight: 700; }
+.tz-site-kpis small { font-size: 11px; color: var(--muted); }
+
+/* ---- empty landing variant keeps its own class ----------------------------------------------------- */
+.tz-home-empty .tz-dash-empty { background: var(--tz-panel); border: 1px dashed var(--tz-line-2); border-radius: 12px; padding: 48px 24px; text-align: center; color: var(--muted); }
+.tz-home-empty .tz-dash-empty p { margin: 6px 0; }
+
+/* ---- dashboard v2 (owner brief §2, 20 Nov 2026): map dominant, left attention, right contextual ---- */
+.tz-dash-v2 .tz-dash-grid-wide { grid-template-columns: minmax(300px, 1fr) minmax(0, 2.6fr) minmax(320px, 1fr); }
+@media (max-width: 1500px) { .tz-dash-v2 .tz-dash-grid-wide { grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr) minmax(300px, 1fr); } }
+@media (max-width: 1100px) { .tz-dash-v2 .tz-dash-grid-wide { grid-template-columns: 1fr; } }
+
+.tz-dash-centre { min-height: 620px; }
+.tz-dash-mapbox { min-height: 540px; }
+
+/* The attention rows are clickable chips that filter the map; the active one has an amber ring. */
+.tz-attn-row { display: inline-flex; align-items: center; gap: 10px; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 6px 8px; width: 100%; text-align: inherit; cursor: pointer; color: var(--ink); font: inherit; text-decoration: none; }
+.tz-attn-row:hover { background: color-mix(in srgb, var(--home-attn) 10%, transparent); }
+.tz-attn-row.is-active { background: color-mix(in srgb, var(--home-attn) 15%, var(--tz-panel-2)); border-color: var(--home-attn); }
+.tz-attn-clear { background: transparent; border: 1px dashed var(--tz-line); color: var(--muted); border-radius: 8px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+
+/* Last-request rows: a selected one has an amber ring too, so it ties to the map and the right panel. */
+.tz-req-row { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; text-align: inherit; cursor: pointer; width: 100%; color: var(--ink); font: inherit; }
+.tz-req-row:hover { border-color: var(--tz-line-2); }
+.tz-req-row.is-active { border-color: var(--home-attn); box-shadow: 0 0 0 1px var(--home-attn) inset; }
+
+/* Filter tag above the map when an attention pick is active. */
+.tz-dash-filtertag { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--home-attn) 15%, var(--tz-panel-2)); border: 1px solid var(--home-attn); color: var(--ink); font-size: 12.5px; }
+.tz-dash-filtertag button { background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 12px; }
+
+/* MapLibre popup tooltip style. */
+.tz-map-tt .maplibregl-popup-content { padding: 6px 8px; font-size: 12.5px; border-radius: 6px; background: var(--tz-panel); border: 1px solid var(--tz-line); color: var(--ink); box-shadow: 0 2px 8px rgba(74, 59, 34, 0.1); }
+.tz-map-tt .maplibregl-popup-tip { display: none; }
+
+/* «صحة الطلبات» (owner, 20 Nov 2026) */
+.rh-chip { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 6px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; min-width: 100px; }
+.rh-chip b { font-size: 18px; color: var(--ink); }
+.rh-chip small { font-size: 11px; color: var(--muted); }
+.rh-chip.green b { color: var(--home-accent); }
+.rh-chip.orange b { color: var(--home-attn); }
+.rh-chip.red b { color: var(--red); }
+.rh-stages { list-style: none; padding: 0; margin: 10px 0; }
+.rh-stages li { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+.rh-stage-icon { width: 26px; height: 26px; border-radius: 50%; background: var(--tz-panel-2); border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.rh-stages li[data-decided="true"] .rh-stage-icon { color: var(--home-accent); border-color: var(--home-accent); }
+.rh-stage-text { display: flex; flex-direction: column; }
+.rh-repairs { list-style: none; padding: 0; margin: 8px 0; }
+.rh-repairs li { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; background: var(--tz-panel-2); }
+.rh-outbox { list-style: none; padding: 0; margin: 6px 0; }
+.rh-outbox li { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 6px; }
+
+/* Requests master/detail (owner UX consolidation §10, 20 Nov 2026) */
+.tz-requests-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 14px; align-items: stretch; }
+@media (max-width: 1100px) { .tz-requests-split { grid-template-columns: 1fr; } }
+.tz-requests-list table tr.is-selected { background: color-mix(in srgb, var(--accent, #8b5a2b) 15%, var(--tz-panel-2, var(--paper))); }
+.tz-requests-detail { align-self: start; position: sticky; top: 72px; }
+.tz-requests-detail dl { display: grid; gap: 4px; margin: 0 0 8px; }
+.tz-requests-detail dt { color: var(--muted); font-size: 12.5px; }
+.tz-requests-detail dd { margin: 0; font-weight: 600; }
+
+/* Owner, 20 Nov 2026: a transparent pane while a lazy route chunk resolves — no «جارٍ التحميل…» text flash before the
+   editor's own shell renders, so the way tabs don't feel like a brief image appears. */
+.tz-suspense-pane { flex: 1; min-height: 240px; }
+
+/* «الموقف العملياتي» rail head — a clean section header (not a toggle), so the tree reads properly (owner, 20 Nov 2026) */
+.tz-posture-rail2 .tz-posture-railhead { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--tz-line); }
+.tz-posture-rail2 .tz-posture-railhead .icon { width: 16px; color: var(--tz-teal, var(--accent)); flex: none; }
+.tz-posture-rail2 .tz-posture-railhead h3 { flex: 1; margin: 0; font-size: 13.5px; font-weight: 700; color: var(--ink, var(--tz-text)); }
+.tz-posture-rail2 .tz-posture-railhead .tz-chip { font-size: 11.5px; }
+
+/* «مساحة التمركز» operational posture (owner, 20 Nov 2026 reset) — read-only, no request controls */
+.tz-posture-shell { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.tz-posture-rail { display: flex; flex-direction: column; }
+.tz-posture-search { padding: 6px 10px 2px; }
+.tz-posture-search input { width: 100%; border: 1px solid var(--tz-line, #e6dcc8); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; background: var(--tz-panel-2, #fbf8f0); color: var(--ink, #2e2618); }
+.tz-posture-tabs { display: flex; gap: 6px; padding: 4px 10px 8px; flex-wrap: wrap; }
+.tz-posture-tab { display: inline-flex; align-items: center; gap: 4px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 12px; color: var(--ink); cursor: pointer; }
+.tz-posture-tab.is-active { background: var(--accent, #8b5a2b); color: #fff; border-color: var(--accent); }
+.tz-posture-tab-num { opacity: .75; font-size: 11px; }
+.tz-posture-list { list-style: none; padding: 0; margin: 0; max-height: 60vh; overflow-y: auto; }
+.tz-posture-list .tz-pad { padding: 10px 12px; font-size: 12.5px; }
+.tz-posture-card { display: flex; align-items: center; gap: 8px; padding: 8px 10px; width: 100%; background: transparent; border: 0; border-bottom: 1px solid var(--tz-line); text-align: inherit; cursor: pointer; font: inherit; color: var(--ink); }
+.tz-posture-card:hover { background: var(--tz-panel-2); }
+.tz-posture-card.is-selected { background: color-mix(in srgb, var(--accent, #8b5a2b) 15%, var(--tz-panel-2)); border-inline-start: 3px solid var(--accent, #8b5a2b); }
+.tz-posture-icon { width: 30px; height: 30px; border-radius: 8px; background: var(--tz-panel-2); display: inline-flex; align-items: center; justify-content: center; color: var(--muted); flex: none; }
+.tz-posture-card.is-selected .tz-posture-icon { background: var(--accent, #8b5a2b); color: #fff; }
+.tz-posture-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.tz-posture-meta b { font-size: 12.5px; color: var(--ink); }
+.tz-posture-meta small { font-size: 11.5px; color: var(--muted); }
+.tz-posture-state { font-size: 12px; }
+.tz-posture-state.on { color: var(--green, #4b6b47); }
+.tz-posture-state.off { color: color-mix(in srgb, var(--red, #9a2a22) 60%, var(--muted)); }
+.tz-posture-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.tz-posture-head-icon { width: 36px; height: 36px; border-radius: 10px; background: color-mix(in srgb, var(--accent, #8b5a2b) 15%, var(--tz-panel-2)); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; }
+.tz-posture-head h2 { margin: 0; font-size: 15px; }
+/* Bottom summary strip — the owner's design shows aggregated numbers under the map */
+.tz-posture-strip { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; padding: 8px 14px; background: var(--tz-panel, #fffcf6); border-top: 1px solid var(--tz-line); font-size: 12.5px; }
+.tz-posture-strip span { display: flex; align-items: center; gap: 8px; }
+.tz-posture-strip b { font-size: 18px; color: var(--ink); font-weight: 700; }
+.tz-posture-strip small { color: var(--muted); }
+@media (max-width: 1100px) { .tz-posture-strip { grid-template-columns: repeat(3, 1fr); } }

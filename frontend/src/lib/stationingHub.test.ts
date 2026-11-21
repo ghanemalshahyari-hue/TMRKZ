@@ -22,12 +22,12 @@ describe('the three ways of stationing, as tabs of the top bar (owner, 17 Nov 20
     expect(hubWays(holding('MANAGE_FACILITIES')).map((w) => w.allowed)).toEqual([true, false, false]);
   });
 
-  it('right after «الرئيسية»; the list of requests stays in «المزيد»', () => {
+  it('right after «الرئيسية» and «مساحة التمركز»; the list of requests stays in «المزيد» (owner, 20 Nov 2026 order)', () => {
     const can = holding('VIEW', 'MANAGE_SITE_LINKS', 'CREATE_RESTATIONING');
     const bar = primaryNav(can, false);
     if (STATIONING_V3_ENABLED) {
-      expect(bar.slice(0, 4).map((l) => l.label)).toEqual(['الرئيسية', 'تحديد مواقع التمركز المبدئية', 'طلب مناطق انتشار', 'طلب إعادة تمركز']);
-      expect(bar.slice(1, 4).map((l) => l.id)).toEqual(['SITE_SETUP', 'DEPLOYMENT_AREAS', 'RESTATIONING']);
+      expect(bar.slice(0, 5).map((l) => l.label)).toEqual(['الرئيسية', 'مساحة التمركز', 'تحديد مواقع التمركز المبدئية', 'طلب مناطق انتشار', 'طلب إعادة تمركز']);
+      expect(bar.slice(2, 5).map((l) => l.id)).toEqual(['SITE_SETUP', 'DEPLOYMENT_AREAS', 'RESTATIONING']);
       expect(moreNav(can, false).map((l) => l.view)).toContain('restationing');
     } else {
       // a Stationing V3 build only (VITE_STATIONING_V3=true), as the views they open

@@ -8,6 +8,7 @@ import { flatSource } from '../components/tree/tree';
 import { UnitTree } from '../components/tree/UnitTree';
 import { Icon } from '../components/ui';
 import { MapFrame, MapLegend } from '../components/workspace/MapFrame';
+import { EmptyCentre } from '../components/workspace/EmptyCentre';
 import { OperationalWorkspace } from '../components/workspace/OperationalWorkspace';
 import { RequestMap } from '../components/workspace/RequestMap';
 import { useApp } from '../lib/app';
@@ -56,11 +57,16 @@ export function PosturePage() {
   const tree = useMemo(() => flatSource(units ?? []), [units]);
   const req = useMemo(() => (unit ? asMapRequest(unit) : null), [unit]);
   useEffect(() => setFit((k) => k + 1), [selected]);
+  // Owner, 20 Nov 2026: simpler rail — a clean section header above the tree (no fake toggle button), and selection
+  // works from both the tree and the map. The map click goes through RequestMap's `pick` callback below.
   const rail = (
-    <div className="tz-rail">
-      <section className="tz-drawer open tz-site-list" aria-label="وحداتي">
-        <div className="tz-drawer-head"><span className="tz-drawer-toggle"><Icon name="units" /><span>وحدتي والوحدات التابعة</span><span className="tz-chip">{units?.length ?? '…'}</span></span></div>
-        {/* the one units tree of the application (owner, 16 Nov 2026); a short list opens whole, a long one down to the chosen unit */}
+    <div className="tz-rail tz-posture-rail2" data-testid="posture-rail">
+      <section className="tz-drawer open tz-site-list" aria-label="وحدتي والوحدات التابعة">
+        <header className="tz-posture-railhead">
+          <Icon name="units" />
+          <h3>وحدتي والوحدات التابعة</h3>
+          <span className="tz-chip" aria-label="عدد الوحدات">{units?.length ?? '…'}</span>
+        </header>
         {units && (
           <UnitTree
             source={tree}
@@ -79,6 +85,10 @@ export function PosturePage() {
       </section>
     </div>
   );
+  // Map-click selection was added briefly on 20 Nov 2026 and removed again: RequestMap's `pick` fully replaces the
+  // info-card fallback, which left clicks on reference sites (no posture unit) silently inert. A follow-up change will
+  // either wrap the info card with a «اختر هذه الوحدة» action or add a dual-callback shape to RequestMap. For now the
+  // unit tree in the right rail remains the only reliable selector, and the map still highlights the selected site.
   const context = (
     <aside className="tz-context" aria-label="موقف الوحدة">
       <div className="tz-context-body" data-testid="posture-details">
@@ -109,7 +119,9 @@ export function PosturePage() {
       sheetKey={selected ?? ''}
       rail={rail}
       context={context}
-      centre={
+      centre={app.state?.empty ? (
+        <EmptyCentre title="لا يوجد موقف تمركز بعد" hint="تظهر الخريطة بعد استيراد الوحدات وتسجيل المواقع." />
+      ) : (
         <MapFrame
           title={<span className="tz-mapstep"><Icon name="map" /><b>الموقف العملياتي</b>{unit && <small>{unit.name}</small>}</span>}
           mode={mode}
@@ -120,9 +132,9 @@ export function PosturePage() {
           onFit={() => setFit((k) => k + 1)}
           legend={<MapLegend stage="full" fold />}
         >
-          {terrain3d !== undefined && req && <RequestMap view={view} terrain3d={terrain3d} request={req} checks={null} mode={mode} fitMaxZoom={13} hideSite fit fitKey={fit} referenceInteractive={false} onMap={setMap} />}
+          {terrain3d !== undefined && req && <RequestMap view={view} terrain3d={terrain3d} request={req} checks={null} mode={mode} fitMaxZoom={13} hideSite fit fitKey={fit} referenceInteractive onMap={setMap} highlight={unit?.site?.id ?? null} fitSites />}
         </MapFrame>
-      }
+      )}
     />
   );
 }

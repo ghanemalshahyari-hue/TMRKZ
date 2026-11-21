@@ -63,6 +63,7 @@ export function restriction(view: View, can: (p: Permission) => boolean, summary
   if (summaryOnly) return true;
   if (view === 'review') return !can('REVIEW');
   if (view === 'audit') return !can('AUDIT');
+  if (view === 'requestHealth') return !can('CONFIGURE');
   return !(can('VIEW') || can('CREATE'));
 }
 
@@ -70,18 +71,28 @@ export function restriction(view: View, can: (p: Permission) => boolean, summary
 export type NavLink = { view: View; label: string; icon: string; id?: string; href?: string; title?: string };
 
 /**
- * The five top-bar entries of the reference (الرئيسية، الطلبات، المواقع، الوحدات، التقارير), each an existing view; an
- * entry falls back to the next view of its group the person may open and disappears when there is none.
+ * Top-bar entries. The three «way» tabs (تحديد مواقع التمركز المبدئية، طلب مناطق انتشار، طلب إعادة تمركز) sit right after
+ * «الرئيسية» so one click starts the work — the owner's 17 Nov 2026 arrangement, kept against the 20 Nov consolidation
+ * because the owner said the ways must remain visible. They share a view with the editor they open but each carries its
+ * own address through `wayKey`, so `activeEntry` can highlight the right tab for the current hash. Ways still appear in
+ * «＋ إنشاء» for anyone who prefers to start from there.
  */
-const PRIMARY: { label: string; icon: string; views: View[]; ways?: true }[] = [
+const PRIMARY: { label: string; icon: string; views: View[]; wayKey?: 'SITE_SETUP' | 'DEPLOYMENT_AREAS' | 'RESTATIONING' }[] = [
   { label: 'الرئيسية', icon: 'home', views: ['home'] },
-  // the three ways of stationing as tabs, right after «الرئيسية» (owner, 17 Nov 2026): one click opens the work. They take the
-  // place of «تهيئة المواقع» (the first way) and «إعادة التمركز» (its list of requests is in «المزيد»)
-  { label: '', icon: '', views: [], ways: true },
+  // Owner, 20 Nov 2026: the top tab's label is «الموقف العملياتي» (replacing «مساحة التمركز»). It opens the operational
+  // posture page; a person without VIEW_OPERATIONAL_POSTURE falls back to the re-stationing editor landing.
+  { label: 'الموقف العملياتي', icon: 'map', views: ['posture', 'restationing'] },
+  { label: 'تحديد مواقع التمركز المبدئية', icon: 'tent', views: ['siteSetup'], wayKey: 'SITE_SETUP' },
+  { label: 'طلب مناطق انتشار', icon: 'layers', views: ['restationing'], wayKey: 'DEPLOYMENT_AREAS' },
+  { label: 'طلب إعادة تمركز', icon: 'swap', views: ['restationing'], wayKey: 'RESTATIONING' },
   { label: 'الطلبات', icon: 'file', views: ['allRequests', 'requests'] },
-  { label: 'المواقع', icon: 'pin', views: ['stationing'] },
+  // Owner, 20 Nov 2026: «المواقع» is merged into «الموقف العملياتي» — the posture map already shows every site this person
+  // may see. The SitesPage view stays reachable from «المزيد» for people who want the list view.
   { label: 'الوحدات', icon: 'tree', views: ['org'] },
+  // «الاعتمادات» appears only when the person actually holds REVIEW (admin without it no longer lands on a refusal page)
+  { label: 'الاعتمادات', icon: 'shield', views: ['review', 'accessInbox'] },
   { label: 'التقارير', icon: 'chart', views: ['audit', 'calendar'] },
+  { label: 'إدارة النظام', icon: 'filter', views: ['settings'] },
 ];
 
 /** The views known to this build (Stationing V3 views only when the flag is on, as NAV lists them). */
@@ -89,12 +100,16 @@ const known = (v: View) => v === 'home' || NAV.some(([id]) => id === v);
 
 export function primaryNav(can: (p: Permission) => boolean, summaryOnly: boolean): NavLink[] {
   const out: NavLink[] = [];
+  const ways = hubWays(can);
   for (const p of PRIMARY) {
-    if (p.ways) {
-      for (const w of hubWays(can)) {
+    if (p.wayKey) {
+      // a way tab shows only when the server would let the person use it; the way's own href is read by activeEntry
+      const w = ways.find((x) => x.key === p.wayKey);
+      if (w && w.allowed) {
         const view: View = w.key === 'SITE_SETUP' ? 'siteSetup' : 'restationing';
-        if (w.allowed && known(view) && !restriction(view, can, summaryOnly))
-          out.push({ id: w.key, view, label: w.title, icon: w.icon, title: w.description, href: w.key === 'SITE_SETUP' ? undefined : w.href });
+        if (known(view) && !restriction(view, can, summaryOnly)) {
+          out.push({ view, label: p.label, icon: p.icon, id: p.wayKey, href: w.href });
+        }
       }
       continue;
     }
@@ -104,13 +119,37 @@ export function primaryNav(can: (p: Permission) => boolean, summaryOnly: boolean
   return out;
 }
 
+/** The actions behind the global «＋ إنشاء» menu (owner UX consolidation §10). Each one opens its target workspace. */
+export type CreateAction = { id: string; label: string; href: string; icon: string };
+export function createActions(can: (p: Permission) => boolean, summaryOnly: boolean): CreateAction[] {
+  const out: CreateAction[] = [];
+  for (const w of hubWays(can)) {
+    if (!w.allowed) continue;
+    if (w.key === 'SITE_SETUP') {
+      if (!restriction('siteSetup', can, summaryOnly)) out.push({ id: w.key, label: w.title, href: '#siteSetup', icon: w.icon });
+    } else {
+      out.push({ id: w.key, label: w.title, href: w.href ?? '#restationing', icon: w.icon });
+    }
+  }
+  // «طلب اعتماد موقع» remains a business request family (ADR-078 kept SITE_REGISTRATION creatable; the server's
+  // /request-hub decides per-unit allowance and reasons). The quick menu entry opens the full hub page so the person
+  // picks the right unit — the same path as «طلب جديد» without the extra click. Without the permission this entry stays
+  // hidden; the server still refuses anything else.
+  if (can('REQUEST_SITE_REGISTRATION')) {
+    out.push({ id: 'SITE_REGISTRATION', label: 'طلب اعتماد موقع', href: '#newRequest', icon: 'boundary' });
+  }
+  if (!restriction('requestAccess', can, summaryOnly)) out.push({ id: 'ACCESS', label: 'طلب صلاحية', href: '#requestAccess', icon: 'shield' });
+  return out;
+}
+
 /** Names that would repeat a top-bar entry's name for another page. */
 const MORE_LABEL: Partial<Record<View, string>> = { requests: 'طلبات المرافق والحجوزات', restationing: 'إعادة التمركز', allRequests: 'الطلبات' };
 
 /** Every other view the person may open, in NAV order, for the «المزيد» menu. */
 export function moreNav(can: (p: Permission) => boolean, summaryOnly: boolean): NavLink[] {
-  // a view the bar opens only at a way's own address (the request editor) keeps its own page in «المزيد»
-  const primary = new Set(primaryNav(can, summaryOnly).filter((l) => !l.href).map((l) => l.view));
+  // every view already reachable from the top bar — way tabs included — stays out of «المزيد» (owner, 20 Nov 2026): no
+  // duplicate entries, and «تهيئة المواقع والتمركز» in particular is not shown twice (its primary entry on top is enough).
+  const primary = new Set<View>(primaryNav(can, summaryOnly).map((l) => l.view));
   return NAV.filter(([id]) => !primary.has(id) && !restriction(id, can, summaryOnly)).map(([view, icon, label]) => ({ view, icon, label: MORE_LABEL[view] ?? label }));
 }
 
