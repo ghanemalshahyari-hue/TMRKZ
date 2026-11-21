@@ -451,10 +451,24 @@ function ContextualPanel({ selection, siteById, requests, current, stationedUnit
             <small className="muted">{s.responsibleOrg?.name ?? '—'}{s.code ? ' · ' + s.code : ''}</small>
             <span className={'pill ' + (stations.length > 0 ? 'green' : '')}>{stations.length > 0 ? 'متمركز حالياً' : 'بدون تمركز'}</span>
           </div>
+          {/* Owner, 21 Nov 2026: every chip on the site card is a map action — عدد المواقع zooms to this site, الوحدات
+             المتمركزة filters the map to the sites that currently host units (permanent ∪ temporary), and طلبات قيد الاعتماد
+             filters to the global in-review sites with their dotted ring. The chips mirror the «ملخص الحالة» rows below. */}
           <div className="tz-site-chips">
-            <span><b>1</b><small>عدد المواقع</small></span>
-            <span><b>{ar(stations.length)}</b><small>الوحدات المتمركزة</small></span>
-            <span><b>{ar(siteRequests.filter((r) => REVIEW.includes(r.state)).length)}</b><small>طلبات قيد الاعتماد</small></span>
+            <button type="button" className="tz-site-chip" data-testid="site-chip-sites" onClick={() => onShowOnMap(s.id)} title="تركيز الخريطة على هذا الموقع">
+              <b>1</b><small>عدد المواقع</small>
+            </button>
+            {(() => {
+              const stationedSiteIds = [...new Set([...permanentSiteIds, ...temporarySiteIds])];
+              return (
+                <button type="button" className={'tz-site-chip' + (filterActive(stationedSiteIds) ? ' is-active' : '')} data-testid="site-chip-units" onClick={() => onFilter(stationedSiteIds)} disabled={stationedSiteIds.length === 0} title="تصفية الخريطة على المواقع المتمركزة">
+                  <b>{ar(stations.length)}</b><small>الوحدات المتمركزة</small>
+                </button>
+              );
+            })()}
+            <button type="button" className={'tz-site-chip' + (filterActive(reviewSiteIds) ? ' is-active' : '')} data-testid="site-chip-review" onClick={() => onFilter(reviewSiteIds)} disabled={reviewSiteIds.length === 0} title={reviewSiteIds.length > 0 ? 'تصفية الخريطة على مواقع الطلبات قيد الاعتماد' : 'لا توجد طلبات قيد الاعتماد'}>
+              <b>{ar(siteRequests.filter((r) => REVIEW.includes(r.state)).length)}</b><small>طلبات قيد الاعتماد</small>
+            </button>
           </div>
           {/* Owner, 21 Nov 2026: the per-site «ملخص الحالة» rows are now filter buttons too — a click narrows the map to the
              sites behind that status (not just this site), the same way as the no-selection summary. The current site stays

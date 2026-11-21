@@ -506,9 +506,16 @@ a.tz-stat:hover { border-color: var(--tz-line-2); transform: translateY(-1px); }
 .tz-site-head b { font-size: 16px; color: var(--ink); }
 .tz-site-head .pill.green { background: color-mix(in srgb, var(--home-accent) 20%, var(--tz-panel-2)); color: var(--home-accent); }
 .tz-site-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.tz-site-chips span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 6px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; }
-.tz-site-chips b { font-size: 16px; color: var(--ink); }
-.tz-site-chips small { font-size: 11px; color: var(--muted); }
+.tz-site-chips span, .tz-site-chip { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 6px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; }
+.tz-site-chips b, .tz-site-chip b { font-size: 16px; color: var(--ink); }
+.tz-site-chips small, .tz-site-chip small { font-size: 11px; color: var(--muted); }
+/* Owner, 21 Nov 2026: the chips are buttons that act on the map. Hover/active follow the summary-row palette so the link
+   between a chip and its filtered rows below stays obvious. */
+button.tz-site-chip { font: inherit; color: inherit; cursor: pointer; transition: border-color .12s, background-color .12s; }
+button.tz-site-chip:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent, #8b5a2b) 45%, var(--tz-line)); background: color-mix(in srgb, var(--accent, #8b5a2b) 6%, var(--tz-panel-2)); }
+button.tz-site-chip:disabled { cursor: not-allowed; opacity: 0.55; }
+button.tz-site-chip.is-active { border-color: var(--accent, #8b5a2b); background: color-mix(in srgb, var(--accent, #8b5a2b) 14%, var(--tz-panel-2)); }
+button.tz-site-chip:focus-visible { outline: 2px solid var(--accent, #8b5a2b); outline-offset: 1px; }
 .tz-site h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 600; }
 .tz-site-rows { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
 .tz-site-rows li { display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--ink); }
