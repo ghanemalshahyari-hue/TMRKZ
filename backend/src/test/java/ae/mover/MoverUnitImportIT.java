@@ -52,9 +52,10 @@ class MoverUnitImportIT extends IntegrationTest {
         assertThat(c1.status()).isEqualTo(200);
         assertThat(c1.body().path("created").asInt()).isEqualTo(4);
 
-        List<String> codes = jdbc.sql("select code from organization where source = 'MOVER' order by code")
+        List<String> codes = jdbc.sql(
+                "select code from organization where source = 'MOVER' and source_external_id in ('101','102','110','199') order by code")
                 .query(String.class).list();
-        assertThat(codes).containsExactly("MOVER-HR-100000", "MOVER-HR-100001", "MOVER-HR-100002", "MOVER-U-99");
+        assertThat(codes).containsExactly("MOVER-HR-100000", "MOVER-HR-100001", "MOVER-HR-100002", "MOVER-U-199");
 
         String rootName = jdbc.sql("select name from organization where code = 'MOVER-HR-100000'")
                 .query(String.class).single();
@@ -62,7 +63,7 @@ class MoverUnitImportIT extends IntegrationTest {
 
         String orphanParent = jdbc.sql("""
                 select p.code from organization c join organization p on p.id = c.parent_id
-                 where c.code = 'MOVER-U-99'""").query(String.class).single();
+                 where c.code = 'MOVER-U-199'""").query(String.class).single();
         assertThat(orphanParent).isEqualTo("MOVER-HR-100001");
 
         // Idempotency.
@@ -114,6 +115,52 @@ class MoverUnitImportIT extends IntegrationTest {
     }
 
     @Test
+    @DisplayName("Older MOVER schema without display_alias and with NULL hr_status is accepted (status defaults to ACTIVE)")
+    void acceptsOlderSchema() throws Exception {
+        Path db = dumps.inbox().resolve("mover-old-" + sfx + ".db");
+        Files.deleteIfExists(db);
+        String url = "jdbc:sqlite:" + db.toAbsolutePath();
+        Class.forName("org.sqlite.JDBC");
+        try (java.sql.Connection c = java.sql.DriverManager.getConnection(url); java.sql.Statement s = c.createStatement()) {
+            // Mirrors the pre-untrack schema: no display_alias; hr_status column exists but every row has it NULL.
+            s.execute("""
+                    create table units (
+                      id INTEGER NOT NULL,
+                      name VARCHAR(128) NOT NULL,
+                      parent_unit_id INTEGER,
+                      level INTEGER,
+                      manager_id INTEGER,
+                      is_final_command BOOLEAN,
+                      unit_operations_approval_unit_id INTEGER,
+                      hr_unit_id INTEGER,
+                      hr_source VARCHAR(8),
+                      hr_status INTEGER,
+                      hr_synced_at DATETIME,
+                      PRIMARY KEY (id),
+                      FOREIGN KEY(parent_unit_id) REFERENCES units (id))""");
+            s.execute("insert into units(id, name, parent_unit_id, level, hr_unit_id) values " +
+                    "(1, 'Old Root', null, 0, 500000)," +
+                    "(2, 'Old Child', 1, 1, 500001)");
+        }
+
+        UUID org = org("IMP-OLD", null);
+        person("imp-admin-old", "SYSTEM_ADMIN", org);
+        Api api = login("imp-admin-old");
+
+        Res p = api.post("/settings/db-migration/mover-units/preview", Map.of("file", db.getFileName().toString()));
+        assertThat(p.status()).isEqualTo(200);
+        assertThat(p.body().path("total").asInt()).isEqualTo(2);
+
+        Res c = api.post("/settings/db-migration/mover-units/commit", Map.of("file", db.getFileName().toString()));
+        assertThat(c.status()).isEqualTo(200);
+
+        List<String> statuses = jdbc.sql(
+                "select status from organization where code in ('MOVER-HR-500000','MOVER-HR-500001') order by code")
+                .query(String.class).list();
+        assertThat(statuses).containsExactly("ACTIVE", "ACTIVE");
+    }
+
+    @Test
     @DisplayName("A person without CONFIGURE cannot call the MOVER unit-import endpoints")
     void requireConfigure() throws Exception {
         Path db = dumps.inbox().resolve("perm-check-" + sfx + ".db");
@@ -151,11 +198,12 @@ class MoverUnitImportIT extends IntegrationTest {
                       display_alias VARCHAR(64),
                       PRIMARY KEY (id),
                       FOREIGN KEY(parent_unit_id) REFERENCES units (id))""");
-            s.execute("insert into units(id, name, parent_unit_id, level, hr_unit_id, hr_status) values " +
-                    "(1, 'Level 1 (تجريبي)', null, 0, 100000, 1)," +
-                    "(2, 'Level 2-1', 1, 1, 100001, 1)," +
-                    "(10, 'Level 2-2', 1, 1, 100002, 1)," +
-                    "(99, 'Orphan (no HR id)', 2, 2, null, 1)");
+            // MOVER ids chosen to not overlap with acceptsOlderSchema's ids (1, 2): source_external_id is the MOVER id
+            // and the IntegrationTest's shared Postgres carries rows between test methods.
+            s.execute("insert into units(id, name, parent_unit_id, level, hr_unit_id, hr_status) values (101, 'Level 1 (تجريبي)', null, 0, 100000, 1)");
+            s.execute("insert into units(id, name, parent_unit_id, level, hr_unit_id, hr_status) values (102, 'Level 2-1', 101, 1, 100001, 1)");
+            s.execute("insert into units(id, name, parent_unit_id, level, hr_unit_id, hr_status) values (110, 'Level 2-2', 101, 1, 100002, 1)");
+            s.execute("insert into units(id, name, parent_unit_id, level, hr_unit_id, hr_status) values (199, 'Orphan (no HR id)', 102, 2, null, 1)");
         }
     }
 }

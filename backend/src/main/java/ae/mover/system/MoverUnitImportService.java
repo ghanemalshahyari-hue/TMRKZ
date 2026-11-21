@@ -69,8 +69,11 @@ public class MoverUnitImportService {
         String code() {
             return hrUnitId != null ? "MOVER-HR-" + hrUnitId : "MOVER-U-" + id;
         }
+        /** hr_status=1 ACTIVE · hr_status=0 (or any other explicit non-1 value) RETIRED · NULL "no HR info" treated as
+         *  ACTIVE, since the older MOVER schema added hr_status after the fact and left it NULL for existing rows. */
         String status() {
-            return hrStatus != null && hrStatus == 1 ? "ACTIVE" : "RETIRED";
+            if (hrStatus == null) return "ACTIVE";
+            return hrStatus == 1 ? "ACTIVE" : "RETIRED";
         }
     }
 
@@ -234,8 +237,33 @@ public class MoverUnitImportService {
                     throw ApiException.validation("قاعدة SQLite لا تحتوي جدول units — ليست قاعدة MOVER.");
                 }
             }
-            try (PreparedStatement ps = c.prepareStatement(
-                    "select id, name, parent_unit_id, level, hr_unit_id, hr_status, display_alias from units order by id");
+            // MOVER has evolved its units schema over releases. Discover the columns actually present and ask only
+            // for those; required (id, name, parent_unit_id) are checked, optional (level, hr_unit_id, hr_status,
+            // display_alias) fall back to null if absent. This lets the importer accept both the current MOVER
+            // SQLite and older snapshots (e.g. transport_requests.2026-10-15-pre-untrack.db).
+            java.util.Set<String> columns = new java.util.HashSet<>();
+            try (Statement s = c.createStatement(); ResultSet rs = s.executeQuery("PRAGMA table_info(units)")) {
+                while (rs.next()) {
+                    columns.add(rs.getString("name"));
+                }
+            }
+            for (String required : List.of("id", "name", "parent_unit_id")) {
+                if (!columns.contains(required)) {
+                    throw ApiException.validation(
+                            "قاعدة SQLite لا تحتوي عمود " + required + " في جدول units — ليست قاعدة MOVER بشكل كامل.");
+                }
+            }
+            boolean hasLevel = columns.contains("level");
+            boolean hasHrId = columns.contains("hr_unit_id");
+            boolean hasHrStatus = columns.contains("hr_status");
+            boolean hasAlias = columns.contains("display_alias");
+            StringBuilder select = new StringBuilder("select id, name, parent_unit_id");
+            if (hasLevel) select.append(", level"); else select.append(", null as level");
+            if (hasHrId) select.append(", hr_unit_id"); else select.append(", null as hr_unit_id");
+            if (hasHrStatus) select.append(", hr_status"); else select.append(", null as hr_status");
+            if (hasAlias) select.append(", display_alias"); else select.append(", null as display_alias");
+            select.append(" from units order by id");
+            try (PreparedStatement ps = c.prepareStatement(select.toString());
                  ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     long id = rs.getLong("id");
