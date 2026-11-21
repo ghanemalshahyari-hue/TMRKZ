@@ -599,6 +599,149 @@ button.tz-summary-row:disabled { cursor: not-allowed; opacity: 0.6; }
    editor's own shell renders, so the way tabs don't feel like a brief image appears. */
 .tz-suspense-pane { flex: 1; min-height: 240px; }
 
+/* «الموقف العملياتي» — reference-matched rebuild (owner, 21 Nov 2026 UI rebuild): compact title; a full-bleed map
+   workspace that owns the viewport height; floating Layers on the left; a docked Units panel on the right; a floating
+   selected-unit card centred over the map; vertical map controls near the lower-left; a full-width bottom status dock.
+   The map is NEVER in the document flow — the workspace is position:relative and the map fills it with position:absolute. */
+.tz-posture3 { display: flex; flex-direction: column; min-height: 0; flex: 1; height: 100%; background: var(--tz-panel, var(--canvas, #fffcf6)); overflow: hidden; }
+.tz-posture3.tz-posture3-empty { align-items: center; justify-content: center; }
+.tz-posture3-title { display: flex; align-items: center; gap: 10px; padding: 8px 18px; border-bottom: 1px solid var(--tz-line); background: var(--tz-panel, var(--canvas, #fffcf6)); flex: none; }
+.tz-posture3-titles { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tz-posture3-titles > .icon { width: 20px; height: 20px; color: var(--accent, #8b5a2b); flex: none; }
+.tz-posture3-titles h1 { margin: 0; font-size: 17px; font-weight: 700; color: var(--ink, var(--tz-text)); line-height: 1.15; }
+.tz-posture3-titles p { margin: 1px 0 0; font-size: 11.5px; color: var(--muted, var(--tz-muted)); }
+
+.tz-posture3-workspace { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.tz-posture3-mapbody { position: absolute; inset: 0; }
+.tz-posture3-mapbody .tz-map-layer, .tz-posture3-mapbody .ml-offline { position: absolute; inset: 0; }
+
+/* Owner, 21 Nov 2026 UI closure §16: panel positioning is PHYSICAL (left:/right:) because `inset-inline-*` reverses in
+   RTL and the reference requires layers physically on the LEFT, units physically on the RIGHT. */
+/* -- Left floating Layers panel (physical LEFT, both LTR and RTL) -------------------------------------------------- */
+.tz-posture3-layers { position: absolute; top: 12px; left: 12px; z-index: 6; width: 260px; max-height: calc(100% - 24px); overflow: auto; background: color-mix(in srgb, var(--tz-panel, var(--canvas, #fff)) 92%, transparent); backdrop-filter: blur(6px); border: 1px solid var(--tz-line); border-radius: 12px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.15); padding: 10px 12px 12px; color: var(--ink, var(--tz-text)); }
+.tz-posture3-layers header { display: flex; align-items: center; gap: 8px; padding: 2px 0 8px; border-bottom: 1px solid var(--tz-line); }
+.tz-posture3-layers header .icon { width: 15px; height: 15px; color: var(--accent, #8b5a2b); }
+.tz-posture3-layers header b { font-size: 13px; }
+.tz-posture3-layers ul { list-style: none; margin: 8px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tz-posture3-layers li label { display: flex; align-items: center; gap: 8px; padding: 4px 4px; font-size: 12.5px; cursor: pointer; }
+.tz-posture3-layers li label.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.tz-posture3-layers li input[type="checkbox"] { width: 14px; height: 14px; accent-color: var(--accent, #8b5a2b); }
+.tz-posture3-layers li span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.tz-posture3-layers li span .icon { width: 13px; height: 13px; color: var(--muted, var(--tz-muted)); }
+.tz-posture3-opacity { padding-top: 6px; border-top: 1px dashed var(--tz-line); }
+.tz-posture3-opacity label { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--muted, var(--tz-muted)); margin-bottom: 4px; }
+.tz-posture3-opacity-value { font-weight: 700; color: var(--ink, var(--tz-text)); }
+.tz-posture3-opacity input[type="range"] { width: 100%; accent-color: var(--accent, #8b5a2b); }
+
+/* Legend swatches shared across the layers panel and the selected-unit card. */
+.tz-sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; flex: none; }
+.tz-sw-primary { background: color-mix(in srgb, #8b5cf6 60%, transparent); border: 1.5px solid #8b5cf6; }
+.tz-sw-sub { background: color-mix(in srgb, #10b981 40%, transparent); border: 1.5px dashed #10b981; }
+
+/* -- Right docked Units panel (physical RIGHT, both LTR and RTL) --------------------------------------------------- */
+.tz-posture3-units { position: absolute; top: 12px; right: 12px; bottom: 12px; z-index: 6; width: 320px; display: flex; flex-direction: column; background: color-mix(in srgb, var(--tz-panel, var(--canvas, #fff)) 92%, transparent); backdrop-filter: blur(6px); border: 1px solid var(--tz-line); border-radius: 12px; box-shadow: 0 4px 16px rgb(0 0 0 / 0.15); color: var(--ink, var(--tz-text)); overflow: hidden; }
+.tz-posture3-units > header { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px 14px; border-bottom: 1px solid var(--tz-line); flex: none; }
+.tz-posture3-units-title { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; }
+.tz-posture3-units-title .icon { width: 15px; height: 15px; color: var(--accent, #8b5a2b); }
+.tz-posture3-units-title b { font-weight: 700; }
+.tz-posture3-units-title em { font-style: normal; color: var(--muted, var(--tz-muted)); font-weight: 600; }
+.tz-posture3-units-search { display: flex; align-items: center; gap: 6px; margin: 10px 12px 6px; padding: 5px 10px; background: var(--paper, #fff); border: 1px solid var(--tz-line); border-radius: 999px; color: var(--muted, var(--tz-muted)); flex: none; }
+.tz-posture3-units-search .icon { width: 13px; height: 13px; }
+.tz-posture3-units-search input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; font-size: 12.5px; color: var(--ink, var(--tz-text)); min-width: 0; }
+.tz-posture3-units-tabs { display: flex; gap: 4px; padding: 0 12px 6px; flex: none; flex-wrap: wrap; }
+.tz-posture3-tab { background: transparent; border: 1px solid var(--tz-line); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 11.5px; color: var(--ink, var(--tz-text)); cursor: pointer; }
+.tz-posture3-tab span { color: var(--muted, var(--tz-muted)); font-weight: 600; margin-inline-start: 2px; }
+.tz-posture3-tab.is-active { background: var(--accent, #8b5a2b); color: #fff; border-color: var(--accent, #8b5a2b); }
+.tz-posture3-tab.is-active span { color: color-mix(in srgb, #fff 80%, transparent); }
+.tz-posture3-browse { margin-inline-start: auto; background: transparent; border: 1px solid var(--tz-line); border-radius: 8px; width: 28px; height: 24px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted, var(--tz-muted)); cursor: pointer; }
+.tz-posture3-browse:hover { border-color: var(--accent, #8b5a2b); color: var(--accent, #8b5a2b); }
+.tz-posture3-units-list { list-style: none; margin: 0; padding: 0 6px 10px; overflow: auto; flex: 1; min-height: 0; scrollbar-width: thin; }
+.tz-posture3-empty-row { padding: 10px 12px; color: var(--muted, var(--tz-muted)); font-size: 12px; }
+.tz-posture3-unit-row { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-bottom: 4px; background: transparent; border: 1px solid transparent; border-radius: 10px; font: inherit; color: inherit; cursor: pointer; text-align: inherit; }
+.tz-posture3-unit-row:hover:not(.is-selected) { background: color-mix(in srgb, var(--accent, #8b5a2b) 7%, transparent); border-color: var(--tz-line); }
+.tz-posture3-unit-row.is-selected { background: var(--accent, #8b5a2b); color: #fff; border-color: var(--accent, #8b5a2b); box-shadow: 0 1px 3px rgb(0 0 0 / 0.1); }
+.tz-posture3-unit-icon { width: 28px; height: 28px; border-radius: 8px; background: color-mix(in srgb, var(--accent, #8b5a2b) 10%, var(--paper, #fff)); color: var(--accent, #8b5a2b); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.tz-posture3-unit-icon .icon { width: 14px; height: 14px; }
+.tz-posture3-unit-row.is-selected .tz-posture3-unit-icon { background: color-mix(in srgb, #fff 20%, transparent); color: #fff; }
+.tz-posture3-unit-meta { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.15; }
+.tz-posture3-unit-meta b { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tz-posture3-unit-meta small { font-size: 11px; opacity: 0.85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tz-posture3-unit-row.is-selected .tz-posture3-unit-meta small { color: #ffe7cf; opacity: 1; }
+.tz-posture3-unit-state { font-size: 12px; flex: none; color: var(--muted, var(--tz-muted)); }
+.tz-posture3-unit-state.on { color: var(--green, var(--tz-green, #4b6b47)); }
+.tz-posture3-unit-state.temp { color: var(--orange, var(--tz-orange, #d9822b)); }
+.tz-posture3-unit-state.off { color: color-mix(in srgb, var(--red, var(--tz-red, #9a2a22)) 60%, var(--muted, var(--tz-muted))); }
+.tz-posture3-unit-row.is-selected .tz-posture3-unit-state { color: #fff; }
+
+/* -- Floating context-detail card (physical, to the LEFT of the units panel; brief §12 one-at-a-time) -------------- */
+.tz-posture3-detail { position: absolute; top: 12px; right: 352px; z-index: 5; width: min(360px, calc(100% - 420px)); background: color-mix(in srgb, var(--tz-panel, var(--canvas, #fff)) 95%, transparent); border: 1px solid var(--tz-line); border-radius: 12px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.18); color: var(--ink, var(--tz-text)); overflow: hidden; }
+.tz-posture3-detail-site .tz-posture3-detail-icon { background: color-mix(in srgb, var(--muted, var(--tz-muted)) 60%, var(--accent, #8b5a2b)); }
+.tz-posture3-detail-note { margin: 0; padding: 10px 14px; font-size: 12px; color: var(--muted, var(--tz-muted)); border-top: 1px solid var(--tz-line); }
+.tz-posture3-detail header { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: color-mix(in srgb, var(--accent, #8b5a2b) 18%, var(--tz-panel, var(--canvas, #fff))); border-bottom: 1px solid var(--tz-line); }
+.tz-posture3-detail-icon { width: 30px; height: 30px; border-radius: 10px; background: var(--accent, #8b5a2b); color: #fff; display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.tz-posture3-detail-icon .icon { width: 16px; height: 16px; }
+.tz-posture3-detail header > div { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+.tz-posture3-detail header b { font-size: 13.5px; }
+.tz-posture3-detail header small { font-size: 11.5px; color: var(--muted, var(--tz-muted)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tz-posture3-detail-close { background: transparent; border: 0; color: var(--muted, var(--tz-muted)); font: inherit; font-size: 18px; width: 24px; height: 24px; border-radius: 6px; cursor: pointer; }
+.tz-posture3-detail-close:hover { background: color-mix(in srgb, var(--tz-line) 60%, transparent); color: var(--ink, var(--tz-text)); }
+.tz-posture3-detail-body { margin: 0; padding: 10px 14px 12px; display: grid; gap: 8px; font-size: 12.5px; }
+.tz-posture3-detail-body > div { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--tz-line); }
+.tz-posture3-detail-body > div:last-child { border-bottom: 0; }
+.tz-posture3-detail-body dt { display: inline-flex; align-items: center; gap: 6px; color: var(--muted, var(--tz-muted)); font-weight: 600; }
+.tz-posture3-detail-body dt .icon { width: 13px; height: 13px; }
+.tz-posture3-detail-body dd { margin: 0; font-weight: 600; color: var(--ink, var(--tz-text)); text-align: end; }
+
+/* -- Map controls bottom-left (physical LEFT) --------------------------------------------------------------------- */
+.tz-posture3-mapctl { position: absolute; bottom: 14px; left: 14px; z-index: 5; display: flex; flex-direction: column; gap: 8px; }
+.tz-posture3-mapctl .tz-segment, .tz-posture3-mapctl .tz-view-switch { background: color-mix(in srgb, var(--tz-panel, var(--canvas, #fff)) 92%, transparent); border: 1px solid var(--tz-line); border-radius: 10px; padding: 3px; }
+.tz-posture3-mapctl-btn { width: 36px; height: 36px; background: color-mix(in srgb, var(--tz-panel, var(--canvas, #fff)) 92%, transparent); border: 1px solid var(--tz-line); border-radius: 10px; color: var(--ink, var(--tz-text)); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.tz-posture3-mapctl-btn:hover { border-color: var(--accent, #8b5a2b); color: var(--accent, #8b5a2b); }
+.tz-posture3-legend { position: absolute; bottom: 14px; right: 352px; z-index: 5; }
+
+/* -- Bottom status dock -------------------------------------------------------------------------------------------- */
+.tz-posture3-dock { flex: none; display: flex; align-items: center; gap: 24px; padding: 10px 18px; border-top: 1px solid var(--tz-line); background: var(--tz-panel-2, color-mix(in srgb, var(--canvas, #fff) 90%, transparent)); font-size: 12.5px; overflow-x: auto; scrollbar-width: thin; }
+.tz-posture3-dock > span { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+.tz-posture3-dock > span .icon { width: 15px; height: 15px; color: var(--accent, #8b5a2b); }
+.tz-posture3-dock b { font-size: 16px; color: var(--ink, var(--tz-text)); font-weight: 700; }
+.tz-posture3-dock small { color: var(--muted, var(--tz-muted)); }
+.tz-posture3-dock-updated { margin-inline-start: auto; flex-direction: column !important; align-items: flex-start !important; gap: 2px !important; line-height: 1.1; }
+.tz-posture3-dock-updated b { font-size: 11.5px; font-weight: 600; color: var(--muted, var(--tz-muted)); }
+
+/* -- Drawer + chooser dialogs -------------------------------------------------------------------------------------- */
+.tz-posture3-drawer, .tz-posture3-chooser { position: fixed; inset: 0; z-index: 60; display: flex; justify-content: flex-start; }
+.tz-posture3-drawer-shade, .tz-posture3-chooser-shade { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.35); }
+.tz-posture3-drawer-panel { position: relative; height: 100%; width: min(420px, 94vw); background: var(--tz-panel, var(--canvas, #fffcf6)); border-inline-end: 1px solid var(--tz-line); box-shadow: 4px 0 24px rgb(0 0 0 / 0.18); display: flex; flex-direction: column; }
+.tz-posture3-drawer-panel > header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--tz-line); gap: 8px; }
+.tz-posture3-drawer-body { flex: 1; min-height: 0; overflow: auto; padding: 8px; }
+.tz-posture3-chooser { align-items: center; justify-content: center; }
+.tz-posture3-chooser-panel { position: relative; width: min(420px, 94vw); max-height: 70vh; background: var(--tz-panel, var(--canvas, #fffcf6)); border: 1px solid var(--tz-line); border-radius: 12px; box-shadow: 0 10px 40px rgb(0 0 0 / 0.25); display: flex; flex-direction: column; }
+.tz-posture3-chooser-panel > header { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--tz-line); }
+.tz-posture3-chooser-panel > header small { color: var(--muted, var(--tz-muted)); font-size: 11.5px; margin-inline-end: auto; margin-inline-start: 8px; }
+.tz-posture3-chooser-panel ul { list-style: none; margin: 0; padding: 6px; overflow: auto; }
+.tz-posture3-chooser-panel li button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: transparent; border: 1px solid transparent; border-radius: 10px; font: inherit; color: inherit; text-align: inherit; cursor: pointer; }
+.tz-posture3-chooser-panel li button:hover { background: color-mix(in srgb, var(--accent, #8b5a2b) 8%, transparent); border-color: var(--tz-line); }
+
+/* -- Responsive breakpoints (physical left/right) ------------------------------------------------------------------ */
+@media (max-width: 1440px) {
+  .tz-posture3-units { width: 280px; }
+  .tz-posture3-detail { right: 312px; }
+  .tz-posture3-legend { right: 312px; }
+}
+@media (max-width: 1200px) {
+  .tz-posture3-layers { width: 220px; }
+  .tz-posture3-units { width: 260px; }
+  .tz-posture3-detail { right: 290px; width: min(300px, calc(100% - 350px)); }
+}
+@media (max-width: 960px) {
+  .tz-posture3-layers { top: 8px; left: 8px; width: 48px; padding: 8px; }
+  .tz-posture3-layers header b, .tz-posture3-layers ul, .tz-posture3-opacity { display: none; }
+  .tz-posture3-layers header { justify-content: center; border: 0; padding: 0; }
+  .tz-posture3-units { width: calc(100% - 16px); right: 8px; left: 8px; top: auto; bottom: 8px; max-height: 45vh; }
+  .tz-posture3-detail { right: 50%; transform: translateX(50%); top: 60px; width: min(320px, 90%); }
+  .tz-posture3-legend { display: none; }
+}
+
 /* «الموقف العملياتي» Design 2 shell (owner, 21 Nov 2026 UI closure Phase 1): title + subtitle, horizontal unit selector
    with search, cohort chips and «استعراض الوحدات», a dominant map in the centre, a side details panel and a scoped
    posture summary along the bottom. The hierarchy is secondary and lives in a drawer. */
