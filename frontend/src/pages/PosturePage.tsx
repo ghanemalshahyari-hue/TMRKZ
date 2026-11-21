@@ -109,18 +109,65 @@ export function PosturePage() {
     return () => { live = false; };
   }, [unit, pendingList]);
 
-  // Pending-geometry GeoJSON: proposed site + proposed PRIMARY + proposed SUB from the fetched request's content.
+  /** Rough centroid of a GeoJSON polygon/multipolygon/point — enough to anchor a connector endpoint. */
+  const centreOf = (g: GeomLike): [number, number] | null => {
+    if (!g || !g.type) return null;
+    if (g.type === 'Point') return g.coordinates as [number, number];
+    const ring = g.type === 'Polygon' ? (g.coordinates as [number, number][][])[0] : ((g.coordinates as [number, number][][][])[0] ?? [])[0];
+    if (!ring?.length) return null;
+    let lng = 0, lat = 0;
+    for (const [x, y] of ring) { lng += x; lat += y; }
+    return [lng / ring.length, lat / ring.length];
+  };
+  /** Initial bearing (degrees from north) for the line between two lng/lat points. */
+  const bearing = (from: [number, number], to: [number, number]): number => {
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const [x1, y1] = from; const [x2, y2] = to;
+    const y = Math.sin(toRad(x2 - x1)) * Math.cos(toRad(y2));
+    const x = Math.cos(toRad(y1)) * Math.sin(toRad(y2)) - Math.sin(toRad(y1)) * Math.cos(toRad(y2)) * Math.cos(toRad(x2 - x1));
+    return (Math.atan2(y, x) * 180) / Math.PI;
+  };
+
+  /**
+   * Pending-geometry GeoJSON: proposed site + proposed PRIMARY + proposed SUB from the fetched request, PLUS the
+   * connector lines/arrows an operator reads as "from here → to there" — the same convention as RequestMap's move/leg
+   * layers, but amber-dashed so they can't be confused with the approved posture.
+   *   - RESTATIONING: current site centroid → proposed site centroid → each proposed area centroid.
+   *   - DEPLOYMENT_AREAS: current site centroid → each proposed area centroid (the site itself does not move).
+   */
   const pendingFC = useMemo<GeoJSON.FeatureCollection>(() => {
     const features: GeoJSON.Feature[] = [];
-    if (pendingReq) {
+    if (pendingReq && unit) {
       const c = pendingReq.content;
       const unitId = pendingReq.requestingUnit.id;
-      if (c.site?.geometry) features.push({ type: 'Feature', geometry: c.site.geometry as unknown as GeoJSON.Geometry, properties: { role: 'SITE', unitId, requestNumber: pendingReq.number } });
-      if (c.primary) features.push({ type: 'Feature', geometry: c.primary as GeoJSON.Geometry, properties: { role: 'PRIMARY', unitId, requestNumber: pendingReq.number } });
-      if (c.alternative) features.push({ type: 'Feature', geometry: c.alternative as GeoJSON.Geometry, properties: { role: 'SUB', unitId, requestNumber: pendingReq.number } });
+      const number = pendingReq.number;
+      const currentCentre = centreOf(unit.site?.geometry as GeomLike);
+      const proposedSiteCentre = c.site?.geometry ? centreOf(c.site.geometry as GeomLike) : currentCentre;
+      const primaryCentre = c.primary ? centreOf(c.primary as GeomLike) : null;
+      const subCentre = c.alternative ? centreOf(c.alternative as GeomLike) : null;
+
+      if (c.site?.geometry) features.push({ type: 'Feature', geometry: c.site.geometry as unknown as GeoJSON.Geometry, properties: { role: 'SITE', unitId, requestNumber: number } });
+      if (c.primary) features.push({ type: 'Feature', geometry: c.primary as GeoJSON.Geometry, properties: { role: 'PRIMARY', unitId, requestNumber: number } });
+      if (c.alternative) features.push({ type: 'Feature', geometry: c.alternative as GeoJSON.Geometry, properties: { role: 'SUB', unitId, requestNumber: number } });
+
+      // The move connector (RESTATIONING only): current site → proposed site. For DEPLOYMENT_AREAS there is no move.
+      if (pendingReq.purpose === 'RESTATIONING' && currentCentre && proposedSiteCentre && c.site?.geometry) {
+        features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [currentCentre, proposedSiteCentre] }, properties: { role: 'MOVE', unitId, requestNumber: number } });
+        features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: proposedSiteCentre }, properties: { role: 'MOVE_HEAD', unitId, rotate: bearing(currentCentre, proposedSiteCentre), requestNumber: number } });
+      }
+      // The deployment legs: proposed (or current) site → each proposed area.
+      const anchor = proposedSiteCentre ?? currentCentre;
+      if (anchor && primaryCentre) {
+        features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [anchor, primaryCentre] }, properties: { role: 'LEG', leg: 'PRIMARY', unitId, requestNumber: number } });
+        features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: primaryCentre }, properties: { role: 'LEG_HEAD', leg: 'PRIMARY', unitId, rotate: bearing(anchor, primaryCentre), requestNumber: number } });
+      }
+      if (anchor && subCentre) {
+        features.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: [anchor, subCentre] }, properties: { role: 'LEG', leg: 'SUB', unitId, requestNumber: number } });
+        features.push({ type: 'Feature', geometry: { type: 'Point', coordinates: subCentre }, properties: { role: 'LEG_HEAD', leg: 'SUB', unitId, rotate: bearing(anchor, subCentre), requestNumber: number } });
+      }
     }
     return { type: 'FeatureCollection', features };
-  }, [pendingReq]);
+  }, [pendingReq, unit]);
   const req = useMemo(() => (unit ? asMapRequest(unit) : null), [unit]);
   useEffect(() => setFit((k) => k + 1), [selected]);
 
@@ -254,6 +301,47 @@ export function PosturePage() {
       filter: ['==', ['get', 'role'], 'SUB'],
       paint: { 'line-color': '#d97706', 'line-width': 2.2, 'line-dasharray': [1.5, 2] },
     });
+    // Move line (RESTATIONING: current site → proposed site) — amber dashed with an arrow head at the destination end.
+    addOverlayLayer(map, {
+      id: 'pending-move', type: 'line', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'MOVE'],
+      layout: { 'line-cap': 'round' },
+      paint: { 'line-color': '#f59e0b', 'line-width': 2.8, 'line-dasharray': [2.5, 2] },
+    });
+    addOverlayLayer(map, {
+      id: 'pending-move-head', type: 'symbol', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'MOVE_HEAD'],
+      layout: {
+        'icon-image': 'tz-arrow-primary',
+        'icon-rotate': ['get', 'rotate'],
+        'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+        'icon-size': 1.2,
+      },
+    }, 'top');
+    // Deployment legs (proposed/current site → proposed PRIMARY / SUB) — amber dashed with their own arrow heads.
+    addOverlayLayer(map, {
+      id: 'pending-leg', type: 'line', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'LEG'],
+      layout: { 'line-cap': 'round' },
+      paint: {
+        'line-color': ['match', ['get', 'leg'], 'SUB', '#d97706', '#f59e0b'] as never,
+        'line-width': 2.4,
+        'line-dasharray': [2.2, 1.8],
+      },
+    });
+    addOverlayLayer(map, {
+      id: 'pending-leg-head', type: 'symbol', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'LEG_HEAD'],
+      layout: {
+        'icon-image': ['match', ['get', 'leg'], 'SUB', 'tz-arrow-alternative', 'tz-arrow-primary'] as never,
+        'icon-rotate': ['get', 'rotate'],
+        'icon-rotation-alignment': 'map',
+        'icon-allow-overlap': true,
+        'icon-ignore-placement': true,
+      },
+    }, 'top');
     // keep the silence warning for the clickSiteRef usage elsewhere
     void clickSiteRef;
   }, [map, postureFC]);
