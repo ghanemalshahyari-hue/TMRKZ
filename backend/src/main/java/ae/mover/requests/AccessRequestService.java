@@ -277,7 +277,9 @@ public class AccessRequestService {
         out.put("unit", orgName(unit));
         out.put("available", type != null && workflows.latestPublished(type) != null);
         out.put("requestable", requestable());
-        out.put("scopeUnits", unit == null ? List.of() : orgTree(unit));
+        // ADR-094 (owner): the scope a person may ask for is their MAIN unit's tree — the main unit above their unit and every
+        // branch under it — never another main unit's; the same tree is checked when the request is sent
+        out.put("scopeUnits", unit == null ? List.of() : orgTree(mainUnitOf(unit)));
         out.put("scopeSites", unit == null ? List.of() : linkedSites(unit));
         out.put("held", jdbc.sql("""
                 select distinct role_code from membership where person_id = :p and valid_from <= now() and (valid_to is null or valid_to > now())""")
@@ -330,6 +332,7 @@ public class AccessRequestService {
         out.put("rank", c.rank());
         out.put("position", c.position());
         out.put("unit", c.unitName());
+        out.put("unitId", c.unitOrgId() == null ? null : c.unitOrgId().toString());
         out.put("mainUnit", c.mainUnitName());
         out.put("source", c.source() == EmploymentContextResolver.Source.ORACLE ? "الموارد البشرية" : "الدليل المؤسسي");
         out.put("sourceCode", c.source().name());
@@ -380,6 +383,24 @@ public class AccessRequestService {
         };
     }
 
+    /**
+     * The main unit of a unit (ADR-064/094): the nearest unit, from this one upward, that the published HR snapshot marks as a
+     * main unit; a directory-placed unit without HR data, or a unit above every main unit, is its own tree.
+     */
+    UUID mainUnitOf(UUID unit) {
+        if (unit == null) {
+            return null;
+        }
+        UUID main = jdbc.sql("""
+                with recursive up(id, parent_id, ext, depth) as (
+                  select o.id, o.parent_id, o.source_external_id, 0 from organization o where o.id = :u
+                  union all select o.id, o.parent_id, o.source_external_id, up.depth + 1 from organization o join up on o.id = up.parent_id where up.depth < 40)
+                select up.id from up join hr_unit h on h.external_id = up.ext
+                  and h.snapshot_id = (select id from hr_snapshot where status = 'PUBLISHED')
+                where h.is_main order by up.depth limit 1""").param("u", unit).query(UUID.class).optional().orElse(null);
+        return main != null ? main : unit;
+    }
+
     private List<Map<String, Object>> orgTree(UUID unit) {
         return jdbc.sql("""
                 with recursive t(id, name, depth) as (
@@ -416,7 +437,7 @@ public class AccessRequestService {
                 return new Scope(scope.mode(), List.of());
             }
             case "UNITS" -> {
-                Set<String> tree = new HashSet<>(orgTree(unit).stream().map(m -> m.get("id").toString()).toList());
+                Set<String> tree = new HashSet<>(orgTree(mainUnitOf(unit)).stream().map(m -> m.get("id").toString()).toList());
                 if (ids.isEmpty() || !ids.stream().allMatch(i -> tree.contains(i.toString()))) {
                     throw ApiException.validation("اختر وحدات من وحدتك وما يتبعها.");
                 }

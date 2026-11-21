@@ -12,6 +12,7 @@ describe('request purposes after ADR-078', () => {
 
   it('a request of that purpose made before is still read with its title', () => {
     expect(isPurpose('INITIAL_STATIONING')).toBe(true);
-    expect(PURPOSE_TITLE.INITIAL_STATIONING).toBe('طلب تمركز أولي');
+    // Owner UX consolidation §9 (20 Nov 2026): legacy records never read «إعادة تمركز» or «تمركز أولي» inside the editor.
+    expect(PURPOSE_TITLE.INITIAL_STATIONING).toBe('طلب اعتماد موقع قديم');
   });
 });

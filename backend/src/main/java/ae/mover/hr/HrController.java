@@ -60,6 +60,12 @@ public class HrController {
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(hr.runNow(access.context(actor), in == null ? null : in.overrideReason()));
     }
 
+    /** ADR-094 «معاينة الوحدات»: read-only; nothing is written to the units. */
+    @PostMapping("/hr/units/preview")
+    public Map<String, Object> previewUnits(Actor actor) {
+        return hr.previewUnits(access.context(actor));
+    }
+
     @GetMapping("/hr/source")
     public Map<String, Object> source(Actor actor) {
         return hr.sourceView(access.context(actor));

@@ -48,6 +48,8 @@ import ae.mover.hr.HrPeopleService;
 @Service
 public class IdentityService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(IdentityService.class);
+
     private final JdbcClient jdbc;
     private final Clock clock;
     private final HrAdminService hr;
@@ -110,6 +112,12 @@ public class IdentityService {
             }
             if (mode == EmploymentContextResolver.Source.ORACLE) {
                 toOracle(person, id);
+                // ADR-094: the person's HR record is refreshed on this need when older than a day; HR not answering changes nothing
+                try {
+                    hrPeople.refreshIfStale(person);
+                } catch (RuntimeException e) {
+                    log.info("HR refresh skipped on sign-in: {}", e.getClass().getSimpleName());
+                }
             }
             employment.observe(person, id);
             return person;
@@ -134,6 +142,27 @@ public class IdentityService {
                 && ("NO_MATCH".equals(m.reason()) || "STALE_SOURCE".equals(m.reason()))) {
             UUID person = directoryPerson(id);
             if (person != null) {
+                employment.observe(person, id);
+                return person;
+            }
+        }
+        // ADR-094 (owner, 20 Nov 2026): Oracle is not a dependency of the sign-in. With «الدخول بالدليل يكفي» on, a verified
+        // directory sign-in that HR cannot confirm now — HR not answering, or its data stale beyond the policy — enters as a
+        // zero-access person from the directory's own attributes, marked «بانتظار مطابقة HR»; a later sign-in or lookup matches
+        // the HR record onto them (toOracle). An ambiguous, inactive or already linked record is still refused and reviewed.
+        // (HR answering that it does not know the key is still refused and reviewed: the toggle covers HR not answering.)
+        if (mode == EmploymentContextResolver.Source.ORACLE && !id.platformRole() && hrPeople.directorySignInSuffices()
+                && ("SOURCE_UNAVAILABLE".equals(m.reason()) || "STALE_SOURCE".equals(m.reason()))) {
+            UUID person;
+            try {
+                person = directoryPerson(id);
+            } catch (ApiException conflict) {
+                // the login or number is already someone's: the original answer (HR not answering) is the one to review
+                throw refuse(id, m.reason(), m.message());
+            }
+            if (person != null) {
+                jdbc.sql("update person set hr_match_pending = true where id = :p").param("p", person).update();
+                audit.system("IDENTITY_HR_MATCH_PENDING", "PERSON", person.toString(), id.displayName(), Map.of("reason", m.reason()));
                 employment.observe(person, id);
                 return person;
             }
@@ -250,7 +279,10 @@ public class IdentityService {
         String refused = adoptInto(person, (String) p.get("employee_no"), found.get(0));
         if (refused != null) {
             deferred(person, refused);
+            return;
         }
+        jdbc.sql("update person set hr_match_pending = false, hr_fetched_at = :now where id = :p").param("now", Db.ts(clock.instant())).param("p", person).update();
+        audit.system("IDENTITY_HR_MATCHED", "PERSON", person.toString(), null, Map.of("via", "SIGN_IN"));
     }
 
     /**
@@ -487,6 +519,12 @@ public class IdentityService {
     private static final String PLATFORM_PREFIX = "PLATFORM-";
     /** Every administrative right: configuration, access, facilities, source identifiers (مدير النظام) and audit. */
     private static final List<String> PLATFORM_ROLES = List.of("SYSTEM_ADMIN", "AUDITOR");
+    /** The «developer» platform account carries a temporary wide-open role in addition (V59, owner 20 Nov 2026). */
+    private static final List<String> PLATFORM_ROLES_DEVELOPER = List.of("SYSTEM_ADMIN", "AUDITOR", "DEVELOPER");
+
+    private List<String> platformRolesFor(String login) {
+        return "developer".equals(login) ? PLATFORM_ROLES_DEVELOPER : PLATFORM_ROLES;
+    }
 
     /**
      * A lasting platform account («admin», «developer»): a local user of the identity provider holding the realm role
@@ -515,7 +553,7 @@ public class IdentityService {
                 .param("e", PLATFORM_PREFIX + login).query(UUID.class).optional()
                 .orElseThrow(() -> platformRefused(id, "PLATFORM_CONFLICT", "اسم حساب المنصة محجوز لسجل آخر."));
         if (created > 0) {
-            audit.system("PLATFORM_ACCOUNT_CREATED", "PERSON", person.toString(), login, Map.of("login", login, "roles", PLATFORM_ROLES));
+            audit.system("PLATFORM_ACCOUNT_CREATED", "PERSON", person.toString(), login, Map.of("login", login, "roles", platformRolesFor(login)));
         }
         UUID linkedTo = jdbc.sql("select person_id from identity_link where issuer = :i and subject = :s")
                 .param("i", id.issuer()).param("s", id.subject()).query(UUID.class).optional().orElse(null);
@@ -536,7 +574,7 @@ public class IdentityService {
             jdbc.sql("insert into organization(id, code, name, valid_from) values (:id, 'LOCAL-ROOT', 'المؤسسة (تهيئة أولى)', :now)")
                     .param("id", org).param("now", Db.ts(now)).update();
         }
-        for (String role : PLATFORM_ROLES) {
+        for (String role : platformRolesFor(login)) {
             int current = jdbc.sql("""
                     select count(*) from membership where person_id = :p and role_code = :r
                       and valid_from <= :now and (valid_to is null or valid_to > :now)""")

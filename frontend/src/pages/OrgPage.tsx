@@ -4,6 +4,8 @@ import type { Delegation, Member, OrgDetail, RoleDef } from '../api/types';
 import { pickableRoles } from '../lib/rolePicker';
 import { PersonPicker } from '../components/access/pickers';
 import { OrgSymbol, SymbolAssignment, SymbolLegend } from '../components/UnitSymbol';
+import { Icon } from '../components/ui';
+import { rememberReturn } from '../lib/returnContext';
 import { flatSource } from '../components/tree/tree';
 import { UnitTree } from '../components/tree/UnitTree';
 import { Dialog, DialogHead, Heading } from '../components/ui';
@@ -148,6 +150,19 @@ export function OrgPage() {
               <OrgSymbol orgId={current} size={44} withText />
               <h2>{name}</h2>
             </div>
+            {app.can('CREATE_RESTATIONING') && current && (
+              <div className="flex" style={{ gap: 8, margin: '8px 0 6px' }}>
+                {/* Owner UX consolidation §5 (20 Nov 2026): the unit → مساحة التمركز path, with the unit preselected. */}
+                <a
+                  className="button compact primary"
+                  data-testid="org-start-restation"
+                  href={'#restationing/new?unit=' + current + '&purpose=RESTATIONING'}
+                  onClick={() => rememberReturn('#org')}
+                >
+                  <Icon name="map" /> طلب إعادة تمركز لهذه الوحدة
+                </a>
+              </div>
+            )}
             <SymbolLegend />
             {app.can('CONFIGURE') && current && <SymbolAssignment key={current} orgId={current} orgName={name} />}
             <p className="micro muted" style={{ marginTop: 7 }}>

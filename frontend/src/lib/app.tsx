@@ -1,11 +1,11 @@
 import { createContext, useContext } from 'react';
-import type { Me, OrgNode, Permission, RequestType, Settings, Site } from '../api/types';
+import type { SystemState, Me, OrgNode, Permission, RequestType, Settings, Site } from '../api/types';
 import { STATIONING_V3_ENABLED } from './stationingV3';
 
 /** The chart studio's page is a rollout of its own. Only a build that says «false» leaves it out (docker-compose defaults to that). */
 export const FLOW_STUDIO_UI_ENABLED = import.meta.env.VITE_FLOW_STUDIO !== 'false';
 
-export type View = 'home' | 'newRequest' | 'allRequests' | 'posture' | 'siteSetup' | 'stationing' | 'restationing' | 'stationingPolicy' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs' | 'requestAccess' | 'accessInbox' | 'support' | 'supportConsole';
+export type View = 'home' | 'newRequest' | 'allRequests' | 'posture' | 'siteSetup' | 'stationing' | 'restationing' | 'stationingPolicy' | 'requests' | 'review' | 'calendar' | 'org' | 'workflow' | 'forms' | 'permissions' | 'settings' | 'audit' | 'docs' | 'requestAccess' | 'accessInbox' | 'support' | 'supportConsole' | 'requestHealth';
 
 /**
  * The views, in the prototype NAV's order (the last entry replaces «حزمة البناء»). #stationing is now «المواقع», the
@@ -37,6 +37,7 @@ export const NAV: [View, string, string][] = [
   ['accessInbox', 'check', 'طلبات الصلاحية'],
   ['requestAccess', 'shield', 'طلب صلاحية'],
   ['settings', 'filter', 'إعدادات النظام'],
+  ['requestHealth', 'shield', 'صحة الطلبات'],
   ['audit', 'clock', 'سجل الإجراءات'],
   ['docs', 'download', 'التوثيق والتشغيل'],
   // «مركز الدعم» for everyone, «لوحة الدعم» for support seats (ADR-053)
@@ -85,6 +86,8 @@ export type AppContextValue = {
   mapDate: string;
   setMapDate: (d: string) => void;
   sites: Site[];
+  /** ADR-094: the installation's state; null while unknown. Empty: the operational screens show no map. */
+  state: SystemState | null;
   requestTypes: RequestType[];
   orgs: FlatOrg[];
   settings: Settings | null;

@@ -98,7 +98,10 @@ public class EmploymentContextResolver {
     /** The unit the person asks for and is routed by (access requests), or null. */
     public UUID unitOf(UUID person) {
         Source mode = mode();
-        return placement(person, mode, mode == Source.LDAP ? profile(person) : null, mode == Source.ORACLE ? hrRow(person) : null).org();
+        Map<String, Object> h = mode == Source.ORACLE ? hrRow(person) : null;
+        // ADR-094: a person the directory admitted before HR confirmed them has no HR row yet; the directory's own attributes place them
+        Map<String, Object> d = mode == Source.LDAP || h == null ? profile(person) : null;
+        return placement(person, mode, d, h).org();
     }
 
     /** The whole context of a person, for the identity card and the access-request page. */
@@ -108,7 +111,7 @@ public class EmploymentContextResolver {
         Source mode = mode();
         Map<String, Object> d = profile(person);
         Map<String, Object> h = hrRow(person);
-        Placement pl = placement(person, mode, mode == Source.LDAP ? d : null, mode == Source.ORACLE ? h : null);
+        Placement pl = placement(person, mode, mode == Source.LDAP || h == null ? d : null, mode == Source.ORACLE ? h : null);
         String rank;
         String position;
         Instant observed;
@@ -221,7 +224,9 @@ public class EmploymentContextResolver {
 
     /** The unit by the rule of the source in force (class comment). */
     private Placement placement(UUID person, Source mode, Map<String, Object> directory, Map<String, Object> oracle) {
-        if (mode == Source.ORACLE) {
+        // Oracle in force and this person known to it; a person without an HR row (admitted from the directory, ADR-094) is placed
+        // by the directory's attributes below, exactly as in the directory mode
+        if (mode == Source.ORACLE && (oracle != null || directory == null)) {
             String stated = text(oracle, "unit_external_id");
             UUID posted = affiliation(person);
             if (posted != null) {

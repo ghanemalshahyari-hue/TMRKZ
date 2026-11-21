@@ -67,7 +67,40 @@ public class HrAdminService {
         out.put("configured", src != null && src.get("settings_ciphertext") != null);
         out.put("enabled", src != null && (Boolean) src.get("enabled"));
         out.put("sourceName", src == null ? null : src.get("name"));
-        out.put("intervalSeconds", props.syncIntervalSeconds());
+        // ADR-094: the schedule is the source's own (auto_sync every sync_interval_hours), not the environment's
+        boolean autoSync = src != null && Boolean.TRUE.equals(src.get("auto_sync"));
+        int intervalHours = src == null ? 24 : ((Number) src.get("sync_interval_hours")).intValue();
+        out.put("autoSync", autoSync);
+        out.put("syncIntervalHours", intervalHours);
+        out.put("intervalSeconds", intervalHours * 3600L);
+        out.put("peopleSync", src != null && Boolean.TRUE.equals(src.get("people_sync")));
+        out.put("directorySignInSuffices", src == null || Boolean.TRUE.equals(src.get("directory_sign_in_suffices")));
+        out.put("personRefreshHours", src == null ? 24 : ((Number) src.get("person_refresh_hours")).intValue());
+        // the source as last seen: its connection test and its units preview (ADR-094), against what is held locally
+        out.put("sourceConnection", src == null || src.get("last_connection_at") == null ? null
+                : Map.of("ok", Boolean.TRUE.equals(src.get("last_connection_ok")), "at", Db.toInstant(src.get("last_connection_at")).toString()));
+        Map<String, Object> preview = null;
+        if (src != null && src.get("last_preview") != null) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> read = json.read(src.get("last_preview").toString(), Map.class);
+                preview = read;
+            } catch (RuntimeException e) {
+                preview = null;
+            }
+        }
+        out.put("lastPreview", preview);
+        out.put("lastPreviewAt", src == null || src.get("last_preview_at") == null ? null : Db.toInstant(src.get("last_preview_at")).toString());
+        out.put("localMainUnits", jdbc.sql("""
+                select count(*) from hr_unit u join hr_snapshot s on s.id = u.snapshot_id
+                where s.status = 'PUBLISHED' and u.is_main and u.active""").query(Long.class).single());
+        out.put("lastAttemptAt", jdbc.sql("select max(started_at) from hr_sync_run").query(java.time.OffsetDateTime.class).optional()
+                .map(t -> t.toInstant().toString()).orElse(null));
+        out.put("lastChanges", lastChanges());
+        out.put("unitsImported", jdbc.sql("select count(*) from organization where source = 'HR' and status = 'ACTIVE'").query(Long.class).single());
+        out.put("peopleFetched", jdbc.sql("select count(*) from person where source = 'HR'").query(Long.class).single());
+        out.put("peopleRefreshedLastDay", jdbc.sql("select count(*) from person where hr_fetched_at > :t").param("t", Db.ts(now.minus(Duration.ofHours(24)))).query(Long.class).single());
+        out.put("pendingHrMatches", jdbc.sql("select count(*) from person where hr_match_pending and status = 'ACTIVE'").query(Long.class).single());
         out.put("running", sync.running());
         Map<String, Object> mapping = src == null ? null : jdbc.sql(
                 "select version from hr_mapping_version where source_id = :s and status = 'PUBLISHED'")
@@ -88,7 +121,8 @@ public class HrAdminService {
         Map<String, Object> last = runs.isEmpty() ? null : runs.get(0);
         out.put("lastRun", last);
         Instant lastFinished = last == null || last.get("finishedAt") == null ? null : Instant.parse((String) last.get("finishedAt"));
-        out.put("nextRunAt", lastFinished == null ? null : lastFinished.plusSeconds(props.syncIntervalSeconds()).toString());
+        out.put("nextRunAt", !autoSync || lastSuccess == null ? null : lastSuccess.plus(Duration.ofHours(intervalHours)).toString());
+        out.put("syncDue", autoSync && sync.due());
         return out;
     }
 
@@ -173,6 +207,11 @@ public class HrAdminService {
         out.put("dropPercent", src.get("drop_percent"));
         out.put("dropMinimum", src.get("drop_minimum"));
         out.put("maxAgeHours", src.get("max_age_hours"));
+        out.put("autoSync", src.get("auto_sync"));
+        out.put("syncIntervalHours", src.get("sync_interval_hours"));
+        out.put("peopleSync", src.get("people_sync"));
+        out.put("directorySignInSuffices", src.get("directory_sign_in_suffices"));
+        out.put("personRefreshHours", src.get("person_refresh_hours"));
         out.put("lastConnectionOk", src.get("last_connection_ok"));
         out.put("lastConnectionAt", src.get("last_connection_at") == null ? null : Db.toInstant(src.get("last_connection_at")).toString());
         boolean readable = false;
@@ -196,7 +235,12 @@ public class HrAdminService {
 
     public record SourceInput(String name, Boolean enabled, String hostOrUrl, Integer port, String serverName, String nameType,
                               String username, String password, String unitView, String personView, Integer connectTimeoutS,
-                              Integer callTimeoutMs, Integer dropPercent, Integer dropMinimum, Integer maxAgeHours) {
+                              Integer callTimeoutMs, Integer dropPercent, Integer dropMinimum, Integer maxAgeHours,
+                              // ADR-094: the automatic unit import and its interval, people refreshed in every run or on demand only,
+                              // and whether a directory sign-in suffices when HR does not answer (null keeps the stored value)
+                              Boolean autoSync, Integer syncIntervalHours, Boolean peopleSync, Boolean directorySignInSuffices,
+                              // «تحديث بيانات الشخص بعد» in hours; 0 = never automatically (null keeps the stored value)
+                              Integer personRefreshHours) {
 
         @Override
         public String toString() {
@@ -248,12 +292,19 @@ public class HrAdminService {
         UUID id = src == null ? UUID.randomUUID() : (UUID) src.get("id");
         jdbc.sql("""
                 insert into hr_source(id, name, enabled, settings_ciphertext, settings_key_id, unit_view, person_view,
-                                      connect_timeout_s, call_timeout_ms, drop_percent, drop_minimum, max_age_hours, updated_at)
-                values (:id, :n, :en, :c, :k, :uv, :pv, :ct, :cl, :dp, :dm, :ma, :now)
+                                      connect_timeout_s, call_timeout_ms, drop_percent, drop_minimum, max_age_hours, updated_at,
+                                      auto_sync, sync_interval_hours, people_sync, directory_sign_in_suffices, person_refresh_hours)
+                values (:id, :n, :en, :c, :k, :uv, :pv, :ct, :cl, :dp, :dm, :ma, :now, :as, :si, :ps, :ds, :pr)
                 on conflict (id) do update set name = :n, enabled = :en, settings_ciphertext = :c, settings_key_id = :k,
                     unit_view = :uv, person_view = :pv, connect_timeout_s = :ct, call_timeout_ms = :cl, drop_percent = :dp,
-                    drop_minimum = :dm, max_age_hours = :ma, updated_at = :now""")
+                    drop_minimum = :dm, max_age_hours = :ma, updated_at = :now, auto_sync = :as, sync_interval_hours = :si,
+                    people_sync = :ps, directory_sign_in_suffices = :ds, person_refresh_hours = :pr""")
                 .param("id", id).param("n", in.name().trim()).param("en", Boolean.TRUE.equals(in.enabled()))
+                .param("as", in.autoSync() != null ? in.autoSync() : src != null && Boolean.TRUE.equals(src.get("auto_sync")))
+                .param("si", clamp(in.syncIntervalHours() != null ? in.syncIntervalHours() : src == null ? null : ((Number) src.get("sync_interval_hours")).intValue(), 24, 1, 720))
+                .param("ps", in.peopleSync() != null ? in.peopleSync() : src != null && Boolean.TRUE.equals(src.get("people_sync")))
+                .param("ds", in.directorySignInSuffices() != null ? in.directorySignInSuffices() : src == null || Boolean.TRUE.equals(src.get("directory_sign_in_suffices")))
+                .param("pr", clamp(in.personRefreshHours() != null ? in.personRefreshHours() : src == null ? null : ((Number) src.get("person_refresh_hours")).intValue(), 24, 0, 8760))
                 .param("c", cipherText).param("k", cipher.keyId()).param("uv", in.unitView()).param("pv", in.personView())
                 .param("ct", clamp(in.connectTimeoutS(), 10, 1, 300)).param("cl", clamp(in.callTimeoutMs(), 30000, 1000, 300000))
                 .param("dp", clamp(in.dropPercent(), 10, 0, 100)).param("dm", clamp(in.dropMinimum(), 3, 0, 1_000_000))
@@ -261,6 +312,43 @@ public class HrAdminService {
         audit.recordAs(ctx.actor(), "HR_SOURCE_CHANGED", "HR_SOURCE", id.toString(), in.name(),
                 Map.of("enabled", Boolean.TRUE.equals(in.enabled()), "passwordChanged", in.password() != null && !in.password().isEmpty()), null);
         return sourceView(ctx);
+    }
+
+    /** What the last successful import changed locally: units added, changed and deactivated (ADR-094). */
+    private Map<String, Object> lastChanges() {
+        Map<String, Object> run = jdbc.sql("""
+                select counts::text as counts, finished_at from hr_sync_run where status = 'SUCCEEDED' order by started_at desc limit 1""")
+                .query().listOfRows().stream().findFirst().orElse(null);
+        if (run == null || run.get("counts") == null) {
+            return null;
+        }
+        JsonNode c = json.tree((String) run.get("counts"));
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("added", c.path("organizationsCreated").asInt(0));
+        m.put("changed", c.path("organizationsUpdated").asInt(0));
+        m.put("deactivated", c.path("organizationsRetired").asInt(0));
+        m.put("at", run.get("finished_at") == null ? null : Db.toInstant(run.get("finished_at")).toString());
+        return m;
+    }
+
+    /**
+     * «معاينة الوحدات» (ADR-094): what an import would bring, read from the source without writing a unit; the result stays
+     * with the source so the screen states the source's counts against the local ones.
+     */
+    public Map<String, Object> previewUnits(AccessContext ctx) {
+        ctx.require(Permission.CONFIGURE);
+        Map<String, Object> src = source();
+        if (src == null || src.get("settings_ciphertext") == null) {
+            throw new ApiException(ErrorCode.HR_SOURCE_NOT_CONFIGURED, "احفظ إعدادات المصدر أولاً.");
+        }
+        Map<String, Object> out = sync.previewUnits(src);
+        Instant now = clock.instant();
+        out.put("at", now.toString());
+        jdbc.sql("update hr_source set last_preview = cast(:p as jsonb), last_preview_at = :now, last_connection_ok = :ok, last_connection_at = :now where id = :id")
+                .param("p", json.write(out)).param("now", Db.ts(now)).param("ok", Boolean.TRUE.equals(out.get("ok"))).param("id", src.get("id")).update();
+        audit.recordAs(ctx.actor(), "HR_UNITS_PREVIEWED", "HR_SOURCE", src.get("id").toString(), (String) src.get("name"),
+                Map.of("ok", Boolean.TRUE.equals(out.get("ok")), "units", out.getOrDefault("units", 0), "problems", out.getOrDefault("problemCount", 0)), null);
+        return out;
     }
 
     private static int clamp(Integer v, int dflt, int min, int max) {

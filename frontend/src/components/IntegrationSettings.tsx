@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { DirectoryTestResult, IntegrationView, OidcTestResult } from '../api/types';
+import type { DirectoryTestResult, IntegrationStatus, IntegrationView, OidcTestResult , AssistantView, AssistantForm, AssistantTestResult } from '../api/types';
 import { useApp } from '../lib/app';
 import { fullTime } from '../lib/dates';
 import {
@@ -28,12 +28,28 @@ import {
  * Nothing saved, or a section switched off: the server's .env applies, and the screen shows those values.
  */
 export function IntegrationSettings() {
+  const [live, setLive] = useState<IntegrationStatus | null>(null);
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    api.integrationStatus().then(setLive, () => setLive(null));
+  }, [tick]);
+  const refresh = () => setTick((t) => t + 1);
   return (
     <>
-      <DirectorySection />
-      <OidcSection />
+      <DirectorySection live={live?.directory ?? null} onChanged={refresh} />
+      <OidcSection live={live?.oidc ?? null} onChanged={refresh} />
+      <AssistantSection onChanged={refresh} />
     </>
   );
+}
+
+const LIVE: Record<'UP' | 'DOWN' | 'NOT_CONFIGURED', [string, string]> = { UP: ['يعمل', 'green'], DOWN: ['غير متصل', 'red'], NOT_CONFIGURED: ['غير مهيأ', ''] };
+
+/** The live state of a section (ADR-094): checked when the settings open and after every save. */
+function LiveBadge({ live }: { live: { state: 'UP' | 'DOWN' | 'NOT_CONFIGURED'; message: string } | null }) {
+  if (!live) return <span className="pill" data-testid="live-badge">…</span>;
+  const [label, tone] = LIVE[live.state];
+  return <span className={'pill ' + tone} title={live.message} data-testid="live-badge" data-state={live.state}>{label}</span>;
 }
 
 function Source({ view }: { view: IntegrationView | null }) {
@@ -64,7 +80,7 @@ function EnvRow({ env, keys }: { env: Record<string, unknown>; keys: [string, st
   );
 }
 
-function DirectorySection() {
+function DirectorySection({ live, onChanged }: { live: IntegrationStatus['directory'] | null; onChanged: () => void }) {
   const app = useApp();
   const [view, setView] = useState<IntegrationView | null>(null);
   const [form, setForm] = useState<DirectoryForm>(directoryFromSaved(null));
@@ -121,7 +137,7 @@ function DirectorySection() {
     <section className="card padding int-settings" data-testid="integration-directory" style={{ gridColumn: '1 / -1' }}>
       <div className="flex spread">
         <h2>إعدادات التكامل — الدليل المؤسسي (LDAP)</h2>
-        <span className="pill">{view ? SOURCE_LABEL[view.source] : '…'}</span>
+        <span className="flex" style={{ gap: 6 }}><LiveBadge live={live} /><span className="pill">{view ? SOURCE_LABEL[view.source] : '…'}</span></span>
       </div>
       <Source view={view} />
       <p className="micro muted" style={{ margin: '0 0 12px' }}>
@@ -197,11 +213,11 @@ function DirectorySection() {
         <button className="button" disabled={busy || !!problem} onClick={() => act(async () => setTest(await api.testIntegrationDirectory(form, testLogin || undefined, testPassword || undefined)))}>
           اختبار الاتصال
         </button>
-        <button className="button primary" disabled={busy || !!problem} onClick={() => act(async () => { setView(await api.saveIntegrationDirectory(form)); setForm({ ...form, bindPassword: '' }); }, 'حُفظت إعدادات الدليل المؤسسي وسرت فوراً')}>
+        <button className="button primary" disabled={busy || !!problem} onClick={() => act(async () => { setView(await api.saveIntegrationDirectory(form)); setForm({ ...form, bindPassword: '' }); onChanged(); }, 'حُفظت إعدادات الدليل المؤسسي وسرت فوراً')}>
           حفظ
         </button>
         {view?.saved && (
-          <button className="button" disabled={busy} onClick={() => act(async () => { setView(await api.clearIntegrationDirectory()); setForm(directoryFromSaved(null)); }, 'أُزيلت الإعدادات المحفوظة؛ تسري قيم ملف البيئة')}>
+          <button className="button" disabled={busy} onClick={() => act(async () => { setView(await api.clearIntegrationDirectory()); setForm(directoryFromSaved(null)); onChanged(); }, 'أُزيلت الإعدادات المحفوظة؛ تسري قيم ملف البيئة')}>
             العودة إلى إعدادات ملف البيئة
           </button>
         )}
@@ -245,7 +261,7 @@ function DirectorySection() {
   );
 }
 
-function OidcSection() {
+function OidcSection({ live, onChanged }: { live: IntegrationStatus['oidc'] | null; onChanged: () => void }) {
   const app = useApp();
   const [view, setView] = useState<IntegrationView | null>(null);
   const [form, setForm] = useState<OidcForm>(oidcFromSaved(null));
@@ -295,7 +311,7 @@ function OidcSection() {
     <section className="card padding int-settings" data-testid="integration-oidc" style={{ gridColumn: '1 / -1' }}>
       <div className="flex spread">
         <h2>إعدادات التكامل — الدخول الآلي (Keycloak)</h2>
-        <span className="pill">{view ? SOURCE_LABEL[view.source] : '…'}</span>
+        <span className="flex" style={{ gap: 6 }}><LiveBadge live={live} /><span className="pill">{view ? SOURCE_LABEL[view.source] : '…'}</span></span>
       </div>
       <Source view={view} />
       <p className="micro muted" style={{ margin: '0 0 12px' }}>
@@ -334,11 +350,11 @@ function OidcSection() {
         <button className="button" disabled={busy || !!problem} onClick={() => act(async () => setTest(await api.testIntegrationOidc(form)))}>
           اختبار الاتصال
         </button>
-        <button className="button primary" disabled={busy || !!problem} onClick={() => act(async () => { setView(await api.saveIntegrationOidc(form)); setForm({ ...form, clientSecret: '' }); }, 'حُفظت إعدادات Keycloak وسرت فوراً')}>
+        <button className="button primary" disabled={busy || !!problem} onClick={() => act(async () => { setView(await api.saveIntegrationOidc(form)); setForm({ ...form, clientSecret: '' }); onChanged(); }, 'حُفظت إعدادات Keycloak وسرت فوراً')}>
           حفظ
         </button>
         {view?.saved && (
-          <button className="button" disabled={busy} onClick={() => act(async () => { setView(await api.clearIntegrationOidc()); setForm(oidcFromSaved(null)); }, 'أُزيلت الإعدادات المحفوظة؛ تسري قيم ملف البيئة')}>
+          <button className="button" disabled={busy} onClick={() => act(async () => { setView(await api.clearIntegrationOidc()); setForm(oidcFromSaved(null)); onChanged(); }, 'أُزيلت الإعدادات المحفوظة؛ تسري قيم ملف البيئة')}>
             العودة إلى إعدادات ملف البيئة
           </button>
         )}
@@ -365,6 +381,91 @@ function OidcSection() {
             ]}
           />
         </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * «المساعد الذكي» (ADR-056, owner 20 Nov 2026): the OpenAI-compatible server the assistant asks, saved on the server
+ * ahead of TMRKZ_AI_* in .env, applied without a restart. The API key is write-only. The assistant never answers from a
+ * preprogrammed template — when the model is off or unreachable, the screen says so.
+ */
+function AssistantSection({ onChanged }: { onChanged: () => void }) {
+  const app = useApp();
+  const [view, setView] = useState<AssistantView | null>(null);
+  const [form, setForm] = useState<AssistantForm>({ enabled: false, baseUrl: '', model: '', apiKey: '', timeoutSeconds: 60 });
+  const [keyStored, setKeyStored] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [test, setTest] = useState<AssistantTestResult | null>(null);
+  const load = async () => {
+    try {
+      const v = await api.integrationAssistant();
+      setView(v);
+      const saved = v.saved ?? null;
+      setForm({
+        enabled: saved?.enabled ?? v.env?.enabled ?? false,
+        baseUrl: saved?.baseUrl ?? v.env?.baseUrl ?? '',
+        model: saved?.model ?? v.env?.model ?? '',
+        apiKey: '',
+        timeoutSeconds: saved?.timeoutSeconds ?? v.env?.timeoutSeconds ?? 60,
+      });
+      setKeyStored(!!saved?.apiKeySet);
+    } catch (e) { app.toast((e as Error).message); }
+  };
+  useEffect(() => { void load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const act = async (fn: () => Promise<unknown>, msg?: string) => {
+    setBusy(true);
+    try { await fn(); if (msg) app.toast(msg); await load(); onChanged(); }
+    catch (e) { app.toast((e as Error).message); }
+    finally { setBusy(false); }
+  };
+  const problem = form.enabled && (!form.baseUrl.match(/^https?:\/\//) ? 'اكتب عنوان خادم النموذج (يبدأ بـ http:// أو https://).' : !form.model.trim() ? 'اكتب اسم النموذج.' : null);
+  return (
+    <section className="card padding int-settings" data-testid="integration-assistant" style={{ gridColumn: '1 / -1' }}>
+      <div className="flex spread">
+        <h2>المساعد الذكي</h2>
+        <span className="pill">{view ? SOURCE_LABEL[view.source] : '…'}</span>
+      </div>
+      <p className="micro muted" style={{ margin: '4px 0 10px' }}>
+        المساعد يُجيب فقط من الدليل المفتوح <b>OKF</b> عبر النموذج هنا؛ لا توجد إجابات مُعدّة مسبقاً. حين لا يكون النموذج متاحاً، تَظهر المراجع من الدليل فقط.
+      </p>
+      <label className="setting-row">
+        <span><b>تفعيل المساعد</b><small>بدونه تظهر شارة «غير مُفعَّل» في زر المساعد ولا يُسأل خادم النموذج</small></span>
+        <input className="toggle" type="checkbox" checked={!!form.enabled} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} aria-label="تفعيل المساعد" />
+      </label>
+      <div className="form-grid" style={{ marginTop: 10 }}>
+        <label className="field"><span>عنوان خادم النموذج</span>
+          <input dir="ltr" value={form.baseUrl} onChange={(e) => setForm({ ...form, baseUrl: e.target.value })} placeholder="http://host.docker.internal:11434/v1" /></label>
+        <label className="field"><span>اسم النموذج</span>
+          <input dir="ltr" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="qwen2.5:7b" /></label>
+        <label className="field"><span>مفتاح API {keyStored ? '(محفوظ)' : ''}</span>
+          <input type="password" dir="ltr" autoComplete="new-password" value={form.apiKey ?? ''} onChange={(e) => setForm({ ...form, apiKey: e.target.value })} placeholder={keyStored ? '••••••••' : 'اختياري (لخوادم تحتاج توثيقاً)'} /></label>
+        <label className="field"><span>مهلة الاستجابة (ثانية)</span>
+          <input type="number" min={5} max={300} value={form.timeoutSeconds ?? 60} onChange={(e) => setForm({ ...form, timeoutSeconds: Number(e.target.value) })} /></label>
+      </div>
+      {problem && <div className="note red" style={{ marginTop: 10 }}>{problem}</div>}
+      <div className="flex" style={{ gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+        <button className="button primary" disabled={busy || !!problem} onClick={() => act(() => api.saveIntegrationAssistant({ ...form, apiKey: form.apiKey?.length ? form.apiKey : undefined }), 'حُفظت إعدادات المساعد')}>حفظ</button>
+        <button className="button" disabled={busy || !form.baseUrl} onClick={() => act(async () => setTest(await api.testIntegrationAssistant({ ...form, apiKey: form.apiKey?.length ? form.apiKey : undefined })))}>اختبار الاتصال</button>
+        {view?.saved && <button className="button" disabled={busy} onClick={() => act(() => api.clearIntegrationAssistant(), 'أُزيلت الإعدادات المحفوظة؛ تعود قيم البيئة')}>إزالة المحفوظ</button>}
+      </div>
+      {test && (
+        <div className={'note ' + (test.ok ? '' : 'red')} data-testid="assistant-test-result" style={{ marginTop: 10 }}>
+          {test.ok ? `خادم النموذج يستجيب (${test.elapsedMs} م.ث)${test.knownModel === false ? ' — لكن النموذج المسمى غير موجود على الخادم' : ''}` : `${test.message}`}
+        </div>
+      )}
+      {view?.env && (
+        <details style={{ marginTop: 10 }}>
+          <summary className="muted">قيم ملف البيئة (.env)</summary>
+          <dl className="access-identity" style={{ marginTop: 6 }}>
+            <div><dt className="muted">TMRKZ_AI_ENABLED</dt><dd>{String(view.env.enabled)}</dd></div>
+            <div><dt className="muted">TMRKZ_AI_BASE_URL</dt><dd dir="ltr">{view.env.baseUrl}</dd></div>
+            <div><dt className="muted">TMRKZ_AI_MODEL</dt><dd dir="ltr">{view.env.model}</dd></div>
+            <div><dt className="muted">TMRKZ_AI_API_KEY</dt><dd>{view.env.apiKeySet ? 'محفوظ' : 'غير محفوظ'}</dd></div>
+            <div><dt className="muted">TMRKZ_AI_TIMEOUT_SECONDS</dt><dd>{view.env.timeoutSeconds}</dd></div>
+          </dl>
+        </details>
       )}
     </section>
   );

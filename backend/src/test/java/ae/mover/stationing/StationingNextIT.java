@@ -2,6 +2,7 @@ package ae.mover.stationing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -671,6 +672,68 @@ class StationingNextIT extends RestationingTestBase {
         wholeRoute(moved);
         assertThat(jdbc.sql("select count(*) from deployment_area where organization_id = :o and state = 'ACTIVE' and request_id = :r").param("o", fresh).param("r", UUID.fromString(first)).query(Long.class).single()).isZero();
         assertThat(areaOf(fresh2, "PRIMARY")).as("the unit that stayed keeps its own").isNotNull();
+    }
+
+    @Test
+    @DisplayName("POSTURE-PENDING: the operational-posture pending array returns only requests the operator may see; identity never leaks for proposals of another branch; excluded states (DRAFT/REJECTED) are omitted; VIEW_OPERATIONAL_POSTURE alone does not reveal every proposal")
+    void operationalPosturePending() {
+        // One request this viewer MAY read (it belongs to this branch): submit it so it reaches UNDER_REVIEW.
+        stationed(fresh, shared);
+        Map<String, Object> visibleContent = deployment(fresh, 0);
+        String visible = request("DEPLOYMENT_AREAS", visibleContent, sec);
+        assertThat(login("rq").post("/restationing-requests/" + visible + "/submit", Map.of()).status()).isEqualTo(200);
+
+        // One DRAFT: the brief excludes DRAFT from the pending set (never shown).
+        String draft = request("DEPLOYMENT_AREAS", deployment(fresh2, 0.01), sec);
+        assertThat(jdbc.sql("select state from restationing_request where id = :id").param("id", UUID.fromString(draft))
+                .query(String.class).single()).isEqualTo("DRAFT");
+
+        // One request this viewer MAY NOT read — of another branch — also submitted so it reaches UNDER_REVIEW.
+        stationed(otherSec, sOther, true);
+        person("otherReq", role("NXOREQ", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING", "APPROVE_HIERARCHY"), otherSec);
+        Res made = login("otherReq").post("/restationing-requests", Map.of("requestingUnitId", otherSec.toString(), "purpose", "DEPLOYMENT_AREAS",
+                "content", deployment(otherSec, 0)));
+        assertThat(made.status()).as("other-branch requester starts their own: " + made).isEqualTo(200);
+        String outOfScope = made.body().path("id").asText();
+        assertThat(login("otherReq").post("/restationing-requests/" + outOfScope + "/submit", Map.of()).status()).isEqualTo(200);
+
+        String visibleNumber = jdbc.sql("select number from restationing_request where id = :id").param("id", UUID.fromString(visible)).query(String.class).single();
+        String outOfScopeNumber = jdbc.sql("select number from restationing_request where id = :id").param("id", UUID.fromString(outOfScope)).query(String.class).single();
+        String draftNumber = jdbc.sql("select number from restationing_request where id = :id").param("id", UUID.fromString(draft)).query(String.class).single();
+
+        // 1. VIEW_OPERATIONAL_POSTURE ALONE does NOT grant visibility into proposals (brief §13).
+        person("postureOnly", role("NXPOST3", "ORGANIZATION", "VIEW_OPERATIONAL_POSTURE"), sec);
+        JsonNode postureOnly = login("postureOnly").get("/operational-posture").body();
+        assertThat(postureOnly.has("pending")).as("the payload carries the pending array").isTrue();
+        List<String> postureOnlyNumbers = new ArrayList<>();
+        postureOnly.path("pending").forEach(p -> postureOnlyNumbers.add(p.path("requestNumber").asText()));
+        assertThat(postureOnlyNumbers).as("VIEW_OPERATIONAL_POSTURE alone is not a free pass into proposals")
+                .doesNotContain(visibleNumber).doesNotContain(outOfScopeNumber);
+        assertThat(postureOnly.toString()).as("no out-of-scope unit identity leaks through the pending array").doesNotContain(outOfScopeNumber);
+
+        // 2. A real operator (VIEW + VIEW_OPERATIONAL_POSTURE on the branch) SEES their branch's proposal and the
+        //    projection carries only operational-map fields (brief §12). The other-branch proposal remains hidden.
+        person("postureOps", role("NXPOST5", "ORGANIZATION", "VIEW", "VIEW_OPERATIONAL_POSTURE"), sec);
+        JsonNode postureOps = login("postureOps").get("/operational-posture").body();
+        JsonNode pending = postureOps.path("pending");
+        List<String> numbers = new ArrayList<>();
+        pending.forEach(p -> numbers.add(p.path("requestNumber").asText()));
+        assertThat(numbers).as("this branch's proposal is included for an operator who already has VIEW").contains(visibleNumber);
+        assertThat(numbers).as("another branch's proposal is NOT included — identity never leaks").doesNotContain(outOfScopeNumber);
+        assertThat(numbers).as("DRAFT is excluded").doesNotContain(draftNumber);
+        assertThat(postureOps.toString()).as("no out-of-scope unit identity leaks through the pending array").doesNotContain(outOfScopeNumber);
+        JsonNode row = pending.get(0);
+        for (String f : List.of("requestId", "requestNumber", "purpose", "state", "currentStage", "unitId", "unitCode", "unitName", "currentSiteId", "proposedSite", "proposedPrimary", "proposedSub")) {
+            assertThat(row.has(f)).as("pending row has field " + f).isTrue();
+        }
+
+        // 3. The other branch's operator DOES see their own proposal (visible(ctx,r) is theirs).
+        person("other-posture", role("NXPOST4", "ORGANIZATION", "VIEW", "VIEW_OPERATIONAL_POSTURE"), otherSec);
+        JsonNode otherPosture = login("other-posture").get("/operational-posture").body();
+        List<String> otherNumbers = new ArrayList<>();
+        otherPosture.path("pending").forEach(p -> otherNumbers.add(p.path("requestNumber").asText()));
+        assertThat(otherNumbers).as("the other branch's operator sees their own proposal").contains(outOfScopeNumber);
+        assertThat(otherNumbers).as("the other branch's operator does not see this branch's proposal").doesNotContain(visibleNumber);
     }
 
     @Test

@@ -1,5 +1,13 @@
 import type { SignInBoard } from '../lib/signInNotes';
 import type { DirectoryForm, OidcForm } from '../lib/integrationSettings';
+import type { DbMigration, DbMigrationBackup, DbMigrationConnectInput, DbMigrationDumpInfo, DbMigrationInbox, DbMigrationListItem, DbMigrationSelectionInput,
+  AssistantView,
+  AssistantForm,
+  AssistantTestResult,
+  RequestHealthSummary,
+  RequestHealthRow,
+  RequestHealthDiagnosis,
+} from './types';
 import type {
   HierarchyLevel,
   SiteLinkRecord,
@@ -101,6 +109,8 @@ import type {
   UnitSymbol,
   StudioItem,
   SystemInfo,
+  SystemState,
+  HrUnitsPreview,
   TaskItem,
   ValidationResult,
   WorkflowDefinition,
@@ -108,7 +118,7 @@ import type {
   Permission,
   Scope,
   RoutingLevelValue,
- IntegrationView, DirectoryTestResult, OidcTestResult } from './types';
+ IntegrationView, IntegrationStatus, DirectoryTestResult, OidcTestResult } from './types';
 
 export const API_BASE = '/api/v1';
 
@@ -254,6 +264,8 @@ export type AccessIdentity = {
   position: string | null;
   unit: string | null;
   mainUnit: string | null;
+  /** the person's own unit in TMRKZ (null when not configured), highlighted in the scope tree (ADR-094) */
+  unitId?: string | null;
   source: string;
   sourceCode?: 'LDAP' | 'ORACLE';
   unitConfigured?: boolean;
@@ -354,6 +366,26 @@ export type StationingRouteRow = { purpose: string; published: StationingRouteVe
 export type StationingRouteTry = { stages: { key: string; kind: string; label: string; unit: string | null; holders: number; inheritedFrom?: string | null; skipped?: boolean }[]; complete: boolean; problems: string[]; activators?: number; fyiHolders?: number };
 export type HomeCard = { key: string; label: string; value: number; href: string };
 export type PostureUnit = { id: string; code: string; name: string; parentId: string | null; depth: number; state: string; site?: { id: string; name: string; geometry: { type: string; coordinates: unknown } | null } | null; kind?: string; plannedEnd?: string | null; primary?: unknown; alternative?: unknown; otherUnitsAtSite?: number; request?: { purpose: string; state: string } | null };
+
+/**
+ * One proposal visible to the operator on «الموقف العملياتي» (ADR-078 scope, owner 21 Nov 2026 brief §10–§14): a
+ * single projection per (request × scope-unit), the server filters by the same `visible(ctx,r)` rule that the request
+ * list uses — the right VIEW_OPERATIONAL_POSTURE alone does NOT reveal every proposal.
+ */
+export type PosturePending = {
+  requestId: string;
+  requestNumber: string;
+  purpose: 'RESTATIONING' | 'DEPLOYMENT_AREAS' | string;
+  state: string;
+  currentStage: string | null;
+  unitId: string;
+  unitCode: string | null;
+  unitName: string | null;
+  currentSiteId: string | null;
+  proposedSite: { type: string; coordinates: unknown } | null;
+  proposedPrimary: { type: string; coordinates: unknown } | null;
+  proposedSub: { type: string; coordinates: unknown } | null;
+};
 export type SiteOccupants = { stationed: { orgId: string; orgName: string }[]; linked: { id: string; orgId: string; orgName: string; reason: string }[]; otherStationed: number };
 export type AccessOfferRow = { code: string; name: string; audience: string | null; description?: string | null; scopeModes?: ScopeMode[] | null; defaultScope?: ScopeMode | null };
 export type ScopeMode = 'UNIT' | 'UNIT_TREE' | 'UNITS' | 'SITES';
@@ -719,7 +751,7 @@ export const api = {
   hubUnit: (id: string) => get<HubUnit>(`/request-hub/units/${id}`),
   requestOverview: (filter: string) => get<OverviewItem[]>('/request-hub/overview' + query({ filter })),
   homeCards: () => get<HomeCard[]>('/request-hub/home-cards'),
-  operationalPosture: () => get<{ units: PostureUnit[]; unitsTotal: number }>('/operational-posture'),
+  operationalPosture: () => get<{ units: PostureUnit[]; unitsTotal: number; pending: PosturePending[] }>('/operational-posture'),
   fyiOptions: (id: string) => get<RestationingUnit[]>(`/restationing-requests/${id}/fyi-options`),
   endFyi: (id: string, unit: string, reason: string) => post<RestationingRequest>(`/restationing-requests/${id}/fyi/${unit}/end`, { reason }),
   distributeFyi: (id: string, units: string[], note?: string) => post<RestationingRequest>(`/restationing-requests/${id}/fyi`, { units, note }),
@@ -880,12 +912,21 @@ export const api = {
   previewOrgImport: (rows: { code: string; name: string; parentCode: string | null }[]) => post<OrgImportPreview>('/integrations/org-structure/preview', { rows }),
   commitOrgImport: (runId: string) => post<unknown>(`/integrations/org-structure/runs/${runId}/commit`),
   systemInfo: () => get<SystemInfo>('/system/info'),
+  /** ADR-094: the installation's state — empty screens show nothing in the middle (no map, no zeros) */
+  systemState: () => get<SystemState>('/system/state'),
+  /** ADR-094: the person asks HR for their own record now */
+  myHrRefresh: () => post<{ refreshed: boolean }>('/me/hr-refresh'),
+  /** ADR «صحة الطلبات» (20 Nov 2026): read-only diagnostic of open re-stationing requests for the system administrator. */
+  requestHealthSummary: () => get<RequestHealthSummary>('/system/request-health/summary'),
+  requestHealthSearch: (p: { q?: string; health?: string; state?: string }) => get<RequestHealthRow[]>('/system/request-health' + query(p)),
+  requestHealthDiagnose: (identifier: string) => get<RequestHealthDiagnosis>('/system/request-health/' + encodeURIComponent(identifier)),
 
   // HR source
   hrStatus: () => get<HrStatus>('/hr/status'),
   hrRuns: (size = 10) => get<HrRun[]>('/hr/runs' + query({ size })),
   hrSync: (overrideReason?: string) => post<{ runId: string }>('/hr/sync', overrideReason ? { overrideReason } : {}),
   // «إعدادات التكامل» (ADR-092): the directory and Keycloak sections, tested with the values on the screen, saved, cleared
+  integrationStatus: () => get<IntegrationStatus>('/settings/integration/status'),
   integrationDirectory: () => get<IntegrationView>('/settings/integration/directory'),
   saveIntegrationDirectory: (form: DirectoryForm) => put<IntegrationView>('/settings/integration/directory', form),
   clearIntegrationDirectory: () => del<IntegrationView>('/settings/integration/directory'),
@@ -895,9 +936,15 @@ export const api = {
   saveIntegrationOidc: (form: OidcForm) => put<IntegrationView>('/settings/integration/oidc', form),
   clearIntegrationOidc: () => del<IntegrationView>('/settings/integration/oidc'),
   testIntegrationOidc: (form: OidcForm) => post<OidcTestResult>('/settings/integration/oidc/test', form),
+  integrationAssistant: () => get<AssistantView>('/settings/integration/assistant'),
+  saveIntegrationAssistant: (form: AssistantForm) => put<AssistantView>('/settings/integration/assistant', form),
+  clearIntegrationAssistant: () => del<AssistantView>('/settings/integration/assistant'),
+  testIntegrationAssistant: (form: AssistantForm) => post<AssistantTestResult>('/settings/integration/assistant/test', form),
   hrSource: () => get<HrSource>('/hr/source'),
   saveHrSource: (input: HrSourceInput) => put<HrSource>('/hr/source', input),
   testHrSource: () => post<HrTestResult>('/hr/source/test'),
+  /** «معاينة الوحدات»: read-only; nothing is written to the units */
+  previewHrUnits: () => post<HrUnitsPreview>('/hr/units/preview'),
   hrContract: () => get<HrCanonical[]>('/hr/contract'),
   hrMappings: () => get<HrMappingVersion[]>('/hr/mappings'),
   saveHrDraft: (fields?: HrField[], activeRules?: Partial<Record<HrEntity, HrRule>>) =>
@@ -971,4 +1018,19 @@ export const api = {
   stationingCurrent: (orgId?: string, siteId?: string) => get<StationingRecord[]>('/stationing/current' + query({ orgId, siteId })),
   siteLinks: (orgId?: string, siteId?: string) => get<SiteLinkRecord[]>('/site-links' + query({ orgId, siteId })),
   terrainDatasets: () => get<TerrainDatasetView[]>('/terrain/datasets'),
+
+  // «مركز ترحيل قاعدة البيانات» (ADR-094): an older TMRKZ database brought into the current one; CONFIGURE only
+  dbMigrations: () => get<DbMigrationListItem[]>('/settings/db-migration'),
+  dbMigration: (id: string) => get<DbMigration>(`/settings/db-migration/${id}`),
+  dbMigrationBackupStatus: () => get<DbMigrationBackup>('/settings/db-migration/backup-status'),
+  dbMigrationInbox: () => get<DbMigrationInbox>('/settings/db-migration/inbox'),
+  uploadDbMigrationDump: (file: File) => {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return call<DbMigrationDumpInfo>('POST', '/settings/db-migration/inbox', { form });
+  },
+  connectDbMigration: (input: DbMigrationConnectInput) => post<DbMigration>('/settings/db-migration/connect', input),
+  selectDbMigrationTables: (id: string, selection: DbMigrationSelectionInput) => put<DbMigration>(`/settings/db-migration/${id}/selection`, selection),
+  runDbMigration: (id: string, backupVerified: boolean) => post<DbMigration>(`/settings/db-migration/${id}/migrate`, { backupVerified }),
+  abandonDbMigration: (id: string) => del<DbMigration>(`/settings/db-migration/${id}`),
 };

@@ -6,6 +6,7 @@ import { HrSourcePanel } from '../components/HrSourcePanel';
 import { SignInNotesSettings } from '../components/SignInNotesSettings';
 import { IntegrationSettings } from '../components/IntegrationSettings';
 import { SiteSetupAccessSettings } from '../components/SiteSetupAccessSettings';
+import { DbMigrationCenter } from '../components/DbMigrationCenter';
 import { useApp } from '../lib/app';
 import { formatBytes, fullTime } from '../lib/dates';
 import { INTEGRATION_STATUS } from '../lib/labels';
@@ -85,7 +86,7 @@ export function SettingsPage() {
         actions={<span className="pill">إصدار السياسة الحالي {policy?.version ?? '—'}</span>}
       />
       <div className="settings-grid">
-        <SignInNotesSettings />
+        <h2 className="settings-group" data-testid="settings-group-policies">السياسات والبيئة</h2>
         <SiteSetupAccessSettings />
         <section className="card padding">
           <h2>سياسات الطلب</h2>
@@ -186,8 +187,16 @@ export function SettingsPage() {
             «غير مربوط» يعني أن الواجهة والعقد جاهزان دون اتصال فعلي؛ لا يعرض النظام اتصالاً وهمياً ناجحاً.
           </p>
         </section>
+        <h2 className="settings-group" data-testid="settings-group-identity">الهوية والدخول</h2>
+        <SignInNotesSettings />
         {app.can('CONFIGURE') && <IntegrationSettings />}
-        {app.can('CONFIGURE') && <HrSourcePanel />}
+        {app.can('CONFIGURE') && (
+          <>
+            <h2 className="settings-group" data-testid="settings-group-hr">مصدر الموارد البشرية</h2>
+            <HrSourcePanel />
+          </>
+        )}
+        <h2 className="settings-group" data-testid="settings-group-migration">ترحيل البيانات</h2>
         <section className="card padding">
           <h2>استيراد الهيكل التنظيمي</h2>
           <p className="micro muted" style={{ margin: '12px 0' }}>
@@ -213,6 +222,7 @@ export function SettingsPage() {
             </div>
           )}
         </section>
+        {app.can('CONFIGURE') && <DbMigrationCenter />}
       </div>
     </>
   );

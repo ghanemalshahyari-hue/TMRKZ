@@ -11,6 +11,8 @@ import { PointsTable } from '../components/stationing/PointsTable';
 import { SiteSymbolPicker, SymbolArt } from '../components/stationing/SiteSymbolPicker';
 import { Icon } from '../components/ui';
 import { MapFrame, MapLegend } from '../components/workspace/MapFrame';
+import { StationingShell } from '../components/workspace/StationingShell';
+import { EmptyCentre } from '../components/workspace/EmptyCentre';
 import { OperationalWorkspace } from '../components/workspace/OperationalWorkspace';
 import { RequestMap } from '../components/workspace/RequestMap';
 import { useAreaInsight } from '../components/workspace/TerrainPanel';
@@ -1136,22 +1138,27 @@ export function SiteSetupPage() {
       )}
     </>
   );
+  // Owner UX consolidation §4 (20 Nov 2026): Site Setup is a mode of «مساحة التمركز», not a separate page.
   return (
-    <OperationalWorkspace
-      listRail
-      swapSides
-      panels="siteSetup"
-      railLabel="موقع تمركز مبدئي"
-      contextLabel="المواقع"
-      sheetKey={(adding ? 'add' : '') + (selected ?? '')}
-      rail={workPanel()}
-      context={listPanel()}
-      centre={
-        <MapFrame title={<span className="tz-mapstep"><Icon name="tent" /><b>تحديد مواقع التمركز المبدئية</b></span>} mode={mode} setMode={setMode} view={view} setView={setView} has3d={!!terrain3d} placing={placing || drawing || placingArea} legend={legend}>
-          {terrain3d !== undefined && <RequestMap view={view} terrain3d={terrain3d} request={EMPTY_MAP} checks={null} mode={mode} fitMaxZoom={13} hideSite fit={false} onMap={onMap} referenceInteractive={!adding && !editingShape} fitSites pick={adding || editingShape ? null : { selectedId: selected, onPick: (id) => setSelected(id) }} focus={selected ? { siteId: selected, key: selected.length } : adding && form.parentId ? { siteId: form.parentId, key: form.parentId.length + 1 } : null} />}
-        </MapFrame>
-      }
-    />
+    <StationingShell mode="site-setup" onExit={() => (location.hash = 'restationing')} exitLabel="العودة إلى مساحة التمركز">
+      <OperationalWorkspace
+        listRail
+        swapSides
+        panels="siteSetup"
+        railLabel="موقع تمركز مبدئي"
+        contextLabel="المواقع"
+        sheetKey={(adding ? 'add' : '') + (selected ?? '')}
+        rail={workPanel()}
+        context={listPanel()}
+        centre={app.state?.empty ? (
+          <EmptyCentre title="لم تُستورد الوحدات بعد" hint="تُهيأ مواقع التمركز بعد استيراد الوحدات من مصدر الموارد البشرية في الإعدادات." />
+        ) : (
+          <MapFrame title={<span className="tz-mapstep"><Icon name="tent" /><b>تحديد مواقع التمركز المبدئية</b></span>} mode={mode} setMode={setMode} view={view} setView={setView} has3d={!!terrain3d} placing={placing || drawing || placingArea} legend={legend}>
+            {terrain3d !== undefined && <RequestMap view={view} terrain3d={terrain3d} request={EMPTY_MAP} checks={null} mode={mode} fitMaxZoom={13} hideSite fit={false} onMap={onMap} referenceInteractive={!adding && !editingShape} fitSites pick={adding || editingShape ? null : { selectedId: selected, onPick: (id) => setSelected(id) }} focus={selected ? { siteId: selected, key: selected.length } : adding && form.parentId ? { siteId: form.parentId, key: form.parentId.length + 1 } : null} />}
+          </MapFrame>
+        )}
+      />
+    </StationingShell>
   );
 }
 

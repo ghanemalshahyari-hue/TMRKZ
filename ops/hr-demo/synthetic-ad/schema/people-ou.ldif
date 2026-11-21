@@ -1,0 +1,5 @@
+# where the synthetic people live
+dn: OU=People,DC=tmrkz,DC=test
+objectClass: top
+objectClass: organizationalUnit
+ou: People

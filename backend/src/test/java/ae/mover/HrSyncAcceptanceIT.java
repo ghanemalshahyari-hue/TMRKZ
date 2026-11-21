@@ -197,6 +197,9 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         src.put("password", "Reader#" + sfx);
         src.put("unitView", schema + ".units_v");
         src.put("personView", schema + ".people_v");
+        // this suite checks the linked people read in every run (the earlier rule); ADR-094 keeps it behind «peopleSync»
+        src.put("peopleSync", true);
+        src.put("autoSync", true); // a scheduled source, as before: the status names its next run
         Res saved = admin.put("/hr/source", src);
         assertThat(saved.status()).as(saved.toString()).isEqualTo(200);
         assertThat(saved.body().has("password")).isFalse();
@@ -387,10 +390,10 @@ class HrSyncAcceptanceIT extends IntegrationTest {
         assertThat(jdbc.sql("select error_code from hr_sync_run where id = :id").param("id", stale).query(String.class).single())
                 .isEqualTo("INTERRUPTED");
         JsonNode st = admin.get("/hr/status").body();
-        assertThat(st.path("intervalSeconds").asLong()).isEqualTo(3600);
+        assertThat(st.path("intervalSeconds").asLong()).as("the source's own schedule: 24 hours by default (ADR-094)").isEqualTo(24 * 3600L);
         assertThat(st.path("stale").asBoolean()).isFalse();
         assertThat(java.time.Duration.between(java.time.Instant.parse(st.path("lastRun").path("finishedAt").asText()),
-                java.time.Instant.parse(st.path("nextRunAt").asText())).getSeconds()).isEqualTo(3600);
+                java.time.Instant.parse(st.path("nextRunAt").asText())).getSeconds()).as("the next run is the last success + the source's interval (ADR-094)").isBetween(24 * 3600L - 60, 24 * 3600L);
 
         // The manual button follows the same path and refuses a second concurrent run.
         // A slow source row (in a mapped column, so it is actually read) keeps the first run busy for about two seconds.

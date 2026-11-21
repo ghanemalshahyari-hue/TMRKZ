@@ -103,10 +103,14 @@ public class HrSyncService {
 
     // ---- triggers ---------------------------------------------------------------------------------------------
 
-    @Scheduled(fixedDelayString = "${tmrkz.hr.sync-interval-seconds:3600}",
+    /**
+     * ADR-094: a tick every minute; the run starts when the source's own schedule says so — «المزامنة التلقائية» on and the last
+     * success older than its interval (24 hours by default) — never on a fixed environment interval.
+     */
+    @Scheduled(fixedDelayString = "${tmrkz.hr.tick-seconds:60}",
             initialDelayString = "${tmrkz.hr.initial-delay-seconds:60}", timeUnit = TimeUnit.SECONDS)
     public void scheduled() {
-        if (!props.schedulerEnabled() || !enabledSourceExists()) {
+        if (!props.schedulerEnabled() || !enabledSourceExists() || !due()) {
             return;
         }
         if (!busy.compareAndSet(false, true)) {
@@ -147,6 +151,14 @@ public class HrSyncService {
 
     private boolean enabledSourceExists() {
         return jdbc.sql("select count(*) from hr_source where enabled").query(Integer.class).single() > 0;
+    }
+
+    /** The enabled source has «المزامنة التلقائية» on and its last success is older than its interval (or there was none). */
+    public boolean due() {
+        return jdbc.sql("""
+                select count(*) from hr_source where enabled and auto_sync
+                  and (last_success_at is null or last_success_at + make_interval(hours => sync_interval_hours) <= :now)""")
+                .param("now", Db.ts(clock.instant())).query(Integer.class).single() > 0;
     }
 
     // ---- the run ----------------------------------------------------------------------------------------------
@@ -250,18 +262,33 @@ public class HrSyncService {
                     insertUnits(runId, snapshot, compiled, rows, dup, skipped);
                 });
                 int read = 0;
-                for (int i = 0; i < linked.size(); i += HrMapping.Condition.MAX_LIST) {
-                    checkDeadline(deadline);
-                    List<String> part = linked.subList(i, Math.min(linked.size(), i + HrMapping.Condition.MAX_LIST));
-                    List<Map<String, Object>> rows = session.select(cfg.personView(), compiled.columns(Entity.PERSON),
-                            compiled.in(Entity.PERSON, "external_person_id", part), 0);
-                    read += rows.size();
-                    insertPeople(runId, snapshot, compiled, rows, asked, dup, skipped);
-                }
-                // none of the linked people came back: an empty person view is refused as always; a view that still has
-                // people means they left, which the departure check below weighs
-                if (!linked.isEmpty() && read == 0) {
-                    counts.put("personViewEmpty", session.select(cfg.personView(), compiled.columns(Entity.PERSON).subList(0, 1), null, 1).isEmpty());
+                if (Boolean.TRUE.equals(src.get("people_sync"))) {
+                    for (int i = 0; i < linked.size(); i += HrMapping.Condition.MAX_LIST) {
+                        checkDeadline(deadline);
+                        List<String> part = linked.subList(i, Math.min(linked.size(), i + HrMapping.Condition.MAX_LIST));
+                        List<Map<String, Object>> rows = session.select(cfg.personView(), compiled.columns(Entity.PERSON),
+                                compiled.in(Entity.PERSON, "external_person_id", part), 0);
+                        read += rows.size();
+                        insertPeople(runId, snapshot, compiled, rows, asked, dup, skipped);
+                    }
+                    // none of the linked people came back: an empty person view is refused as always; a view that still has
+                    // people means they left, which the departure check below weighs
+                    if (!linked.isEmpty() && read == 0) {
+                        counts.put("personViewEmpty", session.select(cfg.personView(), compiled.columns(Entity.PERSON).subList(0, 1), null, 1).isEmpty());
+                    }
+                    jdbc.sql("update person set hr_fetched_at = :now where source = 'HR' and source_external_id in (select external_id from hr_linked_person)")
+                            .param("now", Db.ts(clock.instant())).update();
+                } else {
+                    // ADR-094: people are never synced in bulk — the run reads the units only and carries the linked people's
+                    // records forward unchanged from the published snapshot; each person is refreshed on demand (HrPeopleService)
+                    read = jdbc.sql("""
+                            insert into hr_person(snapshot_id, external_id, employee_number, legacy_employee_number, domain_account, full_name,
+                                                  unit_external_id, position_id, position_title, job_title, status_text, active, leave_status, rank_name)
+                            select :s, external_id, employee_number, legacy_employee_number, domain_account, full_name, unit_external_id,
+                                   position_id, position_title, job_title, status_text, active, leave_status, rank_name
+                            from hr_person where snapshot_id = (select id from hr_snapshot where status = 'PUBLISHED')
+                              and external_id in (select external_id from hr_linked_person)""").param("s", snapshot).update();
+                    counts.put("peopleCarried", read);
                 }
                 counts.put("statements", session.statements().size());
             }
@@ -350,6 +377,136 @@ public class HrSyncService {
                 s.path("nameType").asText("service_name"), s.path("username").asText(), s.path("password").asText(),
                 (String) src.get("unit_view"), (String) src.get("person_view"),
                 ((Number) src.get("connect_timeout_s")).intValue(), ((Number) src.get("call_timeout_ms")).intValue());
+    }
+
+    /**
+     * ADR-094 «معاينة الوحدات»: reads the unit view (and counts the person view) exactly as an import would, writing nothing —
+     * no run, no snapshot, no unit: how many units the source holds, at which levels, how many main units, and the validation
+     * problems an import would report (records without key or name, duplicate keys, parents or main units the source does
+     * not hold). The caller keeps the result on the source for the screen.
+     */
+    public Map<String, Object> previewUnits(Map<String, Object> src) {
+        Map<String, Object> mapping = jdbc.sql("""
+                select id, version, fields::text as fields, active_rules::text as rules from hr_mapping_version
+                where source_id = :s and status = 'PUBLISHED'""").param("s", src.get("id")).query().listOfRows().stream().findFirst().orElse(null);
+        if (mapping == null) {
+            throw new ApiException(ErrorCode.HR_CONTRACT_MISMATCH, "لا يوجد إصدار تعيين منشور لمصدر الموارد البشرية؛ انشر التعيين أولاً.");
+        }
+        Instant started = clock.instant();
+        Instant deadline = started.plus(Duration.ofSeconds(props.maxRunSeconds()));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("mappingVersion", mapping.get("version"));
+        Map<String, String> parentOf = new java.util.HashMap<>();
+        Map<String, String> mainOf = new java.util.HashMap<>();
+        java.util.TreeMap<Integer, Integer> levels = new java.util.TreeMap<>();
+        List<Map<String, Object>> problems = new ArrayList<>();
+        int[] n = new int[5]; // active, main, skipped, duplicate, without level
+        long[] people = new long[1];
+        try {
+            HrMapping.Definition def = definition((String) mapping.get("fields"), (String) mapping.get("rules"));
+            HrSourceAdapter.Config cfg = config(src);
+            try (HrSourceAdapter.Session session = adapter.open(cfg)) {
+                Map<Entity, List<String>> discovered = new EnumMap<>(Entity.class);
+                discovered.put(Entity.UNIT, session.columns(cfg.unitView()));
+                discovered.put(Entity.PERSON, session.columns(cfg.personView()));
+                HrMapping.Compiled compiled = HrMapping.compile(def, discovered);
+                out.put("sourceVersion", session.databaseVersion());
+                session.stream(cfg.unitView(), compiled.columns(Entity.UNIT), props.fetchSize(), props.insertBatch(), rows -> {
+                    checkDeadline(deadline);
+                    for (Map<String, Object> row : rows) {
+                        Map<String, String> v = compiled.convert(Entity.UNIT, row);
+                        String id = v.get("external_unit_id");
+                        if (id == null || v.get("name") == null) {
+                            n[2]++;
+                            previewProblem(problems, "MISSING_KEY", id, "سجل جهة دون معرف أو اسم؛ لن يُستورد.");
+                            continue;
+                        }
+                        if (parentOf.containsKey(id)) {
+                            n[3]++;
+                            previewProblem(problems, "DUPLICATE_KEY", id, "معرف جهة مكرر في المصدر.");
+                            continue;
+                        }
+                        parentOf.put(id, v.get("parent_external_unit_id"));
+                        mainOf.put(id, v.get(HrMapping.MAIN_FIELD));
+                        if (Boolean.parseBoolean(v.get("active"))) {
+                            n[0]++;
+                        }
+                        if (HrMapping.isMain(v)) {
+                            n[1]++;
+                        }
+                        Integer level = integer(v.get("level"));
+                        if (level == null) {
+                            n[4]++;
+                        } else {
+                            levels.merge(level, 1, Integer::sum);
+                        }
+                    }
+                });
+                List<String> personKey = compiled.columns(Entity.PERSON);
+                if (!personKey.isEmpty()) {
+                    session.stream(cfg.personView(), personKey.subList(0, 1), props.fetchSize(), props.insertBatch(), rows -> {
+                        checkDeadline(deadline);
+                        people[0] += rows.size();
+                    });
+                }
+            }
+        } catch (HrSourceAdapter.SourceException e) {
+            out.put("ok", false);
+            out.put("failure", e.failure().name());
+            out.put("message", e.getMessage());
+            out.put("elapsedMs", Duration.between(started, clock.instant()).toMillis());
+            return out;
+        } catch (Rejection e) {
+            out.put("ok", false);
+            out.put("failure", e.code);
+            out.put("message", e.getMessage());
+            out.put("elapsedMs", Duration.between(started, clock.instant()).toMillis());
+            return out;
+        }
+        int roots = 0;
+        int parentMissing = 0;
+        int mainMissing = 0;
+        for (Map.Entry<String, String> e : parentOf.entrySet()) {
+            String parent = e.getValue();
+            if (parent == null) {
+                roots++;
+            } else if (!parentOf.containsKey(parent)) {
+                parentMissing++;
+                previewProblem(problems, "PARENT_MISSING", e.getKey(), "الجهة الأم " + parent + " غير موجودة في المصدر؛ تُستورد الجهة كجذر.");
+            }
+            String main = mainOf.get(e.getKey());
+            if (main != null && !parentOf.containsKey(main)) {
+                mainMissing++;
+                previewProblem(problems, "MAIN_UNIT_MISSING", e.getKey(), "الوحدة الرئيسية " + main + " غير موجودة في المصدر.");
+            }
+        }
+        out.put("ok", true);
+        out.put("units", parentOf.size());
+        out.put("activeUnits", n[0]);
+        out.put("mainUnits", n[1]);
+        out.put("roots", roots);
+        out.put("withoutLevel", n[4]);
+        List<Map<String, Object>> byLevel = new ArrayList<>();
+        levels.forEach((level, count) -> byLevel.add(Map.of("level", level, "units", count)));
+        out.put("levels", byLevel);
+        out.put("people", people[0]);
+        out.put("problems", Map.of("missingKey", n[2], "duplicateKey", n[3], "parentMissing", parentMissing, "mainUnitMissing", mainMissing));
+        out.put("problemCount", n[2] + n[3] + parentMissing + mainMissing);
+        out.put("samples", problems);
+        out.put("elapsedMs", Duration.between(started, clock.instant()).toMillis());
+        return out;
+    }
+
+    private static final int PREVIEW_SAMPLES = 40;
+
+    private static void previewProblem(List<Map<String, Object>> problems, String code, String id, String message) {
+        if (problems.size() < PREVIEW_SAMPLES) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("code", code);
+            m.put("externalId", id);
+            m.put("message", message);
+            problems.add(m);
+        }
     }
 
     // ---- staging ----------------------------------------------------------------------------------------------

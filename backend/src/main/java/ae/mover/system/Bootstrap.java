@@ -31,6 +31,8 @@ import ae.mover.workflow.WorkflowService;
 @Order(1)
 public class Bootstrap implements ApplicationRunner {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Bootstrap.class);
+
     private final JdbcClient jdbc;
     private final Json json;
     private final TransactionTemplate tx;
@@ -145,7 +147,14 @@ public class Bootstrap implements ApplicationRunner {
             UUID wfVersion = UUID.randomUUID();
             jdbc.sql("insert into workflow_version(id, workflow_id, version, status, definition) values (:id, :w, 1, 'DRAFT', cast(:d as jsonb))")
                     .param("id", wfVersion).param("w", wfId).param("d", json.write(defaultWorkflow((String) t[2]))).update();
-            workflows.publishInternal(null, wfVersion);
+            // ADR-078: without MOVER's facilities roles the retired roles hold no permission, so the facilities workflow cannot be
+            // published (its final stage names a role without APPROVE) — and a NEW installation must still start (ADR-094: the
+            // truly empty installation, 20 Nov 2026). The definition stays a draft the studio shows; nothing else needs it.
+            if (legacyFacilityRoles) {
+                workflows.publishInternal(null, wfVersion);
+            } else {
+                log.info("request type {}: facilities workflow seeded as a draft (facilities roles retired, ADR-078)", code);
+            }
         }
     }
 

@@ -185,6 +185,7 @@ class HrLinkedPeopleIT extends IntegrationTest {
         src.put("password", "Reader#" + sfx);
         src.put("unitView", schema + ".units_v");
         src.put("personView", schema + ".people_v");
+        src.put("peopleSync", true); // this suite checks linked people following HR in every run (ADR-094 keeps it behind the switch)
         assertThat(admin.put("/hr/source", src).status()).isEqualTo(200);
         List<Map<String, Object>> f = new ArrayList<>();
         f.add(field("UNIT", "external_unit_id", "ID"));

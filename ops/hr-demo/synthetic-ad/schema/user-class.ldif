@@ -1,0 +1,24 @@
+# the Mil* attributes may appear on a User (as MOVER's schema2.ldif)
+dn:
+changetype: modify
+add: schemaUpdateNow
+schemaUpdateNow: 1
+-
+
+dn: CN=User,CN=Schema,CN=Configuration,DC=tmrkz,DC=test
+changetype: modify
+add: mayContain
+mayContain: MilNumber
+mayContain: MilRankName
+mayContain: MilLegacyNumber
+mayContain: MilOccupation
+mayContain: MilCurrentUnitName
+mayContain: MilUnitId
+mayContain: MilMainUnitId
+-
+
+dn:
+changetype: modify
+add: schemaUpdateNow
+schemaUpdateNow: 1
+-

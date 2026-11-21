@@ -6,6 +6,7 @@ import { useApp, type View } from '../../lib/app';
 import { fullTime } from '../../lib/dates';
 import { activeEntry, restriction, type NavLink } from '../../lib/navigation';
 import { Icon } from '../ui';
+import { rememberReturn } from '../../lib/returnContext';
 
 const POLL_MS = 30_000;
 
@@ -25,11 +26,12 @@ export function BrandMark({ size = 34 }: { size?: number }) {
  * the reference, «المزيد» with every other page the person may open, search, notifications and the identity menu.
  * Links come from `primaryNav`/`moreNav`, which mirror the server's permissions; the server still decides every call.
  */
-export function TopNavigation({ me, view, links, more, onLogout, navOpen, setNavOpen }: {
+export function TopNavigation({ me, view, links, more, create, onLogout, navOpen, setNavOpen }: {
   me: Me;
   view: View;
   links: NavLink[];
   more: NavLink[];
+  create?: { id: string; label: string; href: string; icon: string }[];
   onLogout: () => void;
   navOpen: boolean;
   setNavOpen: (o: boolean) => void;
@@ -45,6 +47,14 @@ export function TopNavigation({ me, view, links, more, onLogout, navOpen, setNav
   const active = activeEntry(view, links, hash);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const createRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const close = (e: MouseEvent) => createRef.current && !createRef.current.contains(e.target as Node) && setCreateOpen(false);
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+  useEffect(() => setCreateOpen(false), [view]);
   useEffect(() => {
     const close = (e: MouseEvent) => moreRef.current && !moreRef.current.contains(e.target as Node) && setMoreOpen(false);
     document.addEventListener('mousedown', close);
@@ -103,6 +113,24 @@ export function TopNavigation({ me, view, links, more, onLogout, navOpen, setNav
         )}
       </nav>
       <div className="tz-top-tools">
+        {create && create.length > 0 && (
+          <div className="tz-create" ref={createRef}>
+            <button className="tz-create-btn" aria-haspopup="menu" aria-expanded={createOpen} onClick={() => setCreateOpen((o) => !o)} data-testid="create-menu-btn">
+              <Icon name="plus" />
+              <span>إنشاء</span>
+            </button>
+            {createOpen && (
+              <div className="tz-menu tz-create-menu" role="menu" data-testid="create-menu">
+                {create.map((c) => (
+                  <a key={c.id} role="menuitem" className="tz-menu-item" href={c.href} onClick={() => { rememberReturn(location.hash || '#home'); setCreateOpen(false); }}>
+                    <Icon name={c.icon} />
+                    <span>{c.label}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <GlobalSearch />
         <Notifications />
         <IdentityMenu me={me} onLogout={onLogout} />

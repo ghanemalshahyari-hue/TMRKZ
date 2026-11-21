@@ -66,3 +66,16 @@
 .rs-parts .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .rs-site-readout { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.92em; }
 .rs-ok { color: var(--green); }
+
+/* «مساحة التمركز» shell (owner UX consolidation, 20 Nov 2026 §1) — one persistent header strip above every state. */
+.tz-stationing-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.tz-stationing-shell-head { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: color-mix(in srgb, var(--accent, #8b5a2b) 10%, var(--tz-panel, #fffcf6)); border-bottom: 1px solid var(--tz-line, #e6dcc8); color: var(--ink, #2e2618); font-size: 13.5px; }
+.tz-stationing-shell-head .tz-ssh-title { display: inline-flex; align-items: center; gap: 8px; color: var(--accent, #8b5a2b); font-weight: 800; }
+.tz-stationing-shell-head .tz-ssh-title .icon { width: 18px; height: 18px; }
+.tz-stationing-shell-head .tz-ssh-mode { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; color: var(--ink); }
+.tz-stationing-shell-head .tz-ssh-sep { color: var(--muted); font-weight: 500; }
+.tz-stationing-shell-head .tz-ssh-exit { margin-inline-start: auto; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--tz-line); background: var(--tz-panel); color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: 12.5px; }
+.tz-stationing-shell-head .tz-ssh-exit:hover { border-color: var(--accent); color: var(--accent); }
+.tz-stationing-shell-head .tz-ssh-exit .icon { width: 14px; height: 14px; }
+.tz-stationing-shell-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tz-stationing-shell-body > * { flex: 1; min-height: 0; }

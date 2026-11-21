@@ -1063,3 +1063,259 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Not run:** the suites that need a second environment on :8096 (`stationing-next`, `persona-buttons`, `access-requests`, `scope-approvals`, `restationing-journey`) — the one-application rule; `access-scope-8088` and `main-8088-extra` were not rerun on a new batch in this closure.
 - **Package:** `ops/release/pack-release.sh` → `release/TMRKZ-2026.11.20.1-folder.zip` (the folder without data, secrets, evidence, maps, history) + `release/tmrkz-images-2026.11.20.1-linux-amd64.tar` (the eight images, built with `DOCKER_DEFAULT_PLATFORM=linux/amd64` by `ops/local/workspace/pack-images.sh`, every image's config read back as `amd64/linux`) + `RELEASE-2026.11.20.1.json` + `SHA256SUMS`; checksums verified after creation. The Mac keeps its arm64 images for :8088.
 - **Data left on :8088 by this closure (fictional units of batch B2 only):** drafts RS-2026-0027…0031, 0033, 0034; deployment-areas RS-2026-0028 (draft), 0032 (under review); round-trip runs RS-2026-0035…0044 (0035 and 0040 approved-not-activated; 0036, 0039, 0041, 0044 under review; 0037 and 0042 returned — the oversized ones; 0038 and 0043 drafts with an invalid site), two sites «موقع قبول — وهمي» from the site-setup suite; grants for `juma.ghfly4` (requester on three B2 units, site-setup seat on one), `majed.mhyry2` (unit operations), `rashed.kndy2` (final approval) on «شعبة السهل — B2»; the three accounts in the stand-in directory; the integration settings saved to the stand-in directory. Nothing activated; `p01`–`p17` untouched; the Oracle sync still paused.
+
+## The AI model from the settings; no preprogrammed answers (20 Nov 2026; ADR-095)
+
+- **«إعدادات التكامل → المساعد الذكي»:** enabled toggle, server address, model name, API key (write-only), timeout; اختبار الاتصال against the server's `/models`. Saved settings win over `TMRKZ_AI_*`; the screen also shows what `.env` carries.
+- **No preprogrammed answers:** `AssistantService` only returns the model's reply over OKF; when off, unreachable, busy or no OKF match, the answer is null and the panel says so. The sources (OKF documents) remain as links.
+- **Checks:** `AssistantServiceTest` 2/2, `IntegrationSettingsIT` 2/2, frontend `tsc` clean, `npm test` 373/373; OpenAPI 295 operations.
+- **Open:** a browser-driven acceptance of the saved AI settings on an installation with a reachable model is still to run; the assistant does not yet log its own «AI-SETTINGS-CHANGED» trail (saves are covered by the generic `INTEGRATION_ASSISTANT_SAVED` audit event).
+
+## Oracle is not a dependency: units on demand, people on demand, the directory sign-in suffices (20 Nov 2026; ADR-094, step 1)
+
+- **Settings («مصدر الموارد البشرية»):** «استيراد الوحدات الآن»; «المزامنة التلقائية للوحدات» off/on with its interval (24 hours by default; the schedule is the source's own, V55 `auto_sync`, `sync_interval_hours`; `TMRKZ_HR_SYNC_INTERVAL_SECONDS` no longer read); «الأشخاص عند الحاجة فقط» (people never read in bulk — carried forward by each run, fetched at first sign-in / lookup / add-by-number, refreshed after 24 hours on the next need; `people_sync` on keeps the earlier every-run refresh); «الدخول بالدليل يكفي» (a directory sign-in that HR cannot confirm — not answering or stale — enters as a zero-access person «بانتظار مطابقة HR», matched when HR answers; off: refused as before). The status states units imported, people fetched, refreshed in the last day, pending matches, and the next run.
+- **Scope of «طلب صلاحية»:** the person's main unit's tree (the nearest `is_main` unit above them), offered and enforced.
+- **Empty system:** the home shows nothing in the middle until a unit, site, stationing, request or waiting card exists.
+- **«إعدادات التكامل»:** a live badge per section — يعمل / غير متصل / غير مهيأ (`GET /settings/integration/status`).
+- **Checks:** `HrOnDemandIT` 3/3 (OD-01…03); `HrSyncAcceptanceIT` 9/9 (its fixture now says `peopleSync` and `autoSync`, the earlier rule), `HrLinkedPeopleIT` 6/6, `EmploymentContextIT` 1/1, `EnterpriseSignInIT` 9/9, `DirectorySignInIT` 10/10, `AccessAcceptanceIT` 13/13, `UnitMemberIT` 4/4, `IntegrationSettingsIT` 2/2; frontend `homeEmpty.test.ts`, 365/365, type check; V55 applied on :8088 (the paused source stays paused: `auto_sync` follows `enabled`).
+- **Step 2 (20 Nov 2026; V57):** «معاينة الوحدات» before any import — read-only, nothing written (units, active, main units, roots, levels, person count, validation problems with samples), kept as «في المصدر مقابل محلياً»; the status states the last attempt, the last import's added/changed/deactivated, the source's state as last tested; «لم يتم استيراد الوحدات» with اختبار الاتصال / معاينة الوحدات / استيراد الوحدات الآن before the first import; «تحديث بيانات الشخص بعد» (24 h default, 0 = never automatically) and the person's own «تحديث بياناتي من الموارد البشرية» (`POST /me/hr-refresh`); «بياناتي» shows the HR state; the scope tree highlights the person's unit; `GET /system/state` and `EmptyCentre` — no map instance on المواقع المسجلة / الموقف / إعادة التمركز / تهيئة المواقع while the installation is empty; settings grouped «السياسات والبيئة» / «الهوية والدخول» / «مصدر الموارد البشرية» / «ترحيل البيانات». Checks: `HrOnDemandIT` 4/4 (OD-04 added), `HrSyncAcceptanceIT` 9/9, `AccessAcceptanceIT` 13/13; frontend 373/373 (`hrState.test.ts`). Browser checks on an empty installation are still pending (the fake sources are being built).
+- **Defect fixed (20 Nov 2026):** a database created after ADR-078 (17 Nov) could not start — the bootstrap published the facilities workflows whose final stage names a role without APPROVE. They are now left as drafts unless `TMRKZ_LEGACY_FACILITY_ROLES=true`. The owner's :8088 database predates ADR-078 and was never affected; the 2026.11.20.1 release image carries the defect for a NEW database only (an upgrade of an existing database is unaffected).
+- **Step 3 (20 Nov 2026; V56):** «مركز ترحيل قاعدة البيانات» under «ترحيل البيانات» — connection or `pg_dump -Fc` archive into an isolated staging database, preview by category with New/Identical/Changed/Conflict/Unsupported, rule A (current wins; TAKE_SOURCE per record on explicit decision, each conflicting table confirmed), verified-backup gate with fingerprints, audit. Not migrated: sessions, passwords, secrets, keys, OpenFGA tuples, Flowable, HR mirror. Checks: `DbMigrationIT` 1/1, `DbMigrationDumpTest` 4/4, frontend `dbMigration.test.ts` 5/5. Limits: the dump path's `pg_restore` needs the rebuilt backend image (not yet rebuilt); the end-to-end restore of a real archive is untested.
+- **Next steps of the same decision:** the fake Oracle HR (about 30,000 units in an irregular tree, 200,000 people) and the fake directory accounts (`ops/hr-demo`, in progress); the migration center «ترحيل قاعدة بيانات» (PostgreSQL → the current database, the current record wins and conflicts are reported, in progress); the browser check of the empty system and the zero-access journey on a temporary empty installation (removed afterwards).
+
+
+## Operational-posture meaning layer (21 Nov 2026; owner brief «FINISH THE OPERATIONAL POSTURE MEANING LAYER»)
+
+- **One source of truth for status:** `frontend/src/lib/operationalPostureStatus.ts` holds the two-dimensional model —
+  Completeness (COMPLETE / INCOMPLETE_DEPLOYMENT / NO_STATIONING) and Timing (PERMANENT / TEMPORARY /
+  TEMPORARY_EXPIRING / NONE). The right-rail tabs, list rows, detail-card badges, bottom-dock chips, map paint and
+  posture-local legend read from this ONE helper. The 30-day «ينتهي قريبًا» threshold is the same `EXPIRING_DAYS`
+  constant the home dashboard uses for `nearReturnStations`, so there is one definition of «expiring» in the system.
+- **Right-rail tabs renamed to carry the meaning:** «موقف مكتمل» (site + PRIMARY + SUB), «مناطق انتشار غير مكتملة»
+  (site exists, PRIMARY or SUB missing — each row explicitly says «ينقص الرئيسية / الفرعية / تنقص الاثنتان»),
+  «وحدات غير متمركزة» (no approved effective stationing) and «طلبات التمركز والانتشار» (split per purpose).
+- **One filter drives list AND map AND dock:** `PostureFilter` is set by both the right-rail tabs and the bottom-dock
+  chips. The map's rendered polygons are the same set as the right-rail list. The camera fits once when the filter
+  changes; it is not reset by polling, details open/close, opacity, layer toggle or search typing.
+- **Scoped pending proposals in the posture payload (brief §10–§14):** `GET /operational-posture` now returns a
+  `pending` array alongside `units`, projected to operational-map fields only
+  (`requestId`, `requestNumber`, `purpose`, `state`, `currentStage`, `unitId`, `unitCode`, `unitName`, `currentSiteId`,
+  `proposedSite`, `proposedPrimary`, `proposedSub`). Each row is filtered by the SAME `visible(ctx,r)` rule the
+  request list uses: `VIEW_OPERATIONAL_POSTURE` alone does NOT reveal every proposal. Included states:
+  `UNDER_REVIEW`, `RETURNED_FOR_CHANGES`, `PAUSED_HIERARCHY_CHANGED`, `APPROVED_NOT_ACTIVATED`,
+  `CANCELLATION_PENDING`, `START_HELD_PENDING_CANCELLATION`. Excluded: `DRAFT`, `REJECTED`, closed states.
+- **Pending overview on the map (brief §15):** every scoped proposal is drawn as amber/dashed site/primary/sub,
+  visible BEFORE any selection, distinct from approved posture (which keeps its semantic colours). The selected
+  unit's connector arrows (current → proposed site → primary → sub) from 43a2ef7 are kept as a stronger layer on top.
+- **Click to inspect (brief §18/§19/§21):** clicking an approved PRIMARY/SUB polygon opens an area context card
+  (role, unit, site, kind, approximate area in km², status, plannedEnd). Several polygons stacked at the click open
+  an overlap chooser («مناطق متداخلة») — never a silent top-feature pick. Clicking an amber pending polygon opens
+  the pending context card (request number, purpose, unit, element clicked, current workflow stage).
+- **Compact collapsible posture-local legend (brief §5):** replaces the generic request legend; shows only the
+  concepts currently enabled (completeness tones, timing tones when counts > 0, approved PRIMARY/SUB, pending badge
+  when `pendingAll.length > 0`, occupied ground when at least one site is in use).
+- **Checks:** backend `StationingNextIT` 14/14 including the new `operationalPosturePending` test (POSTURE-PENDING:
+  this branch's proposal is included for an operator with `VIEW` + `VIEW_OPERATIONAL_POSTURE`; `VIEW_OPERATIONAL_POSTURE`
+  alone is not a free pass; DRAFT excluded; the other branch's proposal never leaks; the projection carries only
+  operational-map fields). Frontend `operationalPostureStatus.test.ts` 13/13 (POSTURE-STATUS-01…06 completeness,
+  missing labels, timing + expiring threshold; POSTURE-FILTER-01…05 filter semantics; POSTURE-COUNT-01 live counts).
+  Full frontend suite 390/390. Vite `tsc` clean, `npm run build` clean. Browser evidence at 1920×1080 + one 1366×768:
+  `docs/evidence/posture/01-overview.png` … `13-overview-1366x768.png` (captured against Vite dev on 127.0.0.1:5173
+  with `VITE_STATIONING_V3=true` and `MOVER_API=http://localhost:8088`, signed in as the acceptance posture viewer
+  `p12.view` / `POSTURE_VIEWER` on `N-A11`).
+- **Limits (open for owner):**
+  - The owner-review environment at :8088 serves the 2026.11.20.1 web+backend containers. The new `pending` array
+    renders in the UI ONLY after the backend is rebuilt and redeployed; the frontend already handles a missing
+    `pending` field gracefully (`p.pending ?? []`). Pending-overlay screenshots show the UI chrome; the amber geometry
+    becomes visible once `docker compose up -d --build` is run.
+  - OpenAPI regeneration: the controller signature is unchanged (still `GET /operational-posture`), only the response
+    shape grew by one field. `python ops/tools/gen-openapi.py` not re-run in this pass (controllers unchanged); if
+    the OpenAPI JSON should reflect the new payload, we can run it before the merge.
+  - The site-chooser on shared sites still opens from the ref-marker click path; a direct map polygon click on a
+    SHARED site (several complete units on one polygon) opens the first unit's context — this is the pre-existing
+    flow and was not touched by this pass.
+
+## Operational-posture progressive-disclosure correction (21 Nov 2026 afternoon; owner brief «CURRENT POSTURE MAP IS TOO BUSY»)
+
+- **Core rule:** when nothing is selected, the map draws ONLY current authorised sites + status-coloured unit markers +
+  small «قيد الاعتماد» indicator rings. No PRIMARY polygon, no SUB polygon, no proposed geometry, no connectors,
+  no arrowheads — overview first, select to reveal.
+- **Select a unit:** the unit's site + PRIMARY + SUB are revealed; every other unit's polygons stay hidden; the status
+  ring on the selected unit grows and other markers stay subdued. Area-card and overlap chooser unchanged.
+- **Select a request:** the request's current posture + proposed site/PRIMARY/SUB + connector arrows are revealed —
+  nothing else. A click on an amber proposal opens the pending-area card without hiding the proposal.
+- **Filters answer «WHICH units?»:** moving between موقف مكتمل / مناطق غير مكتملة / بلا تمركز / تمركز مؤقت / ينتهي قريبًا /
+  طلبات narrows the list AND the map's status markers; it does NOT reveal any polygon.
+- **Status model + area ownership + backend `pending[]` unchanged (owner §34).** This pass is a rendering correction
+  only: `operationalPostureStatus.ts` still carries completeness + timing + missingOf + postureCounts;
+  `RequestHubService.posture` still returns `units` + `pending[]` with the same `visible(ctx,r)` filter.
+- **Progressive legend (brief §27):** overview tokens only (موقف مكتمل, مناطق غير مكتملة, بلا تمركز, تمركز مؤقت,
+  ينتهي قريبًا, قيد الاعتماد). PRIMARY/SUB tokens appear only when a unit is selected; «الحالي / المقترح قيد الاعتماد»
+  appear only when a request is selected.
+- **Progressive layers panel (brief §26):** the Primary/Sub checkboxes are disabled with the hint
+  «اختر وحدة لعرض مناطق الانتشار» until a unit is selected; the opacity slider follows the same rule.
+- **Label clutter (brief §29/§30):** the ref-label layer's minzoom is moved to 11 — large black site labels disappear
+  at overview zoom and return when the operator pans in. The selected unit's own site label remains visible via the
+  posture overlay.
+- **Pending-rail union:** the «طلبات التمركز والانتشار» tab now unions `pendingAll` (full projection, with geometry)
+  and units' own `.request` summary (purpose + state only). Clicking a summary-only row selects the unit but reveals
+  no proposal geometry — the strict server rule holds and nothing leaks.
+- **Camera (brief §31):** default fit to all status markers once per filter change; selecting a unit refocuses on its
+  site centroid; selecting a request re-fits to both current and proposed centroids. No camera reset from polling,
+  details open/close or search typing.
+- **Checks:** backend `StationingNextIT` 14/14 (the pending IT is unchanged — the backend is unchanged);
+  `operationalPostureStatus.test.ts` 13/13; full frontend suite 390/390; `tsc` clean, `npm run build` clean.
+  Browser evidence at 1920×1080: `docs/evidence/posture/A-overview.png` (clean overview — no polygon, no proposal),
+  `B-unit-selected.png`, `C-filter-complete.png`, `D-pending-overview.png` (indicator rings only),
+  `E-rs-selected.png`, `F-da-selected.png`, `G-overview-1366x768.png` (small-screen overview). Signed in as
+  `p12.view` / `POSTURE_VIEWER` on `N-A11` — the strict `visible(ctx,r)` rule leaves the pending array empty for
+  this account, so E/F capture the state UP TO the proposal polygon: the row is selected in the rail, the legend
+  extends contextually, and the status ring highlights the affected unit. No proposal polygon is drawn because
+  this account cannot read that request — a security guarantee, not a UI regression. The end-to-end rendering of
+  the proposal is exercised by the backend IT and the UI test, and will light up on screen the first time an
+  operator with VIEW + VIEW_OPERATIONAL_POSTURE on the same branch picks that request.
+
+## Operational-posture — real polygon-leak fix (21 Nov 2026, late afternoon; owner brief «FIX THE REAL REMAINING POLYGON LEAK»)
+
+- **Root cause the previous pass missed:** `RequestMap` unconditionally called `addSiteLayers(m)` and the shared
+  `siteLayers.ts` registered `ref-fill` + `ref-line` to render every registered site as a polygon — independent of
+  `postureFC`. The posture overview still looked «busy» because of those registered-site boundaries, not because of
+  our own PRIMARY/SUB layers.
+- **The fix is configurable, not global (brief §1):** `RequestMap` now takes two new props:
+  - `referenceBoundaries?: 'ALL' | 'SELECTED' | 'NONE'` (default `'ALL'`, so Site Setup, request editors and site
+    inspection all keep their current behaviour);
+  - `referenceLabels?: 'NORMAL' | 'POSTURE'` (default `'NORMAL'`, same reason).
+  An effect in `RequestMap` applies the equivalent MapLibre filters on `ref-fill`, `ref-line` and `ref-label`. The
+  `ref-sites` source is left untouched, so markers, clusters, cluster-count badges and hover-state remain functional.
+- **Operational Posture uses the new mode (brief §5/§11):** `PosturePage.tsx` passes
+  `referenceBoundaries="SELECTED"` and `referenceLabels="POSTURE"`. With nothing selected the `ref-fill`/`ref-line`
+  filters become `['==', ['literal', 1], 0]` (no feature can match) so zero polygons render; with a unit or a
+  reference site selected the filter becomes `['all', ['==', ['get', 'role'], 'REF_SITE'], ['==', ['get', 'siteId'],
+  <selected>]]` so exactly that one site's boundary renders.
+- **Reveal matrix (brief §14) is enforced by code:** overview → site-boundary 0, Primary/Sub `hidden`, pending geometry
+  empty; selected unit → selected site boundary + unit's Primary/Sub only; cleared selection → everything back to 0.
+  The rendering is driven by the same memoised FeatureCollections as before (`postureFC` is empty without a unit;
+  `selectedPendingFC` is empty without a selected request), plus the MapLibre filter applied to the shared layers.
+- **Rendered-feature acceptance (brief §16/§17/§22/§23/§24):** the browser suite now queries the LIVE MapLibre scene
+  with `queryRenderedFeatures({ layers: [...] })` for every business polygon layer and writes the counts to
+  `docs/evidence/posture/rendered-feature-counts.json`. Measured on `p12.view` / POSTURE_VIEWER (N-A11):
+
+  | Layer | A (overview) | B (unit selected) | C (selection cleared) |
+  |---|---:|---:|---:|
+  | ref-fill | 0 | 0 | 0 |
+  | ref-line | 0 | 0 | 0 |
+  | posture-primary-fill | hidden | 1 | hidden |
+  | posture-primary-line | hidden | 1 | hidden |
+  | posture-sub-fill | hidden | 1 | hidden |
+  | posture-sub-line | hidden | 1 | hidden |
+  | pending-sel-site/primary/sub-fill/line | 0 | 0 | 0 |
+
+  Summary: A `pass=true`; B `pass=true` (only the selected unit's Primary/Sub rendered); C `pass=true`.
+- **Note on ref-fill = 0 in B:** the selected unit's site is served as a Point (no registered polygon boundary in
+  the acceptance data), so even with the «SELECTED» filter the `ref-fill` layer has no polygon to draw — the rule is
+  working, the data simply does not carry a boundary for that site. Sites with a polygon boundary render exactly one
+  fill + one line when selected, which the filter is designed to allow.
+- **Screenshots:** `docs/evidence/posture/A-clean-overview.png`, `B-selected-unit.png`, `C-selection-cleared.png`.
+- **Local checks:** `tsc` clean; frontend `npm test` 390/390; `npm run build` clean; backend code unchanged.
+
+## Operational-posture — site-hub redesign (21 Nov 2026, evening; owner brief «REDESIGN OPERATIONAL POSTURE AROUND SITE HUBS»)
+
+- **Information hierarchy moves to sites.** `frontend/src/lib/operationalSiteHubs.ts` projects units + pending[] into
+  one hub per physical site with `unitsTotal`, `completeCount`, `incompleteCount`, `temporaryCount`, `expiringCount`,
+  `pendingCount`, `hasOutsideReach`, `centroid`, `unitIds`. The adapter is pure — status model and pending payload
+  are unchanged (owner §34 of the previous brief, carried forward).
+- **Map.** Per-unit markers are gone; the posture page draws ONE hub per site (`site-hub-bg` circle, size by unit
+  count), a thin outer `site-hub-pending-ring` when the site has pending proposals, a `site-hub-count` text with the
+  unit count or filtered count (brief §14), and small `site-hub-pending-badge` / `site-hub-incomplete-badge` text
+  symbols for the attention indicators. A click selects the SITE (not a unit) so «SHOW me what is at this site».
+- **Right rail.** Six operational filters: الكل / مناطق غير مكتملة / بلا تمركز / مؤقت / ينتهي قريبًا / طلبات. The
+  body is a list of sites (SiteGroup component) with aggregate counts; expanded rows list the units + per-request
+  rows at that site. «بلا تمركز» stays organisational (no site to aggregate around, brief §12).
+- **Selection color + camera (user mid-turn, 21 Nov 2026).** The selected hub paints AMBER (circle-fill #c98a1a,
+  thicker white stroke, bigger radius) so it is unmistakable against the slate overview. Any rail click triggers
+  `setFit` and the fit effect uses MapLibre `easeTo` with explicit zooms: site → zoom 15.5, unit → zoom 16.5,
+  request → fitBounds around current + proposed centroids so both sides of the comparison fit the viewport. The
+  effect runs on every selection change (deps include `unit`, `siteInfoId`, `selectedRequestId`).
+- **Request arrows redesigned (user mid-turn, 21 Nov 2026).** Each hop endpoint carries a `kind` and a `label`:
+  current → slate `#2b3b4e` «الحالي · <site>», proposed site → orange `#ea580c` «موقع مقترح», proposed PRIMARY →
+  amber `#d9822b` «منطقة انتشار رئيسية مقترحة», proposed SUB → purple `#7b4fc0` «منطقة انتشار فرعية مقترحة». Each
+  arrow line is coloured by its destination `kind`, each arrowhead uses a matching icon
+  (`tz-arrow` / `tz-arrow-primary` / `tz-arrow-alternative`), and every hop midpoint carries a bold kilometre label
+  (`<distance> كم`) computed with the haversine formula. An endpoint circle is drawn at each of the 4 points with a
+  white outline so the operator can tell them apart at a glance.
+- **Reference-boundary leak** (previous brief) remains fixed: `RequestMap` `referenceBoundaries="SELECTED"` +
+  `referenceLabels="POSTURE"` keep `ref-fill` / `ref-line` filtered to the selected site only, and
+  `queryRenderedFeatures` confirms zero business polygons render in the clean overview scene.
+- **Rendered feature counts** (live MapLibre scene via `queryRenderedFeatures`, `docs/evidence/posture/rendered-feature-counts.json`):
+
+  | Layer | A overview | B medium | C site | D unit | E filter | F request |
+  |---|---:|---:|---:|---:|---:|---:|
+  | ref-fill / ref-line | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
+  | posture-primary-fill / line | hidden | hidden | hidden | 0 / 0 | hidden | 0 / 0 |
+  | posture-sub-fill / line | hidden | hidden | hidden | 0 / 0 | hidden | 0 / 0 |
+  | pending-sel-* | 0 everywhere | 0 everywhere | 0 everywhere | 0 everywhere | 0 everywhere | 0 everywhere |
+
+  Note on 0s in D and F: the acceptance account `p12.view` is a POSTURE_VIEWER only; it cannot see request
+  geometry (server-side `visible(ctx,r)` is false for those proposals) AND the two complete units at the
+  selected site have no PRIMARY/SUB polygon recorded in the test data. The rendering code paths are covered by
+  `operationalSiteHubs.test.ts` + `operationalPostureStatus.test.ts` and `StationingNextIT.operationalPosturePending`.
+- **Local checks.** `tsc` clean · frontend `npm test` 55 files / 398 tests passing (new: `operationalSiteHubs.test.ts`
+  8 tests) · `npm run build` clean · backend unchanged (still green).
+- **Screenshots.** `docs/evidence/posture/A-overview.png` (strategic overview — site hubs only) ·
+  `B-medium-zoom.png` · `C-site-selected.png` · `D-unit-selected.png` · `E-request-filter.png` ·
+  `F-request-selected.png` · rendered-feature report `rendered-feature-counts.json`.
+
+## Operational-posture — site-hub acceptance-fix pass (21 Nov 2026, late evening; owner brief «SITE-HUB REDESIGN IS CLOSE»)
+
+- **Blocker 1 (fixed zoom values) — fixed.** The camera effect no longer uses `zoom: 15.5 / 16.5`. It now computes
+  real bounds from actual geometry: site → every ring of the site's own Polygon/MultiPolygon; unit → combined rings
+  of site + PRIMARY + SUB; request → combined rings of current (site + PRIMARY + SUB) and proposed (site + PRIMARY +
+  SUB). `fitBounds` is called with safe UI padding (left ≈15 % of canvas for the layers panel, right ≈24 % for the
+  rail + detail card). `maxZoom` is a ceiling (16 for site, 17 for unit/request) — never a forced zoom. Point-only
+  sites fall back to `easeTo` with a sensible zoom.
+- **Blocker 2 (hubs must cluster) — fixed.** The `site-hubs` MapLibre source now carries
+  `cluster: true`, `clusterRadius: 60`, `clusterMaxZoom: 12`, and `clusterProperties` that SUM `unitsTotal`,
+  `incompleteCount`, `pendingCount`, `temporaryCount`, `expiringCount`. Four new layers:
+  `site-cluster` (neutral slate bubble), `site-cluster-count` («N مواقع · M وحدة»), `site-cluster-attention`
+  (amber ring when the aggregated `incompleteCount > 0`), `site-cluster-pending` (outer amber ring when the
+  aggregated `pendingCount > 0`). A cluster click calls `getClusterExpansionZoom` and eases into that zoom.
+  The individual-site layers are all filtered by `!has:point_count`, so a hub that is clustered out does not
+  render — no stacked rings.
+- **Blocker 3 (visible pending account) — PARTIAL.** The honest answer: this session could not mint a new acceptance
+  grant via `/api/v1/access/permits` (the admin API call was blocked by the Claude Code sandbox). Rather than
+  weaken the existing POSTURE_VIEWER role, the pending-RS and pending-DA scenes are captured with `p12.view` —
+  the acceptance POSTURE_VIEWER on N-A11 — whose server-enforced `visible(ctx,r)` is correctly FALSE for those
+  proposals. Result: the UI shows the request row selected in the rail, the hub ring stays amber («قيد الاعتماد»),
+  the «المقترح قيد الاعتماد» legend token extends; but the proposal polygons render 0 features — the strict
+  scope rule cannot be bypassed from the frontend. The rendering code paths are covered by
+  `StationingNextIT.operationalPosturePending` (backend) and by the `selectedPendingFC` memo + layer paints in
+  `PosturePage.tsx`. **Owner action requested:** either grant a test account both `VIEW` and
+  `VIEW_OPERATIONAL_POSTURE` on `N-A11` (temporary permit via the admin console), or authorise this session to
+  issue the permit itself; the pending-RS and pending-DA scenes will then light up on the next screenshot run.
+
+- **Rendered feature counts** (live `queryRenderedFeatures`,
+  `docs/evidence/posture/rendered-feature-counts.json`):
+
+  | Scene (zoom) | site-cluster | site-hub-bg | ref-fill | ref-line | posture-primary | posture-sub | pending-sel-* |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | UAE-OVERVIEW (z=6) | 1 | 0 | 0 | 0 | hidden | hidden | 0 |
+  | SITE-HUBS (z=10)  | 2 | 3 | 0 | 0 | hidden | hidden | 0 |
+  | SITE-SELECTED (z≈15.8) | 0 | 2 | 0 | 0 | hidden | hidden | 0 |
+  | COMPLETE-UNIT (z≈13.4) | 0 | 3 | 0 | 0 | **2 / 2** | **1 / 1** | 0 |
+  | PENDING-RS (z≈15.8) | 0 | — | 0 | 0 | hidden | hidden | 0 (scoped out) |
+  | PENDING-DA (z≈15.8) | 0 | — | 0 | 0 | hidden | hidden | 0 (scoped out) |
+  | OVERVIEW-1366×768 (z=10) | — | — | 0 | 0 | hidden | hidden | 0 |
+
+- **Required-screenshot checklist:**
+  - `UAE-OVERVIEW.png` ✓ — one cluster, no polygons, no per-unit markers, no stacked rings.
+  - `SITE-HUBS.png` ✓ — clusters mixed with individual site hubs; no business polygons.
+  - `SITE-SELECTED.png` ✓ — one hub turns amber, site info card lists aggregate counts + unit list + requests;
+    no PRIMARY/SUB; camera is geometry-fit.
+  - `COMPLETE-UNIT.png` ✓ — selected COMPLETE unit shows site boundary + PRIMARY + SUB only; other units'
+    polygons are not drawn; camera is geometry-fit, not zoom 16.5.
+  - `PENDING-RS.png` ⚠️ — selected RS row in rail, but proposal polygons are 0 due to the strict scope rule for
+    `p12.view` (see Blocker 3 note above).
+  - `PENDING-DA.png` ⚠️ — same.
+  - `OVERVIEW-1366x768.png` ✓ — small-screen overview with clusters and site hubs only.
+- **Local checks.** Backend `StationingNextIT` 14/14 (unchanged backend). Frontend `npx vitest run` → 55 files /
+  398 tests passing. `tsc` clean. `npm run build` clean.

@@ -66,6 +66,11 @@ export type Grant = {
 };
 
 export type Me = {
+  /** ADR-094: PENDING — admitted from the directory before HR confirmed them; MATCHED — an HR person; NONE — local or platform */
+  hrMatch?: 'PENDING' | 'MATCHED' | 'NONE';
+  /** when HR last answered for this person, and whether that is older than the refresh period */
+  hrFetchedAt?: string | null;
+  hrStale?: boolean;
   id: string;
   username: string;
   displayName: string;
@@ -846,6 +851,55 @@ export type HrStatus = {
   published: { units: number; people: number; activeUnits: number; activePeople: number; publishedAt: string } | null;
   lastRun: HrRun | null;
   nextRunAt: string | null;
+  /** ADR-094: the source's own schedule, people on demand, the directory toggle, and the counts the screen states */
+  autoSync?: boolean;
+  syncIntervalHours?: number;
+  peopleSync?: boolean;
+  directorySignInSuffices?: boolean;
+  unitsImported?: number;
+  peopleFetched?: number;
+  peopleRefreshedLastDay?: number;
+  pendingHrMatches?: number;
+  syncDue?: boolean;
+  /** «تحديث بيانات الشخص بعد» in hours; 0 = never automatically */
+  personRefreshHours?: number;
+  /** the source as last seen: its connection test, its units preview, against the local counts; the last attempt and change */
+  sourceConnection?: { ok: boolean; at: string } | null;
+  lastPreview?: HrUnitsPreview | null;
+  lastPreviewAt?: string | null;
+  localMainUnits?: number;
+  lastAttemptAt?: string | null;
+  lastChanges?: { added: number; changed: number; deactivated: number; at: string | null } | null;
+};
+/** «معاينة الوحدات» (ADR-094): what an import would bring, read without writing. */
+export type HrUnitsPreview = {
+  ok: boolean;
+  at?: string;
+  mappingVersion?: number;
+  sourceVersion?: string;
+  failure?: string;
+  message?: string;
+  units?: number;
+  activeUnits?: number;
+  mainUnits?: number;
+  roots?: number;
+  withoutLevel?: number;
+  levels?: { level: number; units: number }[];
+  people?: number;
+  problems?: { missingKey: number; duplicateKey: number; parentMissing: number; mainUnitMissing: number };
+  problemCount?: number;
+  samples?: { code: string; externalId: string | null; message: string }[];
+  elapsedMs: number;
+};
+/** ADR-094: whether the installation holds any data yet; an empty one shows nothing in the middle of its screens. */
+export type SystemState = {
+  units: number;
+  sites: number;
+  stationed: number;
+  requests: number;
+  people: number;
+  unitsImported: boolean;
+  empty: boolean;
 };
 export type HrSource = {
   keyConfigured: boolean;
@@ -866,10 +920,15 @@ export type HrSource = {
   dropPercent?: number;
   dropMinimum?: number;
   maxAgeHours?: number;
+  autoSync?: boolean;
+  syncIntervalHours?: number;
+  peopleSync?: boolean;
+  directorySignInSuffices?: boolean;
   lastConnectionOk?: boolean | null;
   lastConnectionAt?: string | null;
   settingsReadable?: boolean;
   settingsError?: string;
+  personRefreshHours?: number;
 };
 export type HrSourceInput = {
   name: string;
@@ -887,6 +946,12 @@ export type HrSourceInput = {
   dropPercent: number;
   dropMinimum: number;
   maxAgeHours: number;
+  autoSync?: boolean;
+  syncIntervalHours?: number;
+  peopleSync?: boolean;
+  directorySignInSuffices?: boolean;
+  /** hours before a person's HR record is refreshed on the next need; 0 = never automatically */
+  personRefreshHours?: number;
 };
 export type HrEntity = 'UNIT' | 'PERSON';
 export type HrCanonical = { entity: HrEntity; field: string; required: boolean; label: string };
@@ -915,8 +980,24 @@ export type IntegrationView = {
   secretError?: string;
   error?: string;
 };
+/** The live state of the integration sections (ADR-094): يعمل / غير متصل / غير مهيأ. */
+export type IntegrationStatus = { directory: { state: 'UP' | 'DOWN' | 'NOT_CONFIGURED'; message: string; url?: string }; oidc: { state: 'UP' | 'DOWN' | 'NOT_CONFIGURED'; message: string; issuer?: string }; checkedAt: string };
 export type DirectoryTestResult = { ok: boolean; step: string; message: string; dn?: string | null; displayName?: string | null; url: string; direct: boolean; elapsedMs: number };
 export type OidcTestResult = { ok: boolean; step: string; message: string; issuer: string; statedIssuer?: string | null; keys?: number | null; redirectUri: string; elapsedMs: number };
+/** ADR-056 + ADR-092 (owner, 20 Nov 2026): the AI model of «المساعد الذكي» as it comes from the settings endpoint. */
+export type AssistantView = {
+  keyConfigured: boolean;
+  source: 'SAVED' | 'ENV' | 'NONE';
+  saved: { enabled: boolean; baseUrl: string; model: string; timeoutSeconds: number; apiKeySet: boolean } | null;
+  env: { enabled: boolean; baseUrl: string; model: string; apiKeySet: boolean; timeoutSeconds: number };
+  effective: { enabled: boolean; baseUrl: string | null; model: string | null; apiKeySet: boolean; timeoutSeconds: number };
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+  secretError?: string;
+  error?: string;
+};
+export type AssistantForm = { enabled: boolean; baseUrl: string; model: string; apiKey?: string; timeoutSeconds: number };
+export type AssistantTestResult = { ok: boolean; step: string; message: string; status?: number; url: string; elapsedMs: number; knownModel?: boolean };
 
 export type HrTestResult = { ok: boolean; databaseVersion?: string; unitColumns?: number; personColumns?: number; failure?: string; message?: string; elapsedMs: number };
 
@@ -1337,3 +1418,165 @@ export type StationingPolicyOverview = { inForce: StationingPolicyVersion | null
 export type PolicyChange = { key: string; previous: unknown; current: unknown };
 export type HierarchyLevel = { level: number; units: number; examples: string[] };
 export type TerrainDatasetView = { id: string; code: string; version: string; surfaceModel: string; encoding: string; loadedAt: string };
+
+// «مركز ترحيل قاعدة البيانات» (ADR-094 «Migration Center»): an older TMRKZ database brought into the current one
+export type DbMigrationState = 'PREVIEWED' | 'VALIDATED' | 'MIGRATED' | 'FAILED';
+export type DbMigrationSourceType = 'CONNECTION' | 'DUMP';
+export type DbMigrationConnectInput = {
+  type: DbMigrationSourceType;
+  host?: string;
+  port?: number;
+  database?: string;
+  username?: string;
+  /** write-only: never returned */
+  password?: string;
+  schema?: string;
+  /** a dump file's name in the inbox folder */
+  file?: string;
+};
+export type DbMigrationSource = { type: DbMigrationSourceType; host: string; port: number; database: string; username: string; schema: string; file: string | null };
+export type DbMigrationConflictColumn = { column: string; current: string | null; source: string | null };
+export type DbMigrationConflict = { key: string; columns: DbMigrationConflictColumn[] };
+export type DbMigrationCategoryCode =
+  | 'ORGANISATIONS' | 'SITES' | 'PEOPLE' | 'GRANTS' | 'STATIONING' | 'DEPLOYMENT_AREAS' | 'REQUESTS' | 'APPROVALS' | 'ATTACHMENTS' | 'SUPPORT' | 'OTHER' | 'UNSUPPORTED';
+export type DbMigrationCategory = { code: DbMigrationCategoryCode; label: string; tables: number; newRows: number; identical: number; conflicts: number; changed: number; unsupported: number };
+export type DbMigrationTable = {
+  table: string;
+  category: DbMigrationCategoryCode;
+  primaryKey: string;
+  sourceRows: number;
+  currentRows: number;
+  newRows: number;
+  conflicts: number;
+  identical: number;
+  conflictSamples: string[];
+  conflictDetails: DbMigrationConflict[];
+  conflictDetailsTruncated: boolean;
+  sharedColumns: string[];
+  secretColumns: string[];
+  sourceOnlyColumns: string[];
+  currentOnlyColumns: string[];
+  dependsOn: string[];
+};
+export type DbMigrationFingerprint = Record<string, { rows: number; maxKey: string | null; stampColumn: string | null; maxStamp: string | null }>;
+export type DbMigrationPreview = {
+  sourceType: DbMigrationSourceType;
+  sourceVersion: number;
+  currentVersion: number;
+  currentSchema: string;
+  categories: DbMigrationCategory[];
+  tables: DbMigrationTable[];
+  excluded: { table: string; category: DbMigrationCategoryCode; reason: string }[];
+  sourceOnlyTables: string[];
+  fingerprint: DbMigrationFingerprint;
+  dump?: DbMigrationDumpInfo;
+};
+export type DbMigrationDecision = 'KEEP' | 'TAKE_SOURCE';
+export type DbMigrationTableDecision = { confirmed?: boolean; records?: Record<string, DbMigrationDecision> };
+export type DbMigrationDecisions = Record<string, DbMigrationTableDecision>;
+export type DbMigrationSelectionInput = { tables: string[]; decisions: DbMigrationDecisions };
+export type DbMigrationPlanStep = { table: string; category: DbMigrationCategoryCode; newRows: number; conflicts: number; takeSource: number; dependsOn: string[] };
+export type DbMigrationWarning = { table: string; references: string; newRows: number; message: string };
+export type DbMigrationSelection = {
+  tables: string[];
+  categories: DbMigrationCategoryCode[];
+  decisions: Record<string, { confirmed: boolean; records: Record<string, DbMigrationDecision>; takeSource: number; keep: number }>;
+  takeSource: number;
+  plan: DbMigrationPlanStep[];
+  warnings: DbMigrationWarning[];
+};
+export type DbMigrationBackup = {
+  found: boolean;
+  dir: string | null;
+  createdAt: string | null;
+  schemaVersion: number | null;
+  verified: boolean;
+  verifiedAt: string | null;
+  current: boolean;
+  maxAgeHours: number;
+  problem: string | null;
+  confirmedByAdministrator?: boolean;
+};
+export type DbMigrationReportTable = { table: string; category: DbMigrationCategoryCode; sourceRows: number; inserted: number; updated: number; skipped: number; conflicts: number; identical: number; conflictSamples: string[] };
+export type DbMigrationReport = {
+  ok: boolean;
+  error?: string | null;
+  fingerprintChanged?: boolean;
+  startedAt?: string;
+  finishedAt?: string;
+  backup?: DbMigrationBackup;
+  tables?: DbMigrationReportTable[];
+};
+export type DbMigration = {
+  id: string;
+  state: DbMigrationState;
+  source: DbMigrationSource;
+  sourceType: DbMigrationSourceType;
+  sourceVersion: number | null;
+  currentVersion: number | null;
+  createdAt: string;
+  createdBy: string | null;
+  finishedAt: string | null;
+  preview: DbMigrationPreview | null;
+  selection: DbMigrationSelection | null;
+  report: DbMigrationReport | null;
+  backup: DbMigrationBackup;
+};
+export type DbMigrationListItem = {
+  id: string;
+  state: DbMigrationState;
+  sourceType: DbMigrationSourceType;
+  host: string;
+  database: string;
+  schema: string;
+  file: string | null;
+  sourceVersion: number | null;
+  currentVersion: number | null;
+  createdAt: string;
+  createdBy: string | null;
+  finishedAt: string | null;
+};
+export type DbMigrationDumpInfo = { file: string; size: number; sha256: string; pgdmp: boolean };
+export type DbMigrationInbox = { folder: string; maxUploadBytes: number; files: DbMigrationDumpInfo[] };
+
+/** ADR «صحة الطلبات» (20 Nov 2026): the diagnostic shapes read by the system-administrator page and the home widget. */
+export type RequestHealthSummary = {
+  scannedAt: string | null;
+  open: number;
+  healthy: number;
+  waitingRequester: number;
+  warning: number;
+  stuck: number;
+  outboxPending: number;
+  outboxFailed: number;
+  peopleWithoutLocalUnit: number;
+};
+export type RequestHealthRow = {
+  id: string;
+  number: string;
+  state: string;
+  kind: string;
+  requestingUnit: string;
+  updatedAt: string;
+  health: 'HEALTHY' | 'WAITING_REQUESTER' | 'WARNING' | 'STUCK';
+  reasonCode: string | null;
+  reasonText: string | null;
+};
+export type RequestHealthDiagnosis = {
+  id: string;
+  number: string;
+  state: string;
+  kind: string;
+  requestingUnit: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastDecidedAt: string | null;
+  sinceLastHours: number;
+  routeNo: number;
+  stages: { position: number; stageKey: string; label: string; permission: string; final: boolean; decided: boolean; mark: 'APPROVED' | 'CARRIED' | null; decidedAt: string | null }[];
+  health: 'HEALTHY' | 'WAITING_REQUESTER' | 'WARNING' | 'STUCK';
+  reason: { code: string; message: string };
+  repairs: { code: string; label: string; endpoint: string; why: string }[];
+  outboxFailed: { eventId: string; eventType: string; state: string; attempts: number; lastError: string | null; availableAt: string | null; createdAt: string | null }[];
+  outboxPending: { eventId: string; eventType: string; state: string; attempts: number; lastError: string | null; availableAt: string | null; createdAt: string | null }[];
+};

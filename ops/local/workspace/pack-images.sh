@@ -30,6 +30,13 @@ say "$BACKEND: Maven and the backend's dependencies"
 mkdir -p "$CTX/backend" && cp backend/pom.xml "$CTX/backend/" && cp -r backend/src "$CTX/backend/" && cp "$W/backend-run.sh" "$CTX/backend/"
 cat > "$CTX/backend/Dockerfile" <<'EOF'
 FROM maven:3.9.16-eclipse-temurin-25
+# pg_restore 17 for «مركز ترحيل قاعدة البيانات» (ADR-094): a pg_dump -Fc file restored into a staging database; its own
+# layer before the Maven layers so a code change never repeats it
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg lsb-release \
+ && install -d /usr/share/postgresql-common/pgdg \
+ && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+ && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+ && apt-get update && apt-get install -y --no-install-recommends postgresql-client-17 && rm -rf /var/lib/apt/lists/*
 COPY pom.xml /deps/pom.xml
 COPY src /deps/src
 # the test runner (surefire-junit-platform and the JUnit launcher) is fetched only when a test really runs: two unit tests

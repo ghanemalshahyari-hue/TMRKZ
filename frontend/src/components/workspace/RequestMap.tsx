@@ -97,7 +97,7 @@ function arrow(hex: string) {
 }
 
 /** The request on the offline map: current sites, the proposed site, the deployment areas, their bands and the move. */
-export function RequestMap({ request, checks, mode, view = '2d', terrain3d = null, selected = null, onMap, fitMaxZoom = 15, hideSite = false, fit = true, fitKey = 0, referenceInteractive = true, pick = null, focus = null, fitSites = false, highlight = null, occupied = null }: {
+export function RequestMap({ request, checks, mode, view = '2d', terrain3d = null, selected = null, onMap, fitMaxZoom = 15, hideSite = false, fit = true, fitKey = 0, referenceInteractive = true, pick = null, focus = null, fitSites = false, highlight = null, occupied = null, referenceBoundaries = 'ALL', referenceLabels = 'NORMAL' }: {
   request: RestationingRequest;
   checks: RestationingChecks | null;
   mode: BasemapMode;
@@ -135,6 +135,24 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
   highlight?: string | null;
   /** Occupied ground while the new site is placed: sites of units other than the moving ones, in red. */
   occupied?: GeoJSON.FeatureCollection | null;
+  /**
+   * How reference-site boundary polygons (`ref-fill` / `ref-line`) render (owner, 21 Nov 2026 «FIX THE REAL REMAINING
+   * POLYGON LEAK»):
+   *   - 'ALL' (default) — every registered site's polygon is rendered. Backward-compatible; Site Setup, request
+   *     editors and inspection pages all see what they always saw.
+   *   - 'SELECTED' — only the site whose id matches `highlight` (or `pick.selectedId`) renders a polygon. The
+   *     markers/clusters stay on so the operator still sees «where is each site». Operational Posture uses this.
+   *   - 'NONE' — no reference polygon renders. Markers/clusters stay on.
+   */
+  referenceBoundaries?: 'ALL' | 'SELECTED' | 'NONE';
+  /**
+   * How reference-site labels (`ref-label` for sites with a boundary + `ref-pt-label` for clustered points) render:
+   *   - 'NORMAL' (default) — labels appear at the default minzoom. Backward-compatible.
+   *   - 'POSTURE' — individual site labels are held back until closer zoom, so the overview is not flooded with
+   *     large site labels; the selected site's label stays visible at any zoom via the detail card and the
+   *     status-marker overlay.
+   */
+  referenceLabels?: 'NORMAL' | 'POSTURE';
 }) {
   const [map, setMap] = useState<MlMap | null>(null);
   // the registered sites as a reference layer below the request (owner decision of 5 Nov 2026, item 4): information on
@@ -158,6 +176,41 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
   useEffect(() => {
     if (map) setSiteData(map, refData);
   }, [map, refData]);
+  /**
+   * Progressive-disclosure filter for the registered-site boundary layers (owner, 21 Nov 2026 «FIX THE REAL REMAINING
+   * POLYGON LEAK»). The `ref-sites` SOURCE is left untouched so other paints that read it (markers, cluster bubbles)
+   * keep working; only the `ref-fill` / `ref-line` / `ref-label` RENDERING is filtered.
+   */
+  useEffect(() => {
+    if (!map) return;
+    const hasLayer = (id: string) => !!map.getLayer(id);
+    const baseRef: ['==', ['get', string], string] = ['==', ['get', 'role'], 'REF_SITE'];
+    const labelBase: ['in', ['get', string], ['literal', string[]]] = ['in', ['get', 'role'], ['literal', ['REF_LABEL', 'REF_MARKER']]];
+    // «hidden» filter — reliably matches no feature. Using `['==', 1, 0]` gives a constant false.
+    const hidden: ['==', ['literal', number], number] = ['==', ['literal', 1], 0];
+    let boundaryFilter: unknown;
+    if (referenceBoundaries === 'ALL') boundaryFilter = baseRef;
+    else if (referenceBoundaries === 'NONE') boundaryFilter = hidden;
+    else {
+      boundaryFilter = highlighted
+        ? ['all', baseRef, ['==', ['get', 'siteId'], highlighted]]
+        : hidden;
+    }
+    if (hasLayer('ref-fill')) map.setFilter('ref-fill', boundaryFilter as never);
+    if (hasLayer('ref-line')) map.setFilter('ref-line', boundaryFilter as never);
+    // Labels: POSTURE mode suppresses the big black per-site label (only the selected site keeps it); NORMAL keeps
+    // the original layer filter. The source is unchanged.
+    if (hasLayer('ref-label')) {
+      if (referenceLabels === 'POSTURE') {
+        const sel = highlighted
+          ? ['all', labelBase, ['==', ['get', 'siteId'], highlighted]]
+          : hidden;
+        map.setFilter('ref-label', sel as never);
+      } else {
+        map.setFilter('ref-label', labelBase as never);
+      }
+    }
+  }, [map, referenceBoundaries, referenceLabels, highlighted]);
   useEffect(() => {
     (map?.getSource('occ') as GeoJSONSource | undefined)?.setData(occupied ?? { type: 'FeatureCollection', features: [] });
   }, [map, occupied]);

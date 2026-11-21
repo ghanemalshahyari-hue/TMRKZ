@@ -15,7 +15,7 @@ LIVE="${2:-}"
 IMAGE=postgis/postgis:17-3.5-alpine
 C="tmrkz-backupcheck-$(date -u +%Y%m%d%H%M%S)"
 sha() { (sha256sum "$1" 2>/dev/null || shasum -a 256 "$1") | cut -d' ' -f1; }
-fail() { echo "[verify-backup] FAIL: $*" >&2; exit 1; }
+fail() { echo "[verify-backup] FAIL: $*" >&2; [ -d "${SRC:-}" ] && echo "FAIL $(date -u +%Y-%m-%dT%H:%M:%SZ) $*" > "$SRC/verify-result.txt" 2>/dev/null; exit 1; }
 
 [ -f "$SRC/manifest.json" ] || fail "no manifest.json in $SRC"
 FILES="$(sed -n 's/^ *"\([^"]*\)": "\([0-9a-f]\{64\}\)".*/\1/p' "$SRC/manifest.json")"
@@ -63,4 +63,6 @@ if [ -n "$LIVE" ]; then
     || fail "restored rows differ from the live fingerprint $LIVE (the database changed between backup and fingerprint?)"
   echo "[verify-backup] 4. restored rows equal the live fingerprint ($(wc -l < "$LIVE" | tr -d ' ') rows)"
 fi
+# the migration center's backup gate reads this file (ADR-094): a backup without it shows «لم يُتحقق»
+echo "PASS $(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$SRC/verify-result.txt"
 echo "[verify-backup] PASS: $SRC"

@@ -10,9 +10,10 @@ export const CREATABLE_PURPOSES: Purpose[] = ['SITE_REGISTRATION', 'DEPLOYMENT_A
 
 export const PURPOSE_TITLE: Record<Purpose, string> = {
   RESTATIONING: 'طلب إعادة تمركز',
-  INITIAL_STATIONING: 'طلب تمركز أولي',
+  // Owner UX consolidation §9 (20 Nov 2026): legacy records never read «إعادة تمركز» inside the editor.
+  INITIAL_STATIONING: 'طلب اعتماد موقع قديم',
   DEPLOYMENT_AREAS: 'طلب منطقة انتشار',
-  SITE_REGISTRATION: 'طلب اعتماد موقع',
+  SITE_REGISTRATION: 'طلب اعتماد موقع قديم',
 };
 
 export const PURPOSE_HINT: Record<Purpose, string> = {

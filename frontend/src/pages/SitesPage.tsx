@@ -6,11 +6,13 @@ import type { BasemapMode } from '../components/map/maplibre/offlineStyle';
 import { MapFrame } from '../components/workspace/MapFrame';
 import { OperationalWorkspace } from '../components/workspace/OperationalWorkspace';
 import { SitesMap } from '../components/workspace/SitesMap';
+import { EmptyCentre } from '../components/workspace/EmptyCentre';
 import { useRegisteredSites } from '../components/workspace/useRegisteredSites';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
 import { formatArea } from '../lib/footprint';
 import { newRequestFromSiteHash } from '../lib/restationingRoute';
+import { rememberReturn } from '../lib/returnContext';
 import { partsOf, siteArea } from '../lib/siteGeometry';
 import { registeredSites } from '../lib/sitesLayer';
 import { parseStationingHash } from '../lib/stationingLink';
@@ -25,6 +27,7 @@ type Filter = 'all' | 'stationed' | 'boundary';
  * «إعادة التمركز» with the stationed unit's context, and nothing is saved until the person acts there.
  */
 export function SitesPage() {
+  const app = useApp();
   const registered = useRegisteredSites();
   const [mode, setMode] = useState<BasemapMode>('street');
   const [selected, setSelected] = useState<string | null>(() => parseStationingHash(location.hash).site ?? null);
@@ -109,7 +112,9 @@ export function SitesPage() {
       sheetKey={selected ?? ''}
       rail={<div className="tz-rail">{list}</div>}
       context={<SiteDetailsPanel site={site} sites={sites} stationedAt={stationedAt} stationedShown={stationedShown} hidden={hidden} />}
-      centre={
+      centre={app.state?.empty ? (
+        <EmptyCentre title="لا توجد مواقع مسجلة بعد" hint="تُستورد الوحدات من مصدر الموارد البشرية في الإعدادات أولاً، ثم تُهيأ المواقع." />
+      ) : (
         <MapFrame
           title={
             <span className="tz-mapstep">
@@ -132,7 +137,7 @@ export function SitesPage() {
         >
           <SitesMap sites={registeredSites(sites)} current={registered.current} mode={mode} selectedId={selected} onSelect={select} />
         </MapFrame>
-      }
+      )}
     />
   );
 }
@@ -259,7 +264,12 @@ function SiteDetailsPanel({ site, sites, stationedAt, stationedShown, hidden }: 
             <i className="sw current" /> التمركز الحالي <small>(السجل المعتمد)</small>
           </h4>
           {canRequest && here.length > 0 && (
-            <a className="button compact tz-request-link" href={newRequestFromSiteHash(site.siteId)} title="يفتح «إعادة التمركز» على هذا الموقع موقعاً حالياً؛ تختار أنت من ينتقل، ولا يُحفظ شيء حتى تتصرف">
+            <a
+              className="button compact tz-request-link"
+              href={newRequestFromSiteHash(site.siteId)}
+              title="يفتح «إعادة التمركز» على هذا الموقع موقعاً حالياً؛ تختار أنت من ينتقل، ولا يُحفظ شيء حتى تتصرف"
+              onClick={() => rememberReturn('#stationing/site/' + site.siteId)}
+            >
               <Icon name="map" /> طلب إعادة تمركز من هذا الموقع
             </a>
           )}

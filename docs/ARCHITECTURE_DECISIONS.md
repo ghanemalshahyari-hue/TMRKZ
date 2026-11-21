@@ -2509,3 +2509,133 @@ and an exception opens as saved, opening writes nothing, a save changes only the
 under review read-only); `tests/acceptance/partial-approval-roundtrip.mjs` (owner brief §16–§17, see STATUS);
 `restationing-phase4.mjs` 16/16 (`SAVE=0`), `deployment-areas-phase3.mjs`, `responsive-layout.mjs` 16/16,
 `stationing-hub-phase1.mjs` 6/6 after the change.
+
+## ADR-096 Request-health diagnostic center for the system administrator (owner, 20 Nov 2026)
+
+**Owner.** «The system today only replays failed stationing events. There is no central page that says: this request is waiting here, this is why, and this is the safe way to repair it. Also keep `SYSTEM_ADMIN` from reading the request as if they were an approver.»
+
+**Decision.**
+- **New route** `#requestHealth` under إدارة النظام. Three read-only endpoints, every one audited: `GET /api/v1/system/request-health/summary` (for the admin home widget), `GET /api/v1/system/request-health?q=...&health=...&state=...` (list), `GET /api/v1/system/request-health/{number|id}` (diagnose one request). Permission required: `CONFIGURE`.
+- **Scanner.** `RequestHealthService.scan()` runs every five minutes, reads every open request (`UNDER_REVIEW`, `RETURNED_FOR_CHANGES`, `PAUSED_HIERARCHY_CHANGED`, `APPROVED_NOT_ACTIVATED`) and classifies it as `HEALTHY` / `WAITING_REQUESTER` / `WARNING` / `STUCK` with a reason code. The result is kept in memory only; no new table.
+- **Diagnosis** reads the request row, its current route's stages, the stationing outbox and the local seat holders; returns the undecided-stage pointer, how long since the last decision, whether the seat has a valid current holder, and a reason that names the cause: `FAILED_EVENT`, `HIERARCHY_CHANGED`, `NO_HOLDER`, `NO_PROGRESS` / `NO_PROGRESS_LONG`, `RETURNED`, `NOT_ACTIVATED`, `WAITING_DECISION`.
+- **Repair hints.** The service NEVER mutates the request. A diagnosis returns the names of existing endpoints the administrator may call under their current permissions, for example `POST /api/v1/stationing/outbox/{eventId}/replay` (requires `REPLAY_STATIONING_EVENTS`) or `/#permissions` to assign a missing seat (requires `MANAGE_ACCESS`). Separation of Duties stays: the administrator never decides on behalf of an approver, never flips a state by hand.
+- **Home widget.** Admins see a compact «صحة النظام» card on the dashboard (stuck/warning counts + outbox failed + people without a local unit + an open-the-page link). Other roles never see it.
+
+**Also in this change (same release, V59).**
+- A `DEVELOPER` role: every current permission, scope `ALL`. The `developer` platform login carries it in addition to `SYSTEM_ADMIN` and `AUDITOR`, so «developer» can send requests and act on every screen while the real role boundaries are being drawn. The owner marked this as temporary («later we will change it»).
+
+**Tests.** Backend: `IntegrationSettingsIT` 2/2, `DirectorySignInIT` 10/10, `HrOnDemandIT` 4/4 all green after the change. Frontend: `tsc -b --noEmit` clean; build succeeds. Evidence `docs/evidence/request-health/`.
+
+**Limits (open, not blockers).**
+- The scanner reads from PostgreSQL every five minutes; on an installation with hundreds of thousands of open requests the read would need an index on `(state, updated_at)` or a sampled scan. :8088 holds twelve open requests at writing.
+- The «NO_HOLDER» detection uses a per-stage-unit seat count; nested seat delegation is not yet traced. The fix is the same table the access manager uses; this will be the next addition if a real stuck request surfaces on :8088.
+
+## ADR-095 The AI model is configured from the settings, and the assistant never answers from a preprogrammed template (owner, 20 Nov 2026)
+
+**Owner.** «still missing all the .env — i want to change everything here, even the AI model, and so on. Why do you make the response from AI already programmed? Remove that, only use OKF, no preprogrammed answers.»
+
+**Decision.**
+- «إعدادات التكامل» gains an «المساعد الذكي» section (V58 extends `integration_setting.kind` with `ASSISTANT`): enabled toggle, server base URL, model name, API key (write-only, AES-GCM through `HrSettingsCipher`), timeout; one «اختبار الاتصال» button opens the server's `/models` endpoint before anything is saved. `IntegrationSettingsService.assistant()` returns the saved values when the section is on, otherwise the `TMRKZ_AI_*` values of the environment; the view also discloses what `.env` holds so the administrator sees both sides.
+- `AssistantService` no longer holds `@Value` fields; it reads the live settings for every question through `IntegrationSettingsService.assistant()`. The scheduler, the status badge and every ask follow the saved settings without a restart. The `TMRKZ_AI_*` values stay as the fallback and are collected by the new `AssistantEnv` bean so tests can rebind them.
+- The assistant never returns a preprogrammed answer. The only text presented as an answer is the model's reply to the OKF documents the person may see. When the assistant is off, unreachable, busy, or no OKF document matched, the response's `answer` is null (mode `OFF`, with `degraded` naming the reason), and the screen says the assistant is not available; the matching OKF documents remain as links the person can open, but their body is no longer shown as prose. The badge on the floating button becomes «غير مُفعَّل» instead of «الدليل فقط».
+
+**Tests.** `AssistantServiceTest` AI-1 (model sees the OKF documents, the reasoning tags are stripped, auth header carried, URL from the Assistant record), AI-2 (500/empty answer throws; the status endpoint reads live). `IntegrationSettingsIT` unchanged (the directory and Keycloak paths); the new assistant path is covered end to end in a later step.
+
+**Limits.** The `.env` values that are not integrations (database password, cryptographic keys, Keycloak admin, platform passwords, port, public URL, trust store, feature flags) stay in `.env` because they are read before the application opens the database or they would break the running server. The settings screen's new «قيم ملف البيئة» block states each of them where its section is relevant.
+
+## ADR-094 Oracle is not a dependency: units on demand and on the source's own schedule, people on demand, the directory sign-in suffices, the main unit's tree, the empty system (owner, 20 Nov 2026)
+
+**Owner.** The final picture of 20 Nov 2026: a fake Oracle HR (about 30,000 units in an irregular tree, main units at varying
+depths, about 200,000 people) and a fake directory holding the same people (username, name, rank, number, unit, main unit);
+TMRKZ starts empty; «استيراد الوحدات الآن» from the settings, then «المزامنة التلقائية» every 24 hours by default or off;
+no full people sync — a person is fetched at first sign-in, when searched for, when added by number, and refreshed after
+24 hours on the next need; browsing, requests, approvals, stationing and maps never depend on Oracle; the first sign-in
+while Oracle is unreachable: «the person will use LDAP to sign in … LDAP has enough and he can enter the app … make it an
+option that I can toggle»; the zero-access person sees only their own things and asks for a role within their own main
+unit's tree; an empty system shows nothing in the middle; a migration center for an older PostgreSQL where the current
+record wins and conflicts are only reported (decision A).
+
+**Decision (this step; the fake sources, the empty-system checks and the migration center follow in their own steps).**
+- `hr_source` (V55): `auto_sync` (off on a new installation; an installation that synced hourly keeps `enabled` as its
+  value), `sync_interval_hours` (24; 1–720), `people_sync` (off: people are never read in bulk), `directory_sign_in_suffices`
+  (on). The scheduler ticks every minute and runs when the source's own schedule is due (`HrSyncService.due`), never on an
+  environment interval; `TMRKZ_HR_SYNC_INTERVAL_SECONDS` is no longer read. «استيراد الوحدات الآن» is the manual run.
+- The run reads the whole unit tree and, with `people_sync` off, carries the linked people's records forward unchanged from
+  the published snapshot (`peopleCarried`); `HrPeopleService.refreshIfStale` refreshes one person from HR live on the next
+  need when the last answer is older than 24 hours (`person.hr_fetched_at`): at sign-in (`IdentityService.resolve`), and
+  wherever `importOne` runs. HR not answering changes nothing and refuses nothing. With `people_sync` on, the earlier
+  behaviour (linked people refreshed in every run) remains for an installation that wants it.
+- A directory sign-in that HR cannot confirm now (HR not answering, or its data stale beyond the policy; HR answering that
+  it does not know the key is still refused and reviewed) enters as a zero-access person from the directory's attributes — name, number, rank, unit (ADR-068) — with `person.hr_match_pending`, audited
+  `IDENTITY_HR_MATCH_PENDING`, shown on «طلب صلاحية» and as `/me.hrMatch = PENDING`; the next sign-in that HR answers adopts
+  the HR record onto them (`toOracle`, `IDENTITY_HR_MATCHED`). Ambiguous, inactive or already linked records are still
+  refused and reviewed. The toggle off restores the earlier rule (no new account until HR confirms).
+- The scope a person may ask for in «طلب صلاحية», and the scope the server accepts, is their main unit's tree
+  (`AccessRequestService.mainUnitOf`: the nearest unit upward the published snapshot marks `is_main`; without HR data, the
+  person's own unit) — never another main unit's.
+- The home shows nothing in the middle while no unit, site, stationing, request or waiting card exists (`homeEmpty`); the
+  top navigation and the pages the person may open stay. Only real local data fills the middle.
+- «إعدادات التكامل» carries a live state per section (`GET /settings/integration/status`): يعمل / غير متصل / غير مهيأ.
+
+**Step 2 (20 Nov 2026, the owner's «NEXT DEVELOPMENT PHASE» brief; V57).**
+- «معاينة الوحدات» (`POST /hr/units/preview`, `HrSyncService.previewUnits`): the unit view is read exactly as an import
+  reads it — same mapping, same conversions — and nothing is written: no run, no snapshot, no unit. It states the source's
+  count of units, active ones, main units (MAIN_UNIT_ID pointing to itself), roots, the distribution by level, the count of
+  the person view, and the validation problems an import would report (no key or name, duplicate keys, a parent or a main
+  unit the source does not hold), with samples. The last result stays on `hr_source.last_preview` so the screen states
+  «في المصدر مقابل محلياً»; it is audited `HR_UNITS_PREVIEWED` and counts as a connection test.
+- The status (`GET /hr/status`) adds the last attempt, the last successful import's local changes (added / changed /
+  deactivated from the projection's counts), the source's state as last tested, the local main units, and
+  `personRefreshHours`. Before the first import the panel says «لم يتم استيراد الوحدات» and offers, in order:
+  اختبار الاتصال (read-only), معاينة الوحدات (read-only), استيراد الوحدات الآن.
+- «تحديث بيانات الشخص بعد» (`hr_source.person_refresh_hours`, 24 by default, 0 = never automatically): the period
+  `HrPeopleService.refreshIfStale` honours; the manual refresh is `POST /me/hr-refresh` (open to zero access: it is how a
+  person gets matched) and `HrPeopleService.refreshNow`. `/me` carries `hrFetchedAt` and `hrStale`; «بياناتي» on
+  «طلب صلاحية» shows the HR state (بانتظار تحديث HR / مطابق / بيانات قديمة) and the refresh button.
+- The scope tree of «طلب صلاحية» begins at the main unit and highlights and reveals the person's own unit
+  (`AccessMine.identity.unitId`, `UnitTree` `selected`/`trail`/`reveal`).
+- `GET /system/state` (open to zero access): the counts of units, sites, current stationings, requests and people, and
+  `empty`. While the installation is empty the operational screens — المواقع المسجلة, الموقف, إعادة التمركز's start
+  workspace, تهيئة المواقع — render `EmptyCentre` instead of a map frame: no MapLibre instance is created. The settings are
+  grouped «السياسات والبيئة» / «الهوية والدخول» / «مصدر الموارد البشرية» / «ترحيل البيانات».
+
+- **A new installation could not start** (found while standing up the empty installation, 20 Nov 2026): since ADR-078 the
+  facilities roles are seeded without permissions, and `Bootstrap.seedRequestTypes` still published MOVER's default
+  facilities workflows, whose final stage names `APPROVER` — the validator refuses a final stage whose role lacks APPROVE,
+  so the application failed at startup on any database created after 17 Nov 2026. The bootstrap now publishes those
+  workflows only with `tmrkz.access.legacy-facility-roles=true` (tests, the fictional acceptance environment) and otherwise
+  leaves them as drafts the studio shows. `ops/hr-demo/empty-install.sh` stands up the temporary empty installation
+  (project `tmrkz-empty`, :8098, synthetic directory and demo Oracle) that `tests/acceptance/hr-on-demand-journey.mjs` runs
+  against; both are removed after use.
+
+**Step 3 — «مركز ترحيل قاعدة البيانات» (20 Nov 2026; V56, `ae.mover.system.DbMigration*`, `DbMigrationCenter.tsx`).**
+The data of an older TMRKZ PostgreSQL comes into the current database; the current database is never replaced and never
+restored over. The source is a connection (host, port, database, schema, read-only account) or a `pg_dump -Fc` archive
+(uploaded, or placed in `data/files/migration-inbox`) restored into an isolated staging database `tmrkz_staging_<id>` with
+`pg_restore --no-owner --no-privileges`, dropped afterwards. The source's Flyway version must be at most the current one.
+The preview groups the tables by category (organisations, sites, people/accounts, grants/roles, stationing, deployment
+areas, requests, approval history, attachments, support, other) and states per table New / Identical / Changed /
+Conflict / Unsupported, with the conflicting records' current and source values. **Rule A (owner):** the current record
+wins; a conflict is only reported, and an administrator may decide TAKE_SOURCE per record and must confirm each table
+that has conflicts before the run. Never migrated: sessions, logins, throttles, bootstrap logins, outbox, idempotency,
+Flowable tables, integration settings, HR mirror tables, OpenFGA tuples and sync state, `db_migration` itself; secret
+columns (password, hash, secret, token, ciphertext, private key, credential, api key, key id) are stripped from comparison
+and transfer. The run needs a current verified backup (`ops/verify-backup.sh` writes `verify-result.txt`; the screen shows
+the backup's time, its verification, the source fingerprint and the preview fingerprint) and refuses when the source
+changed since the preview; it runs in dependency order (organisations and people before memberships). Every step is
+audited (`DB_MIGRATION_PREVIEWED/VALIDATED/RUN/ABANDONED/DUMP_UPLOADED`). Limits: `pg_restore` must be in the backend image
+(`ops/local/workspace/pack-images.sh` adds postgresql-client-17; the image has not been rebuilt yet), uploads are capped
+by the 25 MB multipart limit, grants need an OpenFGA rebuild after migration, attachments arrive without their files.
+Tests: `DbMigrationIT` DB-MIGRATION-01, `DbMigrationDumpTest`; frontend `dbMigration.test.ts`. Operations:
+`docs/OPERATIONS.md` «Migration center»; the VM's `db.db` file is identified first by `docs/deployment/MIGRATION_SOURCE_CHECK.md`.
+
+**Not changed.** Sign-in paths (ADR-070/071/092), the review list for ambiguous identities, the HR projection's rules,
+the access workflow (REQUESTED → RECOMMENDED → GRANTED).
+
+**Tests.** `HrOnDemandIT` OD-01 (units now; one person fetched on demand; the next run carries them; refreshed after a day on
+the next need; HR down changes nothing; the schedule due from the source's own interval; `people_sync` on keeps the old
+way), OD-02 (the scope is the main unit's tree), OD-03 (the directory sign-in admitted when HR is down, placed in its unit,
+matched when HR answers; the toggle off refuses as before), OD-04 (the preview writes nothing — no run, snapshot or unit —
+and states six units, four main units, a duplicate and an orphan; the status states source against local; the person
+refresh period saved as 0; `/system/state` and `/me/hr-refresh` answer); `HrSyncAcceptanceIT`, `HrLinkedPeopleIT`, `DirectorySignInIT`,
+`EnterpriseSignInIT`, `AccessAcceptanceIT`, `UnitMemberIT`, `EmploymentContextIT` unchanged; frontend `homeEmpty.test.ts`.

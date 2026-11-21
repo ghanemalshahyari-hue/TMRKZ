@@ -1,5 +1,7 @@
 package ae.mover.hr;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import ae.mover.audit.AuditService;
 import ae.mover.common.ApiException;
+import ae.mover.common.Db;
 import ae.mover.common.ErrorCode;
 import ae.mover.hr.HrMapping.Entity;
 import ae.mover.security.Actor;
@@ -51,13 +54,15 @@ public class HrPeopleService {
     private final HrSourceAdapter adapter;
     private final HrProjection projection;
     private final AuditService audit;
+    private final Clock clock;
 
-    public HrPeopleService(JdbcClient jdbc, HrSyncService sync, HrSourceAdapter adapter, HrProjection projection, AuditService audit) {
+    public HrPeopleService(JdbcClient jdbc, HrSyncService sync, HrSourceAdapter adapter, HrProjection projection, AuditService audit, Clock clock) {
         this.jdbc = jdbc;
         this.sync = sync;
         this.adapter = adapter;
         this.projection = projection;
         this.audit = audit;
+        this.clock = clock;
     }
 
     /** Whether HR can be asked at all: an enabled source with saved settings and a published mapping. */
@@ -141,6 +146,83 @@ public class HrPeopleService {
     }
 
     /** The TMRKZ person already holding this HR record, if any. */
+    /** ADR-094: how long a person's HR record is used before the next need refreshes it. */
+    public static final java.time.Duration REFRESH_AFTER = java.time.Duration.ofHours(24);
+
+    /** ADR-094: the refresh period the source states («تحديث بيانات الشخص بعد»); empty = never automatically (0 hours). */
+    public java.util.Optional<java.time.Duration> refreshAfter() {
+        Integer h = jdbc.sql("select min(person_refresh_hours) from hr_source where enabled").query(Integer.class).optional().orElse(null);
+        return h == null ? java.util.Optional.of(REFRESH_AFTER) : h == 0 ? java.util.Optional.empty() : java.util.Optional.of(java.time.Duration.ofHours(h));
+    }
+
+    /** Whether this person's HR record is older than the refresh period (never fetched counts as stale). */
+    public boolean stale(Instant fetched) {
+        java.util.Optional<java.time.Duration> after = refreshAfter();
+        return after.isPresent() && (fetched == null || !fetched.plus(after.get()).isAfter(clock.instant()));
+    }
+
+    /** The manual refresh of one person (ADR-094): HR asked now whatever the period says; in its own transaction. */
+    @Transactional(noRollbackFor = ApiException.class)
+    public boolean refreshNow(UUID person) {
+        return refresh(person, true);
+    }
+
+    /** Whether a verified directory sign-in is admitted as a zero-access person when HR does not answer or does not know them. */
+    public boolean directorySignInSuffices() {
+        return jdbc.sql("select coalesce(bool_and(directory_sign_in_suffices), true) from hr_source where enabled").query(Boolean.class).single();
+    }
+
+    /**
+     * ADR-094: the person's HR record is refreshed on the next need (a sign-in, a lookup) when the last answer is older than
+     * {@link #REFRESH_AFTER}, from HR live and for this one person; HR not answering, or not configured, changes nothing — HR is
+     * never a dependency of the person's work. Runs inside the caller's transaction; a refused record is only audited.
+     *
+     * @return true when the record was read again
+     */
+    @Transactional(propagation = Propagation.MANDATORY, noRollbackFor = ApiException.class)
+    public boolean refreshIfStale(UUID person) {
+        return refresh(person, false);
+    }
+
+    private boolean refresh(UUID person, boolean force) {
+        Map<String, Object> p = jdbc.sql("select employee_no, source, hr_fetched_at from person where id = :p").param("p", person)
+                .query().listOfRows().stream().findFirst().orElse(null);
+        if (p == null || !"HR".equals(p.get("source")) || !configured()) {
+            return false;
+        }
+        Instant fetched = Db.toInstant(p.get("hr_fetched_at"));
+        Instant now = clock.instant();
+        if (!force && !stale(fetched)) {
+            return false;
+        }
+        List<HrRecord> found;
+        try {
+            found = find((String) p.get("employee_no"), null);
+        } catch (ApiException e) {
+            log.info("HR refresh deferred for a person: {}", e.code()); // HR not answering is not an error of the sign-in
+            return false;
+        }
+        if (found.size() == 1 && found.get(0).active()) {
+            try {
+                importOne(found.get(0), null, "REFRESH", null);
+            } catch (ApiException e) {
+                audit.system("HR_PERSON_REFRESH_REFUSED", "PERSON", person.toString(), null, Map.of("reason", e.code().name()));
+                return false;
+            }
+            jdbc.sql("update person set hr_fetched_at = :now where id = :p").param("now", Db.ts(now)).param("p", person).update();
+            return true;
+        }
+        String reason = found.isEmpty() ? "NO_MATCH" : found.size() > 1 ? "AMBIGUOUS" : "INACTIVE";
+        if ("INACTIVE".equals(reason)) {
+            jdbc.sql("update person set hr_unavailable = coalesce(nullif(btrim(:s), ''), 'غير نشط في الموارد البشرية'), hr_fetched_at = :now where id = :p")
+                    .param("s", found.get(0).statusText()).param("now", Db.ts(now)).param("p", person).update();
+        } else {
+            jdbc.sql("update person set hr_fetched_at = :now where id = :p").param("now", Db.ts(now)).param("p", person).update();
+        }
+        audit.system("HR_PERSON_REFRESH_NOT_ACTIVE", "PERSON", person.toString(), null, Map.of("reason", reason));
+        return false;
+    }
+
     public UUID existing(String externalId) {
         return jdbc.sql("select id from person where source = 'HR' and source_external_id = :x").param("x", externalId)
                 .query(UUID.class).optional().orElse(null);
@@ -203,6 +285,8 @@ public class HrPeopleService {
             // the checks above make this unreachable; never keep a half-made import
             throw new IllegalStateException("HR person not projected");
         }
+        // ADR-094: HR answered for this person now; the next need refreshes them only after REFRESH_AFTER
+        jdbc.sql("update person set hr_fetched_at = :now where id = :p").param("now", Db.ts(clock.instant())).param("p", person).update();
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("via", via);
         detail.put("created", existing == null);

@@ -28,6 +28,18 @@ The data is 100 % synthetic, deterministic (fixed seed), internally consistent:
   * medical exemptions for a slice of the people in service, open-ended or dated.
 
 Secrets come from instance/oracle_hr.env (untracked). Nothing is printed but counts.
+
+Profiles (TMRKZ, owner 20 Nov 2026, ADR-094: «a fake Oracle HR (about 30,000 units in an irregular tree, main units at
+varying depths, about 200,000 people)»), chosen with --profile; the same schema, tables, views, account and grants:
+  * default — exactly the above: the agreed reference organisation (reference_structure.py) and 200,000 people at L7–L10.
+  * large   — large_structure.py: about 30,000 units in an irregular tree (one root; branches of different shapes, some
+              stopping at level 4, others reaching 13–15; branching varies per branch and per level); main units at
+              levels 4–9 by the owner's rule (MAIN_UNIT_ID = ID on a main unit, every unit below points up to it, none
+              above); UNIT_PATH the ID path; short synthetic Arabic names; STATUS mostly 1. 200,000 people in the units at
+              level 4 and below that belong to a main unit's tree (none above level 4): every one with a unique
+              PERSON_USER_ID (first.family123), MIL_NUMBER and NEW_MIL_NO, an Arabic name, rank, position and job,
+              mostly في الخدمة with the other statuses above, MAIN_ORG_UNT_ID = the unit's main unit. Unit IDs 1,000,000+.
+    python build_oracle_hr.py --profile large [--verify]
 """
 import argparse
 import datetime as dt
@@ -41,6 +53,7 @@ import oracledb
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from reference_structure import build_units  # noqa: E402
+from large_structure import build_units as build_large_units  # noqa: E402
 MOVER = os.path.dirname(HERE)
 ENV_FILE = os.path.join(HERE, '.generated', 'oracle_hr.env')
 
@@ -102,18 +115,24 @@ def dsn(env):
 
 
 # ----------------------------------------------------------------------------- generation
-def generate():
+def generate(profile='default'):
     rnd = random.Random(SEED)
-    units = build_units()                      # the agreed reference organisation, nothing invented
+    large = profile == 'large'
+    # default: the agreed reference organisation, nothing invented; large: the irregular 30,000-unit tree (ADR-094)
+    units = build_large_units() if large else build_units()
     by_id = {u['ID']: u for u in units}
 
     def main_of(unit):
         # MAIN_UNIT_ID is the unit's main unit, itself on a main unit (owner, 16 Nov 2026); none above every main unit
         return by_id.get(unit['MAIN_UNIT_ID']) or unit
 
-    live_units = units
-    dead_units = []
-    deep = [u for u in units if u['UNT_LEVEL'] >= 7]        # where the MOVER operations people sit
+    live_units = [u for u in units if u['STATUS'] == 1]
+    dead_units = [u for u in units if u['STATUS'] != 1]
+    if large:
+        # people sit in the units of a main unit's tree (all at level 4 and below); never above a main unit
+        deep = [u for u in live_units if u['MAIN_UNIT_ID'] is not None]
+    else:
+        deep = [u for u in units if u['UNT_LEVEL'] >= 7]    # where the MOVER operations people sit
     shallow = [u for u in units if u['UNT_LEVEL'] < 6]      # small staffs only
     mains = [u for u in units if u['UNT_LEVEL'] == 6]
 
@@ -161,7 +180,7 @@ def generate():
         officer = is_commander or (rnd.random() < (0.35 if unit['UNT_LEVEL'] <= 6 else 0.12))
         years = rnd.randint(1, 32)
         if is_commander:
-            years = max(years, {1: 28, 2: 25, 3: 22, 4: 18, 5: 14, 6: 10, 7: 6, 8: 4, 9: 3, 10: 2}[unit['UNT_LEVEL']])
+            years = max(years, {1: 28, 2: 25, 3: 22, 4: 18, 5: 14, 6: 10, 7: 6, 8: 4, 9: 3, 10: 2}.get(unit['UNT_LEVEL'], 2))
         grade = grade_for(years, officer)
         full_grade = grade + (' ركن' if officer and years >= 14 and rnd.random() < 0.5 else '')
         enlist = TODAY - dt.timedelta(days=int(years * 365.25) + rnd.randint(0, 300))
@@ -182,9 +201,11 @@ def generate():
         elif not in_service:
             unit_status = 'خارج الوحدة'
         has_account = in_service and rnd.random() < 0.96 or (not in_service and rnd.random() < 0.5)
+        if large:
+            has_account = True                              # the large profile: every person has an account and both numbers
         user_id = username(first, family) if has_account else None
         m = mil()
-        new_mil = ('N%08d' % (10_000_000 + prs_seq[0])) if rnd.random() < 0.3 else None   # unique by construction
+        new_mil = ('N%08d' % (10_000_000 + prs_seq[0])) if large or rnd.random() < 0.3 else None   # unique by construction
         main = main_of(unit)
         end_service = None if in_service else TODAY - dt.timedelta(days=rnd.randint(30, 4000))
         deleg_start = deleg_end = ext_org = None
@@ -217,15 +238,24 @@ def generate():
             unit['DIRECTOR_POS_ID'] = p['POSITION_ID']
         return p
 
-    # Owner ruling: L1–L6 = 0 personnel.  ALL fake personnel at L7–L10.
-    # A commander for every L7+ unit; the mass fills L7+ units; not-in-service
-    # people also go to L7+ only.
-    for u in live_units:
-        if u['UNT_LEVEL'] >= 7:
+    if large:
+        # a commander in every unit of a main unit's tree; the mass spread unevenly over the same units (a few people in
+        # most, hundreds in some); the not-in-service people partly in the inactive units
+        for u in deep:
             add_person(u, True)
-    remaining = int(TARGET_PEOPLE * 0.88) - len(people)
-    for _ in range(remaining):
-        add_person(rnd.choice(deep), False)
+        weights = [rnd.lognormvariate(0, 1.1) for _ in deep]
+        for u in rnd.choices(deep, weights, k=int(TARGET_PEOPLE * 0.88) - len(people)):
+            add_person(u, False)
+    else:
+        # Owner ruling: L1–L6 = 0 personnel.  ALL fake personnel at L7–L10.
+        # A commander for every L7+ unit; the mass fills L7+ units; not-in-service
+        # people also go to L7+ only.
+        for u in live_units:
+            if u['UNT_LEVEL'] >= 7:
+                add_person(u, True)
+        remaining = int(TARGET_PEOPLE * 0.88) - len(people)
+        for _ in range(remaining):
+            add_person(rnd.choice(deep), False)
     not_in_service = TARGET_PEOPLE - len(people)
     for i in range(not_in_service):
         pool = dead_units if (dead_units and i % 5 == 0) else deep
@@ -327,10 +357,10 @@ def drop_if_exists(cur, kind, name):
                     IF SQLCODE NOT IN (-942, -1918, -4043) THEN RAISE; END IF; END;""")
 
 
-def build(env):
+def build(env, profile='default'):
     t0 = time.time()
-    units, people, exemptions = generate()
-    print(f'[gen] units={len(units):,} people={len(people):,} exemptions={len(exemptions):,} in {time.time() - t0:.1f}s')
+    units, people, exemptions = generate(profile)
+    print(f'[gen] profile={profile} units={len(units):,} people={len(people):,} exemptions={len(exemptions):,} in {time.time() - t0:.1f}s')
 
     # 1. the reader account (needs SYSTEM) — created once, read-only
     sysconn = connect(env, 'SYSTEM', env['ORACLE_SYSTEM_PASSWORD'])
@@ -408,6 +438,9 @@ def verify(env):
     print('  with annexation          :', q('SELECT COUNT(*) FROM HR_PRS_EMPLOYEES_ALL WHERE ANNEXATION_UNIT_ID IS NOT NULL')[0][0])
     print('  units total              :', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI')[0][0], '| active:', q('SELECT COUNT(*) FROM HR_ENV_UNITS_AI WHERE STATUS = 1')[0][0])
     print('  units per level          :', q('SELECT UNT_LEVEL, COUNT(*) FROM HR_ENV_UNITS_AI GROUP BY UNT_LEVEL ORDER BY 1'))
+    print('  people per unit level    :', q('SELECT u.UNT_LEVEL, COUNT(*) FROM HR_PRS_EMPLOYEES_ALL e JOIN HR_ENV_UNITS_AI u ON u.ID = e.ORG_UNIT_ID GROUP BY u.UNT_LEVEL ORDER BY 1'))
+    print('  people whose MAIN_ORG_UNT_ID is not their unit\'s main unit:',
+          q('SELECT COUNT(*) FROM HR_PRS_EMPLOYEES_ALL e JOIN HR_ENV_UNITS_AI u ON u.ID = e.ORG_UNIT_ID WHERE NVL(e.MAIN_ORG_UNT_ID, -1) <> NVL(u.MAIN_UNIT_ID, -1)')[0][0])
     # the parent is the second-to-last segment of the ID path; a main unit is MAIN_UNIT_ID = ID (owner, 16 Nov 2026)
     tree = ("WITH t AS (SELECT ID, UNT_LEVEL, MAIN_UNIT_ID, CASE WHEN REGEXP_COUNT(UNIT_PATH, '[0-9]+') > 1 THEN "
             "TO_NUMBER(REGEXP_SUBSTR(UNIT_PATH, '[0-9]+', 1, REGEXP_COUNT(UNIT_PATH, '[0-9]+') - 1)) END AS PARENT_ID FROM HR_ENV_UNITS_AI) ")
@@ -443,10 +476,12 @@ def verify(env):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--verify', action='store_true', help='verification queries only (no rebuild)')
+    ap.add_argument('--profile', choices=['default', 'large'], default='default',
+                    help='default: the agreed reference organisation; large: about 30,000 units in an irregular tree (ADR-094)')
     a = ap.parse_args()
     env = load_env()
     if not a.verify:
-        build(env)
+        build(env, a.profile)
     verify(env)
 
 

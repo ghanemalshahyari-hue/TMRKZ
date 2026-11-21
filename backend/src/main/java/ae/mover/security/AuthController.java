@@ -60,10 +60,12 @@ public class AuthController {
     private final SecurityProperties props;
     private final PolicyService policies;
     private final Clock clock;
+    private final ae.mover.hr.HrPeopleService hrPeople;
 
     public AuthController(AuthService auth, OidcClient oidc, DirectoryAuthenticator directory, LoginThrottle throttle,
                           OidcProperties oidcProps, IdentityService identities, AccessService access, JdbcClient jdbc,
-                          SecurityProperties props, PolicyService policies, Clock clock) {
+                          SecurityProperties props, PolicyService policies, Clock clock, ae.mover.hr.HrPeopleService hrPeople) {
+        this.hrPeople = hrPeople;
         this.auth = auth;
         this.oidc = oidc;
         this.directory = directory;
@@ -282,16 +284,29 @@ public class AuthController {
 
     // ---- current person -------------------------------------------------------------------------------------------
 
+    /** ADR-094: the person asks HR for their own record now (zero access may: it is how they get matched). */
+    @PostMapping("/me/hr-refresh")
+    public Map<String, Object> refreshMyHr(Actor actor) {
+        boolean refreshed = hrPeople.refreshNow(actor.personId());
+        return Map.of("refreshed", refreshed);
+    }
+
     @GetMapping("/me")
     public Map<String, Object> me(Actor actor) {
         AccessContext ctx = access.context(actor);
         Map<String, Object> me = new LinkedHashMap<>();
-        Map<String, Object> person = jdbc.sql("select employee_no from person where id = :id").param("id", actor.personId())
+        Map<String, Object> person = jdbc.sql("select employee_no, source, hr_match_pending, hr_fetched_at from person where id = :id").param("id", actor.personId())
                 .query().singleRow();
         me.put("id", actor.personId().toString());
+        // ADR-094: PENDING — admitted from the directory before HR confirmed them; MATCHED — an HR person; NONE — a local or platform account
+        me.put("hrMatch", Boolean.TRUE.equals(person.get("hr_match_pending")) ? "PENDING" : "HR".equals(person.get("source")) ? "MATCHED" : "NONE");
         me.put("username", actor.username());
         me.put("displayName", actor.displayName());
         me.put("employeeNo", person.get("employee_no"));
+        // ADR-094: when HR last answered for this person, and whether that answer is older than the refresh period
+        Instant fetched = person.get("hr_fetched_at") == null ? null : ae.mover.common.Db.toInstant(person.get("hr_fetched_at"));
+        me.put("hrFetchedAt", fetched == null ? null : fetched.toString());
+        me.put("hrStale", "HR".equals(person.get("source")) && hrPeople.stale(fetched));
         me.put("initials", initials(actor.displayName()));
         Grant primary = ctx.primaryGrant().orElse(null);
         me.put("primaryRole", primary == null ? null : Map.of("code", primary.roleCode(), "name", primary.roleName()));

@@ -3,6 +3,9 @@ import { PartReviewPanel, ReturnedParts } from '../components/workspace/PartRevi
 import { flatSource } from '../components/tree/tree';
 import { UnitTree } from '../components/tree/UnitTree';
 import { DeploymentAreasRequest } from './DeploymentAreasRequest';
+import { StationingShell, type ShellMode } from '../components/workspace/StationingShell';
+import { StationingPosture } from './StationingPosture';
+import { popReturn } from '../lib/returnContext';
 import { ApprovalStamps } from '../components/workspace/ApprovalStamps';
 import type { RestationingUnit } from '../api/types';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -18,9 +21,7 @@ import { OperationalWorkspace } from '../components/workspace/OperationalWorkspa
 import { OrgContextPanel, type ContextTab } from '../components/workspace/OrgContextPanel';
 import { RequestDrawer } from '../components/workspace/RequestDrawer';
 import { RequestMap } from '../components/workspace/RequestMap';
-import { SitesMap } from '../components/workspace/SitesMap';
 import { RS_STATE, StatePill } from '../components/workspace/StatePill';
-import { useRegisteredSites } from '../components/workspace/useRegisteredSites';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
 import { formatArea } from '../lib/footprint';
@@ -178,68 +179,94 @@ export function RestationingPage() {
   // Only a legacy purpose (a site registration, an initial stationing made before ADR-078) still opens the old editor.
   const closeEditor = (id?: string | null) => {
     setEditing(null);
-    if (id) select(id);
-    else if (route().kind === 'new') history.replaceState(null, '', '#restationing');
+    if (id) {
+      select(id);
+      popReturn(); // the stored referrer is discarded when we stay on a saved request
+    } else if (route().kind === 'new') {
+      // Owner UX §9: cancelling a new request returns to the origin (Sites, Units, Requests), not generic restationing.
+      const back = popReturn('');
+      if (back) {
+        location.hash = back.startsWith('#') ? back.slice(1) : back;
+        return;
+      }
+      history.replaceState(null, '', '#restationing');
+    }
     reload();
   };
   if (editing && !editing.id && (editing.purpose === 'DEPLOYMENT_AREAS' || editing.purpose === 'RESTATIONING')) {
+    const mode: ShellMode = editing.purpose === 'DEPLOYMENT_AREAS' ? 'deployment' : 'restationing';
     return (
-      <DeploymentAreasRequest
-        key={editing.purpose + ':' + (editing.unit ?? '') + ':' + (editing.site ?? '')}
-        purpose={editing.purpose}
-        preselectUnit={editing.unit ?? null}
-        preselectSite={editing.site ?? null}
-        onClose={() => closeEditor()}
-      />
+      <StationingShell mode={mode} onExit={() => closeEditor()}>
+        <DeploymentAreasRequest
+          key={editing.purpose + ':' + (editing.unit ?? '') + ':' + (editing.site ?? '')}
+          purpose={editing.purpose}
+          preselectUnit={editing.unit ?? null}
+          preselectSite={editing.site ?? null}
+          onClose={() => closeEditor()}
+        />
+      </StationingShell>
     );
   }
   if (editing && editing.id) {
-    return <OpenSavedRequest key={editing.id} id={editing.id} historyOpen={historyOpen} setHistoryOpen={setHistoryOpen} onClose={closeEditor} />;
+    return (
+      <StationingShell mode="view-or-edit" onExit={() => closeEditor()}>
+        <OpenSavedRequest key={editing.id} id={editing.id} historyOpen={historyOpen} setHistoryOpen={setHistoryOpen} onClose={closeEditor} />
+      </StationingShell>
+    );
   }
   if (editing) {
     return (
-      // a legacy purpose only (a site registration): the old editor brings its own step panel on the left
-      <RestationingEditor
-        key={editing.id ?? 'new:' + (editing.purpose ?? '') + ':' + (editing.unit ?? '') + ':' + (editing.site ?? '')}
-        requestId={editing.id}
-        purpose={editing.purpose ?? null}
-        preselectUnit={editing.unit ?? null}
-        preselectSite={editing.site ?? null}
-        historyOpen={historyOpen}
-        setHistoryOpen={setHistoryOpen}
-        onClose={(id) => {
-          setEditing(null);
-          if (id) select(id);
-          else if (route().kind === 'new') history.replaceState(null, '', '#restationing');
-          reload();
-        }}
-      />
+      // Owner UX §9 (20 Nov 2026): the shell banner states «طلب اعتماد موقع قديم», never «إعادة تمركز».
+      <StationingShell mode="legacy" onExit={() => (setEditing(null), history.replaceState(null, '', '#restationing'), reload())}>
+        <RestationingEditor
+          key={editing.id ?? 'new:' + (editing.purpose ?? '') + ':' + (editing.unit ?? '') + ':' + (editing.site ?? '')}
+          requestId={editing.id}
+          purpose={editing.purpose ?? null}
+          preselectUnit={editing.unit ?? null}
+          preselectSite={editing.site ?? null}
+          historyOpen={historyOpen}
+          setHistoryOpen={setHistoryOpen}
+          onClose={(id) => {
+            setEditing(null);
+            if (id) select(id);
+            else if (route().kind === 'new') history.replaceState(null, '', '#restationing');
+            reload();
+          }}
+        />
+      </StationingShell>
     );
   }
   if (!selected) {
-    return <StartWorkspace rail={rail} tab={tab} setTab={setTab} unitId={unitId} setUnitId={setUnitId} />;
+    // Owner, 20 Nov 2026 (reset): «مساحة التمركز» is the read-only operational posture, not a request workspace. The
+    // StartWorkspace with its drawer, request rail and «طلب جديد» link is retired; request creation and management live in
+    // «＋ إنشاء» and «الطلبات». The old rail is still computed above (no cost) so entering a saved request keeps the shell
+    // and its exit button behaviour unchanged.
+    return <StationingShell mode={null} onExit={null}><StationingPosture /></StationingShell>;
   }
   return (
-    <RequestWorkspace
-      key={selected}
-      id={selected}
-      rail={rail}
-      tab={tab}
-      setTab={setTab}
-      unitId={unitId}
-      setUnitId={(u) => (setUnitId(u), setTab('sites'))}
-      historyOpen={historyOpen}
-      setHistoryOpen={setHistoryOpen}
-      fitKey={fitKey}
-      onChanged={reload}
-      onEdit={() => setEditing({ id: selected })}
-      onOpen={(x) => {
-        select(x);
-        reload();
-      }}
-    />
+    <StationingShell mode={null} onExit={null}>
+      <RequestWorkspace
+        key={selected}
+        id={selected}
+        rail={rail}
+        tab={tab}
+        setTab={setTab}
+        unitId={unitId}
+        setUnitId={(u) => (setUnitId(u), setTab('sites'))}
+        historyOpen={historyOpen}
+        setHistoryOpen={setHistoryOpen}
+        fitKey={fitKey}
+        onChanged={reload}
+        onEdit={() => setEditing({ id: selected })}
+        onOpen={(x) => {
+          select(x);
+          reload();
+        }}
+      />
+    </StationingShell>
   );
 }
+
 
 /**
  * A saved request opened for editing (a draft, or one returned for changes): read once to know its purpose, then the map-first
@@ -671,33 +698,8 @@ function Lifecycle({ r, busy, act, onOpen }: { r: RestationingRequest; busy: boo
  * The workspace before a request is open: the sites on the offline map (those with a current stationing coloured), the
  * organisation on the right, and the request list with «طلب إعادة تمركز» on the left. No request opens by itself.
  */
-function StartWorkspace({ rail, tab, setTab, unitId, setUnitId }: { rail: ReactNode; tab: ContextTab; setTab: (t: ContextTab) => void; unitId: string | null; setUnitId: (id: string | null) => void }) {
-  const [mode, setMode] = useState<BasemapMode>('street');
-  const registered = useRegisteredSites();
-  return (
-    <OperationalWorkspace
-      rail={rail}
-      context={<OrgContextPanel request={null} tab={tab === 'request' ? 'units' : tab} setTab={setTab} requestContent={null} unitId={unitId} setUnitId={setUnitId} />}
-      centre={
-        <MapFrame title={<span className="tz-reqtitle">المواقع المسجلة (للمرجع)</span>} mode={mode} setMode={setMode} legend={<SitesLegend />}>
-          <SitesMap sites={registered.all} current={registered.current} mode={mode} />
-          <div className="tz-map-hint" role="note">
-            <Icon name="map" /> اختر طلباً من القائمة، أو ابدأ «طلب إعادة تمركز» جديداً.
-          </div>
-        </MapFrame>
-      }
-    />
-  );
-}
+// Owner 20 Nov 2026 reset: the former StartWorkspace (request drawer idle state) is retired; the operational posture sits
+// in the idle branch of RestationingPage. The function body was removed in this change; the file StationingPosture.tsx is
+// the one source of truth for the idle «مساحة التمركز» surface.
 
 /** The legend of a map that shows only the registered sites. */
-function SitesLegend() {
-  return (
-    <div className="tz-legend rs-legend">
-      <ul>
-        <li><i className="sw ref" /> موقع مسجّل (حدود)</li>
-        <li><i className="sw ref-marker" /> موقع مسجّل (علامة)</li>
-      </ul>
-    </div>
-  );
-}

@@ -140,6 +140,20 @@ configuration changes never require data migration of in-flight requests.
   last runs. Raw source identifiers in run issues are shown only to holders of VIEW_SOURCE_IDENTIFIERS.
 - Migration from TNQL: see `docs/TNQL_COMPATIBILITY.md`. Re-enter the password in TMRKZ; never copy TNQL's token or key.
 
+## HR source: units on demand, people on demand (ADR-094)
+
+- **Units.** «إعدادات النظام ← مصدر الموارد البشرية ← استيراد الوحدات الآن» reads the whole unit tree from Oracle into the
+  local database (the only time Oracle is needed for the tree). «المزامنة التلقائية للوحدات» repeats it every N hours
+  (24 by default) or stays off; the schedule is the source's own setting, not an environment variable.
+- **People.** Never synced in bulk. A person is fetched from Oracle at first sign-in, when searched for, or when added by
+  number («إضافة مستخدم»), and refreshed on the next need when the last answer is older than 24 hours. A run carries the
+  known people forward unchanged. «تحديث الأشخاص المرتبطين في كل مزامنة» restores the earlier every-run refresh if wanted.
+- **Oracle down.** Browsing, requests, approvals, stationing and maps never ask Oracle. A refresh that cannot reach it
+  changes nothing. With «الدخول بالدليل يكفي» on (the default), a person the directory verifies enters with no permission
+  even when Oracle does not answer, marked «بانتظار مطابقة HR», and is matched to their HR record at a later sign-in; off,
+  a new account waits until Oracle confirms it (the earlier rule).
+- **Scope.** A person asks for a role within their own main unit's tree only.
+
 ## Sign-in (Keycloak + enterprise directory)
 
 - **One address.** `TMRKZ_PUBLIC_URL` in `.env` is the address people open (`sh start.sh` writes `http://IP:PORT` from the IP
@@ -277,3 +291,53 @@ node tests/acceptance/resources.mjs                           # resource relatio
 node tests/acceptance/signing.mjs                             # certificate signature and seal (SIGN-01, SIGN-02)
 python ops/tools/gen-openapi.py                               # regenerate docs/api/openapi.json from the controllers
 ```
+
+## Migration center (ADR-094)
+
+«الإعدادات → ترحيل البيانات → مركز ترحيل قاعدة البيانات» brings the data of an **older** TMRKZ database into the current
+one; the current database is never replaced. CONFIGURE only; every step is audited (`DB_MIGRATION_PREVIEWED`,
+`DB_MIGRATION_VALIDATED`, `DB_MIGRATION_RUN`, `DB_MIGRATION_ABANDONED`, `DB_MIGRATION_DUMP_UPLOADED`) with who, the source
+(never its password), the detected schema version, the source fingerprint, the categories and tables chosen, the conflict
+decisions, counts, start/end and result.
+
+Flow: choose the source → schema version check → table analysis → preview by category → choose tables and decide
+conflicts → validate (dependency order) → backup gate → migrate → report.
+
+- **Sources.** A live PostgreSQL connection (read-only: the driver's read-only flag plus
+  `default_transaction_read_only=on`; the role needs SELECT only), or a `pg_dump -Fc` file uploaded on the screen
+  (limit `tmrkz.migration.max-upload-bytes`, 25 MB by default — the servlet multipart limit applies too) or placed in
+  `data/files/migration-inbox/` (`tmrkz.migration.inbox`). A dump is checked (the `PGDMP` magic, its SHA-256) and
+  restored by `pg_restore --no-owner --no-privileges` into an isolated staging database `tmrkz_staging_<id>` on the
+  application's own server with the application's datasource credentials; the staging database is dropped when the
+  migration finishes, fails or is abandoned. **The folder-backend image must be rebuilt** (`ops/local/workspace/pack-images.sh`
+  now installs `postgresql-client-17` in its own cached layer) before the dump source works; until then the screen says
+  that `pg_restore` is missing and the staging database is dropped again.
+- **Refused sources:** the current database itself (same host, port, database and schema as the datasource), a source
+  whose last successful Flyway version is newer than the current one, a database without `flyway_schema_history`.
+- **What is compared and carried.** Only the business tables both sides share, with a single-column primary key.
+  Never read or written (category «لا تُرحَّل»): Flowable (`act_*`), `flyway_schema_history`, `user_session`, `oidc_login`,
+  `login_throttle`, `bootstrap_admin`, `outbox_event`, `stationing_outbox`, `idempotency_record`, `integration_setting`,
+  `sign_in_board`, `hr_*` (staging and the HR source secrets), `authz_*` (the OpenFGA mirror and store state),
+  `local_metadata`, `db_migration` itself. `password_hash` and any column named like a secret, token, ciphertext or
+  key id are stripped even from tables that are migrated. Rows travel as text, shared columns only; a column added by a
+  later migration takes its default; generated columns are skipped.
+- **Conflicts (decision A).** A row with the same stable id and different content is a conflict. The current record
+  wins by default; the preview lists each conflict (first 200 per table) with the differing columns, current beside
+  source, and the administrator decides per record: KEEP, or TAKE_SOURCE (the current row's shared columns are updated
+  from the source). Validation refuses while a chosen table with conflicts has neither its KEEP default confirmed nor
+  every listed record decided. Conflicts beyond the listed 200 stay on the current record.
+- **Backup gate.** The commit stays closed until `backups/<project>-<stamp>/manifest.json` (written by `ops/backup.sh`;
+  `./backups` is mounted read-only at `/var/lib/mover/backups`) is newer than `tmrkz.migration.backup-max-age-hours`
+  (24) and either `verify-result.txt` beside it says `PASS` (`ops/verify-backup.sh` now writes it) or the administrator
+  ticks, on the record, that `sh ops/verify-backup.sh <dir>` passed.
+- **Fingerprint.** Per shared table the source's row count, highest key and latest stamp are taken at the preview and
+  again at the commit; a difference refuses the commit (the row ends FAILED, «fingerprintChanged») and a new preview is
+  required.
+- **The commit** inserts the new rows of the chosen tables in dependency order (foreign keys of the current database,
+  topological; a cycle is refused; a self-referencing table inserts parents before children) and applies the
+  TAKE_SOURCE updates, inside one transaction, with `on conflict do nothing` as the safety net; serial sequences are
+  advanced afterwards. Any failure rolls everything back and records FAILED with the reason.
+- **Limits.** Tables keyed by a serial (`audit_event`, `reservation_lock`, `terrain_slope`) collide by number with the
+  current database and mostly arrive as conflicts. Attachment and map-package rows arrive without their files
+  (`files.tgz`, `map-packages.tgz` of the old backup are copied by hand). After migrating memberships or grants run the
+  OpenFGA rebuild (`POST /api/v1/access/rebuild`). The request runs synchronously; a very large source takes minutes.

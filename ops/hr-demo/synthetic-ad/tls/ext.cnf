@@ -1,0 +1,4 @@
+subjectAltName=DNS:tmrkz-synthetic-ad,DNS:localhost
+extendedKeyUsage=serverAuth
+keyUsage=critical,digitalSignature,keyEncipherment
+basicConstraints=CA:FALSE

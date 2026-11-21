@@ -118,6 +118,8 @@ services:
       - ./backend:/workspace/backend:ro
       - ./map-packages:/opt/mover/map-packages:ro
       - ./data/files:/var/lib/mover
+      # the migration center's backup gate (ADR-094) reads the manifests ops/backup.sh writes; dumps go to data/files/migration-inbox
+      - ./backups:/var/lib/mover/backups:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/system/health"]
       interval: 10s

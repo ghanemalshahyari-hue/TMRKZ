@@ -1,0 +1,39 @@
+# TMRKZ's synthetic enterprise directory (owner, 20 Nov 2026; ADR-094): a throw-away Samba AD holding the demo Oracle HR's
+# people, as MOVER's test directory «mover-test-ldap» (mover-state/test-ldap). Development and acceptance ONLY — the
+# profile «synthetic-enterprise» never starts in production: it is not in the folder installation's compose project,
+# it starts only by ops/hr-demo/synthetic-ad/up.sh, it does not come back by itself (restart: no), and it publishes no
+# port: LDAPS 636 is reachable on the application's internal network only (tmrkz-synthetic-ad:636).
+services:
+  ad:
+    image: smblds/smblds:latest
+    container_name: tmrkz-synthetic-ad
+    profiles: [synthetic-enterprise]
+    restart: "no"
+    environment:
+      REALM: TMRKZ.TEST
+      DOMAIN: TMRKZ
+      ADMINPASS: ${SYNTHETIC_AD_ADMIN_PASSWORD:?run ops/hr-demo/synthetic-ad/up.sh}
+      INSECURE_PASSWORDSETTINGS: "true"   # one test password for every synthetic account, never expiring (as MOVER's)
+      TZ: UTC
+    volumes:
+      - ../.generated/synthetic-ad/tls:/tls:ro
+      - ./entrypoint.d:/entrypoint.d:ro
+      - ./schema:/schema:ro
+      - samba-lib:/var/lib/samba
+      - samba-etc:/etc/samba
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks: [tmrkz]
+
+volumes:
+  samba-lib:
+  samba-etc:
+
+networks:
+  tmrkz:
+    external: true
+    name: tmrkz-mover_internal

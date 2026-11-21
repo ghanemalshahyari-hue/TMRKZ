@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -76,6 +77,19 @@ public class IntegrationSettingsService {
         }
     }
 
+    /**
+     * «المساعد الذكي» (ADR-056, owner 20 Nov 2026): the OpenAI-compatible server the assistant asks, replacing the
+     * {@code TMRKZ_AI_*} environment values without a restart. {@code apiKey} is write-only (null keeps the stored one);
+     * the saved {@code enabled} wins over the environment.
+     */
+    public record Assistant(Boolean enabled, String baseUrl, String model, String apiKey, Integer timeoutSeconds) {
+
+        @Override
+        public String toString() {
+            return "Assistant[" + baseUrl + " " + model + "]"; // never the api key
+        }
+    }
+
     private record Stored<T>(T form, String secret, UUID updatedBy, java.time.Instant updatedAt, String secretError) {
     }
 
@@ -89,11 +103,12 @@ public class IntegrationSettingsService {
     private final HrSettingsCipher cipher;
     private final LdapProperties envLdap;
     private final OidcProperties envOidc;
+    private final AssistantEnv envAssistant;
     private final AtomicLong version = new AtomicLong(1);
     private volatile Effective effective;
 
     public IntegrationSettingsService(JdbcClient jdbc, Json json, Clock clock, AuditService audit, HrSettingsCipher cipher,
-                                      LdapProperties envLdap, OidcProperties envOidc) {
+                                      LdapProperties envLdap, OidcProperties envOidc, AssistantEnv envAssistant) {
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
@@ -101,6 +116,38 @@ public class IntegrationSettingsService {
         this.cipher = cipher;
         this.envLdap = envLdap;
         this.envOidc = envOidc;
+        this.envAssistant = envAssistant;
+    }
+
+    /**
+     * The {@code TMRKZ_AI_*} environment values, read once at startup; the saved assistant settings sit in front of them
+     * (owner, 20 Nov 2026). Defined as a bean so tests can rebind it; the default reads the usual property names.
+     */
+    @org.springframework.stereotype.Component
+    public static class AssistantEnv {
+        private final boolean enabled;
+        private final String baseUrl;
+        private final String model;
+        private final String apiKey;
+        private final int timeoutSeconds;
+
+        public AssistantEnv(@Value("${TMRKZ_AI_ENABLED:false}") boolean enabled,
+                            @Value("${TMRKZ_AI_BASE_URL:http://host.docker.internal:11434/v1}") String baseUrl,
+                            @Value("${TMRKZ_AI_MODEL:qwen2.5:7b}") String model,
+                            @Value("${TMRKZ_AI_API_KEY:}") String apiKey,
+                            @Value("${TMRKZ_AI_TIMEOUT_SECONDS:60}") int timeoutSeconds) {
+            this.enabled = enabled;
+            this.baseUrl = baseUrl == null ? null : (baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl);
+            this.model = model;
+            this.apiKey = apiKey == null || apiKey.isBlank() ? null : apiKey;
+            this.timeoutSeconds = Math.max(5, Math.min(300, timeoutSeconds));
+        }
+
+        public boolean enabled() { return enabled; }
+        public String baseUrl() { return baseUrl; }
+        public String model() { return model; }
+        public String apiKey() { return apiKey; }
+        public int timeoutSeconds() { return timeoutSeconds; }
     }
 
     // ---- what the application uses -------------------------------------------------------------------------------
@@ -580,6 +627,127 @@ public class IntegrationSettingsService {
         String t = s.trim();
         return t.isEmpty() ? null : t;
     }
+
+    // ---- the assistant (ADR-056) -------------------------------------------------------------------------------------
+
+    /** Saved AI settings when enabled, otherwise the environment's. */
+    public Assistant assistant() {
+        Assistant saved = null;
+        try {
+            Stored<Assistant> s = stored("ASSISTANT", Assistant.class);
+            if (s != null && Boolean.TRUE.equals(s.form().enabled())) {
+                saved = new Assistant(true, s.form().baseUrl(), s.form().model(),
+                        s.secret() == null ? envAssistant.apiKey() : s.secret(),
+                        s.form().timeoutSeconds() == null ? envAssistant.timeoutSeconds() : s.form().timeoutSeconds());
+            }
+        } catch (RuntimeException ignore) {
+            // the environment answers below
+        }
+        if (saved != null) {
+            return saved;
+        }
+        return new Assistant(envAssistant.enabled(), envAssistant.baseUrl(), envAssistant.model(),
+                envAssistant.apiKey(), envAssistant.timeoutSeconds());
+    }
+
+    public Map<String, Object> assistantView(AccessContext ctx) {
+        ctx.require(Permission.CONFIGURE);
+        Stored<Assistant> a = null;
+        String error = null;
+        try {
+            a = stored("ASSISTANT", Assistant.class);
+        } catch (RuntimeException e) {
+            error = "تعذرت قراءة الإعدادات المحفوظة: " + e.getMessage();
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("keyConfigured", cipher.configured());
+        out.put("source", a != null && Boolean.TRUE.equals(a.form().enabled()) ? "SAVED" : envAssistant.enabled() ? "ENV" : "NONE");
+        if (a != null) {
+            Map<String, Object> saved = new LinkedHashMap<>();
+            saved.put("enabled", a.form().enabled());
+            saved.put("baseUrl", a.form().baseUrl());
+            saved.put("model", a.form().model());
+            saved.put("timeoutSeconds", a.form().timeoutSeconds());
+            saved.put("apiKeySet", a.secret() != null);
+            out.put("saved", saved);
+            out.put("updatedAt", a.updatedAt() == null ? null : a.updatedAt().toString());
+            out.put("updatedBy", a.updatedBy() == null ? null : a.updatedBy().toString());
+            if (a.secretError() != null) {
+                out.put("secretError", a.secretError());
+            }
+        } else {
+            out.put("saved", null);
+        }
+        if (error != null) {
+            out.put("error", error);
+        }
+        Map<String, Object> env = new LinkedHashMap<>();
+        env.put("enabled", envAssistant.enabled());
+        env.put("baseUrl", envAssistant.baseUrl());
+        env.put("model", envAssistant.model());
+        env.put("apiKeySet", envAssistant.apiKey() != null && !envAssistant.apiKey().isBlank());
+        env.put("timeoutSeconds", envAssistant.timeoutSeconds());
+        out.put("env", env);
+        Assistant eff = assistant();
+        Map<String, Object> e = new LinkedHashMap<>();
+        e.put("enabled", eff.enabled());
+        e.put("baseUrl", eff.baseUrl());
+        e.put("model", eff.model());
+        e.put("apiKeySet", eff.apiKey() != null && !eff.apiKey().isBlank());
+        e.put("timeoutSeconds", eff.timeoutSeconds());
+        out.put("effective", e);
+        return out;
+    }
+
+    @Transactional
+    public Map<String, Object> saveAssistant(AccessContext ctx, Assistant in) {
+        ctx.require(Permission.CONFIGURE);
+        if (in == null) {
+            throw ApiException.validation("لا إعدادات.");
+        }
+        Boolean enabled = in.enabled() == null ? Boolean.FALSE : in.enabled();
+        String baseUrl = strip(text(in.baseUrl()));
+        String model = text(in.model());
+        Integer timeout = in.timeoutSeconds() == null ? 60 : Math.max(5, Math.min(300, in.timeoutSeconds()));
+        if (Boolean.TRUE.equals(enabled)) {
+            if (baseUrl == null || !(baseUrl.startsWith("http://") || baseUrl.startsWith("https://"))) {
+                throw ApiException.validation("اكتب عنوان خادم النموذج الذي يبدأ بـ http:// أو https:// .");
+            }
+            if (model == null) {
+                throw ApiException.validation("اكتب اسم النموذج.");
+            }
+        }
+        String stored = storedAssistantKey();
+        String apiKey = in.apiKey() == null ? stored : (in.apiKey().isEmpty() ? null : in.apiKey());
+        Assistant kept = new Assistant(enabled, baseUrl, model, null, timeout);
+        write("ASSISTANT", kept, apiKey, ctx.personId());
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("enabled", enabled);
+        detail.put("baseUrl", baseUrl);
+        detail.put("model", model);
+        detail.put("timeoutSeconds", timeout);
+        detail.put("apiKeyChanged", in.apiKey() != null);
+        audit.recordAs(ctx.actor(), "INTEGRATION_ASSISTANT_SAVED", "SETTINGS", "integration/assistant",
+                "إعدادات التكامل — المساعد الذكي", detail, "حفظ إعدادات المساعد");
+        return assistantView(ctx);
+    }
+
+    @Transactional
+    public Map<String, Object> clearAssistant(AccessContext ctx) {
+        ctx.require(Permission.CONFIGURE);
+        jdbc.sql("delete from integration_setting where kind = 'ASSISTANT'").update();
+        renew();
+        audit.recordAs(ctx.actor(), "INTEGRATION_ASSISTANT_CLEARED", "SETTINGS", "integration/assistant",
+                "إعدادات التكامل — المساعد الذكي", Map.of(), "العودة إلى إعدادات ملف البيئة");
+        return assistantView(ctx);
+    }
+
+    public String storedAssistantKey() {
+        Stored<Assistant> a = stored("ASSISTANT", Assistant.class);
+        return a == null ? null : a.secret();
+    }
+
+    // ---- common --------------------------------------------------------------------------------------------------
 
     /** A URL without its trailing slash. */
     private static String strip(String url) {

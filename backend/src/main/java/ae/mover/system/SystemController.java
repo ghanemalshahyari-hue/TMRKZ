@@ -266,6 +266,29 @@ public class SystemController {
         return m;
     }
 
+    /**
+     * ADR-094: whether the installation holds any data yet. An empty one shows nothing in the middle of its screens — no map,
+     * no tiles of zeros — until units are imported or a site, a stationing or a request exists. Open to zero access.
+     */
+    @GetMapping("/system/state")
+    public Map<String, Object> state(Actor actor) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        long units = jdbc.sql("select count(*) from organization where status = 'ACTIVE'").query(Long.class).single();
+        long sites = jdbc.sql("select count(*) from site where status <> 'RETIRED'").query(Long.class).single();
+        long stationed = jdbc.sql("select count(*) from org_stationing where valid_from <= :at and (valid_to is null or valid_to > :at)")
+                .param("at", ae.mover.common.Db.ts(clock.instant())).query(Long.class).single();
+        long requests = jdbc.sql("select count(*) from request").query(Long.class).single();
+        long people = jdbc.sql("select count(*) from person where status = 'ACTIVE'").query(Long.class).single();
+        m.put("units", units);
+        m.put("sites", sites);
+        m.put("stationed", stationed);
+        m.put("requests", requests);
+        m.put("people", people);
+        m.put("unitsImported", units > 0);
+        m.put("empty", units == 0 && sites == 0 && stationed == 0 && requests == 0);
+        return m;
+    }
+
     @GetMapping("/system/health")
     public Map<String, Object> health() {
         return Map.of("status", jdbc.sql("select 1").query(Integer.class).single() == 1 ? "UP" : "DOWN");

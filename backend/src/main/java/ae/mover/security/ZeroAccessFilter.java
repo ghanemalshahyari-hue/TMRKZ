@@ -43,6 +43,8 @@ public class ZeroAccessFilter extends OncePerRequestFilter {
             "GET /api/v1/notifications",
             "GET /api/v1/notifications/desktop-feed",
             "GET /api/v1/system/health",
+            "GET /api/v1/system/state",
+            "POST /api/v1/me/hr-refresh",
             "GET /api/v1/openapi.json");
     private static final Pattern OPEN_PATTERNS = Pattern.compile(
             "POST /api/v1/access-requests/[0-9a-fA-F-]{36}/resubmit|POST /api/v1/notifications/[0-9a-fA-F-]{36}/read"

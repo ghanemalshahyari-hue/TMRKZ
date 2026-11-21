@@ -43,5 +43,7 @@ export const ICONS: Record<string, string> = {
   // «مركز الدعم» (ADR-053): drawn for TMRKZ in the same stroke style
   "help": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14\"/><path d=\"M12 17.2v.1\"/>",
   "robot": "<rect x=\"4\" y=\"8\" width=\"16\" height=\"12\" rx=\"3\"/><path d=\"M12 4v4M9 13v1M15 13v1M9 17h6M2 13v3M22 13v3\"/><circle cx=\"12\" cy=\"3.5\" r=\"1\"/>",
+  "alert": "<path d=\"M12 3 2 20h20L12 3Z\"/><path d=\"M12 10v4M12 17v.5\"/>",
+  "mountains": "<path d=\"M3 20 10 10l4 5 3-4 4 9H3Z\"/><path d=\"M10 10l-3 4\"/>",
   "headset": "<path d=\"M4 14v-2a8 8 0 0 1 16 0v2\"/><rect x=\"3\" y=\"14\" width=\"4\" height=\"6\" rx=\"1.5\"/><rect x=\"17\" y=\"14\" width=\"4\" height=\"6\" rx=\"1.5\"/><path d=\"M19 20a3 3 0 0 1-3 2h-3\"/>",
 };

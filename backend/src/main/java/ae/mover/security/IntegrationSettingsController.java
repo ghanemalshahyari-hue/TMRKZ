@@ -36,13 +36,15 @@ public class IntegrationSettingsController {
     private final AccessService access;
     private final IntegrationSettingsService settings;
     private final DirectoryAuthenticator directory;
+    private final ae.mover.assistant.AssistantTester assistantTester;
     private final OidcClient oidc;
 
     public IntegrationSettingsController(AccessService access, IntegrationSettingsService settings, DirectoryAuthenticator directory,
-                                         OidcClient oidc) {
+                                         OidcClient oidc, ae.mover.assistant.AssistantTester assistantTester) {
         this.access = access;
         this.settings = settings;
         this.directory = directory;
+        this.assistantTester = assistantTester;
         this.oidc = oidc;
     }
 
@@ -83,6 +85,43 @@ public class IntegrationSettingsController {
         return out;
     }
 
+    /**
+     * The live state of both sections (owner, 20 Nov 2026): the directory's secured channel opened (and the service account bound
+     * when there is one), Keycloak's discovery document read — with the settings in force, saved or from the environment.
+     */
+    @GetMapping("/status")
+    public Map<String, Object> status(Actor actor) {
+        AccessContext ctx = access.context(actor);
+        ctx.require(Permission.CONFIGURE);
+        Map<String, Object> out = new LinkedHashMap<>();
+        LdapProperties l = settings.ldap();
+        Map<String, Object> d = new LinkedHashMap<>();
+        if (!l.configured()) {
+            d.put("state", "NOT_CONFIGURED");
+            d.put("message", "لم يُهيأ الدليل المؤسسي بعد.");
+        } else {
+            DirectoryAuthenticator.TestResult r = directory.test(l, null, null);
+            d.put("state", r.ok() ? "UP" : "DOWN");
+            d.put("message", r.message());
+            d.put("url", l.url());
+        }
+        out.put("directory", d);
+        OidcProperties.Provider p = settings.oidc().automatic();
+        Map<String, Object> k = new LinkedHashMap<>();
+        if (!p.configured()) {
+            k.put("state", "NOT_CONFIGURED");
+            k.put("message", "لم يُهيأ الدخول الآلي بعد.");
+        } else {
+            OidcClient.Probe r = oidc.probe(p, settings.ssl(), 4000);
+            k.put("state", r.ok() ? "UP" : "DOWN");
+            k.put("message", r.message());
+            k.put("issuer", p.issuer());
+        }
+        out.put("oidc", k);
+        out.put("checkedAt", java.time.Instant.now().toString());
+        return out;
+    }
+
     @GetMapping("/oidc")
     public Map<String, Object> oidc(Actor actor) {
         return settings.oidcView(access.context(actor));
@@ -117,5 +156,39 @@ public class IntegrationSettingsController {
         out.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
         settings.audited(ctx, "INTEGRATION_OIDC_TESTED", Map.of("issuer", p.issuer(), "ok", r.ok(), "step", r.step()));
         return out;
+    }
+
+    // ---- the assistant (ADR-056) ----------------------------------------------------------------------------------
+
+    @GetMapping("/assistant")
+    public Map<String, Object> assistant(Actor actor) {
+        return settings.assistantView(access.context(actor));
+    }
+
+    @PutMapping("/assistant")
+    public Map<String, Object> saveAssistant(Actor actor, @RequestBody IntegrationSettingsService.Assistant in) {
+        return settings.saveAssistant(access.context(actor), in);
+    }
+
+    @DeleteMapping("/assistant")
+    public Map<String, Object> clearAssistant(Actor actor) {
+        return settings.clearAssistant(access.context(actor));
+    }
+
+    @PostMapping("/assistant/test")
+    public Map<String, Object> testAssistant(Actor actor, @RequestBody IntegrationSettingsService.Assistant in) {
+        AccessContext ctx = access.context(actor);
+        ctx.require(Permission.CONFIGURE);
+        return assistantTester.test(in == null ? settings.assistant() : merge(in));
+    }
+
+    /** Fills a blank API key with the stored one so the screen can test what it just saved. */
+    private IntegrationSettingsService.Assistant merge(IntegrationSettingsService.Assistant in) {
+        String key = in.apiKey();
+        if (key == null) {
+            key = settings.storedAssistantKey();
+        }
+        return new IntegrationSettingsService.Assistant(in.enabled(), in.baseUrl(), in.model(), key,
+                in.timeoutSeconds() == null ? 60 : in.timeoutSeconds());
     }
 }

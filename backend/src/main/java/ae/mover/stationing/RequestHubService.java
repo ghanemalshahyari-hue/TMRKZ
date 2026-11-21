@@ -265,9 +265,56 @@ public class RequestHubService {
             }).optional().orElse(null));
             units.add(m);
         }
+        // Scoped pending proposals (owner, 21 Nov 2026 operational-posture meaning-layer brief §10-§14): every request this
+        // person may read, in a state the operator should see as a proposed change, projected to the operational-map fields
+        // only. Each record is stitched by the SAME `visible(ctx, r)` rule that the request list uses: the right
+        // VIEW_OPERATIONAL_POSTURE alone does NOT reveal every proposal — the request must be one this person can see.
+        List<Map<String, Object>> pending = new ArrayList<>();
+        List<String> pendingStates = List.of(
+                "UNDER_REVIEW", "RETURNED_FOR_CHANGES", "PAUSED_HIERARCHY_CHANGED",
+                "APPROVED_NOT_ACTIVATED", "CANCELLATION_PENDING", "START_HELD_PENDING_CANCELLATION");
+        List<UUID> pendingIds = jdbc.sql("""
+                select id from restationing_request
+                 where state = any(string_to_array(:states, ',')::text[])
+                   and purpose in ('RESTATIONING', 'DEPLOYMENT_AREAS')
+                 order by updated_at desc limit 500""")
+                .param("states", String.join(",", pendingStates))
+                .query(UUID.class).list();
+        for (UUID rid : pendingIds) {
+            requests.load(rid).ifPresent(r -> {
+                if (!requests.visible(ctx, r)) return;
+                String stage = jdbc.sql("""
+                        select label from restationing_stage where request_id = :id and route_no = :r and mark is null
+                         order by position limit 1""")
+                        .param("id", r.id()).param("r", r.routeNo()).query(String.class).optional().orElse(null);
+                RestationingContent c = r.content();
+                for (UUID scopeUnit : c.scope()) {
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("requestId", r.id().toString());
+                    row.put("requestNumber", r.number());
+                    row.put("purpose", r.purpose());
+                    row.put("state", r.state());
+                    row.put("currentStage", stage);
+                    row.put("unitId", scopeUnit.toString());
+                    jdbc.sql("select code, name from organization where id = :id")
+                            .param("id", scopeUnit).query((rs, n) -> {
+                                row.put("unitCode", rs.getString("code"));
+                                row.put("unitName", rs.getString("name"));
+                                return null;
+                            }).optional();
+                    UUID currentSite = checks.currentSites(List.of(scopeUnit), now).get(scopeUnit);
+                    row.put("currentSiteId", currentSite == null ? null : currentSite.toString());
+                    row.put("proposedSite", c.site() == null ? null : c.site().geometry());
+                    row.put("proposedPrimary", c.primary());
+                    row.put("proposedSub", c.alternative());
+                    pending.add(row);
+                }
+            });
+        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("units", units);
         out.put("unitsTotal", tree.size());
+        out.put("pending", pending);
         return out;
     }
 

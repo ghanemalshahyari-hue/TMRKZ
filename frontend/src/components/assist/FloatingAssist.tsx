@@ -173,7 +173,7 @@ function AssistantDock({ view, onClose, onReport }: { view: string; onClose: () 
       .finally(() => setBusy(false));
   }, [q, busy, view]);
   const open = (resource: string) => api.helpDoc(resource).then(setDoc).catch((e: Error) => app.toast(e.message));
-  const badge = !status ? '…' : !status.enabled ? 'الدليل فقط' : status.reachable ? status.model ?? 'متصل' : 'النموذج غير متاح';
+  const badge = !status ? '…' : !status.enabled ? 'غير مُفعَّل' : status.reachable ? status.model ?? 'متصل' : 'النموذج غير متاح';
   return (
     <aside className="fa-panel fa-dock" role="dialog" aria-label="المساعد الذكي" data-testid="assistant-dock">
       <header>
@@ -228,22 +228,30 @@ function AssistantDock({ view, onClose, onReport }: { view: string; onClose: () 
                     {t.a.answer ? (
                       // the model writes Markdown: rendered as React elements, never as HTML
                       <div className="fa-text"><Markdown source={t.a.answer} /></div>
-                    ) : t.a.sources.length ? (
-                      <p className="fa-text">وجدت هذا في دليل تمركز:</p>
                     ) : (
-                      <p className="fa-text">لم أجد إجابة موثقة في دليل تمركز.</p>
+                      // Owner, 20 Nov 2026: never a preprogrammed answer. The guide titles stay as references the person
+                      // may open; the body excerpts are no longer presented as an answer.
+                      <p className="fa-text" data-testid="assistant-no-answer">
+                        {{
+                          OFF: 'المساعد الذكي غير مُفعَّل. يُهيَّأ من «إعدادات التكامل → المساعد الذكي».',
+                          UNREACHABLE: 'لم يستجب خادم النموذج. راجع «إعدادات التكامل → المساعد الذكي» أو حاول لاحقاً.',
+                          BUSY: 'النموذج مشغول الآن؛ حاول بعد لحظات.',
+                          NO_DOCS: 'لم أجد وثيقة في دليل تمركز تطابق سؤالك.',
+                        }[t.a.degraded ?? 'OFF'] ?? 'المساعد الذكي غير متاح الآن.'}
+                      </p>
                     )}
                     {t.a.sources.length > 0 && (
-                      <ul className="fa-sources">
-                        {t.a.sources.map((s) => (
-                          <li key={s.resource}>
-                            <button className="sp-link" onClick={() => void open(s.resource)}>{s.title}</button>
-                            {!t.a!.answer && s.snippet && <span> — {s.snippet}</span>}
-                          </li>
-                        ))}
-                      </ul>
+                      <>
+                        {!t.a.answer && <p className="fa-text muted" style={{ marginTop: 8 }}>مراجع ذات صلة من الدليل:</p>}
+                        <ul className="fa-sources">
+                          {t.a.sources.map((s) => (
+                            <li key={s.resource}>
+                              <button className="sp-link" onClick={() => void open(s.resource)}>{s.title}</button>
+                            </li>
+                          ))}
+                        </ul>
+                      </>
                     )}
-                    {t.a.degraded && t.a.degraded !== 'OFF' && <small className="muted">النموذج غير متاح الآن؛ هذه نتائج الدليل.</small>}
                   </div>
                 )}
               </div>

@@ -4,7 +4,11 @@
 # views HR_ENV_UNITS_AI and HR_PRS_EMPLOYEES_ALL by the read-only account TMRKZ_HR. Secrets are generated once into
 # ops/hr-demo/.generated/oracle_hr.env (never committed). Re-running rebuilds the data the same way (fixed seed).
 #   sh ops/hr-demo/up.sh            build (first start takes a few minutes)
+#   sh ops/hr-demo/up.sh --large    build the large profile instead (owner, 20 Nov 2026; ADR-094): about 30,000 units in an
+#                                   irregular tree, main units at levels 4–9, 200,000 people — build_oracle_hr.py --profile large
 #   sh ops/hr-demo/up.sh --verify   verification queries only
+# The application network is isolated (ADR-057): the Oracle driver comes from ops/hr-demo/.generated/wheels, downloaded here
+# once when this machine is online. The synthetic directory holding the same people: ops/hr-demo/synthetic-ad/ (README.md).
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")"
@@ -32,8 +36,18 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' tmrkz-hr-demo-oracle 2>/
   i=$((i + 1)); [ $i -gt 80 ] && { echo "[hr-demo] Oracle did not become healthy" >&2; exit 1; }; sleep 5
 done
 echo "[hr-demo] Oracle is up; building the synthetic HR data"
+ARGS=""
+for a in "$@"; do case "$a" in --large) ARGS="$ARGS --profile large" ;; *) ARGS="$ARGS $a" ;; esac; done
+if ! ls "$G"/wheels/oracledb-* >/dev/null 2>&1; then
+  case "$(uname -m)" in arm64|aarch64) ARCH=aarch64 ;; *) ARCH=x86_64 ;; esac
+  pip3 download -q --disable-pip-version-check -d "$G/wheels" --only-binary=:all: --platform "manylinux2014_$ARCH" \
+    --python-version 3.12 --implementation cp --abi cp312 oracledb==4.0.2 \
+    || { echo "[hr-demo] could not download the Oracle driver; put the oracledb 4.0.2 wheels (linux, cp312, $ARCH) in $G/wheels" >&2; exit 1; }
+fi
 HERE="$(pwd -W 2>/dev/null || pwd)"
 docker run --rm --network tmrkz-mover_internal -v "$HERE:/w" -w /w python:3.12-slim \
-  sh -c "pip install -q --disable-pip-version-check oracledb==4.0.2 >/dev/null 2>&1 && python build_oracle_hr.py $*"
+  sh -c "pip install -q --disable-pip-version-check --no-index --find-links .generated/wheels oracledb==4.0.2 >/dev/null && python build_oracle_hr.py $ARGS"
 echo "[hr-demo] in TMRKZ: «إعدادات النظام» ← مصدر الموارد البشرية: tmrkz-hr-demo-oracle, 1521, FREEPDB1 (service_name), TMRKZ_HR,"
 echo "          views HR_ENV_UNITS_AI and HR_PRS_EMPLOYEES_ALL; the password is ORACLE_MOVER_PASSWORD in $G/oracle_hr.env"
+echo "[hr-demo] the synthetic directory (Samba AD, profile synthetic-enterprise) holding the same people:"
+echo "          sh ops/hr-demo/synthetic-ad/up.sh   then   sh ops/hr-demo/synthetic-ad/load.sh [--limit N | --all]"

@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { api, type AccessMine, type AccessScope, type OverviewItem, type ScopeMode } from '../api/client';
 import { SCOPE_MODES, scopesFor } from '../lib/accessScopes';
 import { identityCard, UNIT_NOT_CONFIGURED } from '../lib/identityCard';
+import { hrState, unitTrail } from '../lib/hrState';
 import { flatSource, withParents } from '../components/tree/tree';
 import { UnitTree } from '../components/tree/UnitTree';
 import { MyPermits } from '../components/access/AccessAdmin';
-import { Heading } from '../components/ui';
+import { KeyValue, Heading } from '../components/ui';
 import { useApp } from '../lib/app';
 import { fullDate } from '../lib/dates';
 
@@ -33,10 +34,12 @@ export const ROLE_MEANING: Record<string, string> = {
 const STATUS: Record<string, string> = { SUBMITTED: 'قيد المراجعة', APPROVED: 'فُعّلت', REJECTED: 'رُفض', RETURNED: 'أُعيد' };
 
 /** The scope choices (ADR-045). The whole system is never offered here: it is not a default, and it cannot be asked for. */
-export function ScopeChoice({ scope, setScope, units, sites, allowed }: { scope: AccessScope; setScope: (s: AccessScope) => void; units: { id: string; name: string; depth?: number }[]; sites: { id: string; name: string }[]; allowed?: ScopeMode[] }) {
+export function ScopeChoice({ scope, setScope, units, sites, allowed, current }: { scope: AccessScope; setScope: (s: AccessScope) => void; units: { id: string; name: string; depth?: number }[]; sites: { id: string; name: string }[]; allowed?: ScopeMode[]; current?: string | null }) {
   const toggle = (id: string) => setScope({ ...scope, ids: scope.ids.includes(id) ? scope.ids.filter((x) => x !== id) : [...scope.ids, id] });
   // the one units tree of the application (owner, 16 Nov 2026)
   const tree = useMemo(() => flatSource(withParents(units)), [units]);
+  // ADR-094: the tree begins at the person's main unit; their own unit is highlighted and brought into view
+  const trail = useMemo(() => unitTrail(units, current ?? null), [units, current]);
   const ticked = useMemo(() => new Set(scope.ids), [scope.ids]);
   return (
     <fieldset className="access-scope" data-testid="access-scope">
@@ -48,7 +51,8 @@ export function ScopeChoice({ scope, setScope, units, sites, allowed }: { scope:
       ))}
       {scope.mode === 'UNITS' && (
         <UnitTree source={tree} label="الوحدات المطلوبة" searchLabel="بحث في الوحدات" checked={ticked} onCheck={(u) => toggle(u.id)}
-          initialOpen={units.length <= 80 ? units.map((u) => u.id) : []} openSingleRoot />
+          initialOpen={units.length <= 80 ? units.map((u) => u.id) : []} openSingleRoot selected={current ?? null} reveal={current ?? null} trail={trail}
+          rowClass={(u) => (u.id === current ? 'ut-current' : undefined)} />
       )}
       {scope.mode === 'SITES' && sites.map((u) => (
         <label key={u.id} className="check-label" style={{ display: 'block' }}><input type="checkbox" checked={scope.ids.includes(u.id)} onChange={() => toggle(u.id)} /> {u.name}</label>
@@ -88,6 +92,19 @@ export function AccessRequestPage() {
   const [scope, setScope] = useState<AccessScope>({ mode: 'UNIT', ids: [] });
   const [busy, setBusy] = useState(false);
   const none = app.me.permissions.length === 0;
+  // ADR-094: the person asks HR for their own record now; HR not answering changes nothing
+  const refreshHr = async () => {
+    setBusy(true);
+    try {
+      const r = await api.myHrRefresh();
+      app.toast(r.refreshed ? 'حُدّثت بياناتك من الموارد البشرية' : 'لم تُجب الموارد البشرية الآن؛ تبقى بياناتك كما هي');
+      await app.refreshMe();
+    } catch (e) {
+      app.toast((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const [fyi, setFyi] = useState<OverviewItem[]>([]);
   const load = () => {
     // a person with no permission sees no request «للعلم» (owner, 16 Nov 2026); the server refuses it too
@@ -104,6 +121,8 @@ export function AccessRequestPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mine?.held.length]);
 
+  // ADR-094: admitted from the directory before HR confirmed them; their HR record is matched on a later sign-in or lookup
+  const pendingHr = app.me.hrMatch === 'PENDING';
   const open = mine?.requests.some((r) => r.status === 'SUBMITTED');
   const returned = mine?.requests.find((r) => r.status === 'RETURNED') ?? null;
   const offered = mine?.requestable.filter((r) => !mine.held.includes(r.code)) ?? [];
@@ -129,6 +148,26 @@ export function AccessRequestPage() {
   };
   return (
     <section data-testid="access-request">
+      {none && (
+        <section className="card padding" data-testid="my-details" style={{ marginBottom: 12 }}>
+          <h2>بياناتي</h2>
+          <KeyValue k="الاسم" v={app.me.displayName} />
+          <KeyValue k="اسم المستخدم" v={app.me.username} />
+          <KeyValue k="الرقم" v={app.me.employeeNo ?? '—'} />
+          <KeyValue k="الوحدة" v={mine?.unit ?? '—'} />
+          <KeyValue k="سجل الموارد البشرية" v={hrState(app.me)} />
+          {app.me.hrMatch === 'MATCHED' && (
+            <div className="flex" style={{ gap: 10, marginTop: 8 }}>
+              <button className="button" data-testid="hr-refresh-me" disabled={busy} onClick={refreshHr}>تحديث بياناتي من الموارد البشرية</button>
+            </div>
+          )}
+        </section>
+      )}
+      {pendingHr && (
+        <div className="note orange" data-testid="hr-match-pending" style={{ marginBottom: 12 }}>
+          تحقق الدليل المؤسسي من هويتك ودخلت بلا صلاحيات؛ بياناتك بانتظار مطابقة الموارد البشرية وتُحدَّث عند توفرها. يمكنك طلب الصلاحية الآن.
+        </div>
+      )}
       <Heading title="طلب صلاحية" description={none ? 'تم التحقق من هويتك، ولا توجد لك صلاحيات بعد. اطلب ما يلزم عملك، وتُفعَّل بعد الموافقة.' : 'اطلب صلاحية إضافية يحتاجها عملك.'} />
       {mine?.identity && <IdentityCard who={mine.identity} overall={mine.overall} />}
       <MyPermits />
@@ -154,7 +193,7 @@ export function AccessRequestPage() {
                 <span>لماذا تحتاجها؟</span>
                 <textarea aria-label="سبب الطلب" value={reason} onChange={(e) => setReason(e.target.value)} />
               </label>
-              <ScopeChoice scope={scope} setScope={setScope} units={mine.scopeUnits ?? []} sites={mine.scopeSites ?? []} allowed={allowedScopes.modes} />
+              <ScopeChoice scope={scope} setScope={setScope} units={mine.scopeUnits ?? []} sites={mine.scopeSites ?? []} allowed={allowedScopes.modes} current={mine.identity?.unitId ?? null} />
               <button className="button primary" disabled={busy || !roles.length || reason.trim().length < 5 || !mine.unit || (['UNITS', 'SITES'].includes(scope.mode) && !scope.ids.length)} onClick={send}>{returned ? 'إعادة إرسال الطلب' : 'إرسال طلب الصلاحية'}</button>
             </>
           )}

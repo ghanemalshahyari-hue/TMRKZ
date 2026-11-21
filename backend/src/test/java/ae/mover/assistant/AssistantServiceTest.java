@@ -53,7 +53,14 @@ class AssistantServiceTest {
     }
 
     private AssistantService service(String key) {
-        return new AssistantService(new KnowledgeService(), null, true, "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/", "qwen2.5:7b", key, 10);
+        return build(true, "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/", "qwen2.5:7b", key);
+    }
+
+    private AssistantService build(boolean enabled, String url, String model, String key) {
+        ae.mover.security.IntegrationSettingsService integration = org.mockito.Mockito.mock(ae.mover.security.IntegrationSettingsService.class);
+        ae.mover.security.IntegrationSettingsService.Assistant cfg = new ae.mover.security.IntegrationSettingsService.Assistant(enabled, url, model, key, 10);
+        org.mockito.Mockito.when(integration.assistant()).thenReturn(cfg);
+        return new AssistantService(new KnowledgeService(), null, integration);
     }
 
     @Test
@@ -61,7 +68,8 @@ class AssistantServiceTest {
     void grounded() throws Exception {
         KnowledgeService k = new KnowledgeService();
         List<KnowledgeService.Hit> hits = k.search("كيف اضيف مستخدم للوحده", d -> true, 2);
-        String answer = service("secret-key").complete("كيف أضيف مستخدماً؟", hits);
+        ae.mover.security.IntegrationSettingsService.Assistant cfg = new ae.mover.security.IntegrationSettingsService.Assistant(true, "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/", "qwen2.5:7b", "secret-key", 10);
+        String answer = service("secret-key").complete("كيف أضيف مستخدماً؟", hits, cfg);
         assertThat(answer).isEqualTo("1. افتح «مصفوفة الوحدات».");
         String sent = lastRequest.get();
         assertThat(sent).contains("\"model\":\"qwen2.5:7b\"").contains("مساعد تمركز").contains("tmrkz://okf/how-to/add-user")
@@ -75,13 +83,14 @@ class AssistantServiceTest {
     void failures() {
         KnowledgeService k = new KnowledgeService();
         List<KnowledgeService.Hit> hits = k.search("اشعارات سطح المكتب", d -> true, 1);
+        ae.mover.security.IntegrationSettingsService.Assistant cfg = new ae.mover.security.IntegrationSettingsService.Assistant(true, "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/", "qwen2.5:7b", "", 10);
         code = 500;
-        assertThatThrownBy(() -> service("").complete("سؤال", hits)).isInstanceOf(IOException.class);
+        assertThatThrownBy(() -> service("").complete("سؤال", hits, cfg)).isInstanceOf(IOException.class);
         code = 200;
         reply = "{\"choices\":[{\"message\":{\"content\":\"<think>only</think>\"}}]}";
-        assertThatThrownBy(() -> service("").complete("سؤال", hits)).isInstanceOf(IOException.class).hasMessageContaining("empty");
+        assertThatThrownBy(() -> service("").complete("سؤال", hits, cfg)).isInstanceOf(IOException.class).hasMessageContaining("empty");
         assertThat(lastAuth.get()).as("no key, no header").isNull();
-        AssistantService off = new AssistantService(k, null, false, "http://127.0.0.1:1/v1", "m", "", 10);
+        AssistantService off = build(false, "http://127.0.0.1:1/v1", "m", "");
         assertThat(off.status()).containsEntry("enabled", false).containsEntry("reachable", false);
     }
 }
