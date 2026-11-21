@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type PostureUnit } from '../api/client';
-import type { GeoPolygon, RestationingRequest, SiteGeometry } from '../api/types';
+import type { GeoPolygon, RestationingListItem, RestationingRequest, RestationingState, SiteGeometry } from '../api/types';
 import type { GeoJSONSource, Map as MlMap, MapMouseEvent } from 'maplibre-gl';
 import { PITCH_3D, addOverlayLayer, installedTerrain3d, type MapView } from '../components/map/maplibre';
 import { MAP_COLOURS } from '../components/workspace/RequestMap';
@@ -74,6 +74,10 @@ export function PosturePage() {
   const [layers, setLayers] = useState<LayerState>({ sites: true, units: true, primary: true, sub: true, boundaries: true, terrain: true, satellite: false });
   const [areaOpacity, setAreaOpacity] = useState(60);
   const [chooser, setChooser] = useState<{ siteId: string; siteName: string; unitIds: string[] } | null>(null);
+  // Pending requests (geometry needed for brief §23 «قيد الاعتماد»): fetch the list once, then fetch the selected unit's
+  // full request on demand so the proposed site/primary/sub can be drawn with the distinct amber-dashed style.
+  const [pendingList, setPendingList] = useState<RestationingListItem[]>([]);
+  const [pendingReq, setPendingReq] = useState<RestationingRequest | null>(null);
 
   const selected = selection?.kind === 'unit' ? selection.unitId : null;
   const siteInfoId = selection?.kind === 'site' ? selection.siteId : null;
@@ -86,11 +90,37 @@ export function PosturePage() {
     // Owner, 21 Nov 2026 operational-posture model §AF: no auto-selection on first open. The map renders the full
     // authorised posture; selection only happens after the user clicks a row, a search result, a marker or an area.
     api.operationalPosture().then((p) => setUnits(p.units)).catch((e: Error) => (setUnits([]), app.toast(e.message)));
+    // Pending-request list for the posture layer. Pending = states the operator should see as proposed changes.
+    const PENDING: RestationingState[] = ['UNDER_REVIEW', 'RETURNED_FOR_CHANGES', 'CANCELLATION_PENDING', 'START_HELD_PENDING_CANCELLATION', 'APPROVED_NOT_ACTIVATED'];
+    api.restationingRequests().then((rows) => setPendingList(rows.filter((r) => PENDING.includes(r.state)))).catch(() => setPendingList([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.revision]);
 
   const tree = useMemo(() => flatSource(units ?? []), [units]);
   const unit = units?.find((u) => u.id === selected) ?? null;
+
+  // When a selected unit has a pending request, fetch it and draw the proposal on the map (brief §F «distinct style»).
+  useEffect(() => {
+    if (!unit || !unit.request || pendingList.length === 0) { setPendingReq(null); return; }
+    const match = pendingList.find((r) => r.requestingUnit.id === unit.id && r.purpose === unit.request?.purpose);
+    if (!match) { setPendingReq(null); return; }
+    let live = true;
+    api.restationingRequest(match.id).then((req) => { if (live) setPendingReq(req); }).catch(() => { if (live) setPendingReq(null); });
+    return () => { live = false; };
+  }, [unit, pendingList]);
+
+  // Pending-geometry GeoJSON: proposed site + proposed PRIMARY + proposed SUB from the fetched request's content.
+  const pendingFC = useMemo<GeoJSON.FeatureCollection>(() => {
+    const features: GeoJSON.Feature[] = [];
+    if (pendingReq) {
+      const c = pendingReq.content;
+      const unitId = pendingReq.requestingUnit.id;
+      if (c.site?.geometry) features.push({ type: 'Feature', geometry: c.site.geometry as unknown as GeoJSON.Geometry, properties: { role: 'SITE', unitId, requestNumber: pendingReq.number } });
+      if (c.primary) features.push({ type: 'Feature', geometry: c.primary as GeoJSON.Geometry, properties: { role: 'PRIMARY', unitId, requestNumber: pendingReq.number } });
+      if (c.alternative) features.push({ type: 'Feature', geometry: c.alternative as GeoJSON.Geometry, properties: { role: 'SUB', unitId, requestNumber: pendingReq.number } });
+    }
+    return { type: 'FeatureCollection', features };
+  }, [pendingReq]);
   const req = useMemo(() => (unit ? asMapRequest(unit) : null), [unit]);
   useEffect(() => setFit((k) => k + 1), [selected]);
 
@@ -192,9 +222,48 @@ export function PosturePage() {
       map.on('mouseenter', id, onEnter);
       map.on('mouseleave', id, onLeave);
     }
+    // Pending-request proposal layers — amber-dashed so an operator never confuses them with approved posture.
+    map.addSource('pending-sel', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+    addOverlayLayer(map, {
+      id: 'pending-site-fill', type: 'fill', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'SITE'],
+      paint: { 'fill-color': '#f59e0b', 'fill-opacity': 0.16 },
+    });
+    addOverlayLayer(map, {
+      id: 'pending-site-line', type: 'line', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'SITE'],
+      paint: { 'line-color': '#f59e0b', 'line-width': 2.2, 'line-dasharray': [2, 2] },
+    });
+    addOverlayLayer(map, {
+      id: 'pending-primary-fill', type: 'fill', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'PRIMARY'],
+      paint: { 'fill-color': '#f59e0b', 'fill-opacity': 0.22 },
+    });
+    addOverlayLayer(map, {
+      id: 'pending-primary-line', type: 'line', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'PRIMARY'],
+      paint: { 'line-color': '#f59e0b', 'line-width': 2.4, 'line-dasharray': [3, 2] },
+    });
+    addOverlayLayer(map, {
+      id: 'pending-sub-fill', type: 'fill', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'SUB'],
+      paint: { 'fill-color': '#d97706', 'fill-opacity': 0.18 },
+    });
+    addOverlayLayer(map, {
+      id: 'pending-sub-line', type: 'line', source: 'pending-sel',
+      filter: ['==', ['get', 'role'], 'SUB'],
+      paint: { 'line-color': '#d97706', 'line-width': 2.2, 'line-dasharray': [1.5, 2] },
+    });
     // keep the silence warning for the clickSiteRef usage elsewhere
     void clickSiteRef;
   }, [map, postureFC]);
+
+  // Push pending request geometry whenever it changes; leaves current posture rendering untouched.
+  useEffect(() => {
+    if (!map) return;
+    const src = map.getSource('pending-sel') as GeoJSONSource | undefined;
+    if (src) src.setData(pendingFC);
+  }, [map, pendingFC]);
 
   // Layer visibility + emphasis. Selection does NOT remove other units (brief §F) — it only dims them.
   useEffect(() => {
@@ -441,6 +510,17 @@ export function PosturePage() {
               {!!unit.otherUnitsAtSite && <div><dt><Icon name="units" /> وحدات أخرى في الموقع</dt><dd data-testid="posture-others">{unit.otherUnitsAtSite}</dd></div>}
               {unit.request && <div><dt><Icon name="file" /> طلب جارٍ</dt><dd data-testid="posture-request">{(isPurpose(unit.request.purpose) ? PURPOSE_TITLE[unit.request.purpose] : unit.request.purpose) + ' · ' + unit.request.state}</dd></div>}
             </dl>
+            {pendingReq && (pendingReq.content.site || pendingReq.content.primary || pendingReq.content.alternative) && (
+              <div className="tz-posture3-pending">
+                <header><i className="tz-posture3-pending-swatch" aria-hidden /> <b>المقترح قيد الاعتماد</b> <small>{pendingReq.number}</small></header>
+                <ul>
+                  {pendingReq.content.site && <li><i className="tz-posture3-pending-swatch is-site" aria-hidden /> موقع مقترح</li>}
+                  {pendingReq.content.primary && <li><i className="tz-posture3-pending-swatch is-primary" aria-hidden /> منطقة انتشار رئيسية مقترحة</li>}
+                  {pendingReq.content.alternative && <li><i className="tz-posture3-pending-swatch is-sub" aria-hidden /> منطقة انتشار فرعية مقترحة</li>}
+                </ul>
+                <p>تظهر هذه العناصر على الخريطة بخط برتقالي منقّط لتمييزها عن الموقف الحالي.</p>
+              </div>
+            )}
           </aside>
         )}
 
