@@ -4,13 +4,19 @@
 # folder — with the build dependencies of its image (tmrkz/folder-web), offline. The result is published to the web
 # server; it builds again a few seconds after a file under ./frontend changes. A build that fails keeps the published
 # version. docs/ (without docs/audit, as in the image) and handoff/ are published too, and refreshed when they change.
+# A restart of the container (a reboot, docker compose restart) keeps what is published when ./frontend, docs/ and handoff/
+# have not changed since: building takes minutes of every core on a small server (the VM slowness check, 23 Nov 2026).
 # TMRKZ_BUILD_ONLY=1 builds once and exits with the result (used when the images are packed).
+# docker-compose.override.yml mounts this file over the copy in the image, so a change here needs no new tmrkz-images.tar.
 set -u
 SRC=/workspace/frontend
 WORK=/tmp/tmrkz-web
 HTML=/out/html
 DOCS=/out/docs
+BUILT=/tmp/tmrkz-web.built        # the source state (and build switches) of what is published
+DOCS_BUILT=/tmp/tmrkz-docs.built
 POLL="${TMRKZ_WORKSPACE_POLL_SECONDS:-3}"
+key() { echo "$1 ${VITE_STATIONING_V3:-} ${VITE_FLOW_STUDIO:-}"; }
 
 state() {
   find "$SRC" \( -name node_modules -o -name dist -o -name tsconfig.tsbuildinfo \) -prune -o -type f -print0 2>/dev/null \
@@ -48,16 +54,29 @@ publish_docs() {
 trap 'exit 0' TERM INT
 if [ "${TMRKZ_BUILD_ONLY:-}" = 1 ]; then build; exit $?; fi
 last="$(state)"
-until build; do
-  while [ "$(state)" = "$last" ]; do sleep "$POLL" & wait $!; done
-  sleep 2; last="$(state)"
-done
-docs_last="$(docs_state)"; publish_docs
+if [ -f "$HTML/index.html" ] && [ "$(cat "$BUILT" 2>/dev/null)" = "$(key "$last")" ]; then
+  echo "[web] ./frontend has not changed since the last build — the published version is kept"
+else
+  until build; do
+    while [ "$(state)" = "$last" ]; do sleep "$POLL" & wait $!; done
+    sleep 2; last="$(state)"
+  done
+  key "$last" > "$BUILT"
+fi
+docs_last="$(docs_state)"
+if [ -n "$(ls -A "$DOCS" 2>/dev/null)" ] && [ "$(cat "$DOCS_BUILT" 2>/dev/null)" = "$docs_last" ]; then
+  echo "[web] docs have not changed since they were published — kept"
+else
+  publish_docs && echo "$docs_last" > "$DOCS_BUILT"
+fi
 n=0
 while :; do
   sleep "$POLL" & wait $!
   now="$(state)"
-  if [ "$now" != "$last" ]; then sleep 2; last="$(state)"; build; fi
+  if [ "$now" != "$last" ]; then sleep 2; last="$(state)"; build && key "$last" > "$BUILT"; fi
   n=$((n + 1))
-  if [ "$n" -ge 20 ]; then n=0; d="$(docs_state)"; [ "$d" != "$docs_last" ] && { docs_last="$d"; publish_docs; }; fi
+  if [ "$n" -ge 20 ]; then
+    n=0; d="$(docs_state)"
+    [ "$d" != "$docs_last" ] && { docs_last="$d"; publish_docs && echo "$d" > "$DOCS_BUILT"; }
+  fi
 done

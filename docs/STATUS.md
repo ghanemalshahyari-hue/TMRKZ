@@ -1364,3 +1364,12 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Transfer:** `RUN.md` sections 1–3 — Command Prompt, the zip, `scp`/`sftp` through PAM on port 4422, unzip next to the previous folder.
 - **Checks on this PC:** V54–V66 applied (backup first, outside the folder: `Desktop\TMRKZ-db-backup-20261123`); backend and web healthy; six sign-in paths; `developer`; 10 of 10 map files; backend and frontend build offline with the current images (no new dependency); frontend migration-center tests 5/5.
 - **No «mover» in the installation (ADR-098):** project and containers `tmrkz`, database and owner `tmrkz`, images `tmrkz/*`, paths `/var/lib/tmrkz` and `/opt/tmrkz`, `.env` keys `TMRKZ_*`, `Started TmrkzApplication`. An older installation is moved on its next `sh start.sh` (keys renamed with their values, old containers replaced, database renamed by `db-init`). The Java package keeps its name.
+
+## A small server: background tabs ask nothing, a restart does not rebuild (23 Nov 2026; ADR-099)
+
+- **Why:** the slowness check of the other application on the VM (23 Nov) found 4 cores, each about 3× slower than the office PC's, used by background work and by browser tabs asking the server on their own. The same kinds of load were looked for in TMRKZ.
+- **Background tabs:** the bell (every 30 s), «المراجعة» (every 30 s: the list of up to 200 requests, the open request and its map) and the permission service's state (every 10 s) now ask only while their tab is in front, and refresh once when it comes back. Desktop notifications keep asking in the background: that is their purpose (ADR-050).
+- **Restart:** the folder run rebuilt the backend and the web at every container start, also after a reboot with nothing changed — on this PC 10 s and 13 s, on the VM minutes of every core. A restart with unchanged source now starts the last build at once (backend healthy 7 s after `docker compose restart`); a saved change still rebuilds; a recreated container builds once.
+- **Source check:** the backend's check every 3 s is about 3× cheaper (`find -printf`, no `stat` per file).
+- **Checked and left as they are:** the health check (`select 1`), the permission synchronisation (1,552 tuples compared every 5 minutes), nginx serving the page files with year-long caching. A TMRKZ nobody uses takes about 5 % of one core here.
+- **On the VM:** the next folder zip carries it; no new `tmrkz-images.tar` (the two scripts are mounted from the folder).

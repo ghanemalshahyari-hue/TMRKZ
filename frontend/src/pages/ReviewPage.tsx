@@ -17,12 +17,13 @@ export function ReviewPage() {
   const [pinned, setPinned] = useState<RequestBoundaries | null>(null);
   const [decision, setDecision] = useState<DecisionTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // the inbox follows the server: reloaded every 30 s, when the window regains focus and when an item is opened, so a
-  // reviewer never acts on a state another person has already changed (the server refuses stale decisions anyway)
+  // the inbox follows the server: reloaded every 30 s while the tab is in front, when the window regains focus and when
+  // an item is opened, so a reviewer never acts on a state another person has already changed (the server refuses stale
+  // decisions anyway). A tab in the background asks nothing: each reload is the list, the request and its map.
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const bump = () => setTick((t) => t + 1);
-    const timer = window.setInterval(bump, 30_000);
+    const timer = window.setInterval(() => document.visibilityState === 'visible' && bump(), 30_000);
     window.addEventListener('focus', bump);
     return () => {
       window.clearInterval(timer);

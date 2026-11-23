@@ -116,6 +116,8 @@ services:
     networks: [internal, edge]
     volumes:
       - ./backend:/workspace/backend:ro
+      # the build-and-run script from this folder, over the copy in the image (a change to it needs no new tmrkz-images.tar)
+      - ./ops/local/workspace/backend-run.sh:/usr/local/bin/tmrkz-backend-run:ro
       - ./map-packages:/opt/tmrkz/map-packages:ro
       - ./data/files:/var/lib/tmrkz
       # the migration center's backup gate (ADR-094) reads the manifests ops/backup.sh writes; dumps go to data/files/migration-inbox
@@ -138,6 +140,7 @@ services:
       VITE_FLOW_STUDIO: ${TMRKZ_FLOW_STUDIO_UI:-false}
     volumes:
       - ./frontend:/workspace/frontend:ro
+      - ./ops/local/workspace/web-run.sh:/usr/local/bin/tmrkz-web-run:ro
       - ./docs:/workspace/docs:ro
       - ./handoff:/workspace/handoff:ro
       - web-html:/out/html

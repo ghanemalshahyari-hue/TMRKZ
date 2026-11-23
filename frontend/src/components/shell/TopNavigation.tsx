@@ -7,6 +7,7 @@ import { fullTime } from '../../lib/dates';
 import { activeEntry, restriction, type NavLink } from '../../lib/navigation';
 import { Icon } from '../ui';
 import { rememberReturn } from '../../lib/returnContext';
+import { startVisibilityPoll } from '../../lib/visibilityPoll';
 
 const POLL_MS = 30_000;
 
@@ -219,11 +220,8 @@ function Notifications() {
       .then(setItems)
       .catch(() => setItems([]));
   }, []);
-  useEffect(() => {
-    load();
-    const t = window.setInterval(load, POLL_MS);
-    return () => window.clearInterval(t);
-  }, [load]);
+  // a tab in the background asks nothing; it refreshes once when it comes back to the front
+  useEffect(() => startVisibilityPoll({ load, intervalMs: POLL_MS }), [load]);
   const unread = items.filter((n) => !n.readAt).length;
   const read = async (n: Notification) => {
     if (!n.readAt) {

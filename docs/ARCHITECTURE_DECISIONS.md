@@ -2777,3 +2777,17 @@ SQLite that lacks a `units` table, and rejects a caller without `CONFIGURE`.
 - An existing installation moves by itself on its next start. `ops/init-env.sh` (run by `start.sh`) renames the five `.env` keys and keeps their values. `start.sh` replaces the `tmrkz-mover-*` containers, keeping `./data`. `db-init` renames the database and its owner before the backend connects; a temporary administrator does the owner's rename, because a role cannot rename itself, and is removed again. Every step checks what is done, so an interrupted start completes on the next one. The backend reads the new names first and the old ones still (the backend tests' own database keeps its names).
 
 **Consequences.** The Java package `ae.mover`, the build's file name and the internal request header keep the old name: nobody sees them, and renaming them would touch every source file. Verified on this PC: V54–V66 applied to its database, backend and web healthy, the six sign-in paths, `developer`, the map files; V66 rehearsed on a copy of the VM's database (254 MOVER units removed, the unit guard back on).
+
+## ADR-099 A small server: background tabs ask nothing, a restart does not rebuild (owner, 23 Nov 2026)
+
+**Owner.** After the slowness check of the other application on the VM — 4 cores, each about 3× slower than the office PC's, taken by background work and by browser tabs asking the server on their own: «fix the same here in the actual app and push».
+
+**Decision.**
+- Three screens stop asking the server from a tab in the background, as the navigation counts already did (ADR-094 §N, `lib/visibilityPoll`): the bell's notifications (every 30 s), «المراجعة» (every 30 s: the list of up to 200 requests, the open request and its map) and the permission service's state (every 10 s). Back in front they refresh once («المراجعة» on the window's focus, as before). Desktop notifications keep asking in the background, which is their purpose (ADR-050).
+- The folder run (ADR-091) built the backend (Maven) and the web (type check and bundle) at every container start, also after a reboot with nothing changed. Each script now records which source state its build came from, inside the container; a restart with the same source starts the last build at once, and docs are copied again only when they changed. A recreated container (a new image, a changed setting) builds once, as before. A saved change still rebuilds a few seconds later.
+- The backend's source check every 3 s lists the files with `find -printf` instead of one `stat` per file (about 3× cheaper). The web image's `find` cannot print, so its check is unchanged.
+- `docker-compose.override.yml` mounts both scripts from the folder over the copies in the images, so an installation gets them with the folder, without a new `tmrkz-images.tar`.
+
+**Checked and kept.** The backend health check is `select 1` every 10 s; the permission synchronisation compares 1,552 tuples every 5 minutes; nginx serves the page files itself with year-long caching (no page file goes through the application). A TMRKZ nobody uses took about 5 % of one core on this PC over 120 s.
+
+**Consequences.** The polling existed since the first implementation (28–30 Oct) and the rebuild at start since the folder run (19 Nov); neither showed on the 32-core PC. Verified on this PC: `docker compose restart backend web-build` without a build (backend healthy in 7 s, page and API 200); a touched backend file rebuilt and restarted; the web container's type check and bundle; `visibilityPoll.test.ts`.

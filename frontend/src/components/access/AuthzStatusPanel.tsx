@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { AuthzStatus } from '../../api/types';
 import { useApp } from '../../lib/app';
 import { fullTime } from '../../lib/dates';
+import { startVisibilityPoll } from '../../lib/visibilityPoll';
 
 /** State of the decision service (OpenFGA) and of the grant synchronisation, with a rebuild for global managers. */
 export function AuthzStatusPanel({ global }: { global: boolean }) {
@@ -17,11 +18,8 @@ export function AuthzStatusPanel({ global }: { global: boolean }) {
       .then((s) => (setStatus(s), setError(null)))
       .catch((e: Error) => setError(e.message));
 
-  useEffect(() => {
-    load();
-    const t = window.setInterval(load, 10_000);
-    return () => window.clearInterval(t);
-  }, [app.revision]);
+  // every 10 s while the tab is in front; a tab in the background asks nothing
+  useEffect(() => startVisibilityPoll({ load, intervalMs: 10_000 }), [app.revision]);
 
   const rebuild = async () => {
     if (!confirm('تُبنى بيانات الصلاحيات من قاعدة البيانات في مخزن جديد ثم يُنتقل إليه. تستمر القرارات على المخزن الحالي حتى الانتقال. متابعة؟')) return;
