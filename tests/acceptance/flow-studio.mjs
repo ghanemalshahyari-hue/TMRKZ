@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const UI = process.env.UI_URL ?? 'http://localhost:8088';
-const DB = process.env.DB_CONTAINER ?? 'tmrkz-mover-db-1';
+const DB = process.env.DB_CONTAINER ?? 'tmrkz-db-1';
 const OUT = process.env.OUT ?? fileURLToPath(new URL('../../docs/evidence/flow-studio/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 const env = readFileSync(new URL('../../.env', import.meta.url), 'utf8');

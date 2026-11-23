@@ -1,8 +1,8 @@
--- DEVELOPMENT ONLY (tmrkz-v3dev; never tmrkz-test or tmrkz-mover): FICTIONAL sites on real relief for the 3D terrain
+-- DEVELOPMENT ONLY (tmrkz-v3dev; never tmrkz-test or tmrkz): FICTIONAL sites on real relief for the 3D terrain
 -- view (owner brief «TRUE OFFLINE 3D TERRAIN», 6 Nov 2026). The coordinates are generic open terrain of the Hajar
 -- foothills chosen from the GLO-30 elevations (a plain at about 380 m with slopes up to about 900 m within 7 km), not
 -- any real facility; every name says «وهمي». Re-running replaces them.
---   docker exec -i tmrkz-v3dev-db-1 psql -U mover -d mover -v ON_ERROR_STOP=1 -f - < ops/test-env/dev-3d-terrain-seed.sql
+--   docker exec -i tmrkz-v3dev-db-1 psql -U tmrkz -d tmrkz -v ON_ERROR_STOP=1 -f - < ops/test-env/dev-3d-terrain-seed.sql
 -- Needs ops/test-env/dev-v3-seed.sql first (fictional levels, roles, policy v1) and the slope analysis loaded.
 \set ON_ERROR_STOP on
 begin;

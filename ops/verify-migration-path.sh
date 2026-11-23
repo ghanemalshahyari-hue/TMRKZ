@@ -21,12 +21,12 @@ LABEL="${3:?label}"
 EXPECT_PENDING="${EXPECT_PENDING:?space-separated versions the plan must contain, e.g. 17}"
 P="${P:-tmrkz-migpath}"
 PORT="${PORT:-8099}"
-case "$P" in tmrkz-mover|tmrkz-test|tmrkz-clean|tmrkz-load) echo "refused: $P is not a disposable project" >&2; exit 2;; esac
+case "$P" in tmrkz|tmrkz-test|tmrkz-clean|tmrkz-load) echo "refused: $P is not a disposable project" >&2; exit 2;; esac
 EV="docs/evidence/migration-path/$LABEL"
 mkdir -p "$EV" backups
 
 . ops/test-env/prepare.sh
-export MOVER_HTTP_PORT="$PORT" TMRKZ_PUBLIC_URL="http://localhost:$PORT" MOVER_URL="http://localhost:$PORT"
+export TMRKZ_HTTP_PORT="$PORT" TMRKZ_PUBLIC_URL="http://localhost:$PORT" MOVER_URL="http://localhost:$PORT"
 OVR="$EV/compose.image.yml"
 # memory caps for the disposable stack only: the Docker VM is shared with other environments, and an uncapped JVM may
 # grow towards 70 % of the VM (two Docker VM freezes on 4 Nov 2026)
@@ -35,7 +35,7 @@ compose() {
   docker compose -p "$P" -f docker-compose.yml -f ops/test-env/compose.directory.yml -f ops/test-env/compose.data.yml \
     -f "$OVR" "$@"
 }
-psqlq() { compose exec -T db psql -U mover -d mover -v ON_ERROR_STOP=1 -At "$@"; }
+psqlq() { compose exec -T db psql -U tmrkz -d tmrkz -v ON_ERROR_STOP=1 -At "$@"; }
 sha() { (sha256sum "$1" 2>/dev/null || shasum -a 256 "$1") | cut -d' ' -f1; }
 log() { echo "[migpath] $*" | tee -a "$EV/run.log"; }
 cleanup() { [ "${KEEP:-0}" = 1 ] || compose down -v >/dev/null 2>&1 || true; }
@@ -62,7 +62,7 @@ history() {
               from flyway_schema_history order by installed_rank" > "$1"
 }
 migrations_in() {
-  docker run --rm --entrypoint sh "$1" -c 'cd /tmp && unzip -o -q /opt/mover/mover-backend.jar "BOOT-INF/classes/db/migration/*" \
+  docker run --rm --entrypoint sh "$1" -c 'cd /tmp && unzip -o -q /opt/tmrkz/tmrkz-backend.jar "BOOT-INF/classes/db/migration/*" \
     && cd BOOT-INF/classes/db/migration && sha256sum V*.sql' | sort -t_ -k1.2n
 }
 
@@ -84,7 +84,7 @@ log "journey on $FROM: $(grep -c '^ok\|✓\|PASS' "$EV/journey-before.txt" || tr
 
 # 2. schema before
 history "$EV/flyway-history-before.txt"
-compose exec -T db pg_dump -U mover -d mover --schema-only --no-owner -N tiger -N tiger_data -N topology > "$EV/schema-before.sql"
+compose exec -T db pg_dump -U tmrkz -d tmrkz --schema-only --no-owner -N tiger -N tiger_data -N topology > "$EV/schema-before.sql"
 psqlq -f - < ops/sql/upgrade-rows.sql | cut -d'|' -f1 | sort | uniq -c > "$EV/rows-before.txt"
 log "schema before: $(tail -1 "$EV/flyway-history-before.txt" | cut -d'|' -f2,3) — schema sha256 $(sha "$EV/schema-before.sql")"
 
@@ -122,7 +122,7 @@ log "backend on $TO healthy; flyway: $(grep -iE 'Successfully applied|up to date
 
 # 6. schema history, schema after, integrity
 history "$EV/flyway-history-after.txt"
-compose exec -T db pg_dump -U mover -d mover --schema-only --no-owner -N tiger -N tiger_data -N topology > "$EV/schema-after.sql"
+compose exec -T db pg_dump -U tmrkz -d tmrkz --schema-only --no-owner -N tiger -N tiger_data -N topology > "$EV/schema-after.sql"
 diff -u "$EV/schema-before.sql" "$EV/schema-after.sql" > "$EV/schema-diff.txt" || true
 psqlq -f - < ops/sql/upgrade-rows.sql | cut -d'|' -f1 | sort | uniq -c > "$EV/rows-after.txt"
 if sh ops/upgrade-check.sh after "$P" > "$EV/upgrade-check-after.txt" 2>&1; then UPG=PASS; else UPG=FAIL; fi

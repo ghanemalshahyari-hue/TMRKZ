@@ -6,7 +6,7 @@ import { closePage, contextFor, go, launch, shot, unitId } from './lib/full26-ui
 import { chooseUnit, openWorkspace, row, tab } from './lib/full26-access-ui.mjs';
 import { execFileSync } from 'node:child_process';
 
-const sql = (q) => execFileSync('docker', ['exec', 'tmrkz-mover-db-1', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "${q}"`], { encoding: 'utf8' }).trim();
+const sql = (q) => execFileSync('docker', ['exec', 'tmrkz-db-1', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "${q}"`], { encoding: 'utf8' }).trim();
 const B = 'وحدة إضافية 1';
 const U = (n) => `${B} · ${n}`;
 const pid = (n) => sql(`select id from person where username = 'full26.u${String(n).padStart(2, '0')}'`);

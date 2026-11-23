@@ -2,7 +2,7 @@
 -- Applied on top of seed.sql for the map stationing journey (ADR-025): example distance rules (the owner configures the
 -- real ones in «إعدادات النظام»), two fictional sections of «الخدمات المشتركة», one approved booking that makes site 05
 -- occupied, and an illustrative boundary for site 05 so the occupied area is drawn. Re-running changes nothing.
--- Usage: docker exec -i tmrkz-test-db-1 psql -U mover -d mover < ops/test-env/stationing-demo.sql
+-- Usage: docker exec -i tmrkz-test-db-1 psql -U tmrkz -d tmrkz < ops/test-env/stationing-demo.sql
 begin;
 
 insert into placement_rule(id, name, action, station_level, organization_id, include_descendants, min_m, max_m, measure, active)

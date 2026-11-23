@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # FULL END-TO-END ACCEPTANCE (owner, 16 Nov 2026: "Yes, on :8088" — ACCEPTANCE ONLY): 14 fictional sign-in accounts
-# full26.u01 … full26.u14 in the local stand-in directory of the one installation (tmrkz-mover-openldap-1, ou=people).
+# full26.u01 … full26.u14 in the local stand-in directory of the one installation (tmrkz-openldap-1, ou=people).
 # They have no HR record: an administrator adds each one in «إدارة الصلاحيات والوحدات» ← «إضافة مستخدم» ← «بدون ربط
 # الموارد» with its User ID before its first sign-in, then grants its roles there (ADR-061, ADR-065).
 # The one password of these accounts is generated once into ops/acceptance-main/.generated/full26-password (git-ignored)
@@ -10,7 +10,7 @@
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
-C=tmrkz-mover-openldap-1
+C=tmrkz-openldap-1
 G=ops/acceptance-main/.generated
 mkdir -p "$G"
 ADMIN_PW="$(cat ops/local/.generated/ldap-admin-password)"

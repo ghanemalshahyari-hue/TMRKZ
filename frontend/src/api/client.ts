@@ -1123,11 +1123,6 @@ export const api = {
     form.append('file', file, file.name);
     return call<DbMigrationDumpInfo>('POST', '/settings/db-migration/inbox', { form });
   },
-  // ADR-097 «استيراد وحدات MOVER»
-  moverUnitsPreview: (file: string) =>
-    post<import('./types').MoverUnitPreview>('/settings/db-migration/mover-units/preview', { file }),
-  moverUnitsCommit: (file: string) =>
-    post<import('./types').MoverUnitCommit>('/settings/db-migration/mover-units/commit', { file }),
   connectDbMigration: (input: DbMigrationConnectInput) => post<DbMigration>('/settings/db-migration/connect', input),
   selectDbMigrationTables: (id: string, selection: DbMigrationSelectionInput) => put<DbMigration>(`/settings/db-migration/${id}/selection`, selection),
   runDbMigration: (id: string, backupVerified: boolean) => post<DbMigration>(`/settings/db-migration/${id}/migrate`, { backupVerified }),

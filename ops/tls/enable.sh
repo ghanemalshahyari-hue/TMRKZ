@@ -1,17 +1,17 @@
 #!/usr/bin/env sh
 # Step 3 of https (ADR-051): switches this installation to https once ops/tls/install-cert.sh has installed server.crt.
 #
-#   sh ops/tls/enable.sh [compose-project] [https-port]        (defaults: tmrkz-mover, 443)
+#   sh ops/tls/enable.sh [compose-project] [https-port]        (defaults: tmrkz, 443)
 #
 # Sets in .env, keeping a copy as .env.before-https-<time>:
-#   TMRKZ_PUBLIC_URL=https://<certificate name>[:port]   MOVER_SECURE_COOKIE=true   COMPOSE_PROFILES=tls
-#   MOVER_HTTP_BIND=127.0.0.1 (plain http from this host only)   TMRKZ_HTTPS_PORT=<port>
+#   TMRKZ_PUBLIC_URL=https://<certificate name>[:port]   TMRKZ_SECURE_COOKIE=true   COMPOSE_PROFILES=tls
+#   TMRKZ_HTTP_BIND=127.0.0.1 (plain http from this host only)   TMRKZ_HTTPS_PORT=<port>
 # then the new address in the identity provider (ops/keycloak/set-public-url.sh). Restart the stack afterwards:
 #   production: docker compose -p <project> up -d        this folder: sh start.sh
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
-PROJECT="${1:-tmrkz-mover}"
+PROJECT="${1:-tmrkz}"
 PORT="${2:-443}"
 DIR="${TMRKZ_TLS_DIR:-ops/tls/private}"
 # a path every tool here can open: on Windows the native openssl and curl need C:/..., not /tmp/...
@@ -37,10 +37,10 @@ setenv() {
   fi
 }
 setenv TMRKZ_PUBLIC_URL "$URL"
-setenv MOVER_SECURE_COOKIE true
+setenv TMRKZ_SECURE_COOKIE true
 setenv COMPOSE_PROFILES tls
-setenv MOVER_HTTP_BIND 127.0.0.1
+setenv TMRKZ_HTTP_BIND 127.0.0.1
 setenv TMRKZ_HTTPS_PORT "$PORT"
-echo "[tls] .env: TMRKZ_PUBLIC_URL=$URL, MOVER_SECURE_COOKIE=true, COMPOSE_PROFILES=tls, MOVER_HTTP_BIND=127.0.0.1, TMRKZ_HTTPS_PORT=$PORT"
+echo "[tls] .env: TMRKZ_PUBLIC_URL=$URL, TMRKZ_SECURE_COOKIE=true, COMPOSE_PROFILES=tls, TMRKZ_HTTP_BIND=127.0.0.1, TMRKZ_HTTPS_PORT=$PORT"
 sh ops/keycloak/set-public-url.sh "$PROJECT"
 echo "[tls] now restart the stack; users open $URL (the name must resolve in the organisation's DNS to this server)"

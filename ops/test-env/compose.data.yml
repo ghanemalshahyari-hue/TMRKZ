@@ -8,10 +8,10 @@ services:
       backend:
         condition: service_healthy
     environment:
-      PGPASSWORD: ${MOVER_DB_PASSWORD}
+      PGPASSWORD: ${TMRKZ_DB_PASSWORD}
     volumes:
       - ./ops/test-env/seed.sql:/seed.sql:ro
-    entrypoint: ["psql", "-h", "db", "-U", "mover", "-d", "mover", "-v", "ON_ERROR_STOP=1", "-q", "-f", "/seed.sql"]
+    entrypoint: ["psql", "-h", "db", "-U", "tmrkz", "-d", "tmrkz", "-v", "ON_ERROR_STOP=1", "-q", "-f", "/seed.sql"]
     networks: [internal]
 
   # Certificate signature and seal with the fictional signing PKI (ops/test-env/signing-pki.sh). Production configures

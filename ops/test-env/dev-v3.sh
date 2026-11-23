@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 # DEVELOPMENT environment for the Stationing V3 work in progress — disposable, fictional data only, never the acceptance
-# (tmrkz-test) or production (tmrkz-mover) project. Project tmrkz-v3dev on :8097 with the fictional directory, HR mirror
+# (tmrkz-test) or production (tmrkz) project. Project tmrkz-v3dev on :8097 with the fictional directory, HR mirror
 # and facilities of the acceptance environment, the backend built from the WORKING TREE (not a release), memory-capped
 # because the Docker VM is shared. Its database is created fresh and migrated to whatever the working tree holds.
 #
-#   sh ops/test-env/dev-v3.sh build   # backend image mover/backend:v3-dev from the working tree
+#   sh ops/test-env/dev-v3.sh build   # backend image tmrkz/backend:v3-dev from the working tree
 #   sh ops/test-env/dev-v3.sh up      # start (or update the backend of) the environment
 #   sh ops/test-env/dev-v3.sh seed    # fictional development values for Stationing V3 (ops/test-env/dev-v3-seed.sql)
 #   sh ops/test-env/dev-v3.sh down    # remove it with its volumes
@@ -13,9 +13,9 @@ export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
 P=tmrkz-v3dev
 PORT=8097
-IMAGE=mover/backend:v3-dev
+IMAGE=tmrkz/backend:v3-dev
 . ops/test-env/prepare.sh
-export MOVER_HTTP_PORT="$PORT" TMRKZ_PUBLIC_URL="http://localhost:$PORT" MOVER_URL="http://localhost:$PORT"
+export TMRKZ_HTTP_PORT="$PORT" TMRKZ_PUBLIC_URL="http://localhost:$PORT" MOVER_URL="http://localhost:$PORT"
 OVR="$G/dev-v3.override.yml"
 printf 'services:\n  backend:\n    image: %s\n    mem_limit: 1536m\n  keycloak:\n    mem_limit: 1g\n' "$IMAGE" > "$OVR"
 compose() {
@@ -35,7 +35,7 @@ case "${1:-up}" in
     echo "[dev-v3] up on $MOVER_URL (fictional users: ops/test-env/README.md; password: $G/user-password)"
     ;;
   seed)
-    compose exec -T db psql -U mover -d mover -v ON_ERROR_STOP=1 -q -f - < ops/test-env/dev-v3-seed.sql
+    compose exec -T db psql -U tmrkz -d tmrkz -v ON_ERROR_STOP=1 -q -f - < ops/test-env/dev-v3-seed.sql
     echo "[dev-v3] Stationing V3 development values seeded"
     ;;
   down)

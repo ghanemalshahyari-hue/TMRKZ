@@ -16,7 +16,7 @@ People keep their records (ORG_UNIT_FULL_PATH stays the name path, MAIN_ORG_UNT_
 Running it again changes nothing. The rows as they were are saved first to .generated/units-before-main-rule.csv.
 
 Run it the way up.sh runs the builder; the TMRKZ network is isolated, so the driver comes from .generated/wheels:
-  docker run --rm --network tmrkz-mover_internal -v "<ops/hr-demo>:/w" -w /w python:3.12-slim \\
+  docker run --rm --network tmrkz_internal -v "<ops/hr-demo>:/w" -w /w python:3.12-slim \\
     sh -c "pip install -q --no-index --find-links .generated/wheels oracledb==4.0.2 && python main_unit_rule.py [--check]"
 """
 import argparse

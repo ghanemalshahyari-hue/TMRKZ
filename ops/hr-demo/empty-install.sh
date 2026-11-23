@@ -13,7 +13,7 @@ G=ops/hr-demo/.generated
 [ -f "$G/synthetic-ad.env" ] && [ -f "$G/synthetic-ad/tls/ca.crt" ] || { echo "[empty] start the synthetic directory first: sh ops/hr-demo/synthetic-ad/up.sh" >&2; exit 2; }
 docker inspect -f '{{.State.Running}}' tmrkz-hr-demo-oracle 2>/dev/null | grep -q true || { echo "[empty] start the demo Oracle first: sh ops/hr-demo/up.sh --large" >&2; exit 2; }
 mkdir -p "$G/synthetic-ad/truststore" && cp "$G/synthetic-ad/tls/ca.crt" "$G/synthetic-ad/truststore/synthetic-ad-ca.pem"
-export MOVER_HTTP_PORT=8098 TMRKZ_PUBLIC_URL=http://localhost:8098 TMRKZ_IP=127.0.0.1 TMRKZ_PORT=8098
+export TMRKZ_HTTP_PORT=8098 TMRKZ_PUBLIC_URL=http://localhost:8098 TMRKZ_IP=127.0.0.1 TMRKZ_PORT=8098
 export LDAP_URL=ldaps://tmrkz-synthetic-ad:636 LDAP_START_TLS=false
 export LDAP_BIND_DN='CN=Administrator,CN=Users,DC=tmrkz,DC=test'
 LDAP_BIND_CREDENTIAL="$(sed -n 's/^SYNTHETIC_AD_ADMIN_PASSWORD=//p' "$G/synthetic-ad.env")"; export LDAP_BIND_CREDENTIAL

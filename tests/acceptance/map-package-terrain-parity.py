@@ -33,7 +33,7 @@ TIE = 0.01
 
 
 def q(db: str, sql: str) -> list[list[str]]:
-    r = subprocess.run(["docker", "exec", db, "psql", "-X", "-q", "-U", "mover", "-d", "mover", "-At", "-F", SEP,
+    r = subprocess.run(["docker", "exec", db, "psql", "-X", "-q", "-U", "tmrkz", "-d", "tmrkz", "-At", "-F", SEP,
                         "-v", "ON_ERROR_STOP=1", "-c", "set default_transaction_read_only = on", "-c", sql],
                        capture_output=True, text=True, encoding="utf-8")
     if r.returncode:

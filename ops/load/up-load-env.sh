@@ -11,7 +11,7 @@ cd "$(dirname "$0")/../.."
 . ops/test-env/prepare.sh
 PORT="${LOAD_HTTP_PORT:-8099}"
 COUNT="${COUNT:-50}"
-export MOVER_HTTP_PORT="$PORT" TMRKZ_PUBLIC_URL="http://localhost:$PORT"
+export TMRKZ_HTTP_PORT="$PORT" TMRKZ_PUBLIC_URL="http://localhost:$PORT"
 P=tmrkz-load
 compose() { docker compose -p "$P" -f docker-compose.yml -f ops/test-env/compose.directory.yml -f ops/test-env/compose.data.yml "$@"; }
 if [ "${DOWN:-0}" = 1 ]; then

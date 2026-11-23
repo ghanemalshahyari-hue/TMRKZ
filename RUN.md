@@ -18,55 +18,97 @@ The database has **no password**: it accepts only TMRKZ's own containers, on an 
 
 ---
 
-## 1. On the Windows PC — make the zip
+## 1. On the Windows PC — make the zip (Command Prompt)
 
-All commands run in the folder `C:\Users\ADMIN\Desktop\TMRKZ`. Use Git Bash, or PowerShell for the `docker` commands.
+Open **Command Prompt** (Start → type `cmd` → Enter) and type each line, one after the other.
 
-1. **Stop TMRKZ.** A database copied while it runs can be damaged.
+1. **Enter the folder.**
+   ```
+   cd /d "%USERPROFILE%\Desktop\TMRKZ"
+   ```
+2. **Stop TMRKZ.** A database copied while it runs can be damaged.
    ```
    docker compose stop
    ```
-2. **Make the zip.** It goes on the Desktop. It leaves out three things the VM does not need:
-   - `frontend/node_modules`, which is Windows-only;
-   - the git history `.git`, which stays on this PC (the VM starts its own, section 9);
-   - the test evidence `docs/evidence`.
+3. **Make the zip** on the Desktop. The dot at the end means "everything in this folder", hidden files such as `.env`
+   included. It leaves out only what the VM does not need: the git history `.git` (it stays on this PC; the VM starts its
+   own, section 10), the Windows-only `node_modules` folders, and the test evidence `docs/evidence`.
    ```
-   cd /c/Users/ADMIN/Desktop/TMRKZ
-   /c/Windows/System32/tar.exe -a -c -f "C:\Users\ADMIN\Desktop\TMRKZ.zip" --exclude "frontend/node_modules" --exclude "backend/target" --exclude "docs/evidence" -C "C:\Users\ADMIN\Desktop\TMRKZ" $(ls -A | grep -vx .git)
-   cd /c/Users/ADMIN/Desktop && sha256sum TMRKZ.zip > TMRKZ.zip.sha256
+   %SystemRoot%\System32\tar.exe -a -c -f "%USERPROFILE%\Desktop\TMRKZ.zip" --exclude ./.git --exclude node_modules --exclude ./backend/target --exclude ./docs/evidence .
    ```
-3. **Start TMRKZ again.**
+4. **Start TMRKZ again.**
    ```
    docker compose up -d
    ```
-4. **Copy to the USB stick:** `TMRKZ.zip` and `TMRKZ.zip.sha256`.
-   - A FAT32 stick cannot hold a file over 4 GB. If the zip ever grows past that, split it:
-     `split -b 3900m -d -a 1 TMRKZ.zip TMRKZ.zip.part`
-   - On the VM, join the parts again: `cat TMRKZ.zip.part0 TMRKZ.zip.part1 > TMRKZ.zip`
-
-## 2. On the VM — put the folder in place
-
-1. **Copy the files from the USB to the VM,** for example into `~/transfer/`.
-2. **Check the zip.** It must print `TMRKZ.zip: OK`.
+5. **Write the zip's checksum** next to it (the VM checks the copy with it).
    ```
-   cd ~/transfer
+   cd /d "%USERPROFILE%\Desktop"
+   powershell -NoProfile -Command "(Get-FileHash TMRKZ.zip -Algorithm SHA256).Hash.ToLower() + '  TMRKZ.zip' | Set-Content -Encoding ascii TMRKZ.zip.sha256"
+   ```
+
+Never copy the folder by selecting the files inside it (Ctrl+A in Explorer, Cmd+A in Finder): that skips the hidden
+files — `.env` first of all — and copies a running database. Always send the zip.
+
+## 2. Send the zip to the VM through PAM (SSH port 4422)
+
+Still in Command Prompt, in the Desktop folder. Put your own PAM login in the first line — the same text you use with
+`ssh -p 4422 …`:
+
+```
+cd /d "%USERPROFILE%\Desktop"
+set PAM=DOMAIN\username+DOMAIN\pam_u123456+PORT@pam.domain
+scp -P 4422 TMRKZ.zip TMRKZ.zip.sha256 "%PAM%:"
+```
+
+- `scp` and `sftp` write the port with a capital `-P`; `ssh` with a small `-p`.
+- The two files land in your home folder on the VM (`~`).
+- If PAM refuses `scp`, use `sftp` (it can also resume a copy that broke off):
+  ```
+  sftp -P 4422 "%PAM%"
+  put TMRKZ.zip
+  put TMRKZ.zip.sha256
+  exit
+  ```
+  After a broken copy: connect again and type `reput TMRKZ.zip` instead of `put TMRKZ.zip`.
+- Without PAM, a USB stick works too. A FAT32 stick cannot hold a file over 4 GB: split the zip in Git Bash with
+  `split -b 3900m -d -a 1 TMRKZ.zip TMRKZ.zip.part`, and join it on the VM with `cat TMRKZ.zip.part0 TMRKZ.zip.part1 > TMRKZ.zip`.
+
+## 3. On the VM — put the folder in place
+
+Connect: `ssh -p 4422 "%PAM%"` (the same login), then:
+
+1. **Check the copy.** It must print `TMRKZ.zip: OK`.
+   ```
+   cd ~
    sha256sum -c TMRKZ.zip.sha256
    ```
-   If it came in parts, first join them: `cat TMRKZ.zip.part0 TMRKZ.zip.part1 > TMRKZ.zip`
-3. **Create the folder TMRKZ on the VM's own disk and unzip into it.**
-   - Not a VirtualBox shared folder (`/media/sf_...`): PostgreSQL refuses to run there.
+2. **Stop the TMRKZ that runs now and keep its folder** until the new one works (nothing is deleted).
+   ```
+   cd ~/TMRKZ && docker compose down; cd ~
+   mv ~/TMRKZ ~/TMRKZ.before-$(date +%Y%m%d)
+   ```
+   (Skip this step the first time, when there is no `~/TMRKZ` yet.)
+3. **Unzip into a new folder TMRKZ on the VM's own disk** — not a VirtualBox shared folder (`/media/sf_...`): PostgreSQL
+   refuses to run there.
    ```
    mkdir -p ~/TMRKZ && cd ~/TMRKZ
-   unzip -q ~/transfer/TMRKZ.zip
+   unzip -q ~/TMRKZ.zip
    ```
-   If `unzip` is missing: `python3 -m zipfile -e ~/transfer/TMRKZ.zip ~/TMRKZ`
-4. **Check what you got.**
+   If `unzip` is missing: `python3 -m zipfile -e ~/TMRKZ.zip ~/TMRKZ`
+4. **Check what you got.** `ls -a` shows hidden files; `.env` must be in the list.
    ```
    ls -a ~/TMRKZ
    ```
    You should see `docker-compose.yml`, `docker-compose.override.yml`, `.env`, `start.sh`, `tmrkz-images.tar`, `data`, `backend`, `frontend` and the rest.
+5. **Check the settings** before the first start: `nano ~/TMRKZ/.env`. Every setting TMRKZ reads is there, in
+   sections — the address, the platform accounts, **the AI assistant** (section 3: `TMRKZ_AI_ENABLED`, the model server's
+   `TMRKZ_AI_BASE_URL`, `TMRKZ_AI_MODEL`, `TMRKZ_AI_API_KEY`), the directory, Keycloak, HR, features. The values are the
+   PC's: change the AI server to the VM's. Section 8 (internal keys) must not be changed. Settings saved later in
+   «إعدادات النظام ← إعدادات التكامل» take precedence over `.env`.
 
-## 3. On the VM — first start
+The old VM folder stays in `~/TMRKZ.before-<date>`; delete it once the new one works (`rm -rf ~/TMRKZ.before-<date>`).
+
+## 4. On the VM — first start
 
 1. **Check Docker.** You need Docker Compose v2.24 or newer. If `docker` needs `sudo`, prefix the commands with `sudo`.
    ```
@@ -111,7 +153,7 @@ All commands run in the folder `C:\Users\ADMIN\Desktop\TMRKZ`. Use Git Bash, or 
    - In VirtualBox, a **Bridged** network adapter gives the VM its own LAN address.
    - With **NAT**, add a port forward instead (host 8088 → guest 8088). People then open the host computer's IP.
 
-## 4. Daily use (on the VM or on the PC)
+## 5. Daily use (on the VM or on the PC)
 
 | What | Command (inside the TMRKZ folder) |
 |---|---|
@@ -125,14 +167,14 @@ All commands run in the folder `C:\Users\ADMIN\Desktop\TMRKZ`. Use Git Bash, or 
 
 **Never** run `docker compose down -v`, and never delete files inside `data/`.
 
-## 5. Changing the code
+## 6. Changing the code
 
 1. **Edit** files in `backend/` (Java) or `frontend/` (React/TypeScript) and save.
 2. **Watch the rebuild.**
    ```
    docker compose logs -f --since 1m backend web-build
    ```
-   - success: `[backend] build ready` → `Started MoverApplication`, and `[web] published`
+   - success: `[backend] build ready` → `Started TmrkzApplication`, and `[web] published`
    - `BUILD FAILED`: the previous version keeps running. Read the error, fix it, save again.
 3. **Run tests, offline.**
    - Frontend, one or more test files:
@@ -147,7 +189,7 @@ All commands run in the folder `C:\Users\ADMIN\Desktop\TMRKZ`. Use Git Bash, or 
 4. **Database changes:** a new file in `backend/src/main/resources/db/migration` with the next number (now `V55__...sql`).
    Never edit an existing migration.
 
-## 6. Bringing in your offline database
+## 7. Bringing in your offline database
 
 The database has no password, so passwords no longer need to match.
 
@@ -178,7 +220,7 @@ The database has no password, so passwords no longer need to match.
    rm -rf data/db.before
    ```
 
-## 7. The enterprise directory and the enterprise Keycloak — in the application, not in files
+## 8. The enterprise directory and the enterprise Keycloak — in the application, not in files
 
 As in MOVER's «إعدادات التكامل». Sign in as `admin` or `developer`, open **إعدادات النظام → إعدادات التكامل**:
 
@@ -197,7 +239,7 @@ As in MOVER's «إعدادات التكامل». Sign in as `admin` or `develope
 Nothing typed for a test is stored; saved secrets are encrypted and never shown again. «العودة إلى إعدادات ملف البيئة»
 removes the saved section and the `.env` values apply again.
 
-## 8. A new library, or newer server images (a connected machine only)
+## 9. A new library, or newer server images (a connected machine only)
 
 When `backend/pom.xml` or `frontend/package-lock.json` gets a new dependency, the offline machine cannot download it.
 
@@ -212,7 +254,7 @@ When `backend/pom.xml` or `frontend/package-lock.json` gets a new dependency, th
    ```
    It loads the new images by itself.
 
-## 9. Working with the AI agent (GLM 5.3 Flash) on the VM
+## 10. Working with the AI agent (GLM 5.3 Flash) on the VM
 
 1. **Open the agent** with `~/TMRKZ` as its working folder.
 2. **Paste the prompt** from **Appendix A** as its system prompt (or first message), once per session.
@@ -241,11 +283,11 @@ When `backend/pom.xml` or `frontend/package-lock.json` gets a new dependency, th
    ```
 7. **Red flags.** Stop the agent if it:
    - touches `data/`, `.env`, `docker-compose*.yml`, `start.sh`, `ops/local/workspace/` or an existing migration
-     (the directory and Keycloak are entered in the application, section 7 — never by editing these files);
+     (the directory and Keycloak are entered in the application, section 8 — never by editing these files);
    - tries to download or install anything;
    - says "done" without a test or a browser check.
 
-## 10. When something is wrong
+## 11. When something is wrong
 
 | You see | Do |
 |---|---|
@@ -279,7 +321,7 @@ small, correct changes, check them, and report honestly. Reply to the owner in t
 
 - Start: `docker compose up -d` (or `sh start.sh`, which asks for the IP address and port).
   Stop: `docker compose stop`. Status: `docker compose ps`.
-- `docker-compose.yml` (base) + `docker-compose.override.yml` (read automatically) — project `tmrkz-mover`.
+- `docker-compose.yml` (base) + `docker-compose.override.yml` (read automatically) — project `tmrkz`.
 - `.env`: `TMRKZ_IP` and `TMRKZ_PORT` at the top = the address people open. After editing `.env`: `docker compose up -d`.
 - `tmrkz-images.tar`: all images, loaded with `docker load -i tmrkz-images.tar`. Nothing is ever pulled.
 - `data/db`: the PostgreSQL 17 database (NO password; rules in `ops/local/workspace/pg_hba.conf`).
@@ -289,7 +331,7 @@ small, correct changes, check them, and report honestly. Reply to the owner in t
   `frontend/`: React 19 + Vite + TypeScript, Arabic right-to-left UI.
 - **Code changes rebuild themselves.** Save a file → within ~25 s the container rebuilds it.
   Watch: `docker compose logs -f --since 1m backend web-build`
-  - success: `[backend] build ready` then `Started MoverApplication`; `[web] published`
+  - success: `[backend] build ready` then `Started TmrkzApplication`; `[web] published`
   - failure: `BUILD FAILED` — the old version keeps running; read the error and fix it.
 - Sign-in: `developer` or `admin`; their passwords are `TMRKZ_PLATFORM_DEVELOPER_PASSWORD` and
   `TMRKZ_PLATFORM_ADMIN_PASSWORD` in `.env` (use them, never print them).
@@ -305,8 +347,8 @@ small, correct changes, check them, and report honestly. Reply to the owner in t
 
 ## 2. NEVER (these broke the app before)
 
-1. Never edit, rename or delete an existing migration (V1–V53). A schema change is a NEW file with the next number:
-   check `ls backend/src/main/resources/db/migration | sort -V | tail -1`, then create `V54__short_name.sql`.
+1. Never edit, rename or delete an existing migration (V1–V66). A schema change is a NEW file with the next number:
+   check `ls backend/src/main/resources/db/migration | sort -V | tail -1`, then create `V67__short_name.sql`.
    Two files with the same version number stop the app from starting. Never UPDATE rows of
    `access_policy_version` whose status is PUBLISHED or SUPERSEDED.
 2. Never touch the files in `data/`. Never run `docker compose down -v`, `docker volume rm`, `docker system prune`
@@ -330,6 +372,10 @@ small, correct changes, check them, and report honestly. Reply to the owner in t
     the owner's decisions (sign-in logo and layout, Keycloak's standard page, database without password).
 11. Scope: administrative stationing, sites and requests only — no military deployment optimisation, tactical
     positioning or operational recommendations.
+12. TMRKZ never uses MOVER's database (owner, 23 Nov 2026). Never read, copy, upload or import MOVER's files
+    (`transport_requests.db` or any other) or connect to MOVER's database. TMRKZ's units and people come only from its
+    own HR source («مصدر الموارد البشرية») and its own directory. Working "like MOVER" means the same way of working,
+    never MOVER's data.
 
 ## 3. ALWAYS — how to do a task
 

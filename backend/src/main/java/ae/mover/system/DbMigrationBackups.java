@@ -56,7 +56,7 @@ public class DbMigrationBackups {
     private final Json json;
     private final Clock clock;
 
-    public DbMigrationBackups(@Value("${tmrkz.migration.backups-dir:/var/lib/mover/backups}") String root,
+    public DbMigrationBackups(@Value("${tmrkz.migration.backups-dir:${mover.storage.root}/backups}") String root,
                               @Value("${tmrkz.migration.backup-max-age-hours:24}") long maxAgeHours, Json json, Clock clock) {
         this.root = Path.of(root);
         this.maxAgeHours = maxAgeHours;

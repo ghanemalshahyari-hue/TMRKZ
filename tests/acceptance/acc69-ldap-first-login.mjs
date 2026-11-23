@@ -20,7 +20,7 @@ const ok = (pass, id, what, detail = '') => {
   console.log(`${pass ? 'PASS' : 'FAIL'} ${id} — ${what}${detail ? ' · ' + String(detail).slice(0, 220) : ''}`);
   return !!pass;
 };
-const sql = (q) => execFileSync('docker', ['exec', 'tmrkz-mover-db-1', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -q -Atc "${q.replaceAll('"', '\\"')}"`], { encoding: 'utf8' }).trim();
+const sql = (q) => execFileSync('docker', ['exec', 'tmrkz-db-1', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -q -Atc "${q.replaceAll('"', '\\"')}"`], { encoding: 'utf8' }).trim();
 const unit = (name) => sql(`select id from organization where name = '${name}' and status = 'ACTIVE'`);
 const person = (login) => sql(`select id from person where lower(username) = '${login}' or id in (select p.id from person p join hr_person h on h.external_id = p.source_external_id and h.snapshot_id = (select id from hr_snapshot where status = 'PUBLISHED') where lower(h.domain_account) = '${login}') limit 1`);
 const RUN = process.env.ACC69_RUN ?? '';

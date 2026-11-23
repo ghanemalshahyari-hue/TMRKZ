@@ -32,12 +32,10 @@ public class DbMigrationController {
 
     private final AccessService access;
     private final DbMigrationService migrations;
-    private final MoverUnitImportService moverUnits;
 
-    public DbMigrationController(AccessService access, DbMigrationService migrations, MoverUnitImportService moverUnits) {
+    public DbMigrationController(AccessService access, DbMigrationService migrations) {
         this.access = access;
         this.migrations = migrations;
-        this.moverUnits = moverUnits;
     }
 
     /** The last migrations: id, state, source type and host/database or file, versions, created, finished. */
@@ -91,17 +89,5 @@ public class DbMigrationController {
     @DeleteMapping("/{id}")
     public Map<String, Object> abandon(Actor actor, @PathVariable UUID id) {
         return migrations.abandon(access.context(actor), id);
-    }
-
-    /** ADR-097 — preview the MOVER SQLite file in the inbox: per-unit verdict (NEW / EXISTING / CODE_CONFLICT). No writes. */
-    @PostMapping("/mover-units/preview")
-    public MoverUnitImportService.Preview moverUnitsPreview(Actor actor, @RequestBody Map<String, String> body) {
-        return moverUnits.preview(access.context(actor), body.get("file"));
-    }
-
-    /** ADR-097 — commit: insert every NEW unit from the preview into {@code organization} with {@code source='MOVER'}. */
-    @PostMapping("/mover-units/commit")
-    public MoverUnitImportService.CommitResult moverUnitsCommit(Actor actor, @RequestBody Map<String, String> body) {
-        return moverUnits.commit(access.context(actor), body.get("file"));
     }
 }

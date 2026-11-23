@@ -69,7 +69,7 @@ for java in sorted(SRC.rglob("*Controller.java")):
 doc = {
     "openapi": "3.1.0",
     "info": {
-        "title": "MOVER API",
+        "title": "TMRKZ API",
         "version": "1.0.0",
         "description": "Administrative facilities, reservations and approvals. Session cookie MOVER_SESSION (HttpOnly, "
                        "SameSite=Strict). Times are ISO-8601 UTC; periods are half-open [start, end). "

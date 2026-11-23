@@ -30,7 +30,7 @@ DB="${PGDATABASE:-mover}"
 DBUSER="${PGUSER:-mover}"
 IMAGE=postgis/postgis:17-3.5-alpine
 TILE=256
-case "$TARGET" in tmrkz-mover|tmrkz-mover-*) echo "[terrain] refused: $TARGET is the owner-retained production project" >&2; exit 2;; esac
+case "$TARGET" in tmrkz|tmrkz-*) echo "[terrain] refused: $TARGET is the owner-retained production project" >&2; exit 2;; esac
 
 if [ "$(docker inspect -f '{{.State.Running}}' "$TARGET" 2>/dev/null || true)" = "true" ]; then
   psql_t() { docker exec -i "$TARGET" psql -X -q -v ON_ERROR_STOP=1 -U "$DBUSER" -d "$DB" "$@"; }

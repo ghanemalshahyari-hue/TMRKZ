@@ -1,8 +1,8 @@
-# MOVER — isolated on-premises stack (development / acceptance profile).
-# Project name is distinct ("tmrkz-mover") so it never collides with other compose projects on the host.
+# TMRKZ — isolated on-premises stack (development / acceptance profile).
+# Project name is distinct ("tmrkz") so it never collides with other compose projects on the host.
 # Only the web entry point is published. Images are pinned by exact version; see docs/OPERATIONS.md for
 # building an offline bundle and docs/INSTALL_AIRGAPPED.md for egress controls (Docker alone is not isolation).
-name: tmrkz-mover
+name: tmrkz
 
 services:
   # PostgreSQL 17.11 with PostGIS 3.5 (site boundaries, ADR-017). Same major version and data directory format as the
@@ -11,21 +11,21 @@ services:
     image: postgis/postgis:17-3.5-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: mover
-      POSTGRES_USER: mover
-      POSTGRES_PASSWORD: ${MOVER_DB_PASSWORD:?set MOVER_DB_PASSWORD in .env}
+      POSTGRES_DB: tmrkz
+      POSTGRES_USER: tmrkz
+      POSTGRES_PASSWORD: ${TMRKZ_DB_PASSWORD:?set TMRKZ_DB_PASSWORD in .env, or run sh start.sh}
       TZ: UTC
     volumes:
       - db-data:/var/lib/postgresql/data
     networks: [internal]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mover -d mover"]
+      test: ["CMD-SHELL", "pg_isready -U tmrkz -d tmrkz"]
       interval: 5s
       timeout: 3s
       retries: 20
 
   backend:
-    image: mover/backend:1.0.0
+    image: tmrkz/backend:1.0.0
     build:
       context: .
       dockerfile: backend/Dockerfile
@@ -36,18 +36,21 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      # db-init prepares the databases first, and gives an older one its current name (ADR-098)
+      db-init:
+        condition: service_completed_successfully
       openfga:
         condition: service_healthy
     environment:
-      MOVER_DB_URL: jdbc:postgresql://db:5432/mover
-      MOVER_DB_USER: mover
-      MOVER_DB_PASSWORD: ${MOVER_DB_PASSWORD}
-      MOVER_STORAGE_ROOT: /var/lib/mover
-      MOVER_MAP_ROOT: /opt/mover/map-packages
-      MOVER_ATTESTATION_KEY: ${MOVER_ATTESTATION_KEY:?set MOVER_ATTESTATION_KEY (32+ chars) in .env}
+      TMRKZ_DB_URL: jdbc:postgresql://db:5432/tmrkz
+      TMRKZ_DB_USER: tmrkz
+      TMRKZ_DB_PASSWORD: ${TMRKZ_DB_PASSWORD}
+      TMRKZ_STORAGE_ROOT: /var/lib/tmrkz
+      TMRKZ_MAP_PACKAGES: /opt/tmrkz/map-packages
+      TMRKZ_ATTESTATION_KEY: ${TMRKZ_ATTESTATION_KEY:?set TMRKZ_ATTESTATION_KEY (32+ chars) in .env; run ops/init-env.sh}
       TMRKZ_HR_SETTINGS_KEY: ${TMRKZ_HR_SETTINGS_KEY:?set TMRKZ_HR_SETTINGS_KEY (32+ chars) in .env; run ops/init-env.sh}
       TMRKZ_HR_SYNC_INTERVAL_SECONDS: ${TMRKZ_HR_SYNC_INTERVAL_SECONDS:-3600}
-      MOVER_SECURE_COOKIE: ${MOVER_SECURE_COOKIE:-false}
+      TMRKZ_SECURE_COOKIE: ${TMRKZ_SECURE_COOKIE:-false}
       # Automatic employee sign-in: an external enterprise Keycloak client (Duty's model, ADR-071). Local defaults
       # preserve development/test stacks; they do not change to enterprise until TMRKZ_ENTERPRISE_OIDC_* are supplied.
       TMRKZ_OIDC_ISSUER: ${TMRKZ_ENTERPRISE_OIDC_ISSUER:-}
@@ -108,7 +111,7 @@ services:
       TMRKZ_STATIONING_OUTBOUND_URL: ${TMRKZ_STATIONING_OUTBOUND_URL:-}
       TMRKZ_STATIONING_OUTBOUND_TOKEN: ${TMRKZ_STATIONING_OUTBOUND_TOKEN:-}
     volumes:
-      - files:/var/lib/mover
+      - files:/var/lib/tmrkz
       - ${TMRKZ_TRUSTSTORE_DIR:-./ops/keycloak/truststores}:/etc/tmrkz/ldap-ca:ro
     networks: [internal]
 
@@ -120,7 +123,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      MOVER_DB_PASSWORD: ${MOVER_DB_PASSWORD}
+      TMRKZ_DB_PASSWORD: ${TMRKZ_DB_PASSWORD}
       TMRKZ_KEYCLOAK_DB_PASSWORD: ${TMRKZ_KEYCLOAK_DB_PASSWORD:?set TMRKZ_KEYCLOAK_DB_PASSWORD in .env; run ops/init-env.sh}
       TMRKZ_OPENFGA_DB_PASSWORD: ${TMRKZ_OPENFGA_DB_PASSWORD:?set TMRKZ_OPENFGA_DB_PASSWORD in .env; run ops/init-env.sh}
     volumes:
@@ -210,7 +213,7 @@ services:
       retries: 30
 
   web:
-    image: mover/web:1.0.0
+    image: tmrkz/web:1.0.0
     build:
       context: .
       dockerfile: frontend/Dockerfile
@@ -225,8 +228,8 @@ services:
       keycloak:
         condition: service_started
     ports:
-      # with https (profile tls) set MOVER_HTTP_BIND=127.0.0.1 so the plain port is reachable from this host only
-      - "${MOVER_HTTP_BIND:-0.0.0.0}:${MOVER_HTTP_PORT:-8088}:80"
+      # with https (profile tls) set TMRKZ_HTTP_BIND=127.0.0.1 so the plain port is reachable from this host only
+      - "${TMRKZ_HTTP_BIND:-0.0.0.0}:${TMRKZ_HTTP_PORT:-8088}:80"
     # The offline map root (ops/map-package/install_package.py): only its current/ package is served under /map-data/.
     volumes:
       - ${TMRKZ_MAP_ROOT:-./map-runtime}:/srv/tmrkz-map:ro
@@ -236,7 +239,7 @@ services:
   # (no further image in the offline bundle) with ops/tls/proxy.conf.template, and reads server.crt / server.key from
   # TMRKZ_TLS_DIR (ops/tls/make-csr.sh, ops/tls/install-cert.sh). Plain http on TMRKZ_HTTP_REDIRECT_PORT only redirects.
   proxy:
-    image: mover/web:1.0.0
+    image: tmrkz/web:1.0.0
     profiles: [tls]
     restart: unless-stopped
     depends_on:

@@ -6,9 +6,9 @@ import { fileURLToPath } from 'node:url';
 export const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 export const GEN = fileURLToPath(new URL('./.generated/', import.meta.url));
 mkdirSync(GEN, { recursive: true });
-export const DB = 'tmrkz-mover-db-1';
-export const LDAP = 'tmrkz-mover-openldap-1';
-export const KEYCLOAK = 'tmrkz-mover-keycloak-1';
+export const DB = 'tmrkz-db-1';
+export const LDAP = 'tmrkz-openldap-1';
+export const KEYCLOAK = 'tmrkz-keycloak-1';
 export const USERS = ['p01.new', 'p02.access', 'p03.final', 'p04.sites', 'p05.req', 'p06.h1', 'p07.h2', 'p08.ops', 'p09.fin', 'p10.fyi', 'p11.act', 'p12.view', 'p13.other', 'p14.admin', 'p15.fyi', 'p16.branch', 'p17.new', 'p18.new', 'p19.new'];
 export const CURRENT = GEN + 'current-run.json';
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
 # Backend-only Keycloak client for manual sign-in of the allow-listed platform accounts (ADR-070).
 # It has no browser authorization-code flow and no service account. The normal tmrkz-web client is unchanged.
-# Usage: sh ops/keycloak/set-platform-password-client.sh [compose-project]  (default tmrkz-mover)
+# Usage: sh ops/keycloak/set-platform-password-client.sh [compose-project]  (default tmrkz)
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
-PROJECT="${1:-tmrkz-mover}"
+PROJECT="${1:-tmrkz}"
 value() { sed -n "s/^$1=//p" .env | tail -n 1; }
 KC_ADMIN="$(value TMRKZ_KEYCLOAK_ADMIN_PASSWORD)"
 CLIENT_ID="$(value TMRKZ_PLATFORM_OIDC_CLIENT_ID)"

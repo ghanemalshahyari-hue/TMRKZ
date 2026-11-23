@@ -2,11 +2,11 @@
 # Rehearses the https steps (ADR-051) with a throw-away test CA in a temporary directory; never touches ops/tls/private, .env
 # or the identity provider. With a running stack it also starts the https entry point (the web image, ops/tls/proxy.conf.template)
 # on 127.0.0.1:9443/9080 next to that stack's web service and checks TLS, the redirect and HSTS, then removes it.
-#   sh ops/tls/test-tls.sh [compose-project]        (default tmrkz-mover; the proxy part is skipped if it is not running)
+#   sh ops/tls/test-tls.sh [compose-project]        (default tmrkz; the proxy part is skipped if it is not running)
 set -u
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
-PROJECT="${1:-tmrkz-mover}"
+PROJECT="${1:-tmrkz}"
 NAME=tmrkz.rehearsal.invalid
 # a fresh temporary directory, removed afterwards only when it is one mktemp made
 TMPD="$(mktemp -d 2>/dev/null || true)"
@@ -60,7 +60,7 @@ else
   HOST_R="$(pwd -W 2>/dev/null || pwd)"
   docker run -d --name tmrkz-tls-rehearsal --network "$NET" -e TMRKZ_HTTPS_PORT=9443 -p 127.0.0.1:9443:8443 -p 127.0.0.1:9080:8080 \
     -v "$HOST_R/ops/tls/proxy.conf.template:/etc/nginx/templates/default.conf.template:ro" -v "$HOST_T/priv:/etc/tmrkz-tls:ro" \
-    mover/web:1.0.0 >/dev/null
+    tmrkz/web:1.0.0 >/dev/null
   # trust and protocol are checked with OpenSSL (curl may use the platform's TLS stack and its revocation rules); HTTP with curl
   tls() { openssl s_client -connect 127.0.0.1:9443 -servername "$NAME" "$@" </dev/null 2>&1; }
   i=0; until tls -brief | grep -q 'Protocol version' || [ $i -ge 20 ]; do i=$((i + 1)); sleep 1; done

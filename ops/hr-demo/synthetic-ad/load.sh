@@ -28,7 +28,7 @@ fi
 [ -f "$G/oracle_hr.env" ] || { echo "[hr-demo] no $G/oracle_hr.env — run sh ops/hr-demo/up.sh first" >&2; exit 2; }
 ls "$G"/wheels/oracledb-* >/dev/null 2>&1 || { echo "[hr-demo] no driver wheels in $G/wheels — run sh ops/hr-demo/up.sh first" >&2; exit 2; }
 HERE="$(pwd -W 2>/dev/null || pwd)"
-docker run --rm --network tmrkz-mover_internal -v "$HERE:/w" -w /w python:3.12-slim \
+docker run --rm --network tmrkz_internal -v "$HERE:/w" -w /w python:3.12-slim \
   sh -c "pip install -q --disable-pip-version-check --no-index --find-links .generated/wheels oracledb==4.0.2 >/dev/null && python ad_accounts.py generate $*"
 python3 ad_accounts.py load
 echo "[synthetic-ad] every synthetic account signs in as <login>@tmrkz.test with the password in $G/ad-people-password"

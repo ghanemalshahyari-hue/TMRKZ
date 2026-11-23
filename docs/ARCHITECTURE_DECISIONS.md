@@ -2707,6 +2707,8 @@ APPROVE. The remaining stationing ITs (`RestationingWorkflowIT`, `RestationingLi
 
 ## ADR-097 Migration Center accepts MOVER SQLite and imports its units into the organization tree (owner, 21 Nov 2026)
 
+**Withdrawn (owner, 23 Nov 2026) — see ADR-098.** The import was removed and V66 deletes the units it brought in: TMRKZ does not use MOVER's database.
+
 **Decision.** The owner asked (21 Nov 2026, after reviewing the Full Real Acceptance report) to extend
 «مركز ترحيل قاعدة البيانات» so an administrator can upload a MOVER SQLite file (the old legacy app's database)
 and bring the MOVER units into TMRKZ's `organization` tree in one pass. This augments ADR-094: the pg_dump path
@@ -2760,3 +2762,18 @@ It is tracked as a stage-2 follow-up; this ADR covers SQLite only.
 **Tests.** `MoverUnitImportIT` 4/4 green on real PostgreSQL + OpenFGA: imports a synthesised MOVER SQLite into an
 empty organization tree, verifies codes and parent chain, re-imports as a no-op, rejects a pg_dump file, rejects a
 SQLite that lacks a `units` table, and rejects a caller without `CONFIGURE`.
+
+## ADR-098 TMRKZ does not use MOVER's database; every setting is in `.env` (owner, 23 Nov 2026)
+
+**Owner.** «why do i see mover db ??? it should not do that anything related to mover remove it i said i want to be the same not using the same db»; «make sure everything is available to be edited» (the `.env`, the AI settings).
+
+**Decision.**
+- The MOVER SQLite import of ADR-097 is removed: its service, its two endpoints, the settings section, the SQLite driver and the SQLite file type of the migration center's inbox (commits 74891ec and 56b60ee reverted; V65 stays because it is applied).
+- V66 deletes the units imported from MOVER (`organization.source = 'MOVER'`), which nothing but each other refers to, and restores the check to `LOCAL` or `HR`. The guard that units are never deleted is switched off only for that statement. The permission store is told that the structure changed, so their tuples leave OpenFGA on the next sync. On the VM's database V66 removes 254 units (rehearsed on a copy; it runs there at the next start); on this PC's it removed none.
+- MOVER's database files were removed from the TMRKZ folder they had been copied into (`data/files/migration-inbox/transport_requests*.db`). The VM agent's rules (`RUN.md`, appendix A) forbid reading, copying or importing MOVER's data. TMRKZ's units and people come only from its own HR source and directory.
+- `.env` lists every setting the Compose files read (69), in sections with a note each, including the AI assistant (`TMRKZ_AI_*`). Values that were not written before are the defaults the application already used, so the effective configuration is unchanged. `MOVER_DEMO_*`, which nothing read, are gone.
+- `RUN.md` sections 1–3: the zip made in Command Prompt, sent to the VM through PAM (`scp`/`sftp` on port 4422), unzipped beside the previous folder, which is kept until the new one works.
+- No «mover» in what the owner sees («in the docker file i see some mover data»): TMRKZ's names from its first working name are renamed. The Compose project and containers are `tmrkz` (`tmrkz-db-1`, …), the database and its owner `tmrkz`, the images `tmrkz/backend` and `tmrkz/web`, the container paths `/var/lib/tmrkz` and `/opt/tmrkz`, the settings `TMRKZ_DB_PASSWORD`, `TMRKZ_ATTESTATION_KEY`, `TMRKZ_HTTP_PORT`, `TMRKZ_HTTP_BIND` and `TMRKZ_SECURE_COOKIE`. The application's name in its logs is `tmrkz` (`Started TmrkzApplication`), the API title «TMRKZ API», and two settings texts no longer say «كما في MOVER».
+- An existing installation moves by itself on its next start. `ops/init-env.sh` (run by `start.sh`) renames the five `.env` keys and keeps their values. `start.sh` replaces the `tmrkz-mover-*` containers, keeping `./data`. `db-init` renames the database and its owner before the backend connects; a temporary administrator does the owner's rename, because a role cannot rename itself, and is removed again. Every step checks what is done, so an interrupted start completes on the next one. The backend reads the new names first and the old ones still (the backend tests' own database keeps its names).
+
+**Consequences.** The Java package `ae.mover`, the build's file name and the internal request header keep the old name: nobody sees them, and renaming them would touch every source file. Verified on this PC: V54–V66 applied to its database, backend and web healthy, the six sign-in paths, `developer`, the map files; V66 rehearsed on a copy of the VM's database (254 MOVER units removed, the unit guard back on).

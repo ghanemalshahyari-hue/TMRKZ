@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "MOVER API",
+    "title": "TMRKZ API",
     "version": "1.0.0",
     "description": "Administrative facilities, reservations and approvals. Session cookie MOVER_SESSION (HttpOnly, SameSite=Strict). Times are ISO-8601 UTC; periods are half-open [start, end). Generated from the controllers by ops/tools/gen-openapi.py; payload shapes in docs/api/API_V1.md."
   },

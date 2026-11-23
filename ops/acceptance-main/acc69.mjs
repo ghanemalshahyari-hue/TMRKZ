@@ -54,7 +54,7 @@ exit
  * secrets go to files only the script sees (removed at its end); the accounts' password is stored hashed (slappasswd).
  */
 function ldap(script, body = '') {
-  return execFileSync('docker', ['exec', '-i', 'tmrkz-mover-openldap-1', 'sh', '-c', `set -u
+  return execFileSync('docker', ['exec', '-i', 'tmrkz-openldap-1', 'sh', '-c', `set -u
 IFS= read -r ADM; IFS= read -r UPW; cat > /tmp/acc69.in
 umask 077; printf %s "$ADM" > /tmp/acc69.p; printf %s "$UPW" > /tmp/acc69.u
 L="-x -ZZ -H ldap://localhost -D cn=admin,dc=tmrkz,dc=local -y /tmp/acc69.p"

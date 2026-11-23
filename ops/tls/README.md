@@ -13,8 +13,8 @@ on port 80 only redirects. TLS 1.2 and 1.3, HSTS.
 2. **Install.** `sh ops/tls/install-cert.sh <issued certificate> <CA chain>`. It refuses a certificate for another key,
    one missing a requested name, one not for server authentication, an expired one, or one that does not chain to the
    given root; nothing changes when a check fails.
-3. **Switch on.** `sh ops/tls/enable.sh [project] [port]` (defaults `tmrkz-mover`, 443). It keeps a copy of `.env`, sets
-   `TMRKZ_PUBLIC_URL=https://<name>`, `MOVER_SECURE_COOKIE=true`, `COMPOSE_PROFILES=tls`, `MOVER_HTTP_BIND=127.0.0.1` and
+3. **Switch on.** `sh ops/tls/enable.sh [project] [port]` (defaults `tmrkz`, 443). It keeps a copy of `.env`, sets
+   `TMRKZ_PUBLIC_URL=https://<name>`, `TMRKZ_SECURE_COOKIE=true`, `COMPOSE_PROFILES=tls`, `TMRKZ_HTTP_BIND=127.0.0.1` and
    `TMRKZ_HTTPS_PORT`, and gives the identity provider the new address (`ops/keycloak/set-public-url.sh`). Then restart:
    `docker compose -p <project> up -d` (this folder: `sh start.sh`).
 4. **DNS and clients.** The name must resolve in the organisation's DNS to this server. Domain PCs already trust the

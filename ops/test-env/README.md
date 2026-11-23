@@ -28,7 +28,7 @@ It is idempotent and publishes no policy. Terrain is loaded separately with `ops
 **Stationing V3 page on the acceptance environment.**
 - **Web image:** built with `--build-arg STATIONING_V3=true` (the unit tests still run with the flag off) and swapped with `sh ops/test-env/upgrade-web.sh <image> <label>`.
 - **Map files:** mounts the offline map packages read-only under `/map-data/` (`compose.v3-maps.yml`).
-- **Recovery:** `MAPS=0 sh ops/test-env/upgrade-web.sh mover/web:1.0.0 <label>`.
+- **Recovery:** `MAPS=0 sh ops/test-env/upgrade-web.sh tmrkz/web:1.0.0 <label>`.
 - **Policy:** import `acceptance-v3-policy-template.json` in «سياسة التمركز», set the routing levels and the deployment
   requirement, check, and publish as the System Administrator. `node tests/acceptance/publish-acceptance-policy.mjs`
   does this through the page (version 1 published 4 Nov 2026), or only reads back and checks a version already in force.
@@ -41,13 +41,13 @@ disposable project `tmrkz-v3dev` on :8097. It has the same fictional directory a
 working tree (never a release), memory caps, and illustrative development values for Stationing V3
 (`ops/test-env/dev-v3-seed.sql`). The live frontend runs with `cd frontend && MOVER_API=http://localhost:8097
 VITE_STATIONING_V3=true npx vite --config vite.dev.config.mjs --host 127.0.0.1`, then «إعادة التمركز» at `http://127.0.0.1:5173/#restationing`. It is
-never the acceptance (`tmrkz-test`) or production (`tmrkz-mover`) project.
+never the acceptance (`tmrkz-test`) or production (`tmrkz`) project.
 
 **3D terrain on the development environment (6 Nov 2026, ADR-038).** In this order:
 1. `dev-v3.sh build`, `up` and `seed`.
 2. Load the slope analysis: `CONFIRM_TARGET=tmrkz-v3dev sh ops/terrain/load-slope.sh tmrkz-v3dev 2026.11`.
 3. Add the fictional sites on real Hajar-foothill relief and policy `DEV-3D`: `docker exec -i tmrkz-v3dev-db-1 psql -U
-   mover -d mover -v ON_ERROR_STOP=1 -f - < ops/test-env/dev-3d-terrain-seed.sql`. Policy `DEV-3D` holds the owner's
+   mover -d tmrkz -v ON_ERROR_STOP=1 -f - < ops/test-env/dev-3d-terrain-seed.sql`. Policy `DEV-3D` holds the owner's
    acceptance values and the labelled 90,000 m² initial area, not production values.
 4. Install `tmrkz-map-2026.11.2` into `map-data/runtime-3d` with `ops/map-package/install_package.py`.
 5. Run the dev server with `TMRKZ_MAP_ROOT=../map-data/runtime-3d` (port 5197 in `tests/acceptance/terrain-3d.mjs`).

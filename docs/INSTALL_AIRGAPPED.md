@@ -27,7 +27,7 @@ The procedure below (a separate bundle directory) remains for building a release
 sh ops/airgap-bundle.sh            # → offline-bundle/mover-1.0.0/
 ```
 
-The bundle contains the runtime images saved with `docker save` (`mover/backend:1.0.0`, `mover/web:1.0.0`,
+The bundle contains the runtime images saved with `docker save` (`tmrkz/backend:1.0.0`, `tmrkz/web:1.0.0`,
 `tmrkz/keycloak:26.7.5-2`, `postgis/postgis:17-3.5-alpine` — PostgreSQL 17.11 with PostGIS 3.5, GEOS and PROJ, whose
 coordinate transformations run locally with network access disabled) with their image IDs, `docker-compose.yml`, operational scripts (`ops/init-env.sh` writes `.env`), the local
 map packages, all documentation, and a `SHA256SUMS` manifest. Build-only images (Maven, Node) are not needed in the
@@ -51,13 +51,13 @@ membership once their HR record is mirrored.
 
 ## 3. Network and TLS
 
-- Only the `web` service publishes a port (`MOVER_HTTP_PORT`, default 8088). The database and backend are reachable
+- Only the `web` service publishes a port (`TMRKZ_HTTP_PORT`, default 8088). The database and backend are reachable
   only on the internal compose network.
 - **https (ADR-051):** TMRKZ serves it itself, as TNQL: `ops/tls/make-csr.sh` (key on the server, request to the PKI
   team), `ops/tls/install-cert.sh` (checks the issued certificate), `ops/tls/enable.sh` (sets `.env` and the identity
   provider), then restart; see `ops/tls/README.md`. The plain port is then bound to this host only. An organisation that
   prefers its own reverse proxy may instead terminate TLS there, in front of `web`, and set `TMRKZ_PUBLIC_URL` and
-  `MOVER_SECURE_COOKIE=true`. Either way the organisation's internal CA is used; nothing contacts external certificate
+  `TMRKZ_SECURE_COOKIE=true`. Either way the organisation's internal CA is used; nothing contacts external certificate
   services.
 - **Docker networking is not isolation.** A default bridge network can still reach the outside. Enforce egress
   denial at the host/firewall level and verify it, e.g. from inside the backend container:

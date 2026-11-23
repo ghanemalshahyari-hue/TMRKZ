@@ -28,4 +28,4 @@ volumes:
 networks:
   tmrkz:
     external: true
-    name: tmrkz-mover_internal
+    name: tmrkz_internal

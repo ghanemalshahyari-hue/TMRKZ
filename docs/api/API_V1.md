@@ -1,4 +1,4 @@
-# MOVER API v1 — implemented contract
+# TMRKZ API v1 — implemented contract
 
 All paths are prefixed with `/api/v1`. JSON in/out, UTF-8. Times are ISO-8601 UTC strings
 (`2026-11-02T00:00:00Z`); the UI renders them in `Asia/Dubai`. Periods are half-open `[start, end)`;

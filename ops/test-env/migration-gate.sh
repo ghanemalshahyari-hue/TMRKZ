@@ -6,7 +6,7 @@
 # (no database container yet) has no data to protect and is allowed. Uses: $P (compose project, default tmrkz-test).
 P="${P:-tmrkz-test}"
 if docker inspect -f '{{.State.Running}}' "$P-db-1" 2>/dev/null | grep -q true; then
-  APPLIED="$(docker exec "$P-db-1" psql -U mover -d mover -At -c \
+  APPLIED="$(docker exec "$P-db-1" psql -U tmrkz -d tmrkz -At -c \
     "select version from flyway_schema_history where success and version is not null" 2>/dev/null | sort -n | tr '\n' ' ')"
   PENDING=""
   for f in backend/src/main/resources/db/migration/V*__*.sql; do

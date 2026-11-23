@@ -13,7 +13,7 @@
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
-PROJECT="${1:-tmrkz-mover}"
+PROJECT="${1:-tmrkz}"
 # a value from the environment wins over .env (as docker compose does)
 value() { eval "v=\${$1:-}"; if [ -n "$v" ]; then printf '%s' "$v"; else sed -n "s/^$1=//p" .env | tail -n 1 | tr -d '\r'; fi; }
 URL="$(value LDAP_URL)"

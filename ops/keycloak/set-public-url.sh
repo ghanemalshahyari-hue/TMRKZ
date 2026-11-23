@@ -6,7 +6,7 @@
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
-PROJECT="${1:-tmrkz-mover}"
+PROJECT="${1:-tmrkz}"
 value() { sed -n "s/^$1=//p" .env | tail -n 1 | tr -d '\r'; }
 URL="$(value TMRKZ_PUBLIC_URL)"
 URL="${URL%/}"

@@ -1,7 +1,7 @@
--- DEVELOPMENT ONLY (tmrkz-v3dev; never tmrkz-test or tmrkz-mover): fictional current sites of several geometry kinds for the
+-- DEVELOPMENT ONLY (tmrkz-v3dev; never tmrkz-test or tmrkz): fictional current sites of several geometry kinds for the
 -- Stationing V3 geometry editing (owner, 4 Nov 2026) — a two-part MultiPolygon (إدارة التقنية), a four-part MultiPolygon
 -- (وحدة الصيانة الإدارية) and a dense polygon of about 1,500 vertices (فريق مرافق الشمال). Re-running replaces them.
---   docker exec -i tmrkz-v3dev-db-1 psql -U mover -d mover -v ON_ERROR_STOP=1 -f - < ops/test-env/dev-v3-geometry-seed.sql
+--   docker exec -i tmrkz-v3dev-db-1 psql -U tmrkz -d tmrkz -v ON_ERROR_STOP=1 -f - < ops/test-env/dev-v3-geometry-seed.sql
 \set ON_ERROR_STOP on
 begin;
 

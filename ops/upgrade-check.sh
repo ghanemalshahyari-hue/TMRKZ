@@ -9,10 +9,10 @@ set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
 PHASE="${1:?before|after}"
-PROJECT="${2:-tmrkz-mover}"
+PROJECT="${2:-tmrkz}"
 mkdir -p backups
 OUT="backups/upgrade-$PROJECT-$PHASE.txt"
-docker compose -p "$PROJECT" exec -T db psql -U mover -d mover -At -f - < ops/sql/upgrade-rows.sql > "$OUT"
+docker compose -p "$PROJECT" exec -T db psql -U tmrkz -d tmrkz -At -f - < ops/sql/upgrade-rows.sql > "$OUT"
 echo "[upgrade-check] $PHASE: $(wc -l < "$OUT") rows fingerprinted → $OUT"
 if [ "$PHASE" = "after" ]; then
   BEFORE="backups/upgrade-$PROJECT-before.txt"

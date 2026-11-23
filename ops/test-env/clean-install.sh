@@ -7,7 +7,7 @@ set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
 . ops/test-env/prepare.sh
-export MOVER_HTTP_PORT=8098 TMRKZ_PUBLIC_URL=http://localhost:8098 MOVER_URL=http://localhost:8098
+export TMRKZ_HTTP_PORT=8098 TMRKZ_PUBLIC_URL=http://localhost:8098 MOVER_URL=http://localhost:8098
 P=tmrkz-clean
 compose() { docker compose -p "$P" -f docker-compose.yml -f ops/test-env/compose.directory.yml "$@"; }
 cleanup() { [ "${KEEP:-0}" = 1 ] || compose down -v >/dev/null 2>&1 || true; }

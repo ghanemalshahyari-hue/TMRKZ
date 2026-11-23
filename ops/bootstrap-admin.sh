@@ -8,9 +8,9 @@ set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
 LOGIN="$(printf '%s' "${1:?usage: ops/bootstrap-admin.sh <directory-login> [compose-project]}" | tr 'A-Z' 'a-z')"
-PROJECT="${2:-tmrkz-mover}"
+PROJECT="${2:-tmrkz}"
 case "$LOGIN" in *[!a-z0-9._@-]*) echo "invalid login"; exit 2;; esac
-RESULT="$(docker compose -p "$PROJECT" exec -T db psql -U mover -d mover -v ON_ERROR_STOP=1 -v login="$LOGIN" -At <<'SQL'
+RESULT="$(docker compose -p "$PROJECT" exec -T db psql -U tmrkz -d tmrkz -v ON_ERROR_STOP=1 -v login="$LOGIN" -At <<'SQL'
 with admins as (
   select count(*) as n from membership m join person p on p.id = m.person_id and p.status = 'ACTIVE'
   where m.role_code = 'SYSTEM_ADMIN' and m.valid_from <= now() and (m.valid_to is null or m.valid_to > now())),

@@ -3,16 +3,16 @@
 # installed offline map root map-data/runtime, whose current/ package it serves under /map-data/ (ops/test-env/
 # compose.v3-maps.yml, ADR-036). Only the web container changes;
 # the database and the backend are untouched. The previous image is kept for recovery:
-#   sh ops/test-env/upgrade-web.sh <web-image> <label>                 # e.g. mover/web:rel-<sha>-v3
-#   MAPS=0 sh ops/test-env/upgrade-web.sh mover/web:1.0.0 <label>      # recovery: the earlier image, no map mount
+#   sh ops/test-env/upgrade-web.sh <web-image> <label>                 # e.g. tmrkz/web:rel-<sha>-v3
+#   MAPS=0 sh ops/test-env/upgrade-web.sh tmrkz/web:1.0.0 <label>      # recovery: the earlier image, no map mount
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
 IMAGE="${1:?web image}"
 LABEL="${2:?label}"
 P="${P:-tmrkz-test}"
-case "$P" in tmrkz-mover|tmrkz-mover-*) echo "refused: $P is an owner-retained production project" >&2; exit 2;; esac
-IDENT="$(docker exec "$P-db-1" psql -U mover -d mover -At -c "select shobj_description(oid, 'pg_database') from pg_database where datname = 'mover'")"
+case "$P" in tmrkz|tmrkz-*) echo "refused: $P is an owner-retained production project" >&2; exit 2;; esac
+IDENT="$(docker exec "$P-db-1" psql -U tmrkz -d tmrkz -At -c "select shobj_description(oid, 'pg_database') from pg_database where datname = 'mover'")"
 case "$IDENT" in ACCEPTANCE*) ;; *) echo "refused: $P is not labelled ACCEPTANCE" >&2; exit 2;; esac
 docker image inspect "$IMAGE" >/dev/null
 EV="docs/evidence/acceptance-upgrade/$LABEL"

@@ -30,7 +30,7 @@ sh ops/hr-demo/up.sh --large    # the large profile (ADR-094), see below
 sh ops/hr-demo/up.sh --verify   # verification queries only, counts only
 ```
 
-TMRKZ must be running (`sh start.sh`): the container joins `tmrkz-mover_internal`. The first start pulls the image and
+TMRKZ must be running (`sh start.sh`): the container joins `tmrkz_internal`. The first start pulls the image and
 takes a few minutes. The build is deterministic (fixed seeds); running it again rebuilds the same data. The application
 network is isolated, so the Oracle driver is downloaded once on this machine into `.generated/wheels`.
 

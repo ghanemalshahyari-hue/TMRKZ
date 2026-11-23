@@ -9,7 +9,7 @@ set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
 C="${1:?disposable postgis container}"
-q() { docker exec -i "$C" psql -X -q -At -v ON_ERROR_STOP=1 -U mover -d mover "$@"; }
+q() { docker exec -i "$C" psql -X -q -At -v ON_ERROR_STOP=1 -U tmrkz -d tmrkz "$@"; }
 FIX=backend/src/test/resources/terrain
 
 echo "[verify] 1. fixture and ST_Clip inclusion"

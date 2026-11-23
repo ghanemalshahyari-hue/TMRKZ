@@ -10,13 +10,13 @@
 # - The backend and the web are built from ./backend and ./frontend inside their containers and loaded a few seconds after
 #   a change is saved — no image is built for a code change. Their images carry the build tools and dependencies.
 # - Nothing is downloaded: images come only from tmrkz-images.tar. The database, Keycloak, OpenFGA and the local directory
-#   are on a network with no route out; only the backend (for the enterprise directory and the enterprise Keycloak, as MOVER
-#   reaches them, ADR-092) and the web entry point (to publish the port) also join «edge».
+#   are on a network with no route out; only the backend (for the enterprise directory and the enterprise Keycloak, reached
+#   directly, ADR-092) and the web entry point (to publish the port) also join «edge».
 # - One address everywhere (ADR-092): TMRKZ_PUBLIC_URL in .env is the address people open — written by start.sh from
 #   TMRKZ_IP and TMRKZ_PORT (http://IP:PORT), or https://name by ops/tls/enable.sh — and every sign-in address derives from it.
 # The tools that name their files with -f (ops/test-env, ops/verify-migration-path.sh, ops/airgap-bundle.sh) do not read
 # this file and keep running the image-built application.
-name: tmrkz-mover
+name: tmrkz
 
 x-address: &address "${TMRKZ_PUBLIC_URL:?write in .env the address people open TMRKZ with (TMRKZ_PUBLIC_URL=http://IP:PORT), or run: sh start.sh}"
 
@@ -111,15 +111,15 @@ services:
       TMRKZ_OIDC_REDIRECT_URI: "${TMRKZ_PUBLIC_URL}/api/v1/auth/oidc/callback"
       TMRKZ_OIDC_POST_LOGOUT_REDIRECT_URI: "${TMRKZ_PUBLIC_URL}/?signed-out=1"
       JAVA_OPTS: "-XX:MaxRAMPercentage=60 -Duser.timezone=UTC -Dfile.encoding=UTF-8"
-    # the enterprise directory and the enterprise Keycloak are reached directly, as MOVER reaches them (ADR-092): their
+    # the enterprise directory and the enterprise Keycloak are reached directly (ADR-092): their
     # addresses, certificates and secrets are entered in «إعدادات النظام ← إعدادات التكامل», not in a relay or in .env
     networks: [internal, edge]
     volumes:
       - ./backend:/workspace/backend:ro
-      - ./map-packages:/opt/mover/map-packages:ro
-      - ./data/files:/var/lib/mover
+      - ./map-packages:/opt/tmrkz/map-packages:ro
+      - ./data/files:/var/lib/tmrkz
       # the migration center's backup gate (ADR-094) reads the manifests ops/backup.sh writes; dumps go to data/files/migration-inbox
-      - ./backups:/var/lib/mover/backups:ro
+      - ./backups:/var/lib/tmrkz/backups:ro
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/system/health"]
       interval: 10s

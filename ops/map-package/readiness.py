@@ -51,7 +51,7 @@ PKG_CHECKS = {  # verifier check → readiness question
 
 
 def psql(container: str, sql: str) -> str:
-    out = subprocess.run(["docker", "exec", container, "psql", "-X", "-q", "-U", "mover", "-d", "mover", "-At", "-v",
+    out = subprocess.run(["docker", "exec", container, "psql", "-X", "-q", "-U", "tmrkz", "-d", "tmrkz", "-At", "-v",
                           "ON_ERROR_STOP=1", "-c", "set default_transaction_read_only = on", "-c", sql],
                          capture_output=True, text=True, encoding="utf-8")
     if out.returncode != 0:

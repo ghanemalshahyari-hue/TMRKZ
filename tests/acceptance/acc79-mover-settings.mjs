@@ -41,7 +41,7 @@ const ok = (pass, id, what, detail = '') => {
   save();
   return !!pass;
 };
-const sql = (q) => execFileSync('docker', ['exec', 'tmrkz-mover-db-1', 'psql', '-U', 'mover', '-d', 'mover', '-X', '-q', '-At', '-c', q], { encoding: 'utf8' }).trim();
+const sql = (q) => execFileSync('docker', ['exec', 'tmrkz-db-1', 'psql', '-U', 'mover', '-d', 'mover', '-X', '-q', '-At', '-c', q], { encoding: 'utf8' }).trim();
 const q = (s) => "'" + String(s).replaceAll("'", "''") + "'";
 const org = (hrId) => sql(`select id from organization where source_external_id = ${q(hrId)} and status = 'ACTIVE'`);
 const orgName = (hrId) => sql(`select name from organization where source_external_id = ${q(hrId)} and status = 'ACTIVE'`);

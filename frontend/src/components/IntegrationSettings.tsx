@@ -141,7 +141,7 @@ function DirectorySection({ live, onChanged }: { live: IntegrationStatus['direct
       </div>
       <Source view={view} />
       <p className="micro muted" style={{ margin: '0 0 12px' }}>
-        الدخول اليدوي: يُتحقق من اسم المستخدم وكلمة المرور بربطٍ مباشر بالدليل عبر اتصال مؤمَّن (LDAPS أو StartTLS) بشهادة الجهة المصدرة، كما في MOVER.
+        الدخول اليدوي: يُتحقق من اسم المستخدم وكلمة المرور بربطٍ مباشر بالدليل عبر اتصال مؤمَّن (LDAPS أو StartTLS) بشهادة الجهة المصدرة.
         التغيير يسري فور الحفظ من غير إعادة تشغيل، ويتقدم على قيم ملف البيئة.
       </p>
       <div className="form-grid">
@@ -171,7 +171,7 @@ function DirectorySection({ live, onChanged }: { live: IntegrationStatus['direct
         <summary>السمات (أسماء الحقول في الدليل)</summary>
         <div className="flex" style={{ gap: 8, margin: '8px 0' }}>
           <button type="button" className="button small" onClick={() => set(AD_PRESET)}>
-            Active Directory (كما في MOVER)
+            Active Directory
           </button>
           <button type="button" className="button small" onClick={() => set(STANDARD_PRESET)}>
             دليل قياسي (inetOrgPerson)
@@ -315,7 +315,7 @@ function OidcSection({ live, onChanged }: { live: IntegrationStatus['oidc'] | nu
       </div>
       <Source view={view} />
       <p className="micro muted" style={{ margin: '0 0 12px' }}>
-        زر «الدخول بالحساب المؤسسي» يفتح Keycloak المؤسسي الذي يُكتب هنا (الخادم، المجال، عميل تمركز وسره)، كما في MOVER. حسابا المنصة
+        زر «الدخول بالحساب المؤسسي» يفتح Keycloak المؤسسي الذي يُكتب هنا (الخادم، المجال، عميل تمركز وسره). حسابا المنصة
         admin وdeveloper يبقيان على Keycloak المحلي ولا يتأثران. اطلب من فريق Keycloak عميلاً سرياً بتدفق الرمز (Authorization Code + PKCE)
         وعنوان العودة المبين أدناه.
       </p>

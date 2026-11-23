@@ -3,7 +3,7 @@
 ## Backup
 
 ```sh
-sh ops/backup.sh [project] [output-root]     # default project tmrkz-mover → backups/<project>-<UTC stamp>/
+sh ops/backup.sh [project] [output-root]     # default project tmrkz → backups/<project>-<UTC stamp>/
 ```
 
 Produces `db.dump` (pg_dump custom format: business data, identities, roles, delegations, policies, form and
@@ -81,16 +81,16 @@ configuration changes never require data migration of in-flight requests.
 
 ## Secrets and key rotation
 
-- `.env` holds `MOVER_DB_PASSWORD`, `MOVER_ATTESTATION_KEY`, `TMRKZ_HR_SETTINGS_KEY`, `TMRKZ_OIDC_CLIENT_SECRET`,
+- `.env` holds `TMRKZ_DB_PASSWORD`, `TMRKZ_ATTESTATION_KEY`, `TMRKZ_HR_SETTINGS_KEY`, `TMRKZ_OIDC_CLIENT_SECRET`,
   `TMRKZ_KEYCLOAK_DB_PASSWORD`, `TMRKZ_KEYCLOAK_ADMIN_PASSWORD`, `TMRKZ_OPENFGA_DB_PASSWORD`, `TMRKZ_OPENFGA_API_TOKEN`
   (the OpenFGA preshared key) and the directory settings; permissions 600; never committed. `sh ops/init-env.sh` adds
   keys introduced by later versions to an existing `.env` without changing the others.
-- Keys restored with a backup: `MOVER_ATTESTATION_KEY` (re-verifies attestation evidence), `TMRKZ_HR_SETTINGS_KEY`
+- Keys restored with a backup: `TMRKZ_ATTESTATION_KEY` (re-verifies attestation evidence), `TMRKZ_HR_SETTINGS_KEY`
   (decrypts the stored HR source password), `TMRKZ_OIDC_CLIENT_SECRET` (the realm's client secret) and the Keycloak and
   database passwords. They are not in the backup set: keep them in the organisation's key vault and restore `.env`
   from there before running `ops/restore.sh`. A backup contains the business database, the identity database
   (`keycloak.dump`), attachments and map packages, each with a SHA-256 in `manifest.json`.
-- Rotating `MOVER_ATTESTATION_KEY` affects only new attestations. Keep the retired key in the organisation's key
+- Rotating `TMRKZ_ATTESTATION_KEY` affects only new attestations. Keep the retired key in the organisation's key
   vault to re-verify evidence on historical approval documents.
 - Production hardening: create a restricted runtime database role (DML on business tables, no DDL, no `TRUNCATE`)
   and run migrations with a separate owner role; keep the audit table's triggers owned by that owner.
@@ -208,7 +208,7 @@ configuration changes never require data migration of in-flight requests.
   `ops/keycloak/set-platform-password-client.sh`, with local Keycloak step-up/logout, and hold every administrative
   right. HR and the directory never disable them. To revoke one, remove its role in Keycloak or drop it from
   `TMRKZ_PLATFORM_ACCOUNTS`.
-- **Single local installation (ADR-091):** `sh start.sh` asks for the IP address and the port and starts `tmrkz-mover`
+- **Single local installation (ADR-091):** `sh start.sh` asks for the IP address and the port and starts `tmrkz`
   from this folder (`docker-compose.override.yml`; data in `data/`; the procedure in `RUN.md`). Until a directory is
   entered, it uses a stand-in directory with no people; the platform accounts are set on every start.
 

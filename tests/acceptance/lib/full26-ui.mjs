@@ -23,7 +23,7 @@ export const external = [];
 export const consoleErrors = [];
 
 export const sql = (q) =>
-  execFileSync('docker', ['exec', 'tmrkz-mover-db-1', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -q -Atc "${q.replaceAll('"', '\\"')}"`], { encoding: 'utf8' }).trim();
+  execFileSync('docker', ['exec', 'tmrkz-db-1', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -q -Atc "${q.replaceAll('"', '\\"')}"`], { encoding: 'utf8' }).trim();
 
 /** Results of one phase, appended to a JSON-lines file so every phase adds to the same record. */
 export function recorder(phase) {

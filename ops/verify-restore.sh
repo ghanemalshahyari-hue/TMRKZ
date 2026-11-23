@@ -9,7 +9,7 @@
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
-SOURCE="${1:-tmrkz-mover}"
+SOURCE="${1:-tmrkz}"
 TARGET="${SOURCE}-restoretest"
 PORT=18088
 
@@ -25,9 +25,9 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' "${TARGET}-backend-1" 2>
   i=$((i+1)); [ $i -gt 60 ] && { echo "[verify] restored backend not healthy"; exit 1; }; sleep 3
 done
 
-docker compose -p "$TARGET" exec -T db psql -U mover -d mover -At -f - < ops/sql/fingerprint.sql > "$BACKUP/fingerprint.restored.txt"
+docker compose -p "$TARGET" exec -T db psql -U tmrkz -d tmrkz -At -f - < ops/sql/fingerprint.sql > "$BACKUP/fingerprint.restored.txt"
 if [ -f "$BACKUP/keycloak.dump" ]; then
-  docker compose -p "$TARGET" exec -T db psql -U mover -d keycloak -At -c "select 'realms', count(*) from realm union all select 'users', count(*) from user_entity union all select 'clients', count(*) from client" > "$BACKUP/identity-fingerprint.restored.txt"
+  docker compose -p "$TARGET" exec -T db psql -U tmrkz -d keycloak -At -c "select 'realms', count(*) from realm union all select 'users', count(*) from user_entity union all select 'clients', count(*) from client" > "$BACKUP/identity-fingerprint.restored.txt"
   if diff -q "$BACKUP/identity-fingerprint.txt" "$BACKUP/identity-fingerprint.restored.txt" >/dev/null; then
     echo "[verify] identity realm, users and clients identical"
   else
@@ -42,12 +42,12 @@ else
   echo "[verify] FINGERPRINT MISMATCH"; exit 1
 fi
 
-docker compose -p "$TARGET" exec -T db psql -U mover -d mover -At \
+docker compose -p "$TARGET" exec -T db psql -U tmrkz -d tmrkz -At \
   -c "select storage_key || ' ' || sha256 from attachment where storage_key is not null order by 1" > "$BACKUP/attachments.expected"
 COUNT=0
 while read -r key sum; do
   [ -z "$key" ] && continue
-  actual="$(docker compose -p "$TARGET" exec -T backend sha256sum "/var/lib/mover/$key" < /dev/null | cut -d' ' -f1)"
+  actual="$(docker compose -p "$TARGET" exec -T backend sha256sum "/var/lib/tmrkz/$key" < /dev/null | cut -d' ' -f1)"
   if [ "$actual" != "$sum" ]; then echo "[verify] attachment content mismatch: $key"; exit 1; fi
   COUNT=$((COUNT+1))
 done < "$BACKUP/attachments.expected"

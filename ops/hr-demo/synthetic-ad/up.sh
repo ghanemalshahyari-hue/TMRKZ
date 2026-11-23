@@ -15,7 +15,7 @@ G=../.generated
 TLS="$G/synthetic-ad/tls"
 ENV="$G/synthetic-ad.env"
 rand() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c "$1"; }
-docker network inspect tmrkz-mover_internal >/dev/null 2>&1 || { echo "[synthetic-ad] start TMRKZ first (sh start.sh)" >&2; exit 2; }
+docker network inspect tmrkz_internal >/dev/null 2>&1 || { echo "[synthetic-ad] start TMRKZ first (sh start.sh)" >&2; exit 2; }
 mkdir -p "$TLS"
 if [ ! -f "$ENV" ]; then
   umask 077

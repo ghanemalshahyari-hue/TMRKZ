@@ -1,10 +1,10 @@
 spring:
   application:
-    name: mover
+    name: tmrkz
   datasource:
-    url: ${MOVER_DB_URL:jdbc:postgresql://localhost:5432/mover}
-    username: ${MOVER_DB_USER:mover}
-    password: ${MOVER_DB_PASSWORD:}
+    url: ${TMRKZ_DB_URL:${MOVER_DB_URL:jdbc:postgresql://localhost:5432/tmrkz}}
+    username: ${TMRKZ_DB_USER:${MOVER_DB_USER:tmrkz}}
+    password: ${TMRKZ_DB_PASSWORD:${MOVER_DB_PASSWORD:}}
     hikari:
       maximum-pool-size: ${MOVER_DB_POOL:20}
   flyway:
@@ -41,7 +41,7 @@ management:
         enabled: true
   metrics:
     tags:
-      application: mover
+      application: tmrkz
 
 logging:
   pattern:
@@ -50,15 +50,15 @@ logging:
 mover:
   version: 1.0.0
   storage:
-    root: ${MOVER_STORAGE_ROOT:/var/lib/mover}
+    root: ${TMRKZ_STORAGE_ROOT:${MOVER_STORAGE_ROOT:/var/lib/tmrkz}}
   map:
-    root: ${MOVER_MAP_ROOT:/opt/mover/map-packages}
+    root: ${TMRKZ_MAP_PACKAGES:${MOVER_MAP_ROOT:/opt/tmrkz/map-packages}}
   signature:
-    attestation-key: ${MOVER_ATTESTATION_KEY:}
+    attestation-key: ${TMRKZ_ATTESTATION_KEY:${MOVER_ATTESTATION_KEY:}}
   security:
     session-idle-minutes: ${MOVER_SESSION_IDLE_MINUTES:30}
     session-absolute-hours: ${MOVER_SESSION_ABSOLUTE_HOURS:12}
-    secure-cookie: ${MOVER_SECURE_COOKIE:false}
+    secure-cookie: ${TMRKZ_SECURE_COOKIE:${MOVER_SECURE_COOKIE:false}}
     max-failed-logins: 5
     lock-minutes: 15
   outbox:

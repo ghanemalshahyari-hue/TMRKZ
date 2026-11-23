@@ -11,7 +11,7 @@
 -- delete, in one transaction, after waiting for a running HR sync or one-person import to end, and it records one audit event
 -- (HR_UNLINKED_PRUNED). Re-runnable: a second run finds nothing left to remove.
 --
---   ops/hr-prune-unlinked.sh                    dry run on the compose project tmrkz-mover
+--   ops/hr-prune-unlinked.sh                    dry run on the compose project tmrkz
 --   ops/hr-prune-unlinked.sh --apply            for real, AFTER a verified backup (ops/backup.sh, ops/verify-backup.sh)
 --
 -- Output, one line per step: hr_people_unlinked, hr_people_kept_referenced, hr_people_to_remove, affiliations_to_remove,

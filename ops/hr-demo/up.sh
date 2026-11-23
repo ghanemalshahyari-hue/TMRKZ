@@ -29,7 +29,7 @@ ORACLE_MOVER_USER=TMRKZ_HR
 ORACLE_MOVER_PASSWORD=R$(rand 20)
 EOF
 fi
-docker network inspect tmrkz-mover_internal >/dev/null 2>&1 || { echo "[hr-demo] start TMRKZ first (sh start.sh)" >&2; exit 2; }
+docker network inspect tmrkz_internal >/dev/null 2>&1 || { echo "[hr-demo] start TMRKZ first (sh start.sh)" >&2; exit 2; }
 docker compose -p tmrkz-hr-demo --env-file "$G/oracle_hr.env" -f compose.yml up -d
 i=0
 until [ "$(docker inspect -f '{{.State.Health.Status}}' tmrkz-hr-demo-oracle 2>/dev/null)" = healthy ]; do
@@ -45,7 +45,7 @@ if ! ls "$G"/wheels/oracledb-* >/dev/null 2>&1; then
     || { echo "[hr-demo] could not download the Oracle driver; put the oracledb 4.0.2 wheels (linux, cp312, $ARCH) in $G/wheels" >&2; exit 1; }
 fi
 HERE="$(pwd -W 2>/dev/null || pwd)"
-docker run --rm --network tmrkz-mover_internal -v "$HERE:/w" -w /w python:3.12-slim \
+docker run --rm --network tmrkz_internal -v "$HERE:/w" -w /w python:3.12-slim \
   sh -c "pip install -q --disable-pip-version-check --no-index --find-links .generated/wheels oracledb==4.0.2 >/dev/null && python build_oracle_hr.py $ARGS"
 echo "[hr-demo] in TMRKZ: «إعدادات النظام» ← مصدر الموارد البشرية: tmrkz-hr-demo-oracle, 1521, FREEPDB1 (service_name), TMRKZ_HR,"
 echo "          views HR_ENV_UNITS_AI and HR_PRS_EMPLOYEES_ALL; the password is ORACLE_MOVER_PASSWORD in $G/oracle_hr.env"

@@ -55,9 +55,16 @@ if [ -z "$LDAP" ] || [ "$LDAP" = "ldap://openldap:389" ]; then
   fi
   [ -n "$(value TMRKZ_TRUSTSTORE_DIR)" ] || setenv TMRKZ_TRUSTSTORE_DIR ./ops/local/.generated/truststore
 fi
-# data kept by an older version of this installation stays in Docker volumes until it is moved here (RUN.md section 6)
+# data kept by an older version of this installation stays in Docker volumes until it is moved here (RUN.md section 7)
 if [ -z "$(ls -A data/db 2>/dev/null)" ] && docker volume inspect tmrkz-mover_db-data >/dev/null 2>&1; then
-  echo "  note: data/db is empty, and an older TMRKZ database is in the Docker volume tmrkz-mover_db-data — RUN.md section 6"
+  echo "  note: data/db is empty, and an older TMRKZ database is in the Docker volume tmrkz-mover_db-data — RUN.md section 7"
+fi
+# the containers were called tmrkz-mover-* until 23 Nov 2026 (ADR-098): they are replaced by tmrkz-*; the data in ./data is
+# kept, and db-init renames the database on the first start (the old web volumes hold only built pages)
+if [ -n "$(docker ps -aq --filter label=com.docker.compose.project=tmrkz-mover 2>/dev/null)" ]; then
+  echo "  replacing the containers of the old name tmrkz-mover (the data is kept)"
+  docker compose -p tmrkz-mover down >/dev/null 2>&1 || true
+  docker volume rm tmrkz-mover_web-html tmrkz-mover_web-docs >/dev/null 2>&1 || true
 fi
 
 # 1. the address
@@ -80,12 +87,15 @@ until echo "$PORT" | grep -Eq '^[0-9]+$' && [ "$PORT" -ge 1 ] && [ "$PORT" -le 6
   n=$((n + 1)); [ $n -le 3 ] || { echo "no valid port"; exit 2; }
   printf '  Port [%s]: ' "$CUR_PORT"; read -r PORT || true; PORT="${PORT:-$CUR_PORT}"
 done
-busy="$(docker ps --format '{{.Names}} {{.Ports}}' | grep -v '^tmrkz-mover-' | grep -E ":$PORT->" | cut -d' ' -f1 | head -n 1 || true)"
+# another container on the port — this installation's own (project tmrkz) do not count
+own=" $(docker ps -q --filter label=com.docker.compose.project=tmrkz 2>/dev/null | tr '\n' ' ') "
+busy="$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' | grep -E ":$PORT->" | while read -r id name rest; do
+  case "$own" in *" $id "*) ;; *) echo "$name" ;; esac; done | head -n 1 || true)"
 [ -z "$busy" ] || { echo "port $PORT is already used by the container $busy; choose another"; exit 2; }
 setenv TMRKZ_IP "$IP"; setenv TMRKZ_PORT "$PORT"
 # the one address every sign-in address derives from (docker-compose.override.yml, ops/*.sh); an https address is kept
 [ -n "$HTTPS" ] || setenv TMRKZ_PUBLIC_URL "http://$IP:$PORT"
-setenv MOVER_HTTP_PORT "$PORT"
+setenv TMRKZ_HTTP_PORT "$PORT"
 
 # 2. the images: loaded when one is missing or tmrkz-images.tar is newer than the last one loaded here
 LOADED=ops/local/.generated/images-loaded.sha256
@@ -112,4 +122,4 @@ done
 echo
 echo "  TMRKZ is running: $URL"
 echo "  sign in as admin or developer (passwords: TMRKZ_PLATFORM_ADMIN_PASSWORD / TMRKZ_PLATFORM_DEVELOPER_PASSWORD in .env)"
-echo "  the enterprise directory and Keycloak: إعدادات النظام ← إعدادات التكامل (RUN.md section 7)"
+echo "  the enterprise directory and Keycloak: إعدادات النظام ← إعدادات التكامل (RUN.md section 8)"

@@ -7,7 +7,7 @@
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
-PROJECT="${1:-tmrkz-mover}"
+PROJECT="${1:-tmrkz}"
 OUT_ROOT="${2:-backups}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT="$OUT_ROOT/$PROJECT-$STAMP"
@@ -16,12 +16,12 @@ dc() { docker compose -p "$PROJECT" "$@"; }
 
 # The fingerprint must describe what the dump holds. The application keeps writing (the HR sync, sign-ins), so the dump counts only
 # when the fingerprint before it equals the one after it; otherwise it is taken again.
-fingerprint() { dc exec -T db psql -U mover -d mover -At -f - < ops/sql/fingerprint.sql; }
+fingerprint() { dc exec -T db psql -U tmrkz -d tmrkz -At -f - < ops/sql/fingerprint.sql; }
 echo "[backup] database → $OUT/db.dump"
 tries=0
 while :; do
   fingerprint > "$OUT/fingerprint.txt"
-  dc exec -T db pg_dump -U mover -d mover -Fc --no-owner > "$OUT/db.dump"
+  dc exec -T db pg_dump -U tmrkz -d tmrkz -Fc --no-owner > "$OUT/db.dump"
   fingerprint > "$OUT/fingerprint.after.txt"
   cmp -s "$OUT/fingerprint.txt" "$OUT/fingerprint.after.txt" && break
   tries=$((tries + 1))
@@ -31,21 +31,21 @@ done
 rm -f "$OUT/fingerprint.after.txt"
 
 echo "[backup] identity database → $OUT/keycloak.dump"
-dc exec -T db pg_dump -U mover -d keycloak -Fc --no-owner > "$OUT/keycloak.dump"
-dc exec -T db psql -U mover -d keycloak -At -c "select 'realms', count(*) from realm union all select 'users', count(*) from user_entity union all select 'clients', count(*) from client" > "$OUT/identity-fingerprint.txt"
+dc exec -T db pg_dump -U tmrkz -d keycloak -Fc --no-owner > "$OUT/keycloak.dump"
+dc exec -T db psql -U tmrkz -d keycloak -At -c "select 'realms', count(*) from realm union all select 'users', count(*) from user_entity union all select 'clients', count(*) from client" > "$OUT/identity-fingerprint.txt"
 
 echo "[backup] authorisation database → $OUT/openfga.dump"
-dc exec -T db pg_dump -U mover -d openfga -Fc --no-owner > "$OUT/openfga.dump"
+dc exec -T db pg_dump -U tmrkz -d openfga -Fc --no-owner > "$OUT/openfga.dump"
 
 echo "[backup] files volume → $OUT/files.tgz"
-dc exec -T backend tar czf - -C /var/lib/mover . > "$OUT/files.tgz"
+dc exec -T backend tar czf - -C /var/lib/tmrkz . > "$OUT/files.tgz"
 
 echo "[backup] map packages → $OUT/map-packages.tgz"
-dc exec -T backend tar czf - -C /opt/mover/map-packages . > "$OUT/map-packages.tgz"
+dc exec -T backend tar czf - -C /opt/tmrkz/map-packages . > "$OUT/map-packages.tgz"
 
 sha() { (sha256sum "$1" 2>/dev/null || shasum -a 256 "$1") | cut -d' ' -f1; }
 # numeric order: versions are text, and max('9', '17') would report 9
-SCHEMA="$(dc exec -T db psql -U mover -d mover -Atc "select max(version::int) from flyway_schema_history where success and version is not null")"
+SCHEMA="$(dc exec -T db psql -U tmrkz -d tmrkz -Atc "select max(version::int) from flyway_schema_history where success and version is not null")"
 cat > "$OUT/manifest.json" <<EOF
 {
   "project": "$PROJECT",

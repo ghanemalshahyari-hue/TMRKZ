@@ -7,7 +7,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import { execFileSync } from 'node:child_process';
 import { readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 
-const DB = process.env.DB_CONTAINER ?? 'tmrkz-mover-db-1';
+const DB = process.env.DB_CONTAINER ?? 'tmrkz-db-1';
 const NAME = 'TMRKZ_HR_SETTINGS_KEY';
 const sql = (script) => execFileSync('docker', ['exec', '-i', DB, 'psql', '-X', '-q', '-U', 'mover', '-d', 'mover', '-At', '-v', 'ON_ERROR_STOP=1', '-f', '-'], { input: script, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 // the same derivation as ae.mover.hr.HrSettingsCipher

@@ -10,7 +10,7 @@ const [root] = process.argv.slice(2);
 const { adminSession } = await import(pathToFileURL(`${root}/tests/acceptance/lib/full26-admin.mjs`).href);
 const a = await adminSession(root);
 const REASON = 'ACCEPTANCE ONLY — renumbered to the owner\'s specification';
-const sql = (q) => execFileSync('docker', ['exec', 'tmrkz-mover-db-1', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "${q}"`], { encoding: 'utf8' }).trim();
+const sql = (q) => execFileSync('docker', ['exec', 'tmrkz-db-1', 'sh', '-c', `psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "${q}"`], { encoding: 'utf8' }).trim();
 const grants = sql(`select m.id || '|' || p.username || '|' || m.role_code from membership m join person p on p.id = m.person_id where p.username like 'full26.%' and m.valid_from <= now() and (m.valid_to is null or m.valid_to > now()) order by 1`).split('\n').filter(Boolean);
 for (const line of grants) {
   const [id, who, role] = line.split('|');

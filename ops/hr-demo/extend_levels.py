@@ -9,7 +9,7 @@ access request (ADR-061); the next HR sync brings the units and the HR records.
 
 Everything added carries CODE 'DX…', unit IDs from 990001 and person IDs from 990001, so --remove takes exactly it away.
 Run it the way up.sh runs the builder (the demo's Oracle is reachable on the TMRKZ network only):
-  docker run --rm --network tmrkz-mover_internal -v "<ops/hr-demo>:/w" -w /w python:3.12-slim \
+  docker run --rm --network tmrkz_internal -v "<ops/hr-demo>:/w" -w /w python:3.12-slim \
     sh -c "pip install -q oracledb==4.0.2 && python extend_levels.py [--seed N] [--remove]"
 """
 import argparse

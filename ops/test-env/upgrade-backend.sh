@@ -16,7 +16,7 @@ IMAGE="${1:?release image}"
 LABEL="${2:?label}"
 [ "${EXPECT_PENDING+set}" = set ] || { echo "set EXPECT_PENDING to the exact pending versions (\"\" for none)" >&2; exit 2; }
 P="${P:-tmrkz-test}"
-case "$P" in tmrkz-mover) echo "refused: $P is an owner-retained production project" >&2; exit 2;; esac
+case "$P" in tmrkz) echo "refused: $P is an owner-retained production project" >&2; exit 2;; esac
 EV="docs/evidence/acceptance-upgrade/$LABEL"
 mkdir -p "$EV" backups
 . ops/test-env/prepare.sh
@@ -34,7 +34,7 @@ compose() {
   # shellcheck disable=SC2086
   docker compose -p "$P" $FILES -f "$OVR" "$@"
 }
-psqlq() { docker exec -i "$P-db-1" psql -U mover -d mover -v ON_ERROR_STOP=1 -At "$@"; }
+psqlq() { docker exec -i "$P-db-1" psql -U tmrkz -d tmrkz -v ON_ERROR_STOP=1 -At "$@"; }
 log() { echo "[upgrade] $*" | tee -a "$EV/run.log"; }
 : > "$EV/run.log"
 
@@ -48,11 +48,11 @@ case "$IDENT" in ACCEPTANCE*) ;; *) log "REFUSED: the database is not labelled A
 log "schema version before: $(psqlq -c "select max(version::int) from flyway_schema_history where success and version is not null")"
 psqlq -c "select installed_rank, version, description, checksum, success, installed_on from flyway_schema_history order by installed_rank" \
   > "$EV/flyway-history-before.txt"
-docker exec "$P-db-1" pg_dump -U mover -d mover --schema-only --no-owner -N tiger -N tiger_data -N topology > "$EV/schema-before.sql"
+docker exec "$P-db-1" pg_dump -U tmrkz -d tmrkz --schema-only --no-owner -N tiger -N tiger_data -N topology > "$EV/schema-before.sql"
 log "schema fingerprint before: sha256 $(sha256sum "$EV/schema-before.sql" | cut -d' ' -f1)"
 
 # plan
-docker run --rm --entrypoint sh "$IMAGE" -c 'cd /tmp && unzip -o -q /opt/mover/mover-backend.jar "BOOT-INF/classes/db/migration/*" \
+docker run --rm --entrypoint sh "$IMAGE" -c 'cd /tmp && unzip -o -q /opt/tmrkz/tmrkz-backend.jar "BOOT-INF/classes/db/migration/*" \
   && cd BOOT-INF/classes/db/migration && sha256sum V*.sql' | sort -t_ -k1.2n > "$EV/migrations-in-image.txt"
 psqlq -c "select version from flyway_schema_history where success and version is not null" | sort > "$EV/applied.txt"
 : > "$EV/plan.txt"
@@ -93,7 +93,7 @@ log "backend healthy on $IMAGE; $(grep -iE 'Successfully applied|up to date' "$E
 # after
 psqlq -c "select installed_rank, version, description, checksum, success, installed_on from flyway_schema_history order by installed_rank" \
   > "$EV/flyway-history-after.txt"
-docker exec "$P-db-1" pg_dump -U mover -d mover --schema-only --no-owner -N tiger -N tiger_data -N topology > "$EV/schema-after.sql"
+docker exec "$P-db-1" pg_dump -U tmrkz -d tmrkz --schema-only --no-owner -N tiger -N tiger_data -N topology > "$EV/schema-after.sql"
 diff -u "$EV/schema-before.sql" "$EV/schema-after.sql" > "$EV/schema-diff.txt" || true
 if sh ops/upgrade-check.sh after "$P" > "$EV/upgrade-check-after.txt" 2>&1; then UPG=PASS; else UPG=FAIL; fi
 log "$(tail -1 "$EV/upgrade-check-after.txt")"

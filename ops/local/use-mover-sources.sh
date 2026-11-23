@@ -9,7 +9,7 @@ set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../.."
 G=ops/local/.generated; mkdir -p "$G"
-NET=tmrkz-mover_internal
+NET=tmrkz_internal
 MOVER="${MOVER_DIR:-../../mover}"   # MOVER's folder (read only): its directory CA
 rand() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c "$1"; }
 
@@ -70,8 +70,8 @@ echo "[mover-sources] .env names MOVER's directory"
 cat <<'EOF'
 [mover-sources] next, in this order:
   sh start.sh                                                         (the stand-in directory is left out)
-  CONFIRM=yes sh ops/keycloak/set-directory.sh tmrkz-mover             (Keycloak's federation → mover-ldap, tested first)
-  CONFIRM=yes sh ops/keycloak/set-employment-attributes.sh tmrkz-mover
-  sh ops/platform-accounts.sh tmrkz-mover && sh ops/keycloak/set-platform-password-client.sh tmrkz-mover
+  CONFIRM=yes sh ops/keycloak/set-directory.sh tmrkz             (Keycloak's federation → mover-ldap, tested first)
+  CONFIRM=yes sh ops/keycloak/set-employment-attributes.sh tmrkz
+  sh ops/platform-accounts.sh tmrkz && sh ops/keycloak/set-platform-password-client.sh tmrkz
   node ops/local/mover-settings.mjs all                                (roles, Oracle source, MOVER's mapping, first sync)
 EOF

@@ -37,7 +37,7 @@ public class SignatureService {
         this.auth = auth;
         this.oidc = oidc;
         if (key == null || key.length() < 32) {
-            throw new IllegalStateException("mover.signature.attestation-key (MOVER_ATTESTATION_KEY) must be at least 32 characters");
+            throw new IllegalStateException("TMRKZ_ATTESTATION_KEY (mover.signature.attestation-key) must be at least 32 characters");
         }
         this.key = key.getBytes(StandardCharsets.UTF_8);
     }

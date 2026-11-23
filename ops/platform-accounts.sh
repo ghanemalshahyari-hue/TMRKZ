@@ -5,11 +5,11 @@
 # TMRKZ_PLATFORM_DEVELOPER_PASSWORD; ops/init-env.sh generates random ones), never from this repository. Re-running sets
 # the passwords to the .env values again. Refused when a directory user already holds either login.
 # Their first TMRKZ sign-in creates the local person with lasting administrator and auditor grants.
-# Usage: sh ops/platform-accounts.sh [compose-project]   (default tmrkz-mover; Keycloak must be healthy)
+# Usage: sh ops/platform-accounts.sh [compose-project]   (default tmrkz; Keycloak must be healthy)
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
-PROJECT="${1:-tmrkz-mover}"
+PROJECT="${1:-tmrkz}"
 value() { sed -n "s/^$1=//p" .env | tail -n 1; }
 KC_ADMIN="$(value TMRKZ_KEYCLOAK_ADMIN_PASSWORD)"
 ADMIN_PW="$(value TMRKZ_PLATFORM_ADMIN_PASSWORD)"

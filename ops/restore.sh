@@ -9,9 +9,9 @@ set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.."
 SRC="$1"
-PROJECT="${2:-tmrkz-mover}"
+PROJECT="${2:-tmrkz}"
 PORT="${3:-8088}"
-dc() { MOVER_HTTP_PORT="$PORT" docker compose -p "$PROJECT" "$@"; }
+dc() { TMRKZ_HTTP_PORT="$PORT" docker compose -p "$PROJECT" "$@"; }
 sha() { (sha256sum "$1" 2>/dev/null || shasum -a 256 "$1") | cut -d' ' -f1; }
 
 FILES="db.dump files.tgz map-packages.tgz fingerprint.txt"
@@ -34,30 +34,30 @@ dc up -d db
 # A clean volume is initialised first (the PostGIS image runs its init scripts on a temporary server, then restarts):
 # wait for the end of initialisation, not only for the first accepted connection.
 until dc logs db 2>/dev/null | grep -q "PostgreSQL init process complete"; do sleep 2; done
-until dc exec -T db pg_isready -U mover -d mover >/dev/null 2>&1; do sleep 2; done
+until dc exec -T db pg_isready -U tmrkz -d tmrkz >/dev/null 2>&1; do sleep 2; done
 sleep 2
 echo "[restore] database"
 # the image's own extensions and tiger schema would collide with the dump; refuses a database that already holds TMRKZ data
-dc exec -T db psql -X -q -U mover -d mover -v ON_ERROR_STOP=1 -f - < ops/sql/clear-postgis-init.sql >/dev/null 2>&1 \
+dc exec -T db psql -X -q -U tmrkz -d tmrkz -v ON_ERROR_STOP=1 -f - < ops/sql/clear-postgis-init.sql >/dev/null 2>&1 \
   || { echo "[restore] the target database is not empty or could not be prepared; nothing restored"; exit 1; }
-dc exec -T db pg_restore -U mover -d mover --no-owner --exit-on-error < "$SRC/db.dump"
+dc exec -T db pg_restore -U tmrkz -d tmrkz --no-owner --exit-on-error < "$SRC/db.dump"
 
 dc run --rm db-init >/dev/null
 if [ -f "$SRC/keycloak.dump" ]; then
   echo "[restore] identity database"
-  dc exec -T db pg_restore -U mover -d keycloak --no-owner --role=keycloak --exit-on-error < "$SRC/keycloak.dump"
+  dc exec -T db pg_restore -U tmrkz -d keycloak --no-owner --role=keycloak --exit-on-error < "$SRC/keycloak.dump"
 fi
 # The authorisation store is restored with the business database it was built from. A backup without it is still
 # usable: the backend then creates a new store and rebuilds every tuple from the restored grants (ADR-018).
 if [ -f "$SRC/openfga.dump" ]; then
   echo "[restore] authorisation database"
-  dc exec -T db pg_restore -U mover -d openfga --no-owner --role=openfga --exit-on-error < "$SRC/openfga.dump"
+  dc exec -T db pg_restore -U tmrkz -d openfga --no-owner --role=openfga --exit-on-error < "$SRC/openfga.dump"
 fi
 
 echo "[restore] files"
 dc create backend >/dev/null 2>&1 || true
-docker run --rm -i --entrypoint sh -v "${PROJECT}_files:/var/lib/mover" -u 0 mover/backend:1.0.0 \
-  -c "tar xzf - -C /var/lib/mover && chown -R mover:mover /var/lib/mover" < "$SRC/files.tgz"
+docker run --rm -i --entrypoint sh -v "${PROJECT}_files:/var/lib/tmrkz" -u 0 tmrkz/backend:1.0.0 \
+  -c "tar xzf - -C /var/lib/tmrkz && chown -R tmrkz:tmrkz /var/lib/tmrkz" < "$SRC/files.tgz"
 
 if [ "${RESTORE_DATA_ONLY:-}" = 1 ]; then
   echo "[restore] data restored; application not started (RESTORE_DATA_ONLY)"
