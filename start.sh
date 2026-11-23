@@ -66,6 +66,9 @@ if [ -n "$(docker ps -aq --filter label=com.docker.compose.project=tmrkz-mover 2
   docker compose -p tmrkz-mover down >/dev/null 2>&1 || true
   docker volume rm tmrkz-mover_web-html tmrkz-mover_web-docs >/dev/null 2>&1 || true
 fi
+# the same folder everywhere (RUN.md, «The folder»): anything else at the top is named, nothing is moved or deleted
+extra="$(ls -A | grep -vxE '\.env|\.gitignore|\.gitattributes|\.github|\.vscode|\.zcode|\.git|AGENTS\.md|CLAUDE\.md|FINAL_HANDOFF_2026-11-18\.md|FONT-LICENSE\.txt|README\.md|RUN\.md|assets|backend|backups|data|docker-compose\.yml|docker-compose\.override\.yml|docs|frontend|handoff|map-data|map-packages|ops|prototypes|start\.sh|tests|tmrkz-images\.tar|tmrkz-images\.tar\.sha256' | tr '\n' ' ' || true)"
+[ -z "$extra" ] || echo "  note: not part of the TMRKZ folder — move to its place (RUN.md, «The folder»): $extra"
 
 # 1. the address
 IP="${TMRKZ_IP:-}"; PORT="${TMRKZ_PORT:-}"

@@ -2,15 +2,30 @@
 
 This folder is the whole application: code, settings, images and data. It needs no internet.
 
+### The folder — the same on the PC, the USB stick and the VM
+
+Everything at the top of the folder, and nothing else:
+
 | In the folder | What it is |
 |---|---|
 | `docker-compose.yml` + `docker-compose.override.yml` | how everything runs (Compose reads both automatically) |
-| `.env` | settings and passwords; `TMRKZ_IP` and `TMRKZ_PORT` at the top are the address people open |
-| `tmrkz-images.tar` | all Docker images in one file (about 1 GB) |
-| `data/` | the data: `data/db` (PostgreSQL 17 database), `data/files` (uploads), `data/ldap-data` + `data/ldap-config` (local directory) |
-| `backend/`, `frontend/` | the code — a saved change is rebuilt and live in about 25 seconds, no image build |
+| `.env` | every setting and password (hidden file: `ls -a` shows it) |
 | `start.sh` | asks for the IP address and the port, loads the images, starts everything |
-| `map-data/runtime/current` | the offline map package (base map, 3D terrain, fonts, styles) |
+| `tmrkz-images.tar` + `tmrkz-images.tar.sha256` | all Docker images in one file (about 1 GB) and its checksum |
+| `data/` | the data: `data/db` (PostgreSQL 17 database), `data/files` (uploads), `data/ldap-data` + `data/ldap-config` (local directory) |
+| `backups/` | database backups and dumps (`ops/backup.sh` writes here; the migration center reads it) |
+| `backend/`, `frontend/` | the code — a saved change is rebuilt and live in about 25 seconds, no image build |
+| `map-data/` | the offline map: `map-data/runtime/current` (base map, 3D terrain, fonts, styles) |
+| `map-packages/` | the map package files the backend reads |
+| `ops/` | the scripts; `ops/local/.generated/` holds the local directory's certificates and password, `ops/tls/private/` the https certificate |
+| `docs/`, `handoff/`, `tests/`, `assets/`, `prototypes/` | documentation, specifications, tests, shared assets, earlier prototypes |
+| `RUN.md`, `README.md`, `CLAUDE.md`, `AGENTS.md`, `FINAL_HANDOFF_2026-11-18.md`, `FONT-LICENSE.txt` | this guide and the project's notes and licence |
+| `.gitignore`, `.gitattributes`, `.github/`, `.vscode/`, `.zcode/`, `.git/` | git and editor files (`.git` only where git is used) |
+
+Anything else does not belong at the top: `start.sh` names it when it starts. Where such things go:
+- the transfer files `TMRKZ.zip` and `TMRKZ.zip.sha256`: the home folder (`~`), outside `TMRKZ`;
+- a database backup or dump (`*.backup`, `*.dump`, `*.db`): `backups/`;
+- the https certificate and key: `ops/tls/private/` (`sh ops/tls/install-cert.sh` puts them there).
 
 Sign-in accounts: `developer` and `admin`. Their passwords are in `.env`:
 `TMRKZ_PLATFORM_DEVELOPER_PASSWORD` and `TMRKZ_PLATFORM_ADMIN_PASSWORD`.
@@ -43,7 +58,7 @@ Open **Command Prompt** (Start → type `cmd` → Enter) and type each line, one
 5. **Write the zip's checksum** next to it (the VM checks the copy with it).
    ```
    cd /d "%USERPROFILE%\Desktop"
-   powershell -NoProfile -Command "(Get-FileHash TMRKZ.zip -Algorithm SHA256).Hash.ToLower() + '  TMRKZ.zip' | Set-Content -Encoding ascii TMRKZ.zip.sha256"
+   powershell -NoProfile -Command "[IO.File]::WriteAllText((Join-Path $PWD 'TMRKZ.zip.sha256'), (Get-FileHash TMRKZ.zip -Algorithm SHA256).Hash.ToLower() + '  TMRKZ.zip' + [char]10)"
    ```
 
 Never copy the folder by selecting the files inside it (Ctrl+A in Explorer, Cmd+A in Finder): that skips the hidden
@@ -105,6 +120,15 @@ Connect: `ssh -p 4422 "%PAM%"` (the same login), then:
    `TMRKZ_AI_BASE_URL`, `TMRKZ_AI_MODEL`, `TMRKZ_AI_API_KEY`), the directory, Keycloak, HR, features. The values are the
    PC's: change the AI server to the VM's. Section 8 (internal keys) must not be changed. Settings saved later in
    «إعدادات النظام ← إعدادات التكامل» take precedence over `.env`.
+6. **Bring over only the VM's own files from the old folder,** each into its place in the new one (the folder section at
+   the top). Only if the VM uses https, its certificate and key:
+   ```
+   mkdir -p ~/TMRKZ/ops/tls/private && cp -a ~/TMRKZ.before-*/https-certs/. ~/TMRKZ/ops/tls/private/
+   ls ~/TMRKZ/ops/tls/private        # the https entry point reads server.crt and server.key here
+   ```
+   If they have other names, install them properly: `sh ops/tls/install-cert.sh <certificate> <CA chain>` (ops/tls/README.md).
+   A database backup of the old VM, if you want to keep it: `cp ~/TMRKZ.before-*/*.backup ~/TMRKZ/backups/`.
+   Nothing else is copied: the new folder already has everything else.
 
 The old VM folder stays in `~/TMRKZ.before-<date>`; delete it once the new one works (`rm -rf ~/TMRKZ.before-<date>`).
 
