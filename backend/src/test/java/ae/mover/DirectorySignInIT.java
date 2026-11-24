@@ -260,7 +260,7 @@ class DirectorySignInIT extends IntegrationTest {
     private static ae.mover.security.DirectoryAuthenticator authenticator(String url, Path caDir, boolean direct) {
         return new ae.mover.security.DirectoryAuthenticator(new ae.mover.security.LdapProperties(url, true, "cn=service," + BASE,
                 "service-secret", BASE, "uid", "entryUUID", "employeeNumber", "inetOrgPerson", caDir.toString(), null, 3000, 5000, 0, 0,
-                null, null, null, null, null, direct ? "uid={username}," + PEOPLE : null, null));
+                null, null, null, null, null, direct ? "uid={username}," + PEOPLE : null, null, null));
     }
 
     @Test

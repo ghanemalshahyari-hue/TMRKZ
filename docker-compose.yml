@@ -91,6 +91,8 @@ services:
       LDAP_EMPLOYEE_NUMBER_ATTRIBUTE: ${LDAP_EMPLOYEE_NUMBER_ATTRIBUTE:-employeeNumber}
       LDAP_USER_OBJECT_CLASS: ${LDAP_USER_OBJECT_CLASS:-inetOrgPerson}
       LDAP_DIRECT_BIND_PATTERN: ${LDAP_DIRECT_BIND_PATTERN:-}
+      # ADR-100: people bind as {username}@LDAP_DOMAIN (empty: the DC= parts of LDAP_USERS_DN); no service account needed
+      LDAP_DOMAIN: ${LDAP_DOMAIN:-}
       TMRKZ_LDAP_CA_DIR: /etc/tmrkz/ldap-ca
       # ADR-068: which directory attributes / ID-token claims carry unit ID, unit name, main unit ID, rank and position.
       # Empty: not read (the default). Keycloak's mappers: ops/keycloak/set-employment-attributes.sh.
@@ -156,11 +158,14 @@ services:
       # Values substituted into the realm on first import (ops/keycloak/realm/tmrkz-realm.json).
       TMRKZ_PUBLIC_URL: ${TMRKZ_PUBLIC_URL:-http://localhost:8088}
       TMRKZ_OIDC_CLIENT_SECRET: ${TMRKZ_OIDC_CLIENT_SECRET}
-      LDAP_URL: ${LDAP_URL:?set LDAP_URL to the enterprise directory (ldaps://... or ldap://... with LDAP_START_TLS=true)}
+      # ADR-100: optional. The application starts without a service account; people then sign in with their own directory
+      # account through the username/password form (the backend binds as each person). Keycloak's own page can look people
+      # up in the directory only with a service account, so without one it serves the platform accounts alone.
+      LDAP_URL: ${LDAP_URL:-}
       LDAP_START_TLS: ${LDAP_START_TLS:-true}
-      LDAP_BIND_DN: ${LDAP_BIND_DN:?set LDAP_BIND_DN (read-only service account)}
-      LDAP_BIND_CREDENTIAL: ${LDAP_BIND_CREDENTIAL:?set LDAP_BIND_CREDENTIAL}
-      LDAP_USERS_DN: ${LDAP_USERS_DN:?set LDAP_USERS_DN}
+      LDAP_BIND_DN: ${LDAP_BIND_DN:-}
+      LDAP_BIND_CREDENTIAL: ${LDAP_BIND_CREDENTIAL:-}
+      LDAP_USERS_DN: ${LDAP_USERS_DN:-}
       LDAP_USERNAME_ATTRIBUTE: ${LDAP_USERNAME_ATTRIBUTE:-uid}
       LDAP_UUID_ATTRIBUTE: ${LDAP_UUID_ATTRIBUTE:-entryUUID}
       LDAP_USER_OBJECT_CLASSES: ${LDAP_USER_OBJECT_CLASSES:-inetOrgPerson}

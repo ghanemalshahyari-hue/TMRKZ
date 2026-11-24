@@ -40,12 +40,15 @@ fi
   echo "TMRKZ_PUBLIC_URL=http://localhost:8088"
   echo "TMRKZ_HTTP_PORT=8088"
   echo "TMRKZ_SECURE_COOKIE=false"
-  echo "# Enterprise directory used by Keycloak (fill in from the organisation; see docs/OPERATIONS.md)"
+  echo "# Enterprise directory (fill in from the organisation, or on the screen «إعدادات التكامل»; see docs/OPERATIONS.md)"
   echo "LDAP_URL="
   echo "LDAP_START_TLS=true"
+  echo "# optional read-only service account (ADR-100: not needed — each person binds as {username}@LDAP_DOMAIN)"
   echo "LDAP_BIND_DN="
   echo "LDAP_BIND_CREDENTIAL="
   echo "LDAP_USERS_DN="
+  echo "# people sign in as {username}@LDAP_DOMAIN; empty = the DC= parts of LDAP_USERS_DN"
+  echo "LDAP_DOMAIN="
 } > .env
 chmod 600 .env
 echo ".env created"

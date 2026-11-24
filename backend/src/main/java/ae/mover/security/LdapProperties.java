@@ -14,6 +14,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * and the same authenticated connection then finds their one entry under {@code usersDn}; without it, a read-only service account
  * ({@code bindDn}) finds exactly one entry and the person's own bind follows (ADR-016).
  *
+ * <p>No service account is ever required (ADR-100, owner 24 Nov 2026: «anyone who has LDAP credentials»). {@code domain}
+ * ({@code LDAP_DOMAIN}, MOVER's name) gives the pattern {@code {username}@domain}; with neither a pattern, a domain nor a complete
+ * service account, the domain is the {@code DC=} parts of {@code usersDn} ({@code OU=Staff,DC=corp,DC=example} →
+ * {@code corp.example}), which is how Active Directory accepts {@code sAMAccountName@dnsDomain}. A wrong guess is only a refused
+ * bind: the directory still checks every password.
+ *
  * <p>{@code caCertificatesPem} (ADR-092): the CA certificates pasted in «إعدادات التكامل», trusted together with the files of
  * {@code caDir}; the settings saved there replace these environment values as a whole ({@link IntegrationSettingsService}).
  *
@@ -45,9 +51,11 @@ public record LdapProperties(
         String rankAttribute,
         String positionAttribute,
         String directBindPattern,
-        String caCertificatesPem) {
+        String caCertificatesPem,
+        String domain) {
 
     static final Pattern ATTRIBUTE = Pattern.compile("^[A-Za-z][A-Za-z0-9-]{0,63}$");
+    static final Pattern DOMAIN = Pattern.compile("^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,252}[A-Za-z0-9])?$");
     /** The one place the login goes in a direct-bind pattern. */
     public static final String USERNAME_MARKER = "{username}";
 
@@ -73,6 +81,17 @@ public record LdapProperties(
         if (maxFailures <= 0) maxFailures = 5;
         if (lockMinutes <= 0) lockMinutes = 15;
         directBindPattern = pattern(directBindPattern);
+        domain = text(domain);
+        if (domain != null && !DOMAIN.matcher(domain).matches()) {
+            throw new IllegalArgumentException("LDAP_DOMAIN is not a domain name");
+        }
+        if (directBindPattern == null) {
+            // ADR-100: each person binds as themselves unless a complete service account is given
+            String d = domain != null ? domain : bindDn == null || bindCredential == null ? domainOf(usersDn) : null;
+            if (d != null) {
+                directBindPattern = USERNAME_MARKER + "@" + d;
+            }
+        }
         unitIdAttribute = optional("LDAP_ATTR_UNIT_ID", unitIdAttribute);
         unitNameAttribute = optional("LDAP_ATTR_UNIT_NAME", unitNameAttribute);
         mainUnitIdAttribute = optional("LDAP_ATTR_MAIN_UNIT_ID", mainUnitIdAttribute);
@@ -104,6 +123,36 @@ public record LdapProperties(
                     + " marker and no control character");
         }
         return p;
+    }
+
+    /** The {@code DC=} parts of a DN as a DNS domain ({@code OU=x,DC=corp,DC=example} → {@code corp.example}); null if none. */
+    public static String domainOf(String dn) {
+        if (dn == null || dn.isBlank()) {
+            return null;
+        }
+        try {
+            java.util.List<javax.naming.ldap.Rdn> rdns = new javax.naming.ldap.LdapName(dn.trim()).getRdns();
+            java.util.List<String> parts = new java.util.ArrayList<>();
+            for (int i = rdns.size() - 1; i >= 0; i--) { // getRdns() lists the rightmost first
+                javax.naming.ldap.Rdn r = rdns.get(i);
+                if ("dc".equalsIgnoreCase(r.getType())) {
+                    parts.add(String.valueOf(r.getValue()).trim());
+                }
+            }
+            String d = String.join(".", parts);
+            return parts.isEmpty() || !DOMAIN.matcher(d).matches() ? null : d;
+        } catch (javax.naming.InvalidNameException e) {
+            return null;
+        }
+    }
+
+    /**
+     * The domain of a {@code {username}@domain} pattern: the person signs in to Active Directory with their own account, and
+     * the directory's own names (sAMAccountName, userPrincipalName, objectGUID) are accepted next to the configured ones.
+     */
+    public String upnSuffix() {
+        String m = USERNAME_MARKER + "@";
+        return directBindPattern != null && directBindPattern.startsWith(m) ? directBindPattern.substring(m.length()) : null;
     }
 
     private static String text(String s) {

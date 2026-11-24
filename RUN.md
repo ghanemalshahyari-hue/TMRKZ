@@ -254,6 +254,12 @@ As in MOVER's «إعدادات التكامل». Sign in as `admin` or `develope
    `openssl s_client -connect <server>:636 -showcerts` on a machine that reaches it, and paste the CA certificates,
    not the server's own). Press **اختبار الاتصال** — with a real username and password it tries that person's sign-in —
    then **حفظ**. It is in force at once: no restart, nothing in `.env`.
+   **No service account is needed (ADR-100):** leave «حساب الخدمة» empty. Each person's own username and password are
+   checked by the directory (bind as `user@domain`); with «نطاق الدخول» empty the domain is the `DC=` parts of the search
+   base (`DC=corp,DC=example` → `corp.example`). People sign in with **«إدخال رقم الـــــ U وكلمة المرور يدويا»** and may type
+   `user`, `DOMAIN\user` or `user@domain`. The automatic button opens the local Keycloak, which can look people up in the
+   directory only with a service account; without one it is for `admin` and `developer`, until an enterprise Keycloak is
+   saved in step 2.
 2. **الدخول الآلي (Keycloak)** — the enterprise Keycloak's address, realm, TMRKZ's client ID and secret (ask the
    Keycloak team for a confidential client with the return address shown on the screen), the CA if internal.
    **اختبار الاتصال**, then **حفظ**. The automatic button now goes there; `admin` and `developer` keep the local Keycloak.

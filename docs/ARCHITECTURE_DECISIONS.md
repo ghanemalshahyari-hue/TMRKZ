@@ -2791,3 +2791,50 @@ SQLite that lacks a `units` table, and rejects a caller without `CONFIGURE`.
 **Checked and kept.** The backend health check is `select 1` every 10 s; the permission synchronisation compares 1,552 tuples every 5 minutes; nginx serves the page files itself with year-long caching (no page file goes through the application). A TMRKZ nobody uses took about 5 % of one core on this PC over 120 s.
 
 **Consequences.** The polling existed since the first implementation (28–30 Oct) and the rebuild at start since the folder run (19 Nov); neither showed on the 32-core PC. Verified on this PC: `docker compose restart backend web-build` without a build (backend healthy in 7 s, page and API 200); a touched backend file rebuilt and restarted; the web container's type check and bundle; `visibilityPoll.test.ts`.
+
+## ADR-100 Directory sign-in never needs a service account; Active Directory's own names are accepted (owner, 24 Nov 2026)
+
+**Owner.** «how did you build the ldap service as i cant sign in no one can ??? it should allow anyone who have ldap and ldap
+credential as everytime the app fails as it ask for bind».
+
+**What was wrong.**
+- `docker-compose.yml` required `LDAP_BIND_DN`, `LDAP_BIND_CREDENTIAL`, `LDAP_URL` and `LDAP_USERS_DN` for Keycloak (`${…:?}`). As
+  soon as `.env` named a real directory without a service account, `docker compose up` stopped with «set LDAP_BIND_DN
+  (read-only service account)» and nothing started.
+- The manual sign-in bound as the person only when a direct-bind pattern or, on the screen, «نطاق الدخول» was given; otherwise
+  the backend and the screen required a service account («بلا نطاق دخول يلزم حساب خدمة للقراءة»).
+- After a person's own `user@domain` bind, their entry was searched with the configured names only. `.env` still carries the
+  standard directory's `uid` / `entryUUID` / `inetOrgPerson` (ADR-098 wrote every key); Active Directory has none of them, so a
+  correct password found no entry and everybody got «wrong username or password».
+- A login typed `DOMAIN\user` or `user@domain` was refused outright.
+
+**Decision.**
+- No service account is required anywhere. `LdapProperties` takes `domain` (`LDAP_DOMAIN`, MOVER's name) → `{username}@domain`;
+  with no pattern, no domain and no complete service account, the domain is the `DC=` parts of the users DN
+  (`OU=Staff,DC=corp,DC=example` → `corp.example`), which is how Active Directory accepts `sAMAccountName@dnsDomain`. A complete
+  service account without a domain keeps the search-first profile of ADR-016 unchanged; an explicit domain or pattern wins as
+  before. A wrong guess is only a refused bind: the directory checks every password.
+- With a `{username}@domain` pattern (Active Directory), `DirectoryAuthenticator` after the person's own bind finds their one
+  entry by the configured login attribute, `sAMAccountName` or the `userPrincipalName` they bound with, of the configured class
+  or any `person`; reads `objectGUID` (binary) / `entryUUID` when the configured identifier is absent and `sAMAccountName` when
+  the configured login is absent; and accepts `DOMAIN\user` and `user@<this domain>` as `user`. Still exactly one entry, still
+  the uniform refusal, still TLS-verified, still never an empty password; the direct-bind DN check (ADR-070) and the
+  service-search profile are unchanged.
+- «إعدادات التكامل»: the service account is optional («لا يلزم»); with «نطاق الدخول» empty the screen shows the domain derived from
+  the search base; a service account name without its password, or a search base with no `DC=` and no domain, is the problem
+  named before a save.
+- `docker-compose.yml`: Keycloak's `LDAP_*` are optional, the backend reads `LDAP_DOMAIN`; `ops/init-env.sh` writes
+  `LDAP_DOMAIN=` and marks the service account optional.
+
+**Not changed.** Keycloak's own page (the automatic button against the local realm) can look people up in a directory only with
+a service account — Keycloak has no bind-as-the-person mode. Without one, people use «إدخال رقم الـــــ U وكلمة المرور يدويا»
+(this ADR), or the enterprise Keycloak saved in «إعدادات التكامل» (ADR-092); the local realm serves `admin` and `developer`. An
+existing realm keeps its federation; a new realm imported with an empty service account has not been tried.
+
+**Tests.** `ActiveDirectoryDirectBindTest` (new, no database): a fictional StartTLS directory that behaves as AD does (binds as
+`user@dnsDomain`, `user` objects with `sAMAccountName`, `userPrincipalName`, binary `objectGUID`, no `uid`/`entryUUID`) — no
+service account and the `.env` leftovers `uid`/`entryUUID`/`inetOrgPerson` sign in `jdoe`, `CORP\jdoe`, `jdoe@corp.test`,
+`jdoe@CORP.TEST` and an account whose UPN differs from its `sAMAccountName`; step-up by identifier; wrong password, unknown
+login, another domain, empty password and a filter-shaped login refused alike; the AD preset with `MilNumber`; the derivation
+rules. Unchanged and passing: `DirectorySignInIT`, `DirectDirectorySignInIT`, `IntegrationSettingsIT`; frontend
+`integrationSettings.test.ts`.

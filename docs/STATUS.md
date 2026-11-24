@@ -1373,3 +1373,13 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Source check:** the backend's check every 3 s is about 3× cheaper (`find -printf`, no `stat` per file).
 - **Checked and left as they are:** the health check (`select 1`), the permission synchronisation (1,552 tuples compared every 5 minutes), nginx serving the page files with year-long caching. A TMRKZ nobody uses takes about 5 % of one core here.
 - **On the VM:** the next folder zip carries it; no new `tmrkz-images.tar` (the two scripts are mounted from the folder).
+
+## Directory sign-in with no service account (24 Nov 2026; ADR-100)
+
+- **Why:** the owner could not sign in, nor could anyone else: «it should allow anyone who has LDAP credentials … every time the app fails as it asks for bind».
+- **Start:** `docker compose up` no longer stops when `.env` names a real directory without `LDAP_BIND_DN` / `LDAP_BIND_CREDENTIAL`.
+- **Sign-in:** each person's own username and password are checked by the directory (bind as `user@domain`). The domain comes from `LDAP_DOMAIN` or «نطاق الدخول»; when both are empty it is the `DC=` parts of the search base. People may type `user`, `DOMAIN\user` or `user@domain`.
+- **Active Directory with the old names:** with `uid` / `entryUUID` / `inetOrgPerson` still in `.env`, a correct AD password now finds the person (`sAMAccountName`, `userPrincipalName`, `objectGUID`) instead of being refused.
+- **Screen:** «حساب الخدمة» is optional; the screen shows the domain it will use.
+- **Limit:** the automatic button (local Keycloak) can look people up in a directory only with a service account. Without one, people use «إدخال رقم الـــــ U وكلمة المرور يدويا», or an enterprise Keycloak saved in «إعدادات التكامل». Not tried against the organisation's real directory from this PC.
+- **On the VM:** the next folder zip carries it (backend source and `docker-compose.yml`; no new `tmrkz-images.tar`).

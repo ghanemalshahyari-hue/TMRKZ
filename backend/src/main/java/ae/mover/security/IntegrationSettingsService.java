@@ -312,6 +312,7 @@ public class IntegrationSettingsService {
         eff.put("configured", l.configured());
         eff.put("url", l.url());
         eff.put("direct", l.direct());
+        eff.put("domain", l.upnSuffix());
         eff.put("usersDn", l.usersDn());
         eff.put("caDir", l.caDir());
         out.put("effective", eff);
@@ -383,8 +384,12 @@ public class IntegrationSettingsService {
         if (d.domain() != null && !DOMAIN.matcher(d.domain()).matches()) {
             throw ApiException.validation("نطاق الدخول ليس اسم نطاق صالحاً.");
         }
-        if (d.domain() == null && (d.bindDn() == null || password == null)) {
-            throw ApiException.validation("بلا نطاق دخول يلزم حساب خدمة للقراءة: اسمه المميز وكلمة مروره.");
+        // ADR-100: no service account is required; without a domain, each person binds as {username}@<the DC= parts of the base DN>
+        if (d.domain() == null && d.bindDn() != null && password == null) {
+            throw ApiException.validation("اكتب كلمة مرور حساب الخدمة، أو امسح اسمه ليدخل كل شخص بحسابه.");
+        }
+        if (d.domain() == null && d.bindDn() == null && LdapProperties.domainOf(d.baseDn()) == null) {
+            throw ApiException.validation("اكتب نطاق الدخول (مثل corp.example): قاعدة البحث لا تحوي DC=… يُستنتج منها.");
         }
         if (d.timeoutSeconds() < 1 || d.timeoutSeconds() > 120) {
             throw ApiException.validation("المهلة بين 1 و120 ثانية.");
@@ -400,8 +405,8 @@ public class IntegrationSettingsService {
             return new LdapProperties(url, !ldaps, d.bindDn(), password, d.baseDn(), d.usernameAttribute(), d.uuidAttribute(),
                     d.employeeNumberAttribute(), d.userObjectClass(), envLdap.caDir(), envLdap.issuer(), d.timeoutSeconds() * 1000,
                     d.timeoutSeconds() * 1000, envLdap.maxFailures(), envLdap.lockMinutes(), d.unitIdAttribute(), d.unitNameAttribute(),
-                    d.mainUnitIdAttribute(), d.rankAttribute(), d.positionAttribute(),
-                    d.domain() == null ? null : LdapProperties.USERNAME_MARKER + "@" + d.domain(), d.caCertificatesPem());
+                    d.mainUnitIdAttribute(), d.rankAttribute(), d.positionAttribute(), null, d.caCertificatesPem(),
+                    d.domain());
         } catch (IllegalArgumentException e) {
             throw ApiException.validation("أسماء السمات: " + e.getMessage());
         }

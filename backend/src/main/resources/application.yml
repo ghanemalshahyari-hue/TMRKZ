@@ -116,7 +116,10 @@ tmrkz:
     # Manual sign-in (username and password verified by the directory); the same LDAP_* values configure Keycloak's federation.
     # LDAP_DIRECT_BIND_PATTERN (ADR-070): exactly one {username}, e.g. {username}@corp.example — the person binds as themselves
     # and that connection reads their entry; empty: the read-only service account (bind-dn) finds the entry first.
+    # ADR-100: no service account is required. LDAP_DOMAIN gives {username}@domain; with no pattern, no domain and no complete
+    # service account, the domain is the DC= parts of LDAP_USERS_DN (DC=corp,DC=example → corp.example).
     url: ${LDAP_URL:}
+    domain: ${LDAP_DOMAIN:}
     start-tls: ${LDAP_START_TLS:true}
     bind-dn: ${LDAP_BIND_DN:}
     bind-credential: ${LDAP_BIND_CREDENTIAL:}

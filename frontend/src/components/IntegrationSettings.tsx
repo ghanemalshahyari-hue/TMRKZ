@@ -154,9 +154,9 @@ function DirectorySection({ live, onChanged }: { live: IntegrationStatus['direct
           </select>
         </label>
         {field('port', 'المنفذ', undefined, 'number')}
-        {field('domain', 'نطاق الدخول', 'يدخل كل شخص بحسابه user@domain')}
+        {field('domain', 'نطاق الدخول', 'يدخل كل شخص بحسابه user@domain؛ فارغاً: من DC=… في قاعدة البحث')}
         {field('baseDn', 'قاعدة البحث (Base DN)', 'مثل DC=example,DC=local')}
-        {field('bindDn', 'حساب الخدمة (اختياري مع نطاق الدخول)', 'الاسم المميز')}
+        {field('bindDn', 'حساب الخدمة (اختياري — لا يلزم)', 'الاسم المميز')}
         <label className="field">
           <span>كلمة مرور حساب الخدمة {passwordStored ? '(محفوظة؛ اتركها فارغة للإبقاء عليها)' : ''}</span>
           <input type="password" dir="ltr" autoComplete="new-password" value={form.bindPassword} onChange={(e) => set({ bindPassword: e.target.value })} />

@@ -4,6 +4,7 @@ import {
   EMPTY_DIRECTORY,
   EMPTY_OIDC,
   bindDescription,
+  domainOfBaseDn,
   directoryFromSaved,
   directoryProblem,
   directoryUrl,
@@ -31,7 +32,12 @@ describe('integration settings (ADR-092)', () => {
   it('describes how a person binds: as user@domain (MOVER), or found by the service account', () => {
     expect(bindDescription(dir())).toContain('{username}@example.local');
     expect(bindDescription(dir({ domain: '', bindDn: 'CN=svc,DC=example,DC=local' }))).toContain('حساب الخدمة');
-    expect(bindDescription(dir({ domain: '', bindDn: '' }))).toContain('اكتب');
+    // ADR-100: no domain and no service account — each person binds with the domain of the search base
+    expect(bindDescription(dir({ domain: '', bindDn: '' }))).toContain('{username}@example.local');
+    expect(bindDescription(dir({ domain: '', bindDn: '', baseDn: 'OU=Staff,DC=corp,DC=example,DC=com' }))).toContain('{username}@corp.example.com');
+    expect(bindDescription(dir({ domain: '', bindDn: '', baseDn: 'ou=people,o=org' }))).toContain('اكتب');
+    expect(domainOfBaseDn('OU=Staff, dc=Corp ,DC=example')).toBe('Corp.example');
+    expect(domainOfBaseDn('ou=people,o=org')).toBe('');
   });
 
   it('names the first problem before a save, with the server rules', () => {
@@ -39,7 +45,10 @@ describe('integration settings (ADR-092)', () => {
     expect(directoryProblem(dir({ server: '' }), false)).toContain('اسم خادم');
     expect(directoryProblem(dir({ server: 'bad host!' }), false)).toContain('مضيف');
     expect(directoryProblem(dir({ baseDn: '' }), false)).toContain('Base DN');
-    expect(directoryProblem(dir({ domain: '', bindDn: '' }), false)).toContain('حساب خدمة');
+    // ADR-100: a service account is never required
+    expect(directoryProblem(dir({ domain: '', bindDn: '' }), false)).toBe('');
+    expect(directoryProblem(dir({ domain: '', bindDn: '', baseDn: 'ou=people,o=org' }), false)).toContain('نطاق الدخول');
+    expect(directoryProblem(dir({ domain: '', bindDn: 'CN=svc', bindPassword: '' }), false)).toContain('كلمة مرور حساب الخدمة');
     expect(directoryProblem(dir({ domain: '', bindDn: 'CN=svc', bindPassword: '' }), true)).toBe('');
     expect(directoryProblem(dir({ usernameAttribute: '1bad' }), false)).toContain('سمة');
     expect(directoryProblem(dir({ caCertificatesPem: '-----BEGIN PRIVATE KEY-----' }), false)).toContain('مفتاح خاص');

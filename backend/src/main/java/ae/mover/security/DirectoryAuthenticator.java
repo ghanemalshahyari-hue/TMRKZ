@@ -56,6 +56,8 @@ public class DirectoryAuthenticator {
 
     private static final Logger log = LoggerFactory.getLogger(DirectoryAuthenticator.class);
     private static final Pattern ATTRIBUTE = Pattern.compile("^[A-Za-z][A-Za-z0-9-]{0,63}$");
+    /** Active Directory's own names, read next to the configured ones when people bind as {@code user@domain} (ADR-100). */
+    private static final java.util.List<String> AD_NAMES = java.util.List.of("sAMAccountName", "userPrincipalName", "objectGUID", "entryUUID");
     /**
      * A login that may be placed in a direct-bind pattern: letters, digits, dot, hyphen and underscore only, so it can change
      * neither a DN nor a UPN (nothing to escape, nothing to inject); anything else is the uniform wrong-credentials answer.
@@ -201,7 +203,7 @@ public class DirectoryAuthenticator {
             throw invalid();
         }
         if (props().direct()) {
-            return direct(username.trim(), password);
+            return direct(bare(username.trim()), password);
         }
         return verify(props().usernameAttribute(), username.trim(), password);
     }
@@ -219,7 +221,7 @@ public class DirectoryAuthenticator {
             if (login == null || login.isBlank() || login.length() > 128) {
                 throw invalid();
             }
-            DirectoryUser user = direct(login.trim(), password);
+            DirectoryUser user = direct(bare(login.trim()), password);
             if (!user.uuid().equalsIgnoreCase(uuid.trim())) {
                 log.warn("Directory step-up refused: the linked login now names another directory entry");
                 throw invalid();
@@ -248,7 +250,8 @@ public class DirectoryAuthenticator {
         String principal = props().directBindPattern().replace(LdapProperties.USERNAME_MARKER, username);
         LdapContext ctx = connect(principal, password, true);
         try {
-            SearchResult entry = unique(ctx, props().usernameAttribute(), username);
+            SearchResult entry = props().upnSuffix() != null ? uniqueAd(ctx, username, principal)
+                    : unique(ctx, props().usernameAttribute(), username);
             LdapName bound = dn(principal);
             if (bound != null && !bound.equals(dn(entry.getNameInNamespace()))) {
                 // a DN pattern: the entry found for the login must be the entry that has just authenticated
@@ -295,16 +298,35 @@ public class DirectoryAuthenticator {
         }
     }
 
+    /**
+     * The login a person typed, as the {@code {username}@domain} pattern needs it (ADR-100): {@code DOMAIN&#92;user} and
+     * {@code user@domain} (this directory's domain) are the same person as {@code user}. Other patterns: unchanged.
+     */
+    private String bare(String login) {
+        String suffix = props().upnSuffix();
+        if (suffix == null) {
+            return login;
+        }
+        int slash = login.lastIndexOf('\\');
+        String l = slash >= 0 ? login.substring(slash + 1) : login;
+        int at = l.lastIndexOf('@');
+        return at > 0 && l.substring(at + 1).equalsIgnoreCase(suffix) ? l.substring(0, at) : l;
+    }
+
+    /**
+     * Active Directory after the person's own {@code user@domain} bind (ADR-100): their one entry, found by the configured login
+     * attribute, by {@code sAMAccountName} or by the {@code userPrincipalName} they bound with, of the configured class or any
+     * {@code person} (AD's user class descends from it). An installation still on the standard directory's names
+     * ({@code uid}, {@code inetOrgPerson}) therefore finds AD's entries too, instead of refusing every correct password.
+     */
+    private SearchResult uniqueAd(LdapContext ctx, String login, String principal) throws NamingException, DirectoryException {
+        String filter = "(&(|(objectClass=" + props().userObjectClass() + ")(objectClass=person))(|(" + props().usernameAttribute()
+                + "={0})(sAMAccountName={0})(userPrincipalName={1})))";
+        return search(ctx, filter, new Object[]{login, principal});
+    }
+
     /** Exactly one entry of the configured class whose {@code attribute} equals {@code value}; none or several is a refusal. */
     private SearchResult unique(LdapContext ctx, String attribute, String value) throws NamingException, DirectoryException {
-        SearchControls controls = new SearchControls();
-        controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-        controls.setCountLimit(2);
-        controls.setTimeLimit(props().readTimeoutMs());
-        java.util.List<String> returning = new java.util.ArrayList<>(java.util.List.of(props().uuidAttribute(), props().usernameAttribute(),
-                props().employeeNumberAttribute(), "displayName", "cn"));
-        returning.addAll(props().employmentAttributes());
-        controls.setReturningAttributes(returning.stream().distinct().toArray(String[]::new));
         String filter = "(&(objectClass=" + props().userObjectClass() + ")(" + attribute + "={0}))";
         // Active Directory's objectGUID is binary: it is kept as hex text and searched with its bytes.
         Object arg;
@@ -313,7 +335,23 @@ public class DirectoryAuthenticator {
         } catch (IllegalArgumentException e) {
             throw invalid();
         }
-        NamingEnumeration<SearchResult> results = ctx.search(props().usersDn(), filter, new Object[]{arg}, controls);
+        return search(ctx, filter, new Object[]{arg});
+    }
+
+    /** Exactly one entry for {@code filter} under the users DN; none or several is a refusal. */
+    private SearchResult search(LdapContext ctx, String filter, Object[] args) throws NamingException, DirectoryException {
+        SearchControls controls = new SearchControls();
+        controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+        controls.setCountLimit(2);
+        controls.setTimeLimit(props().readTimeoutMs());
+        java.util.List<String> returning = new java.util.ArrayList<>(java.util.List.of(props().uuidAttribute(), props().usernameAttribute(),
+                props().employeeNumberAttribute(), "displayName", "cn"));
+        if (props().upnSuffix() != null) {
+            returning.addAll(AD_NAMES);
+        }
+        returning.addAll(props().employmentAttributes());
+        controls.setReturningAttributes(returning.stream().distinct().toArray(String[]::new));
+        NamingEnumeration<SearchResult> results = ctx.search(props().usersDn(), filter, args, controls);
         SearchResult first = null;
         int count = 0;
         try {
@@ -344,11 +382,20 @@ public class DirectoryAuthenticator {
     /** The verified person as the entry states them; an entry without its stable identifier or login is refused. */
     private DirectoryUser user(SearchResult entry) throws NamingException, DirectoryException {
         Attributes a = entry.getAttributes();
+        boolean ad = props().upnSuffix() != null;
         String uuid = text(a.get(props().uuidAttribute()));
+        if (uuid == null && ad) {
+            // ADR-100: AD's own stable identifier when the configured one is not on the entry (e.g. entryUUID left from .env)
+            uuid = text(a.get("objectGUID"));
+            uuid = uuid != null ? uuid : text(a.get("entryUUID"));
+        }
         if (uuid == null) {
             throw new DirectoryException(Failure.UNAVAILABLE, "directory entry has no stable identifier", null);
         }
         String login = lower(text(a.get(props().usernameAttribute())));
+        if (login == null && ad) {
+            login = lower(text(a.get("sAMAccountName")));
+        }
         if (login == null) {
             throw new DirectoryException(Failure.UNAVAILABLE, "directory entry has no readable login", null);
         }
@@ -383,8 +430,8 @@ public class DirectoryAuthenticator {
         env.put("com.sun.jndi.ldap.connect.timeout", String.valueOf(props().connectTimeoutMs()));
         env.put("com.sun.jndi.ldap.read.timeout", String.valueOf(props().readTimeoutMs()));
         env.put("com.sun.jndi.ldap.connect.pool", "false");
-        if (binaryUuid()) {
-            env.put("java.naming.ldap.attributes.binary", props().uuidAttribute());
+        if (binaryUuid() || props().upnSuffix() != null) {
+            env.put("java.naming.ldap.attributes.binary", binaryUuid() ? props().uuidAttribute() : "objectGUID");
         }
         LdapContext ctx = null;
         try {

@@ -107,12 +107,28 @@ export function directoryUrl(f: Pick<DirectoryForm, 'server' | 'port' | 'securit
   return (f.securityMode === 'ldaps' ? 'ldaps://' : 'ldap://') + host + ':' + (f.port || (f.securityMode === 'ldaps' ? 636 : 389));
 }
 
-/** How a person's password is checked: their own bind as user@domain (MOVER), or found first by the service account. */
-export function bindDescription(f: Pick<DirectoryForm, 'domain' | 'bindDn'>): string {
+/** The DC= parts of a DN as a DNS domain (OU=x,DC=corp,DC=example → corp.example), as the server derives it (ADR-100). */
+export function domainOfBaseDn(dn: string): string {
+  const parts = dn
+    .split(',')
+    .map((p) => p.trim())
+    .filter((p) => /^dc\s*=/i.test(p))
+    .map((p) => p.replace(/^dc\s*=\s*/i, '').trim())
+    .filter(Boolean);
+  return parts.join('.');
+}
+
+/**
+ * How a person's password is checked (ADR-100): their own bind as user@domain — the domain typed, or else the DC= parts of the
+ * search base — unless a service account is given, which then finds the entry first. No service account is ever required.
+ */
+export function bindDescription(f: Pick<DirectoryForm, 'domain' | 'bindDn' | 'baseDn'>): string {
   const domain = f.domain.trim();
   if (domain) return 'كل شخص يدخل بحسابه: {username}@' + domain;
   if (f.bindDn.trim()) return 'حساب الخدمة يجد السجل أولاً، ثم يُتحقق من كلمة مرور الشخص بربطه';
-  return 'اكتب نطاق الدخول، أو حساب خدمة للقراءة';
+  const derived = domainOfBaseDn(f.baseDn);
+  if (derived) return 'كل شخص يدخل بحسابه: {username}@' + derived + ' (من قاعدة البحث)';
+  return 'اكتب نطاق الدخول (مثل corp.example)';
 }
 
 const HOST = /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,252}[A-Za-z0-9])?$/;
@@ -125,7 +141,9 @@ export function directoryProblem(f: DirectoryForm, passwordStored: boolean): str
   if (!HOST.test(f.server.trim())) return 'اسم الخادم ليس اسم مضيف صالحاً.';
   if (!f.port || f.port < 1 || f.port > 65535) return 'المنفذ بين 1 و65535.';
   if (!f.baseDn.trim()) return 'اكتب قاعدة البحث (Base DN).';
-  if (!f.domain.trim() && !(f.bindDn.trim() && (f.bindPassword || passwordStored))) return 'بلا نطاق دخول يلزم حساب خدمة: اسمه المميز وكلمة مروره.';
+  // ADR-100: a service account is optional; without a domain each person binds as {username}@<DC= parts of the base DN>
+  if (!f.domain.trim() && f.bindDn.trim() && !(f.bindPassword || passwordStored)) return 'اكتب كلمة مرور حساب الخدمة، أو امسح اسمه ليدخل كل شخص بحسابه.';
+  if (!f.domain.trim() && !f.bindDn.trim() && !domainOfBaseDn(f.baseDn)) return 'اكتب نطاق الدخول (مثل corp.example): قاعدة البحث لا تحوي DC=… يُستنتج منها.';
   for (const [k, v] of Object.entries({
     'سمة اسم الدخول': f.usernameAttribute,
     'سمة المعرّف الثابت': f.uuidAttribute,
