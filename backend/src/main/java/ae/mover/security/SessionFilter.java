@@ -40,6 +40,7 @@ public class SessionFilter extends OncePerRequestFilter {
             "GET /api/v1/auth/oidc/callback",
             "POST /api/v1/auth/directory/login",
             "GET /api/v1/system/health",
+            "GET /api/v1/system/embedding/csp",
             "GET /api/v1/openapi.json");
 
     private final AuthService auth;

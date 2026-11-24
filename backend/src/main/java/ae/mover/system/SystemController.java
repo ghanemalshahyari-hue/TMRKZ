@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -53,10 +54,11 @@ public class SystemController {
     private final Clock clock;
     private final String version;
     private final DesktopFeed desktop;
+    private final AuditService audit;
 
     public SystemController(AccessService access, PolicyService policies, IntegrationService integrations,
                             ReportService reports, OutboxProcessor outbox, JdbcClient jdbc, Json json, Clock clock, @Value("${mover.version:1.0.0}") String version,
-                            DesktopFeed desktop) {
+                            DesktopFeed desktop, AuditService audit) {
         this.desktop = desktop;
         this.access = access;
         this.policies = policies;
@@ -67,6 +69,7 @@ public class SystemController {
         this.json = json;
         this.clock = clock;
         this.version = version;
+        this.audit = audit;
     }
 
     // ---- policies -----------------------------------------------------------------------------------
@@ -298,5 +301,112 @@ public class SystemController {
     public ResponseEntity<byte[]> openapi() throws java.io.IOException {
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON)
                 .body(new ClassPathResource("openapi.json").getContentAsByteArray());
+    }
+
+    // ---- management center (§3B) ---------------------------------------------------------------
+
+    @GetMapping("/system/management")
+    public Map<String, Object> management(Actor actor) {
+        access.context(actor).require(Permission.CONFIGURE);
+        Map<String, Object> m = new LinkedHashMap<>();
+        Integer schema = jdbc.sql("select max(cast(version as integer)) from flyway_schema_history where success and version is not null")
+                .query(Integer.class).optional().orElse(null);
+        m.put("schemaVersion", schema);
+        m.put("organizations", jdbc.sql("select count(*) from organization where status = 'ACTIVE'").query(Long.class).single());
+        m.put("people", jdbc.sql("select count(*) from person where status = 'ACTIVE'").query(Long.class).single());
+        m.put("requests", jdbc.sql("select count(*) from request").query(Long.class).single());
+        m.put("sites", jdbc.sql("select count(*) from site where status <> 'RETIRED'").query(Long.class).single());
+
+        java.io.File backupsDir = new java.io.File("backups");
+        if (backupsDir.isDirectory()) {
+            String[] dirs = backupsDir.list();
+            m.put("backupCount", dirs != null ? dirs.length : 0);
+        } else {
+            m.put("backupCount", 0);
+        }
+
+        String tlsDir = System.getenv("TMRKZ_TLS_DIR");
+        if (tlsDir == null || tlsDir.isBlank()) tlsDir = "ops/tls/private";
+        java.io.File certFile = new java.io.File(tlsDir, "server.crt");
+        if (certFile.exists()) {
+            m.put("tlsConfigured", true);
+            try {
+                var cf = java.security.cert.CertificateFactory.getInstance("X.509");
+                try (var fis = new java.io.FileInputStream(certFile)) {
+                    var cert = (java.security.cert.X509Certificate) cf.generateCertificate(fis);
+                    m.put("tlsSubject", cert.getSubjectX500Principal().getName());
+                    m.put("tlsIssuer", cert.getIssuerX500Principal().getName());
+                    m.put("tlsExpiry", cert.getNotAfter().toInstant().toString());
+                    m.put("tlsNotBefore", cert.getNotBefore().toInstant().toString());
+                    var sans = cert.getSubjectAlternativeNames();
+                    if (sans != null) {
+                        m.put("tlsSAN", sans.stream().map(e -> String.valueOf(e.get(1))).toList());
+                    }
+                }
+            } catch (Exception e) {
+                m.put("tlsError", e.getMessage());
+            }
+        } else {
+            m.put("tlsConfigured", false);
+        }
+
+        m.put("embeddingAllowedOrigins", embeddingOrigins());
+        m.put("version", version);
+        m.put("serverTime", clock.instant().toString());
+        m.put("database", jdbc.sql("select 1").query(Integer.class).single() == 1 ? "UP" : "DOWN");
+        m.put("mapPackages", jdbc.sql("select count(*) from map_package where status = 'ACTIVE'").query(Long.class).single());
+        return m;
+    }
+
+    @GetMapping("/system/embedding")
+    public Map<String, Object> getEmbedding(Actor actor) {
+        access.context(actor).require(Permission.CONFIGURE);
+        return Map.of("allowedOrigins", embeddingOrigins());
+    }
+
+    @PutMapping("/system/embedding")
+    public Map<String, Object> setEmbedding(Actor actor, @RequestBody Map<String, Object> body) {
+        var ctx = access.context(actor);
+        ctx.require(Permission.CONFIGURE);
+        @SuppressWarnings("unchecked")
+        var origins = (List<String>) body.get("allowedOrigins");
+        if (origins == null) origins = List.of();
+        var validated = new java.util.ArrayList<String>();
+        for (String o : origins) {
+            if (o == null || o.isBlank()) continue;
+            o = o.strip();
+            if (!o.matches("^https://[a-zA-Z0-9._-]+(:[0-9]+)?$")) {
+                throw ApiException.validation("مصدر غير صالح: " + o + " — يجب أن يكون https://host أو https://host:port فقط");
+            }
+            validated.add(o);
+        }
+        if (validated.isEmpty()) {
+            jdbc.sql("delete from system_setting where key = 'EMBEDDING_ALLOWED_ORIGINS'").update();
+        } else {
+            jdbc.sql("""
+                insert into system_setting (key, value) values ('EMBEDDING_ALLOWED_ORIGINS', :v)
+                on conflict (key) do update set value = excluded.value""")
+                .param("v", String.join(",", validated)).update();
+        }
+        audit.recordAs(ctx.actor(), "EMBEDDING_ORIGINS_CHANGED", "SYSTEM", "embedding", null,
+                Map.of("origins", validated), null);
+        return Map.of("allowedOrigins", validated);
+    }
+
+    @GetMapping(value = "/system/embedding/csp", produces = "text/plain")
+    public String embeddingCsp() {
+        List<String> origins = embeddingOrigins();
+        return origins.isEmpty() ? "'none'" : "'self' " + String.join(" ", origins);
+    }
+
+    private List<String> embeddingOrigins() {
+        try {
+            String raw = jdbc.sql("select value from system_setting where key = 'EMBEDDING_ALLOWED_ORIGINS'")
+                    .query(String.class).optional().orElse("");
+            if (raw == null || raw.isBlank()) return List.of();
+            return java.util.Arrays.stream(raw.split(",")).filter(s -> !s.isBlank()).map(String::strip).toList();
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 }

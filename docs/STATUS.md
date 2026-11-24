@@ -1395,3 +1395,15 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **start.sh:** bash 3.2 awk compatibility on macOS.
 - **Tests:** OracleAbsenceIT 2/2, EmploymentContextIT 1/1, DbMigrationIT 1/1 (validates V67), AdministrationAcceptanceIT 8/8, AuthorizationIT 10/10 — 22 backend tests green. Frontend 57 files / 405 tests green.
 - **On the VM:** the next folder zip carries it (backend source, frontend build, V67 migration; no new `tmrkz-images.tar`).
+
+## V3 engineering: CLI recovery, Management Center, AI context, GIS cursor, admin lifecycle (24 Nov 2026; ADR-102)
+
+- **CLI recovery engine (`ops/tmrkzctl.sh`):** 8 modes — doctor (21 checks: images, mounts, .env, ports, disk, DB health, schema, TLS, services, caches, images tar), setup, status, verify, update (validates bundle, staging, pre-update backup, restart, health wait), rollback, backup, inventory. All checks PASS on the development machine.
+- **Management Center (browser UI):** system status with count cards (organisations, people, requests, sites), schema version, TLS certificate metadata (subject, issuer, expiry, SAN), embedding allowlist CRUD, backup information, CLI emergency command reference. Rendered under «مركز إدارة النظام» in the settings page, gated by `CONFIGURE`.
+- **Embedding allowlist:** full CRUD for `frame-ancestors` values (`https://host[:port]` only), persisted in `system_setting` (V68), audit-logged, public CSP endpoint (`GET /system/embedding/csp`) for nginx consumption. `ops/local/workspace/gen-csp-embedding.sh` generates the nginx include.
+- **AI conversation context:** the assistant now sends up to 6 prior turns as bounded history (user/assistant messages) so the AI has conversational memory within a session. Backend `AssistantService.complete()` builds the conversation; frontend `FloatingAssist` accumulates completed turns.
+- **GIS cursor alignment:** root cause is `html { zoom: 0.9 }` in `prototype.css` causing MapLibre/Leaflet offset. Fixed with counter-zoom `.maplibregl-map, .leaflet-container { zoom: calc(1 / 0.9); }` in `map.css` without modifying `prototype.css`.
+- **Administrator lifecycle:** list, add (by username lookup) and remove system administrators from the settings page. Self-escalation, duplicates and removal of the last active admin prevented. `OrganizationService.listAdministrators/addAdministrator/removeAdministrator`, `OrgController`, `AdminLifecycle.tsx`.
+- **Arabic documentation:** `docs/ADMIN_UI_QUICK_START_AR.md` (admin UI guide), `docs/VM_BOOTSTRAP_AR.md` (VM bootstrap), `docs/VM_QUICK_START_AR.md` (VM quick start).
+- **Tests:** AuthorizationIT 10/10, IntegrationSettingsIT 2/2, AdministrationAcceptanceIT 8/8, OracleAbsenceIT 2/2, DbMigrationIT 1/1 — all green. Frontend 405/405 tests, type check and build clean.
+- **On the VM:** the next folder zip carries it (backend source, frontend build, V68 migration; no new `tmrkz-images.tar`).

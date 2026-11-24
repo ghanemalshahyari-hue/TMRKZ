@@ -109,6 +109,7 @@ import type {
   UnitSymbol,
   StudioItem,
   SystemInfo,
+  SystemManagement,
   SystemState,
   HrUnitsPreview,
   TaskItem,
@@ -571,6 +572,7 @@ export type WorkspaceUnit = {
   myRights: string[];
 };
 export type AccessRightDef = { key: string; label: string; byDefault: boolean };
+export type Administrator = { personId: string; displayName: string; username: string; employeeNumber: string | null; grantedAt: string; grantedBy: string };
 export type DutyPermit = {
   id: string;
   person: { id: string; displayName: string; employeeNo: string };
@@ -711,6 +713,10 @@ export const api = {
   setLevel: (level: number, name: string) => call<{ level: number; name: string; unitCount: number }>('PUT', `/levels/${level}`, { body: { name } }),
   deleteLevel: (level: number) => del<void>(`/levels/${level}`),
   setUnitLevel: (orgId: string, level: number | null) => call<void>('PUT', `/organizations/${orgId}/level`, { body: { level } }),
+  // admin: administrator lifecycle
+  listAdministrators: () => get<Administrator[]>('/administrators'),
+  addAdministrator: (username: string) => post<Administrator>('/administrators', { username }),
+  removeAdministrator: (personId: string) => del<void>(`/administrators/${personId}`),
 
   // permissions studio (policy versions, scoped grants, explanations, OpenFGA sync)
   authzStatus: () => get<AuthzStatus>('/access/status'),
@@ -1017,6 +1023,9 @@ export const api = {
   previewOrgImport: (rows: { code: string; name: string; parentCode: string | null }[]) => post<OrgImportPreview>('/integrations/org-structure/preview', { rows }),
   commitOrgImport: (runId: string) => post<unknown>(`/integrations/org-structure/runs/${runId}/commit`),
   systemInfo: () => get<SystemInfo>('/system/info'),
+  systemManagement: () => get<SystemManagement>('/system/management'),
+  getEmbedding: () => get<{ allowedOrigins: string[] }>('/system/embedding'),
+  setEmbedding: (origins: string[]) => call<{ allowedOrigins: string[] }>('PUT', '/system/embedding', { body: { allowedOrigins: origins } }),
   /** ADR-094: the installation's state — empty screens show nothing in the middle (no map, no zeros) */
   systemState: () => get<SystemState>('/system/state'),
   /** ADR-094: the person asks HR for their own record now */
@@ -1078,7 +1087,8 @@ export const api = {
   supportEndSeat: (id: string, reason: string) => post<void>(`/support/seats/${id}/end`, { reason }),
   // «المساعد الذكي» (ADR-056)
   assistantStatus: () => get<{ enabled: boolean; model: string | null; reachable: boolean }>('/assistant/status'),
-  assistantAsk: (question: string, screen?: string | null) => post<AssistantAnswer>('/assistant/ask', { question, screen }),
+  assistantAsk: (question: string, screen?: string | null, history?: { question: string; answer: string | null }[]) =>
+    post<AssistantAnswer>('/assistant/ask', { question, screen, history: history?.filter((t) => t.answer).map((t) => ({ question: t.question, answer: t.answer })) }),
   // «دليل تمركز» (ADR-054)
   helpSearch: (q: string) => get<HelpHit[]>('/help/search' + query({ q })),
   helpIndex: () => get<HelpHit[]>('/help/index'),

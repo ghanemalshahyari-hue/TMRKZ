@@ -1,5 +1,10 @@
 /* Administrative map workspace. Reuses the prototype tokens (prototype.css is kept verbatim). */
 
+/* Counter the html{zoom:.9} from prototype.css inside map containers so pointer coordinates match
+   the WebGL canvas.  Without this, getBoundingClientRect() reports zoomed dimensions while
+   offsetWidth reports unzoomed, and both MapLibre and Leaflet over-correct their scale factor. */
+.maplibregl-map, .leaflet-container { zoom: calc(1 / 0.9); }
+
 .map-workspace{display:flex;flex-direction:column;gap:12px;min-width:0}
 
 /* context bar: what is selected, always readable, tools collapsible */

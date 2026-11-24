@@ -702,4 +702,138 @@ public class OrganizationService {
         }
         jdbc.sql("update organization set level = :l where id = :id").param("l", level).param("id", orgId).update();
     }
+
+    // ---- admin: administrator lifecycle (§6) ---------------------------------------------------
+
+    public record AdminView(String personId, String displayName, String username, String employeeNumber,
+                            String grantedAt, String grantedBy) {}
+
+    public List<AdminView> listAdministrators(AccessContext ctx) {
+        ctx.require(Permission.CONFIGURE);
+        return jdbc.sql("""
+                select m.person_id, p.display_name, p.username, p.employee_no,
+                       m.valid_from as granted_at, g.display_name as granted_by
+                from membership m
+                join person p on p.id = m.person_id
+                left join person g on g.id = m.granted_by
+                where m.role_code = 'SYSTEM_ADMIN'
+                  and m.valid_from <= now() and (m.valid_to is null or m.valid_to > now())
+                  and p.status = 'ACTIVE'
+                order by m.valid_from""")
+                .query((rs, _) -> new AdminView(
+                        rs.getString("person_id"),
+                        rs.getString("display_name"),
+                        rs.getString("username"),
+                        rs.getString("employee_no"),
+                        rs.getTimestamp("granted_at") != null ? rs.getTimestamp("granted_at").toInstant().toString() : null,
+                        rs.getString("granted_by")
+                )).list();
+    }
+
+    @Transactional
+    public AdminView addAdministrator(AccessContext ctx, String username) {
+        ctx.require(Permission.CONFIGURE);
+        if (username == null || username.isBlank()) {
+            throw ApiException.validation("اسم المستخدم مطلوب.");
+        }
+        String login = username.strip().toLowerCase();
+
+        // prevent self-escalation: the acting person cannot add themselves
+        Map<String, Object> actorPerson = jdbc.sql("select username from person where id = :id")
+                .param("id", ctx.personId()).query().singleRow();
+        if (login.equalsIgnoreCase((String) actorPerson.get("username"))) {
+            throw ApiException.validation("لا يمكنك منح نفسك صلاحية مدير النظام.");
+        }
+
+        // find the person by verified directory login
+        Map<String, Object> person = jdbc.sql("""
+                select p.id, p.display_name, p.username, p.employee_no, p.status
+                from person p
+                where lower(p.username) = :login and p.status = 'ACTIVE'
+                  and exists (select 1 from identity_link il where il.person_id = p.id and il.method = 'DIRECTORY')""")
+                .param("login", login).query().listOfRows().stream().findFirst().orElse(null);
+        if (person == null) {
+            throw ApiException.validation("لم يُعثر على شخص بهذا الحساب في الدليل المؤسسي، أو الحساب غير نشط. يجب أن يدخل الشخص أولاً.");
+        }
+
+        UUID personId = (UUID) person.get("id");
+
+        // prevent duplicate: check if already a system admin
+        int existing = jdbc.sql("""
+                select count(*) from membership
+                where person_id = :p and role_code = 'SYSTEM_ADMIN'
+                  and valid_from <= now() and (valid_to is null or valid_to > now())""")
+                .param("p", personId).query(Integer.class).single();
+        if (existing > 0) {
+            throw ApiException.validation("هذا الشخص مدير نظام بالفعل.");
+        }
+
+        // find or pick an organization for the grant scope (global: use a root org)
+        UUID orgId = jdbc.sql("select id from organization where parent_id is null and status = 'ACTIVE' limit 1")
+                .query(UUID.class).optional().orElseThrow(() -> ApiException.validation("لا توجد وحدة جذرية — استورد الهيكل أولاً."));
+
+        UUID membershipId = UUID.randomUUID();
+        Instant now = clock.instant();
+        jdbc.sql("""
+                insert into membership(id, person_id, organization_id, role_code, position_title, valid_from, granted_by)
+                values (:id, :p, :o, 'SYSTEM_ADMIN', 'مدير نظام', :now, :by)""")
+                .param("id", membershipId).param("p", personId).param("o", orgId)
+                .param("now", Db.ts(now)).param("by", ctx.personId()).update();
+
+        // global scope target
+        jdbc.sql("""
+                insert into membership_scope_target(membership_id, kind, target_id, include_descendants)
+                values (:m, 'ALL', :o, true)""")
+                .param("m", membershipId).param("o", orgId).update();
+
+        audit.recordAs(ctx.actor(), "ADMIN_GRANTED", "PERSON", personId.toString(),
+                (String) person.get("display_name"),
+                Map.of("username", login, "membershipId", membershipId.toString()), null);
+
+        return new AdminView(personId.toString(), (String) person.get("display_name"),
+                (String) person.get("username"), (String) person.get("employee_no"),
+                now.toString(), null);
+    }
+
+    @Transactional
+    public void removeAdministrator(AccessContext ctx, UUID personId) {
+        ctx.require(Permission.CONFIGURE);
+
+        // prevent removing self
+        if (ctx.personId().equals(personId)) {
+            throw ApiException.validation("لا يمكنك إزالة صلاحيتك أنت — اطلب من مدير آخر.");
+        }
+
+        // count active system admins
+        long adminCount = jdbc.sql("""
+                select count(distinct m.person_id) from membership m
+                join person p on p.id = m.person_id and p.status = 'ACTIVE'
+                where m.role_code = 'SYSTEM_ADMIN'
+                  and m.valid_from <= now() and (m.valid_to is null or m.valid_to > now())""")
+                .query(Long.class).single();
+        if (adminCount <= 1) {
+            throw ApiException.validation("لا يمكن إزالة آخر مدير نظام — يجب أن يبقى مدير واحد على الأقل.");
+        }
+
+        // find and end the membership
+        List<UUID> ids = jdbc.sql("""
+                select m.id from membership m
+                where m.person_id = :p and m.role_code = 'SYSTEM_ADMIN'
+                  and m.valid_from <= now() and (m.valid_to is null or m.valid_to > now())""")
+                .param("p", personId).query(UUID.class).list();
+        if (ids.isEmpty()) {
+            throw ApiException.validation("هذا الشخص ليس مدير نظام حالياً.");
+        }
+
+        Instant now = clock.instant();
+        for (UUID id : ids) {
+            jdbc.sql("update membership set valid_to = :e, ended_reason = 'إزالة بواسطة مدير النظام' where id = :id")
+                    .param("e", Db.ts(now)).param("id", id).update();
+        }
+
+        String name = jdbc.sql("select display_name from person where id = :id")
+                .param("id", personId).query(String.class).optional().orElse(null);
+        audit.recordAs(ctx.actor(), "ADMIN_REVOKED", "PERSON", personId.toString(), name,
+                Map.of("membershipIds", ids.stream().map(UUID::toString).toList()), null);
+    }
 }

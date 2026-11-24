@@ -116,7 +116,14 @@ public class AssistantService {
     public record Answer(String mode, String answer, List<KnowledgeService.Hit> sources, String model, String degraded) {
     }
 
+    public record PriorTurn(String question, String answer) {
+    }
+
     public Answer ask(AccessContext ctx, String question, String screen, Predicate<KnowledgeService.Doc> visible) {
+        return ask(ctx, question, screen, visible, List.of());
+    }
+
+    public Answer ask(AccessContext ctx, String question, String screen, Predicate<KnowledgeService.Doc> visible, List<PriorTurn> history) {
         String q = question == null ? "" : question.trim();
         if (q.isEmpty() || q.length() > MAX_QUESTION) {
             throw ApiException.validation("اكتب سؤالك في " + MAX_QUESTION + " حرف على الأكثر.");
@@ -141,7 +148,7 @@ public class AssistantService {
             out = new Answer("OFF", null, hits, null, "BUSY");
         } else {
             try {
-                out = new Answer("MODEL", complete(q, hits, c), hits, c.model(), null);
+                out = new Answer("MODEL", complete(q, hits, c, history), hits, c.model(), null);
             } catch (IOException | RuntimeException e) {
                 log.warn("assistant model call failed: {}", e.toString());
                 out = new Answer("OFF", null, hits, null, "UNREACHABLE");
@@ -173,8 +180,11 @@ public class AssistantService {
         }
     }
 
-    /** One chat completion over the documents the person may see; plain text back, the model's reasoning tags removed. */
-    String complete(String question, List<KnowledgeService.Hit> hits, IntegrationSettingsService.Assistant c)
+    String complete(String question, List<KnowledgeService.Hit> hits, IntegrationSettingsService.Assistant c) throws IOException, InterruptedException {
+        return complete(question, hits, c, List.of());
+    }
+
+    String complete(String question, List<KnowledgeService.Hit> hits, IntegrationSettingsService.Assistant c, List<PriorTurn> history)
             throws IOException, InterruptedException {
         StringBuilder docs = new StringBuilder();
         for (KnowledgeService.Hit h : hits) {
@@ -183,11 +193,20 @@ public class AssistantService {
                     .append(body.length() > 3000 ? body.substring(0, 3000) : body).append("\n\n");
         }
         String user = "الوثائق:\n\n" + docs + "السؤال: " + question;
+        List<Map<String, String>> messages = new ArrayList<>();
+        messages.add(Map.of("role", "system", "content", SYSTEM));
+        int maxHistory = Math.min(history.size(), 6);
+        for (int i = history.size() - maxHistory; i < history.size(); i++) {
+            PriorTurn t = history.get(i);
+            if (t.question() != null && !t.question().isBlank()) messages.add(Map.of("role", "user", "content", t.question()));
+            if (t.answer() != null && !t.answer().isBlank()) messages.add(Map.of("role", "assistant", "content", t.answer()));
+        }
+        messages.add(Map.of("role", "user", "content", user));
         Map<String, Object> req = new LinkedHashMap<>();
         req.put("model", c.model());
         req.put("temperature", 0.1);
         req.put("stream", false);
-        req.put("messages", List.of(Map.of("role", "system", "content", SYSTEM), Map.of("role", "user", "content", user)));
+        req.put("messages", messages);
         byte[] body = json.writeValueAsBytes(req);
         if (body.length > MAX_REQUEST) {
             throw new IOException("request too large");

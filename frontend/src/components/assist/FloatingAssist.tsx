@@ -166,8 +166,9 @@ function AssistantDock({ view, onClose, onReport }: { view: string; onClose: () 
     setQ('');
     setBusy(true);
     setTurns((t) => [...t, { q: question, a: null }]);
+    const priorTurns = turns.filter((t) => t.a?.answer).map((t) => ({ question: t.q, answer: t.a?.answer ?? null }));
     api
-      .assistantAsk(question, view)
+      .assistantAsk(question, view, priorTurns)
       .then((a) => setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, a } : x))))
       .catch((e: Error) => setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, error: e.message } : x))))
       .finally(() => setBusy(false));

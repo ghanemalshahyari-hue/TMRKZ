@@ -186,4 +186,22 @@ public class OrgController {
         orgs.setUnitLevel(access.context(actor), id, body.get("level"));
         return ResponseEntity.noContent().build();
     }
+
+    // ---- admin: administrator lifecycle (§6) ---------------------------------------------------
+
+    @GetMapping("/administrators")
+    public List<OrganizationService.AdminView> listAdministrators(Actor actor) {
+        return orgs.listAdministrators(access.context(actor));
+    }
+
+    @PostMapping("/administrators")
+    public OrganizationService.AdminView addAdministrator(Actor actor, @RequestBody Map<String, String> body) {
+        return orgs.addAdministrator(access.context(actor), body.get("username"));
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/administrators/{personId}")
+    public ResponseEntity<Void> removeAdministrator(Actor actor, @PathVariable UUID personId) {
+        orgs.removeAdministrator(access.context(actor), personId);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -5,8 +5,10 @@ import { Heading, KeyValue } from '../components/ui';
 import { HrSourcePanel } from '../components/HrSourcePanel';
 import { SignInNotesSettings } from '../components/SignInNotesSettings';
 import { IntegrationSettings } from '../components/IntegrationSettings';
+import { AdminLifecycle } from '../components/AdminLifecycle';
 import { SiteSetupAccessSettings } from '../components/SiteSetupAccessSettings';
 import { DbMigrationCenter } from '../components/DbMigrationCenter';
+import { ManagementCenter } from '../components/ManagementCenter';
 import { useApp } from '../lib/app';
 import { formatBytes, fullTime } from '../lib/dates';
 import { INTEGRATION_STATUS } from '../lib/labels';
@@ -190,6 +192,7 @@ export function SettingsPage() {
         <h2 className="settings-group" data-testid="settings-group-identity">الهوية والدخول</h2>
         <SignInNotesSettings />
         {app.can('CONFIGURE') && <IntegrationSettings />}
+        {app.can('CONFIGURE') && <AdminLifecycle />}
         {app.can('CONFIGURE') && (
           <>
             <h2 className="settings-group" data-testid="settings-group-hr">مصدر الموارد البشرية</h2>
@@ -223,6 +226,12 @@ export function SettingsPage() {
           )}
         </section>
         {app.can('CONFIGURE') && <DbMigrationCenter />}
+        {app.can('CONFIGURE') && (
+          <>
+            <h2 className="settings-group" data-testid="settings-group-management">مركز إدارة النظام</h2>
+            <ManagementCenter />
+          </>
+        )}
       </div>
     </>
   );

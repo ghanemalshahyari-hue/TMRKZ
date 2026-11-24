@@ -783,6 +783,29 @@ export type SystemInfo = {
   mapPackages: number;
 };
 
+export type SystemManagement = {
+  schemaVersion: number | null;
+  organizations: number;
+  people: number;
+  requests: number;
+  sites: number;
+  backupCount: number;
+  backupsPath?: string;
+  tlsConfigured: boolean;
+  tlsPath?: string;
+  tlsSubject?: string;
+  tlsIssuer?: string;
+  tlsExpiry?: string;
+  tlsNotBefore?: string;
+  tlsSAN?: string[];
+  tlsError?: string;
+  embeddingAllowedOrigins: string[];
+  version: string;
+  serverTime: string;
+  database: string;
+  mapPackages: number;
+};
+
 // ---------- audit, reports, exports, notifications ----------
 export type AuditEvent = {
   id: string;

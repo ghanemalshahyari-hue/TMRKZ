@@ -1,6 +1,7 @@
 package ae.mover.assistant;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -33,13 +34,16 @@ public class AssistantController {
         return assistant.status();
     }
 
-    public record AskInput(String question, String screen) {
+    public record AskInput(String question, String screen, List<PriorTurn> history) {
+    }
+    public record PriorTurn(String question, String answer) {
     }
 
     @PostMapping("/ask")
     public Map<String, Object> ask(Actor actor, @RequestBody AskInput in) {
+        List<PriorTurn> history = in != null && in.history() != null ? in.history() : List.of();
         AssistantService.Answer a = assistant.ask(access.context(actor), in == null ? null : in.question(), in == null ? null : in.screen(),
-                help.visible(actor));
+                help.visible(actor), history.stream().map(t -> new AssistantService.PriorTurn(t.question(), t.answer())).toList());
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("mode", a.mode());
         m.put("answer", a.answer());
