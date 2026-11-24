@@ -1383,3 +1383,15 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Screen:** «حساب الخدمة» is optional; the screen shows the domain it will use.
 - **Limit:** the automatic button (local Keycloak) can look people up in a directory only with a service account. Without one, people use «إدخال رقم الـــــ U وكلمة المرور يدويا», or an enterprise Keycloak saved in «إعدادات التكامل». Not tried against the organisation's real directory from this PC.
 - **On the VM:** the next folder zip carries it (backend source and `docker-compose.yml`; no new `tmrkz-images.tar`).
+
+## Unit management, level management, employee number admin, screen transitions (24 Nov 2026; ADR-101)
+
+- **Unit management:** system administrators (`CONFIGURE`) can create, rename, reparent and retire organisation units from the directory page. Retirement is refused when active children or members remain. Cycle prevention by DB trigger. All operations audited.
+- **Level management:** `organization_level` table (V67, levels 1–20); CRUD from the directory page; a level with active units cannot be deleted; units can be assigned a level.
+- **Employee number admin:** `PUT /people/{id}/employee-no` lets a system admin set an employee number on any person without needing HR resources. Uniqueness enforced, audited.
+- **Oracle fully separated from login:** `EmploymentContextResolver.mode()` reads only local tables (`hr_source.enabled` AND `hr_snapshot.status = 'PUBLISHED'`). `IdentityService.resolve()` calls `toOracle()` only as a post-sign-in step, never as a dependency. `directorySignInSuffices` allows login even when Oracle is unreachable. `OracleAbsenceIT` (2 tests) proves the `HrConnectionFactory` is never called during login when HR is not in force — the factory throws if contacted, and both tests pass with zero calls.
+- **Screen transitions fixed:** `.tz-app.is-page` now sets `height: auto; overflow: visible` to reset the console viewport pin. `.tz-main` on pages uses `overflow: visible` with `min-height: 200px`. Scroll reset targets both `window` and `#main`. Pages no longer disappear or collapse when navigating from console views.
+- **TopNavigation RTL and identity card:** nav overflow corrected; identity card spacing fixed for Arabic layout.
+- **start.sh:** bash 3.2 awk compatibility on macOS.
+- **Tests:** OracleAbsenceIT 2/2, EmploymentContextIT 1/1, DbMigrationIT 1/1 (validates V67), AdministrationAcceptanceIT 8/8, AuthorizationIT 10/10 — 22 backend tests green. Frontend 57 files / 405 tests green.
+- **On the VM:** the next folder zip carries it (backend source, frontend build, V67 migration; no new `tmrkz-images.tar`).
