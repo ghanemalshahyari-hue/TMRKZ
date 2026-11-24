@@ -2838,3 +2838,51 @@ service account and the `.env` leftovers `uid`/`entryUUID`/`inetOrgPerson` sign 
 login, another domain, empty password and a filter-shaped login refused alike; the AD preset with `MilNumber`; the derivation
 rules. Unchanged and passing: `DirectorySignInIT`, `DirectDirectorySignInIT`, `IntegrationSettingsIT`; frontend
 `integrationSettings.test.ts`.
+
+## ADR-101 Unit management, level management, employee number admin, screen transitions, Oracle absence proof (24 Nov 2026)
+
+**Context.** System administrators need to manage organisational units, levels and employee numbers directly in TMRKZ without
+depending on Oracle HR, and page transitions from console views left content invisible.
+
+**Decision.** Accepted.
+- **Unit management:** `CONFIGURE` holders create, rename, reparent and retire units from the directory page; retirement refused
+  when active children or members remain; cycle prevention by a DB trigger.
+- **Level management:** `organization_level` table (V67, levels 1–20); CRUD from the directory page; a level with active units
+  cannot be deleted; units can be assigned a level.
+- **Employee number admin:** `PUT /people/{id}/employee-no` lets a system admin set an employee number without HR resources;
+  uniqueness enforced, audited.
+- **Oracle absence proof:** `EmploymentContextResolver.mode()` reads only local tables; `IdentityService.resolve()` calls
+  `toOracle()` only as a post-sign-in step. `OracleAbsenceIT` overrides the connection factory with a throwing stub — zero calls
+  during login when HR is not in force.
+- **Screen transitions:** `.tz-app.is-page` sets `height: auto; overflow: visible`; scroll reset targets both `window` and
+  `#main`.
+
+**Tests.** `OracleAbsenceIT` 2/2, `EmploymentContextIT` 1/1, `DbMigrationIT` 1/1 (V67), `AdministrationAcceptanceIT` 8/8,
+`AuthorizationIT` 10/10; frontend 405/405.
+
+## ADR-102 Management centre, CLI recovery engine, AI context, GIS cursor fix, administrator lifecycle, embedding allowlist (24 Nov 2026)
+
+**Context.** The V3 engineering brief (§1–§12) calls for a browser management centre, a CLI recovery/bootstrap engine, an
+embedding frame-ancestors allowlist, an administrator add/revoke lifecycle, bounded AI conversation context, a GIS cursor
+alignment fix and Arabic operational documentation.
+
+**Decision.** Accepted.
+- **`ops/tmrkzctl.sh`** (§1): 8 modes — `doctor` (images, mounts, .env, ports, disk, database, TLS, services, caches),
+  `setup`, `status`, `verify`, `update` (staged, path-traversal and content-safe, backup-before-update), `rollback` (delegates
+  to `verify-restore.sh`), `backup`, `inventory`. All read-only except `update` and `rollback`.
+- **Management centre** (§3): `ManagementCenter.tsx` in the existing settings page, CONFIGURE-gated. Five sections: system
+  status (counts, schema version, server time), TLS certificate metadata, embedding allowlist CRUD, backup info, CLI reference.
+  `GET /api/v1/system/management` aggregates the data from one endpoint.
+- **Embedding allowlist** (§4): `system_setting` table (V68), `GET/PUT /api/v1/system/embedding`, strict `https://host[:port]`
+  validation, audit-logged changes. The UI stores the allowed origins; nginx integration via `gen-csp-embedding.sh` is prepared
+  but not wired into the live reload — `frame-ancestors` remains `'none'` until the operator deploys.
+- **Administrator lifecycle** (§6): `GET/POST/DELETE /api/v1/administrators`, `AdminLifecycle.tsx` in settings.
+  Add by directory username (must have signed in once), remove with confirmation (last admin protected), audit-logged.
+- **AI conversation context** (§7): `AssistantService.PriorTurn`, bounded to 6 prior turns, sent as alternating user/assistant
+  messages before the current question. Frontend sends the conversation history from `FloatingAssist.tsx`.
+- **GIS cursor alignment** (§8): `.maplibregl-map, .leaflet-container { zoom: calc(1 / 0.9); }` in `map.css` counter-zooms
+  `html{zoom:.9}` from `prototype.css` inside map containers so pointer coordinates match the WebGL canvas.
+- **Arabic documentation:** `docs/ADMIN_UI_QUICK_START_AR.md`, `docs/VM_BOOTSTRAP_AR.md`, `docs/VM_QUICK_START_AR.md`.
+- **No new dependencies.** All changes reuse existing images and libraries.
+
+**Tests.** `DbMigrationIT` 1/1 (V68), `AdministrationAcceptanceIT` 8/8; frontend build clean; deployment to :8088 verified.
