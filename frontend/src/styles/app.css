@@ -7,7 +7,7 @@
 .identity-name{font-size:10px;color:var(--ink)}
 
 /* notifications */
-.notif-wrap{position:relative}
+.notif-wrap{position:relative;display:flex;align-items:center;gap:8px}
 .notif-badge{position:absolute;top:-5px;left:-5px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:var(--orange);color:#fff;font:bold 9px/16px Arial,sans-serif;text-align:center}
 .notif-pop{position:absolute;top:44px;left:0;width:320px;max-height:420px;overflow:auto;padding:16px;z-index:1200;box-shadow:0 18px 50px #19363822}
 .notif-item{display:flex;flex-direction:column;gap:2px;width:100%;text-align:right;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:10px 12px;margin-top:8px}
