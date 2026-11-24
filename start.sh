@@ -92,8 +92,7 @@ until echo "$PORT" | grep -Eq '^[0-9]+$' && [ "$PORT" -ge 1 ] && [ "$PORT" -le 6
 done
 # another container on the port — this installation's own (project tmrkz) do not count
 own=" $(docker ps -q --filter label=com.docker.compose.project=tmrkz 2>/dev/null | tr '\n' ' ') "
-busy="$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' | grep -E ":$PORT->" | while read -r id name rest; do
-  case "$own" in *" $id "*) ;; *) echo "$name" ;; esac; done | head -n 1 || true)"
+busy="$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' | grep -E ":$PORT->" | awk -v own="$own" '$1 && index(own," "$1" ")==0{print $2;exit}' || true)"
 [ -z "$busy" ] || { echo "port $PORT is already used by the container $busy; choose another"; exit 2; }
 setenv TMRKZ_IP "$IP"; setenv TMRKZ_PORT "$PORT"
 # the one address every sign-in address derives from (docker-compose.override.yml, ops/*.sh); an https address is kept

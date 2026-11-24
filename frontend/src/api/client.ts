@@ -700,6 +700,17 @@ export const api = {
   createDelegation: (body: { delegateId: string; membershipId: string; validFrom: string; validTo: string; reason: string }) => post<Delegation>('/delegations', body),
   revokeDelegation: (id: string, reason: string) => post<Delegation>(`/delegations/${id}/revoke`, { reason }),
   roles: () => get<RoleDef[]>('/roles'),
+  // admin: employee number
+  setEmployeeNo: (personId: string, employeeNo: string) => call<{ id: string; employeeNo: string }>('PUT', `/people/${personId}/employee-no`, { body: { employeeNo } }),
+  // admin: unit management
+  createUnit: (body: { code: string; name: string; parentId?: string }) => post<{ id: string; code: string; name: string }>('/organizations', body),
+  updateUnit: (id: string, body: { name: string; parentId?: string | null }) => call<{ id: string; code: string; name: string }>('PUT', `/organizations/${id}`, { body }),
+  retireUnit: (id: string, reason: string) => post<void>(`/organizations/${id}/retire`, { reason }),
+  // admin: level management
+  levels: () => get<{ level: number; name: string; unitCount: number }[]>('/levels'),
+  setLevel: (level: number, name: string) => call<{ level: number; name: string; unitCount: number }>('PUT', `/levels/${level}`, { body: { name } }),
+  deleteLevel: (level: number) => del<void>(`/levels/${level}`),
+  setUnitLevel: (orgId: string, level: number | null) => call<void>('PUT', `/organizations/${orgId}/level`, { body: { level } }),
 
   // permissions studio (policy versions, scoped grants, explanations, OpenFGA sync)
   authzStatus: () => get<AuthzStatus>('/access/status'),
@@ -901,8 +912,8 @@ export const api = {
   requestTypes: () => get<RequestType[]>('/request-types'),
   createRequestType: (body: { name: string; kind: string }) => post<{ code: string; name: string }>('/request-types', body),
   removeRequestType: (code: string) => del<void>(`/request-types/${code}`),
-  requests: (p: { status?: string; q?: string; page?: number; size?: number; excludeDrafts?: boolean; mine?: boolean; type?: string; from?: string; to?: string; sort?: string; dir?: string } = {}) =>
-    get<Page<RequestListItem>>('/requests' + query({ size: 100, ...p })),
+  requests: (p: { status?: string; q?: string; page?: number; size?: number; excludeDrafts?: boolean; mine?: boolean; type?: string; from?: string; to?: string; sort?: string; dir?: string } = {}, opts?: { silent401?: boolean }) =>
+    get<Page<RequestListItem>>('/requests' + query({ size: 100, ...p }), opts),
   requestCounts: (p: { q?: string; mine?: boolean; type?: string; from?: string; to?: string } = {}) => get<Partial<Record<RequestStatus, number>>>('/requests/counts' + query(p)),
   request: (id: string) => get<RequestDetail>(`/requests/${id}`),
   createRequest: (body: DraftInput) => post<RequestDetail>('/requests', body),
@@ -964,7 +975,7 @@ export const api = {
   changeRequest: (reservationId: string, typeCode: string) => post<RequestDetail>(`/reservations/${reservationId}/change-requests`, { typeCode }),
 
   // tasks
-  tasks: () => get<TaskItem[]>('/tasks'),
+  tasks: (opts?: { silent401?: boolean }) => get<TaskItem[]>('/tasks', opts),
   approvalDocument: (taskId: string) => get<ApprovalDocument>(`/tasks/${taskId}/approval-document`),
   decide: (taskId: string, body: DecisionInput, key: string) => post<RequestDetail>(`/tasks/${taskId}/decision`, body, key),
   signTask: (taskId: string, expectedRevision: number) => post<SigningJob>(`/tasks/${taskId}/signing`, { expectedRevision }),

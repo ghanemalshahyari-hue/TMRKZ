@@ -541,5 +541,165 @@ public class OrganizationService {
                         Db.strings(rs, "grantable_roles"), (Integer) rs.getObject("policy_version"))).list();
     }
 
+    // ---- admin: employee number ------------------------------------------------------------------
 
+    public record EmployeeNoInput(String employeeNo) {}
+
+    @Transactional
+    public Map<String, Object> setEmployeeNo(AccessContext ctx, UUID personId, EmployeeNoInput in) {
+        ctx.require(Permission.CONFIGURE);
+        String newNo = in.employeeNo() == null ? null : in.employeeNo().trim();
+        if (newNo == null || newNo.isEmpty()) {
+            throw ApiException.validation("الرقم الوظيفي مطلوب.");
+        }
+        if (newNo.length() > 100) {
+            throw ApiException.validation("الرقم الوظيفي أطول من المسموح.");
+        }
+        Map<String, Object> person = jdbc.sql("select employee_no, display_name from person where id = :id")
+                .param("id", personId).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
+        String old = (String) person.get("employee_no");
+        if (newNo.equals(old)) {
+            return Map.of("id", personId.toString(), "employeeNo", old);
+        }
+        int existing = jdbc.sql("select count(*) from person where employee_no = :n and id <> :id")
+                .param("n", newNo).param("id", personId).query(Integer.class).single();
+        if (existing > 0) {
+            throw ApiException.validation("هذا الرقم مستخدم لشخص آخر.");
+        }
+        jdbc.sql("update person set employee_no = :n where id = :id").param("n", newNo).param("id", personId).update();
+        audit.recordAs(ctx.actor(), "EMPLOYEE_NO_SET", "PERSON", personId.toString(), (String) person.get("display_name"),
+                Map.of("old", old, "new", newNo), null);
+        return Map.of("id", personId.toString(), "employeeNo", newNo);
+    }
+
+    // ---- admin: unit management (create, update, retire) -----------------------------------------
+
+    public record CreateUnitInput(String code, String name, String parentId) {}
+    public record UpdateUnitInput(String name, String parentId) {}
+    public record RetireUnitInput(String reason) {}
+
+    @Transactional
+    public Map<String, Object> createUnit(AccessContext ctx, CreateUnitInput in) {
+        ctx.require(Permission.CONFIGURE);
+        String code = in.code() == null ? null : in.code().trim();
+        String name = in.name() == null ? null : in.name().trim();
+        if (code == null || code.isEmpty()) throw ApiException.validation("رمز الوحدة مطلوب.");
+        if (name == null || name.isEmpty()) throw ApiException.validation("اسم الوحدة مطلوب.");
+        if (code.length() > 50) throw ApiException.validation("رمز الوحدة أطول من المسموح.");
+        if (name.length() > 200) throw ApiException.validation("اسم الوحدة أطول من المسموح.");
+        int dup = jdbc.sql("select count(*) from organization where code = :c").param("c", code).query(Integer.class).single();
+        if (dup > 0) throw ApiException.validation("رمز الوحدة مستخدم.");
+        UUID parentId = null;
+        if (in.parentId() != null && !in.parentId().isBlank()) {
+            parentId = UUID.fromString(in.parentId());
+            int parent = jdbc.sql("select count(*) from organization where id = :id and status = 'ACTIVE'")
+                    .param("id", parentId).query(Integer.class).single();
+            if (parent == 0) throw ApiException.validation("الوحدة الأم غير موجودة أو متوقفة.");
+        }
+        UUID id = UUID.randomUUID();
+        jdbc.sql("""
+                insert into organization(id, code, name, parent_id, status, source)
+                values (:id, :code, :name, :parent, 'ACTIVE', 'LOCAL')""")
+                .param("id", id).param("code", code).param("name", name).param("parent", parentId).update();
+        audit.recordAs(ctx.actor(), "UNIT_CREATED", "ORGANIZATION", id.toString(), name,
+                Map.of("code", code, "parent", parentId == null ? "" : parentId.toString()), null);
+        return Map.of("id", id.toString(), "code", code, "name", name);
+    }
+
+    @Transactional
+    public Map<String, Object> updateUnit(AccessContext ctx, UUID id, UpdateUnitInput in) {
+        ctx.require(Permission.CONFIGURE);
+        Map<String, Object> existing = jdbc.sql("select code, name, parent_id, status from organization where id = :id for update")
+                .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
+        if ("RETIRED".equals(existing.get("status"))) throw ApiException.validation("لا يمكن تعديل وحدة متوقفة.");
+        String name = in.name() == null ? null : in.name().trim();
+        if (name == null || name.isEmpty()) throw ApiException.validation("اسم الوحدة مطلوب.");
+        if (name.length() > 200) throw ApiException.validation("اسم الوحدة أطول من المسموح.");
+        UUID parentId = null;
+        if (in.parentId() != null && !in.parentId().isBlank()) {
+            parentId = UUID.fromString(in.parentId());
+            if (parentId.equals(id)) throw ApiException.validation("لا يمكن أن تكون الوحدة أماً لنفسها.");
+            int parent = jdbc.sql("select count(*) from organization where id = :id and status = 'ACTIVE'")
+                    .param("id", parentId).query(Integer.class).single();
+            if (parent == 0) throw ApiException.validation("الوحدة الأم غير موجودة أو متوقفة.");
+        }
+        jdbc.sql("update organization set name = :name, parent_id = :parent where id = :id")
+                .param("name", name).param("parent", parentId).param("id", id).update();
+        audit.recordAs(ctx.actor(), "UNIT_UPDATED", "ORGANIZATION", id.toString(), name,
+                Map.of("oldName", (String) existing.get("name"), "newName", name), null);
+        return Map.of("id", id.toString(), "code", existing.get("code"), "name", name);
+    }
+
+    @Transactional
+    public void retireUnit(AccessContext ctx, UUID id, RetireUnitInput in) {
+        ctx.require(Permission.CONFIGURE);
+        Map<String, Object> org = jdbc.sql("select name, status from organization where id = :id for update")
+                .param("id", id).query().listOfRows().stream().findFirst().orElseThrow(ApiException::notFound);
+        if ("RETIRED".equals(org.get("status"))) throw ApiException.validation("الوحدة متوقفة بالفعل.");
+        int activeChildren = jdbc.sql("select count(*) from organization where parent_id = :id and status = 'ACTIVE'")
+                .param("id", id).query(Integer.class).single();
+        if (activeChildren > 0) throw ApiException.validation("لا يمكن إيقاف وحدة لديها وحدات فرعية نشطة. أوقف الفرعية أولاً.");
+        int activeMembers = jdbc.sql("""
+                select count(*) from membership where organization_id = :id
+                  and valid_from <= now() and (valid_to is null or valid_to > now())""")
+                .param("id", id).query(Integer.class).single();
+        if (activeMembers > 0) throw ApiException.validation("لا يمكن إيقاف وحدة فيها أعضاء نشطون. أنهِ العضويات أولاً.");
+        jdbc.sql("update organization set status = 'RETIRED', valid_to = now() where id = :id").param("id", id).update();
+        audit.recordAs(ctx.actor(), "UNIT_RETIRED", "ORGANIZATION", id.toString(), (String) org.get("name"),
+                Map.of(), in.reason());
+    }
+
+    // ---- admin: level management -----------------------------------------------------------------
+
+    public record LevelView(int level, String name, int unitCount) {}
+    public record SetLevelInput(String name) {}
+
+    public List<LevelView> levels(AccessContext ctx) {
+        ctx.requireAny(Permission.VIEW, Permission.VIEW_SUMMARY, Permission.CONFIGURE);
+        return jdbc.sql("""
+                select ol.level, ol.name, count(o.id) as unit_count
+                from organization_level ol left join organization o on o.level = ol.level and o.status = 'ACTIVE'
+                group by ol.level, ol.name order by ol.level""")
+                .query((rs, n) -> new LevelView(rs.getInt("level"), rs.getString("name"), rs.getInt("unit_count"))).list();
+    }
+
+    @Transactional
+    public LevelView setLevel(AccessContext ctx, int level, SetLevelInput in) {
+        ctx.require(Permission.CONFIGURE);
+        if (level < 1 || level > 20) throw ApiException.validation("المستوى يجب أن يكون بين 1 و20.");
+        String name = in.name() == null ? null : in.name().trim();
+        if (name == null || name.isEmpty()) throw ApiException.validation("اسم المستوى مطلوب.");
+        if (name.length() > 100) throw ApiException.validation("اسم المستوى أطول من المسموح.");
+        jdbc.sql("""
+                insert into organization_level(level, name) values (:l, :n)
+                on conflict (level) do update set name = excluded.name""")
+                .param("l", level).param("n", name).update();
+        int unitCount = jdbc.sql("select count(*) from organization where level = :l and status = 'ACTIVE'")
+                .param("l", level).query(Integer.class).single();
+        audit.recordAs(ctx.actor(), "LEVEL_SET", "SYSTEM", String.valueOf(level), name, Map.of(), null);
+        return new LevelView(level, name, unitCount);
+    }
+
+    @Transactional
+    public void deleteLevel(AccessContext ctx, int level) {
+        ctx.require(Permission.CONFIGURE);
+        int used = jdbc.sql("select count(*) from organization where level = :l and status = 'ACTIVE'")
+                .param("l", level).query(Integer.class).single();
+        if (used > 0) throw ApiException.validation("لا يمكن حذف مستوى مستخدم بواسطة وحدات نشطة.");
+        jdbc.sql("delete from organization_level where level = :l").param("l", level).update();
+        audit.recordAs(ctx.actor(), "LEVEL_DELETED", "SYSTEM", String.valueOf(level), null, Map.of(), null);
+    }
+
+    @Transactional
+    public void setUnitLevel(AccessContext ctx, UUID orgId, Integer level) {
+        ctx.require(Permission.CONFIGURE);
+        jdbc.sql("select 1 from organization where id = :id and status = 'ACTIVE'")
+                .param("id", orgId).query(Integer.class).optional().orElseThrow(ApiException::notFound);
+        if (level != null) {
+            jdbc.sql("select 1 from organization_level where level = :l")
+                    .param("l", level).query(Integer.class).optional()
+                    .orElseThrow(() -> ApiException.validation("المستوى غير معرّف."));
+        }
+        jdbc.sql("update organization set level = :l where id = :id").param("l", level).param("id", orgId).update();
+    }
 }

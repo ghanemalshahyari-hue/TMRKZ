@@ -63,6 +63,43 @@ export function TopNavigation({ me, view, links, more, create, onLogout, navOpen
   }, []);
   useEffect(() => setMoreOpen(false), [view]);
 
+  const navRef = useRef<HTMLElement>(null);
+  const [overflowStart, setOverflowStart] = useState(links.length);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    const GAP = 4;
+    const compute = () => {
+      const items = Array.from(nav.querySelectorAll<HTMLElement>(':scope > a[data-nav]'));
+      if (!items.length) return;
+      const all = Array.from(nav.querySelectorAll<HTMLElement>(':scope > *'));
+      const saved = all.map(el => el.style.display);
+      all.forEach(el => { el.style.display = ''; });
+      const navW = nav.clientWidth;
+      const itemW = items.map(el => el.offsetWidth);
+      const moreEl = nav.querySelector<HTMLElement>('.tz-more');
+      const moreW = moreEl ? moreEl.offsetWidth + GAP : 120;
+      all.forEach((el, i) => { el.style.display = saved[i]; });
+      let total = 0, cut = items.length;
+      if (more.length === 0) {
+        for (const w of itemW) total += w + GAP;
+        if (total <= navW) { setOverflowStart(items.length); return; }
+      }
+      total = 0;
+      for (let i = 0; i < itemW.length; i++) {
+        total += itemW[i] + GAP;
+        if (total + moreW > navW) { cut = i; break; }
+      }
+      setOverflowStart(cut);
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(nav);
+    return () => ro.disconnect();
+  }, [links.length, more.length]);
+  const overflowLinks = links.slice(overflowStart);
+  const allMore = [...overflowLinks, ...more];
+
   return (
     <header className="tz-top" role="banner">
       <button className="tz-icon-btn tz-burger" aria-label="فتح القائمة" aria-expanded={navOpen} onClick={() => setNavOpen(!navOpen)}>
@@ -79,39 +116,44 @@ export function TopNavigation({ me, view, links, more, create, onLogout, navOpen
         <Icon name="building" />
         <span>{me.primaryOrg?.name ?? 'مساحة العمل'}</span>
       </span>
-      <nav id="navigation" className={'tz-nav' + (navOpen ? ' open' : '')} aria-label="القائمة الرئيسية">
-        {links.map((l) => (
-          <a key={l.id ?? l.view} data-nav={l.id ?? l.view} title={l.title} className={'nav-item tz-nav-item' + (active === (l.id ?? l.view) ? ' active' : '')} href={l.href ?? '#' + l.view} aria-current={active === (l.id ?? l.view) ? 'page' : undefined}>
+      <nav ref={navRef} id="navigation" className={'tz-nav' + (navOpen ? ' open' : '')} aria-label="القائمة الرئيسية">
+        {links.map((l, i) => (
+          <a key={l.id ?? l.view} data-nav={l.id ?? l.view} title={l.title ?? l.label} className={'nav-item tz-nav-item' + (active === (l.id ?? l.view) ? ' active' : '')} href={l.href ?? '#' + l.view} aria-current={active === (l.id ?? l.view) ? 'page' : undefined} style={!navOpen && i >= overflowStart ? { display: 'none' } : undefined}>
             <Icon name={l.icon} />
             <span>{l.label}</span>
           </a>
         ))}
-        {more.length > 0 && (
-          <div className="tz-more" ref={moreRef}>
-            <button className={'nav-item tz-nav-item' + (active === 'more' ? ' active' : '')} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
-              <Icon name="grid" />
-              <span>المزيد</span>
-              <Icon name="chevron" />
-            </button>
-            {(moreOpen || navOpen) && (
-              <div className="tz-menu" role="menu">
-                {more.map((l) => (
-                  <a key={l.view} role="menuitem" className={'tz-menu-item' + (view === l.view ? ' active' : '')} href={'#' + l.view}>
-                    <Icon name={l.icon} />
-                    <span>{l.label}</span>
-                    {l.view === 'review' && app.counts.tasks > 0 && <span className="tz-count">{app.counts.tasks}</span>}
-                  </a>
-                ))}
-                {app.can('CREATE') && (
-                  <button role="menuitem" className="tz-menu-item" onClick={() => app.openWizard({ origin: 'LIST', layout: 'dialog' })}>
-                    <Icon name="plus" />
-                    <span>طلب مرفق جديد</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+        <div className="tz-more" ref={moreRef} style={allMore.length === 0 ? { display: 'none' } : undefined}>
+          <button className={'nav-item tz-nav-item' + (active === 'more' || overflowLinks.some(ol => active === (ol.id ?? ol.view)) ? ' active' : '')} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
+            <Icon name="grid" />
+            <span>المزيد</span>
+            <Icon name="chevron" />
+          </button>
+          {(moreOpen || navOpen) && (
+            <div className="tz-menu" role="menu">
+              {overflowLinks.map((l) => (
+                <a key={l.id ?? l.view} role="menuitem" className={'tz-menu-item' + (active === (l.id ?? l.view) ? ' active' : '')} href={l.href ?? '#' + l.view}>
+                  <Icon name={l.icon} />
+                  <span>{l.label}</span>
+                </a>
+              ))}
+              {overflowLinks.length > 0 && more.length > 0 && <hr className="tz-menu-sep" />}
+              {more.map((l) => (
+                <a key={l.view} role="menuitem" className={'tz-menu-item' + (view === l.view ? ' active' : '')} href={'#' + l.view}>
+                  <Icon name={l.icon} />
+                  <span>{l.label}</span>
+                  {l.view === 'review' && app.counts.tasks > 0 && <span className="tz-count">{app.counts.tasks}</span>}
+                </a>
+              ))}
+              {app.can('CREATE') && (
+                <button role="menuitem" className="tz-menu-item" onClick={() => app.openWizard({ origin: 'LIST', layout: 'dialog' })}>
+                  <Icon name="plus" />
+                  <span>طلب مرفق جديد</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </nav>
       <div className="tz-top-tools">
         {create && create.length > 0 && (

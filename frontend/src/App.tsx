@@ -119,6 +119,8 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
       setView(viewFromHash());
       setNavOpen(false);
       window.scrollTo({ top: 0 });
+      const m = document.getElementById('main');
+      if (m) m.scrollTop = 0;
     };
     window.addEventListener('hashchange', onHash);
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setNavOpen(false);
@@ -170,8 +172,8 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     let live = true;
     const load = () => {
       Promise.all([
-        can('REVIEW') ? api.tasks().then((t) => t.length).catch(() => 0) : Promise.resolve(0),
-        me.summaryOnly ? Promise.resolve(0) : api.requests({ status: 'SUBMITTED', size: 1 }).then((p) => p.total).catch(() => 0),
+        can('REVIEW') ? api.tasks({ silent401: true }).then((t) => t.length).catch(() => 0) : Promise.resolve(0),
+        me.summaryOnly ? Promise.resolve(0) : api.requests({ status: 'SUBMITTED', size: 1 }, { silent401: true }).then((p) => p.total).catch(() => 0),
       ]).then(([tasks, submitted]) => live && setCounts({ tasks, submitted }));
     };
     const stop = startVisibilityPoll({ load, intervalMs: POLL_MS });

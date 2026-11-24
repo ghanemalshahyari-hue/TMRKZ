@@ -137,4 +137,53 @@ public class OrgController {
         symbols.remove(access.context(actor), id, in);
         return ResponseEntity.noContent().build();
     }
+
+    // ---- admin: employee number (system admin sets it without HR) ------------------------------------
+
+    @org.springframework.web.bind.annotation.PutMapping("/people/{id}/employee-no")
+    public Map<String, Object> setEmployeeNo(Actor actor, @PathVariable UUID id, @RequestBody OrganizationService.EmployeeNoInput in) {
+        return orgs.setEmployeeNo(access.context(actor), id, in);
+    }
+
+    // ---- admin: unit management (create, update, retire) --------------------------------------------
+
+    @PostMapping("/organizations")
+    public Map<String, Object> createUnit(Actor actor, @RequestBody OrganizationService.CreateUnitInput in) {
+        return orgs.createUnit(access.context(actor), in);
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/organizations/{id}")
+    public Map<String, Object> updateUnit(Actor actor, @PathVariable UUID id, @RequestBody OrganizationService.UpdateUnitInput in) {
+        return orgs.updateUnit(access.context(actor), id, in);
+    }
+
+    @PostMapping("/organizations/{id}/retire")
+    public ResponseEntity<Void> retireUnit(Actor actor, @PathVariable UUID id, @RequestBody OrganizationService.RetireUnitInput in) {
+        orgs.retireUnit(access.context(actor), id, in);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ---- admin: level management (create, update, delete levels) ------------------------------------
+
+    @GetMapping("/levels")
+    public java.util.List<OrganizationService.LevelView> levels(Actor actor) {
+        return orgs.levels(access.context(actor));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/levels/{level}")
+    public OrganizationService.LevelView setLevel(Actor actor, @PathVariable int level, @RequestBody OrganizationService.SetLevelInput in) {
+        return orgs.setLevel(access.context(actor), level, in);
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/levels/{level}")
+    public ResponseEntity<Void> deleteLevel(Actor actor, @PathVariable int level) {
+        orgs.deleteLevel(access.context(actor), level);
+        return ResponseEntity.noContent().build();
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping("/organizations/{id}/level")
+    public ResponseEntity<Void> setUnitLevel(Actor actor, @PathVariable UUID id, @RequestBody java.util.Map<String, Integer> body) {
+        orgs.setUnitLevel(access.context(actor), id, body.get("level"));
+        return ResponseEntity.noContent().build();
+    }
 }

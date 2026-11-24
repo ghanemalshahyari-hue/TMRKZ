@@ -426,8 +426,8 @@ select.sw-input { appearance: auto; }
 }
 :root[data-theme='dark'] { --home-hero: linear-gradient(180deg, #2a2420 0%, #322a22 100%); }
 
-.tz-dash { display: flex; flex-direction: column; gap: 14px; padding: 0 0 24px; }
-.tz-dash-hero { position: relative; background: var(--home-hero); border: 1px solid var(--tz-line); border-radius: 14px; padding: 18px 20px; min-height: 92px; overflow: hidden; }
+.tz-dash { display: flex; flex-direction: column; gap: 10px; padding: 0 0 10px; }
+.tz-dash-hero { position: relative; background: var(--home-hero); border: 1px solid var(--tz-line); border-radius: 12px; padding: 12px 16px; overflow: hidden; }
 .tz-dash-hero-bg {
   position: absolute; inset: 0; pointer-events: none; opacity: .7;
   background:
@@ -442,23 +442,23 @@ select.sw-input { appearance: auto; }
 .tz-dash-hero-title p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 
 /* ---- the six stat cards (one row, equal width) ------------------------------------------------------- */
-.tz-dash-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
-.tz-stat { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--tz-panel); border: 1px solid var(--tz-line); border-radius: 12px; color: var(--ink); text-decoration: none; box-shadow: var(--tz-raise) 0 2px 0; }
+.tz-dash-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.tz-stat { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--tz-panel); border: 1px solid var(--tz-line); border-radius: 10px; color: var(--ink); text-decoration: none; box-shadow: var(--tz-raise) 0 2px 0; }
 a.tz-stat { transition: border-color .15s, transform .15s; }
 a.tz-stat:hover { border-color: var(--tz-line-2); transform: translateY(-1px); }
-.tz-stat-icon { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 10px; background: color-mix(in srgb, var(--home-accent) 15%, var(--tz-panel-2)); color: var(--home-accent); }
+.tz-stat-icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 9px; background: color-mix(in srgb, var(--home-accent) 15%, var(--tz-panel-2)); color: var(--home-accent); }
 .tz-stat-icon.amber { background: color-mix(in srgb, var(--home-attn) 20%, var(--tz-panel-2)); color: var(--home-attn); }
 .tz-stat-text { display: flex; flex-direction: column; min-width: 0; }
-.tz-stat-text b { font-size: 24px; line-height: 1.15; color: var(--ink); font-weight: 700; }
+.tz-stat-text b { font-size: 20px; line-height: 1.15; color: var(--ink); font-weight: 700; }
 .tz-stat-text span { font-size: 12.5px; color: var(--muted); }
 @media (max-width: 1200px) { .tz-dash-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .tz-dash-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ---- three-column grid: attention · map · details --------------------------------------------------- */
-.tz-dash-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr) minmax(300px, 1fr); gap: 14px; align-items: stretch; }
+.tz-dash-grid { display: grid; grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr) minmax(300px, 1fr); gap: 10px; align-items: stretch; }
 @media (max-width: 1200px) { .tz-dash-grid { grid-template-columns: 1fr; } }
-.tz-dash-side { display: flex; flex-direction: column; gap: 12px; }
-.tz-dash-card { background: var(--tz-panel); border: 1px solid var(--tz-line); border-radius: 12px; padding: 14px 16px; }
+.tz-dash-side { display: flex; flex-direction: column; gap: 8px; }
+.tz-dash-card { background: var(--tz-panel); border: 1px solid var(--tz-line); border-radius: 10px; padding: 10px 12px; }
 .tz-dash-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .tz-dash-card-head h3 { margin: 0; font-size: 14.5px; color: var(--ink); }
 .tz-dash-side-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: var(--muted); font-weight: 600; font-size: 13px; }
@@ -483,13 +483,13 @@ a.tz-stat:hover { border-color: var(--tz-line-2); transform: translateY(-1px); }
 .tz-alerts li div { display: flex; flex-direction: column; gap: 2px; }
 
 /* ---- the map in the centre ------------------------------------------------------------------------- */
-.tz-dash-centre { display: flex; flex-direction: column; gap: 10px; background: var(--tz-panel); border: 1px solid var(--tz-line); border-radius: 12px; padding: 10px 12px; min-height: 520px; }
+.tz-dash-centre { display: flex; flex-direction: column; gap: 8px; background: var(--tz-panel); border: 1px solid var(--tz-line); border-radius: 10px; padding: 8px 10px; min-height: 400px; }
 .tz-dash-maptool { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tz-dash-maptool .tz-mapbtn { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--tz-line); background: var(--tz-panel); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
 .tz-dash-maptool .tz-mapbtn:hover { color: var(--ink); border-color: var(--tz-line-2); }
 .tz-mapcluster { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink); background: var(--tz-panel-2); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--tz-line); }
 .tz-mapselect { margin-inline-start: auto; height: 32px; border-radius: 8px; border: 1px solid var(--tz-line); background: var(--tz-panel); padding: 0 10px; color: var(--ink); font-size: 12.5px; }
-.tz-dash-mapbox { flex: 1; min-height: 420px; border-radius: 10px; overflow: hidden; border: 1px solid var(--tz-line); background: var(--tz-panel-2); position: relative; }
+.tz-dash-mapbox { flex: 1; min-height: 320px; border-radius: 10px; overflow: hidden; border: 1px solid var(--tz-line); background: var(--tz-panel-2); position: relative; }
 .tz-dash-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); padding-top: 4px; }
 .tz-dash-legend b { color: var(--ink); font-weight: 600; margin-inline-end: 6px; }
 .tz-dash-legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -499,14 +499,14 @@ a.tz-stat:hover { border-color: var(--tz-line-2); transform: translateY(-1px); }
 
 /* ---- the site details card ------------------------------------------------------------------------- */
 .tz-dash-details { }
-.tz-site { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
-.tz-site-cover { height: 110px; border-radius: 10px; background: linear-gradient(135deg, var(--tz-panel-2) 0%, color-mix(in srgb, var(--home-accent) 15%, var(--tz-panel-2)) 100%); display: flex; align-items: center; justify-content: center; color: color-mix(in srgb, var(--home-accent) 70%, var(--muted)); }
-.tz-site-cover .icon { width: 32px; height: 32px; }
+.tz-site { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.tz-site-cover { height: 64px; border-radius: 8px; background: linear-gradient(135deg, var(--tz-panel-2) 0%, color-mix(in srgb, var(--home-accent) 15%, var(--tz-panel-2)) 100%); display: flex; align-items: center; justify-content: center; color: color-mix(in srgb, var(--home-accent) 70%, var(--muted)); }
+.tz-site-cover .icon { width: 26px; height: 26px; }
 .tz-site-head { display: flex; flex-direction: column; gap: 4px; }
 .tz-site-head b { font-size: 16px; color: var(--ink); }
 .tz-site-head .pill.green { background: color-mix(in srgb, var(--home-accent) 20%, var(--tz-panel-2)); color: var(--home-accent); }
 .tz-site-chips { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.tz-site-chips span, .tz-site-chip { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 10px 6px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; }
+.tz-site-chips span, .tz-site-chip { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 7px 6px; background: var(--tz-panel-2); border: 1px solid var(--tz-line); border-radius: 10px; }
 .tz-site-chips b, .tz-site-chip b { font-size: 16px; color: var(--ink); }
 .tz-site-chips small, .tz-site-chip small { font-size: 11px; color: var(--muted); }
 /* Owner, 21 Nov 2026: the chips are buttons that act on the map. Hover/active follow the summary-row palette so the link
@@ -547,8 +547,8 @@ button.tz-summary-row:disabled { cursor: not-allowed; opacity: 0.6; }
 @media (max-width: 1500px) { .tz-dash-v2 .tz-dash-grid-wide { grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr) minmax(300px, 1fr); } }
 @media (max-width: 1100px) { .tz-dash-v2 .tz-dash-grid-wide { grid-template-columns: 1fr; } }
 
-.tz-dash-centre { min-height: 620px; }
-.tz-dash-mapbox { min-height: 540px; }
+.tz-dash-centre { min-height: 400px; }
+.tz-dash-mapbox { min-height: 320px; }
 
 /* The attention rows are clickable chips that filter the map; the active one has an amber ring. */
 .tz-attn-row { display: inline-flex; align-items: center; gap: 10px; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 6px 8px; width: 100%; text-align: inherit; cursor: pointer; color: var(--ink); font: inherit; text-decoration: none; }

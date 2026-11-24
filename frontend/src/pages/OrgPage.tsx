@@ -15,17 +15,26 @@ import { stationingSiteHash } from '../lib/stationingLink';
 
 type MembershipForm = { personId: string; roleCode: string; positionTitle: string; validFrom: string; validTo: string };
 type DelegationForm = { membership: Member; delegateId: string; validFrom: string; validTo: string; reason: string };
+type UnitForm = { code: string; name: string; parentId: string };
+type UnitEditForm = { name: string; parentId: string };
+type LevelItem = { level: number; name: string; unitCount: number };
 
 export function OrgPage() {
   const app = useApp();
   const { orgs, revision } = app;
   const canConfigure = app.can('MANAGE_ACCESS');
+  const canAdmin = app.can('CONFIGURE');
   const [selected, setSelected] = useState<string | null>(null);
   const [detail, setDetail] = useState<OrgDetail | null>(null);
   const [delegations, setDelegations] = useState<Delegation[]>([]);
   const [roles, setRoles] = useState<RoleDef[]>([]);
   const [membershipForm, setMembershipForm] = useState<MembershipForm | null>(null);
   const [delegationForm, setDelegationForm] = useState<DelegationForm | null>(null);
+  const [createUnitForm, setCreateUnitForm] = useState<UnitForm | null>(null);
+  const [editUnitForm, setEditUnitForm] = useState<UnitEditForm | null>(null);
+  const [levels, setLevels] = useState<LevelItem[]>([]);
+  const [levelName, setLevelName] = useState('');
+  const [levelNum, setLevelNum] = useState(1);
   const [formError, setFormError] = useState('');
   const current = selected ?? orgs[0]?.id ?? null;
 
@@ -48,7 +57,9 @@ export function OrgPage() {
         .roles()
         .then(setRoles)
         .catch(() => setRoles([]));
-  }, [revision, canConfigure]);
+    if (canAdmin)
+      api.levels().then(setLevels).catch(() => setLevels([]));
+  }, [revision, canConfigure, canAdmin]);
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     setFormError('');
@@ -113,6 +124,45 @@ export function OrgPage() {
     await run(() => api.revokeDelegation(d.id, reason), 'أُلغي التفويض؛ تتوقف الإجراءات المفوضة فوراً');
   };
 
+  const saveUnit = async () => {
+    if (!createUnitForm) return;
+    const f = createUnitForm;
+    if (!f.code.trim() || !f.name.trim()) return setFormError('أكمل رمز الوحدة واسمها.');
+    const ok = await run(() => api.createUnit({ code: f.code.trim(), name: f.name.trim(), parentId: f.parentId || undefined }), 'أُنشئت الوحدة');
+    if (ok) setCreateUnitForm(null);
+  };
+
+  const saveUnitEdit = async () => {
+    if (!editUnitForm || !current) return;
+    if (!editUnitForm.name.trim()) return setFormError('اسم الوحدة مطلوب.');
+    const ok = await run(() => api.updateUnit(current, { name: editUnitForm.name.trim(), parentId: editUnitForm.parentId || null }), 'حُدثت بيانات الوحدة');
+    if (ok) setEditUnitForm(null);
+  };
+
+  const retireUnit = async () => {
+    if (!current) return;
+    const reason = window.prompt('سبب إيقاف الوحدة (يسجل في سجل التدقيق):', '');
+    if (!reason) return;
+    await run(() => api.retireUnit(current, reason), 'أُوقفت الوحدة');
+  };
+
+  const setEmployeeNo = async (personId: string, displayName: string) => {
+    const newNo = window.prompt('الرقم الوظيفي الجديد لـ ' + displayName + ':', '');
+    if (!newNo) return;
+    await run(() => api.setEmployeeNo(personId, newNo.trim()), 'حُدث الرقم الوظيفي');
+  };
+
+  const saveLevel = async () => {
+    if (!levelName.trim()) return setFormError('اسم المستوى مطلوب.');
+    const ok = await run(() => api.setLevel(levelNum, levelName.trim()), 'حُفظ المستوى');
+    if (ok) { setLevelName(''); setLevelNum(Math.max(...levels.map((l) => l.level), 0) + 1); }
+  };
+
+  const removeLevel = async (l: LevelItem) => {
+    if (!window.confirm('حذف المستوى ' + l.level + ' (' + l.name + ')؟')) return;
+    await run(() => api.deleteLevel(l.level), 'حُذف المستوى');
+  };
+
   const root = orgs.find((o) => o.depth === 0);
   const tree = useMemo(() => flatSource(orgs), [orgs]);
   const name = detail?.org.name ?? root?.name ?? 'المؤسسة';
@@ -123,7 +173,10 @@ export function OrgPage() {
         en="ORGANIZATION / MEMBERSHIP & SCOPE"
         title="الهيكل التنظيمي"
         description="الجهة والموقع سجّلان مستقلان، ويرتبطان بالحجوزات والطلبات."
-        actions={<span className="pill">{orgs.length} جهة ضمن نطاقك</span>}
+        actions={<>
+          <span className="pill">{orgs.length} جهة ضمن نطاقك</span>
+          {canAdmin && <button className="button compact primary" onClick={() => { setFormError(''); setCreateUnitForm({ code: '', name: '', parentId: current ?? '' }); }}>＋ وحدة جديدة</button>}
+        </>}
       />
       <div className="org-layout">
         <aside className="card org-tree">
@@ -165,6 +218,12 @@ export function OrgPage() {
             )}
             <SymbolLegend />
             {app.can('CONFIGURE') && current && <SymbolAssignment key={current} orgId={current} orgName={name} />}
+            {canAdmin && detail && (
+              <div className="flex" style={{ gap: 8, margin: '8px 0 0' }}>
+                <button className="button compact" onClick={() => { setFormError(''); setEditUnitForm({ name: detail.org.name, parentId: detail.org.parentId ?? '' }); }}>تعديل الوحدة</button>
+                {detail.org.status === 'ACTIVE' && <button className="button compact danger" onClick={retireUnit}>إيقاف الوحدة</button>}
+              </div>
+            )}
             <p className="micro muted" style={{ marginTop: 7 }}>
               العضويات مؤرخة؛ انتهاء العضوية يسحب صلاحية الجهة فوراً في الخادم.
             </p>
@@ -219,6 +278,7 @@ export function OrgPage() {
                         {m.person.displayName}
                         <br />
                         <span className="latin tiny muted">{m.person.employeeNo}</span>
+                        {canAdmin && m.person.id && <button className="text-link" style={{ marginInlineStart: 6 }} onClick={() => setEmployeeNo(m.person.id, m.person.displayName)}>تغيير الرقم</button>}
                       </td>
                       <td>{m.role.name}</td>
                       <td>{m.site?.name ?? 'الجهة'}</td>
@@ -452,6 +512,84 @@ export function OrgPage() {
           </>
         )}
       </Dialog>
+
+      {/* Create Unit Dialog */}
+      <Dialog open={!!createUnitForm} onClose={() => setCreateUnitForm(null)} className="small-dialog">
+        {createUnitForm && (
+          <>
+            <DialogHead eyebrow="ORGANIZATION / NEW" title="وحدة جديدة" onClose={() => setCreateUnitForm(null)} />
+            <div className="dialog-content">
+              <label className="field"><span>رمز الوحدة</span><input dir="ltr" value={createUnitForm.code} onChange={(e) => setCreateUnitForm({ ...createUnitForm, code: e.target.value })} /></label>
+              <label className="field"><span>اسم الوحدة</span><input value={createUnitForm.name} onChange={(e) => setCreateUnitForm({ ...createUnitForm, name: e.target.value })} /></label>
+              <label className="field"><span>الوحدة الأم — اختياري</span>
+                <select value={createUnitForm.parentId} onChange={(e) => setCreateUnitForm({ ...createUnitForm, parentId: e.target.value })}>
+                  <option value="">بلا (جذر)</option>
+                  {orgs.map((o) => <option key={o.id} value={o.id}>{'—'.repeat(o.depth)} {o.name}</option>)}
+                </select>
+              </label>
+              <div className="error-text" role="alert">{formError}</div>
+            </div>
+            <div className="dialog-actions">
+              <button className="button primary" onClick={saveUnit}>إنشاء</button>
+              <button className="button" onClick={() => setCreateUnitForm(null)}>إلغاء</button>
+            </div>
+          </>
+        )}
+      </Dialog>
+
+      {/* Edit Unit Dialog */}
+      <Dialog open={!!editUnitForm} onClose={() => setEditUnitForm(null)} className="small-dialog">
+        {editUnitForm && (
+          <>
+            <DialogHead eyebrow="ORGANIZATION / EDIT" title={'تعديل ' + name} onClose={() => setEditUnitForm(null)} />
+            <div className="dialog-content">
+              <label className="field"><span>اسم الوحدة</span><input value={editUnitForm.name} onChange={(e) => setEditUnitForm({ ...editUnitForm, name: e.target.value })} /></label>
+              <label className="field"><span>الوحدة الأم</span>
+                <select value={editUnitForm.parentId} onChange={(e) => setEditUnitForm({ ...editUnitForm, parentId: e.target.value })}>
+                  <option value="">بلا (جذر)</option>
+                  {orgs.filter((o) => o.id !== current).map((o) => <option key={o.id} value={o.id}>{'—'.repeat(o.depth)} {o.name}</option>)}
+                </select>
+              </label>
+              <div className="error-text" role="alert">{formError}</div>
+            </div>
+            <div className="dialog-actions">
+              <button className="button primary" onClick={saveUnitEdit}>حفظ</button>
+              <button className="button" onClick={() => setEditUnitForm(null)}>إلغاء</button>
+            </div>
+          </>
+        )}
+      </Dialog>
+
+      {/* Level Management — shown below the main layout for CONFIGURE holders */}
+      {canAdmin && (
+        <section className="card" style={{ marginTop: 18 }}>
+          <div className="column-heading flex spread">
+            <h3>المستويات التنظيمية</h3>
+          </div>
+          <div className="table-scroll">
+            <table className="data-table">
+              <thead><tr><th>المستوى</th><th>الاسم</th><th>الوحدات</th><th>إجراء</th></tr></thead>
+              <tbody>
+                {levels.map((l) => (
+                  <tr key={l.level}>
+                    <td className="latin">{l.level}</td>
+                    <td>{l.name}</td>
+                    <td>{l.unitCount}</td>
+                    <td>{l.unitCount === 0 && <button className="button compact danger" onClick={() => removeLevel(l)}>حذف</button>}</td>
+                  </tr>
+                ))}
+                {!levels.length && <tr><td colSpan={4} className="empty">لا توجد مستويات معرّفة</td></tr>}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex" style={{ gap: 8, padding: '12px 16px' }}>
+            <label className="field" style={{ marginBottom: 0, flex: '0 0 80px' }}><span>رقم</span><input type="number" min={1} max={20} value={levelNum} onChange={(e) => setLevelNum(Number(e.target.value))} /></label>
+            <label className="field" style={{ marginBottom: 0, flex: 1 }}><span>اسم المستوى</span><input value={levelName} onChange={(e) => setLevelName(e.target.value)} placeholder="مثال: فرع، قسم، إدارة" /></label>
+            <button className="button primary" style={{ alignSelf: 'flex-end', minHeight: 42 }} onClick={saveLevel}>＋ حفظ المستوى</button>
+          </div>
+          {formError && <p className="error-text" style={{ padding: '0 16px 10px' }}>{formError}</p>}
+        </section>
+      )}
     </>
   );
 }
