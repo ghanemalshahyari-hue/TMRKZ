@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { api, type AdminCandidate, type AdminLookup, type Administrator } from '../api/client';
+import { ApiError, api, type AdminCandidate, type AdminLookup, type AdminLookupOptions, type Administrator } from '../api/client';
 import { useApp } from '../lib/app';
 import { fullTime } from '../lib/dates';
 
 const LOOKUPS: { key: AdminLookup; label: string; hint: string; placeholder: string }[] = [
   { key: 'EMPLOYEE_NUMBER', label: 'الرقم الوظيفي (الموارد البشرية)', hint: 'يُسأل مصدر الموارد البشرية مباشرة؛ سجل نشط واحد فقط.', placeholder: 'الرقم الوظيفي' },
-  { key: 'DIRECTORY_ACCOUNT', label: 'حساب الدليل المؤسسي', hint: 'حساب تحقق منه الدليل عند دخول سابق للشخص (دون حساب خدمة).', placeholder: 'u1234567' },
+  { key: 'DIRECTORY_ACCOUNT', label: 'حساب الدليل المؤسسي', hint: 'حساب تحقق منه الدليل عند دخول سابق، أو يُبحث عنه في الدليل الآن.', placeholder: 'u1234567' },
 ];
 
 const VERIFIED: Record<AdminCandidate['verifiedBy'], string> = {
   ORACLE_HR: 'تحقق منه مصدر الموارد البشرية الآن',
   DIRECTORY_SIGN_IN: 'تحقق منه الدليل المؤسسي عند دخول سابق',
+  DIRECTORY_SERVICE_LOOKUP: 'وُجد في الدليل المؤسسي الآن (حساب الخدمة للقراءة)',
+  DIRECTORY_OWN_ACCOUNT_LOOKUP: 'وُجد في الدليل المؤسسي الآن (بحثٌ بحسابك)',
 };
 
 /**
@@ -29,21 +31,34 @@ export function AdminLifecycle() {
   const [ending, setEnding] = useState<Administrator | null>(null);
   const [endReason, setEndReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [options, setOptions] = useState<AdminLookupOptions | null>(null);
+  const [password, setPassword] = useState('');
+  const [needPassword, setNeedPassword] = useState(false);
+  const [notice, setNotice] = useState('');
 
   const load = () => api.listAdministrators().then(setAdmins).catch((e: Error) => app.toast(e.message));
   useEffect(() => { void load(); }, []);
+  useEffect(() => { if (adding && !options) api.adminLookupOptions().then(setOptions).catch(() => setOptions(null)); }, [adding]);
 
-  const reset = () => { setValue(''); setCandidate(null); setReason(''); };
+  const reset = () => { setValue(''); setCandidate(null); setReason(''); setPassword(''); setNeedPassword(false); setNotice(''); };
   const effectiveCount = admins.filter((a) => a.effective).length;
 
   const find = async () => {
     if (!value.trim()) return;
     setBusy(true);
     setCandidate(null);
+    setNotice('');
     try {
-      setCandidate(await api.resolveAdministrator(method, value.trim()));
+      setCandidate(await api.resolveAdministrator(method, value.trim(), method === 'DIRECTORY_ACCOUNT' ? password : undefined));
+      setPassword(''); // used for that one search only
+      setNeedPassword(false);
     } catch (e) {
-      app.toast((e as Error).message);
+      const lookup = e instanceof ApiError ? (e.details?.lookup as string | undefined) : undefined;
+      if (lookup === 'PASSWORD_REQUIRED' || lookup === 'PASSWORD_REFUSED') {
+        setNeedPassword(true);
+        setPassword('');
+      }
+      setNotice((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -103,6 +118,11 @@ export function AdminLifecycle() {
             ))}
           </div>
           <p className="micro muted" style={{ margin: '6px 0' }}>{lookup.hint}</p>
+          {options && (
+            <p className="micro" data-testid="admin-lookup-options" data-mode={method === 'DIRECTORY_ACCOUNT' ? options.directoryMode : 'HR'}>
+              {method === 'DIRECTORY_ACCOUNT' ? options.directoryMessage : options.employeeNumberMessage}
+            </p>
+          )}
           <div className="flex" style={{ gap: 8 }}>
             <input
               dir="ltr"
@@ -116,6 +136,21 @@ export function AdminLifecycle() {
             />
             <button className="button" disabled={busy || !value.trim()} onClick={find}>عرض الهوية</button>
           </div>
+          {method === 'DIRECTORY_ACCOUNT' && (needPassword || options?.directoryNeedsPassword) && (
+            <div className="flex" style={{ gap: 8, marginTop: 8 }}>
+              <input
+                type="password"
+                autoComplete="current-password"
+                data-testid="admin-directory-password"
+                placeholder="كلمة مرورك في الدليل (للبحث عمن لم يدخل بعد؛ لا تُحفظ)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && find()}
+                style={{ flex: 1 }}
+              />
+            </div>
+          )}
+          {notice && <p className="micro" role="alert" data-testid="admin-lookup-notice">{notice}</p>}
 
           {candidate && (
             <div data-testid="admin-candidate" style={{ marginTop: 12 }}>
@@ -125,7 +160,13 @@ export function AdminLifecycle() {
               <div className="key-value"><span>الوحدة</span><span>{candidate.unitName ?? '—'}</span></div>
               {candidate.hrStatus && <div className="key-value"><span>حالة الموارد البشرية</span><span>{candidate.hrStatus}</span></div>}
               <div className="key-value"><span>التحقق</span><span>{VERIFIED[candidate.verifiedBy]}</span></div>
-              {!candidate.personId && <p className="micro muted">ليس في تمركز بعد: يُستورد من سجله في الموارد البشرية عند التأكيد، بلا أي صلاحية أخرى.</p>}
+              {!candidate.personId && (
+                <p className="micro muted">
+                  {candidate.verifiedBy === 'ORACLE_HR'
+                    ? 'ليس في تمركز بعد: يُستورد من سجله في الموارد البشرية عند التأكيد، بلا أي صلاحية أخرى.'
+                    : 'لم يدخل تمركز بعد: يُنشأ سجله عند التأكيد كما ينشئه دخوله الأول (مرتبطاً بمعرّفه الثابت في الدليل)، بلا أي صلاحية أخرى.'}
+                </p>
+              )}
               {candidate.alreadyAdmin ? (
                 <p className="micro">هذا الشخص مدير نظام بالفعل.</p>
               ) : (

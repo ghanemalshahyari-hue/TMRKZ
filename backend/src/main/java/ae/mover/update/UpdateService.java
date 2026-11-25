@@ -76,10 +76,12 @@ public class UpdateService {
     private final OidcProperties oidc;
     private final Json json;
     private final Clock clock;
+    private final long minFree;
     private final SecureRandom random = new SecureRandom();
 
     public UpdateService(@Value("${tmrkz.update.dir:/update}") String dir, AuditService audit, AuthService auth, OidcProperties oidc,
-                         Json json, Clock clock) {
+                         Json json, Clock clock, @Value("${tmrkz.update.min-free-mb:100}") long minFreeMb) {
+        this.minFree = minFreeMb << 20;
         this.root = Path.of(dir);
         this.audit = audit;
         this.auth = auth;
@@ -249,9 +251,13 @@ public class UpdateService {
         if (!target.startsWith(s.resolve("files")) || size > MAX_FILE) {
             throw ApiException.validation("مسار أو حجم غير مقبول: " + path);
         }
+        Path tmp = target.resolveSibling(target.getFileName() + ".part");
         try {
             Files.createDirectories(target.getParent());
-            Path tmp = target.resolveSibling(target.getFileName() + ".part");
+            long free = Files.getFileStore(target.getParent()).getUsableSpace();
+            if (free < size + minFree) {
+                throw ApiException.validation("مساحة القرص غير كافية لاستلام " + path + ": المتاح " + (free >> 20) + " MB؛ لم يُستلم شيء.");
+            }
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             long n = 0;
             try (OutputStream out = Files.newOutputStream(tmp)) {
@@ -266,12 +272,21 @@ public class UpdateService {
                 }
             }
             if (n != size || !HexFormat.of().formatHex(md.digest()).equals(c.get("sha256"))) {
-                Files.deleteIfExists(tmp);
-                throw ApiException.validation("محتوى الملف لا يطابق الإصدار الموقع (تغير بعد التوقيع؟): " + path);
+                throw ApiException.validation(n < size ? "انقطع رفع الملف قبل اكتماله؛ أعد رفعه: " + path
+                        : "محتوى الملف لا يطابق الإصدار الموقع (تغير بعد التوقيع؟): " + path);
             }
             Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException | java.security.NoSuchAlgorithmException e) {
+        } catch (IOException e) {
+            // an interrupted transfer: the part received is dropped, nothing is staged
+            throw ApiException.validation("انقطع رفع الملف قبل اكتماله؛ أعد رفعه: " + path);
+        } catch (java.security.NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
+        } finally {
+            try {
+                Files.deleteIfExists(tmp);
+            } catch (IOException ignored) {
+                // removed with the session
+            }
         }
     }
 

@@ -1,0 +1,245 @@
+{
+  "stamp": "mwvvgzyt",
+  "results": [
+    {
+      "id": "SETUP",
+      "pass": true,
+      "label": "two fictional accounts in the stand-in directory",
+      "extra": "adding new entry \"uid=e2euser-mwvvgzyt,ou=people,dc=tmrkz,dc=local\""
+    },
+    {
+      "id": "SETUP",
+      "pass": true,
+      "label": "a fictional root, issuing CA, server certificate and .pfx",
+      "extra": ""
+    },
+    {
+      "id": "UC-12",
+      "pass": true,
+      "label": "without a session every update, certificate and lookup call is refused",
+      "extra": "401,401,401 put 401"
+    },
+    {
+      "id": "UC-12",
+      "pass": true,
+      "label": "a signed-in person without global administration is refused everywhere",
+      "extra": "403,403,403,403"
+    },
+    {
+      "id": "UC-12",
+      "pass": true,
+      "label": "and does not even see «إدارة النظام»",
+      "extra": ""
+    },
+    {
+      "id": "UC-19",
+      "pass": true,
+      "label": "the VM holds only the public verification key",
+      "extra": ""
+    },
+    {
+      "id": "UC-19",
+      "pass": true,
+      "label": "neither the manifest nor the transfer package carries a key, .env, data or certificates",
+      "extra": "TMRKZ-app-20261125-083922-nogit.tar 845 entries"
+    },
+    {
+      "id": "UC-18",
+      "pass": true,
+      "label": "neither the maintenance worker nor the backend has the Docker socket or privileges",
+      "extra": "/tmrkz-vmsim-maintenance-1,/tmrkz-vmsim-backend-1"
+    },
+    {
+      "id": "UC-18",
+      "pass": true,
+      "label": "no Docker socket inside the worker",
+      "extra": ""
+    },
+    {
+      "id": "UC-18",
+      "pass": true,
+      "label": "a file name with shell syntax is listed as an ordinary file",
+      "extra": "docs/e2e-$(touch pwned-mwvvgzyt).md"
+    },
+    {
+      "id": "UC-18",
+      "pass": true,
+      "label": "it is written as a literal file and nothing is executed",
+      "extra": "DONE "
+    },
+    {
+      "id": "UC-14",
+      "pass": true,
+      "label": "a file changed on the VM since the last update is flagged and not selected by default",
+      "extra": "docs/e2e-$(touch pwned-mwvvgzyt).md\tمعدّل\tمعدّل على هذا الجهاز بعد آخر تحديث"
+    },
+    {
+      "id": "UC-13",
+      "pass": true,
+      "label": "a transfer cut short is refused, nothing staged; it can be sent again",
+      "extra": "400 {\"code\":\"VALIDATION_FAILED\",\"message\":\"انقطع رفع الملف قبل اكتماله؛ أعد رفعه: do"
+    },
+    {
+      "id": "UC-15",
+      "pass": true,
+      "label": "with too little free space nothing is applied",
+      "extra": "مساحة القرص غير كافية: المتاح 409771 MB، ويلزم 99999999 MB (النسخة الاحتياطية والملفات الجديدة وهامش 99999999 MB)؛ لم يُ"
+    },
+    {
+      "id": "UC-17",
+      "pass": true,
+      "label": "an update applied while the backend restarts completes and verifies",
+      "extra": "DONE"
+    },
+    {
+      "id": "UC-17",
+      "pass": true,
+      "label": "the worker restarts on its own and its history is kept",
+      "extra": "{\"alive\":true,\"version\":\"c227a6fe0b5f\",\"trustInstalled\":true,\"baseline\":true,\"lastSeen\":\"2026-11-25T08:41:18.179100418Z\"}"
+    },
+    {
+      "id": "UC-16",
+      "pass": true,
+      "label": "a build that never answers is rolled back by itself and the previous one serves again",
+      "extra": "FAILED_ROLLED_BACK"
+    },
+    {
+      "id": "ENV-E1",
+      "pass": true,
+      "label": "recognised and compared: a conflict kept, the CA found in this machine's folders, the same password recognised",
+      "extra": ""
+    },
+    {
+      "id": "ENV-E1",
+      "pass": true,
+      "label": "never-imported values named only, no secret shown, the other application's Keycloak not chosen (incomplete)",
+      "extra": ""
+    },
+    {
+      "id": "ENV-E2",
+      "pass": true,
+      "label": "applying is not possible before the test",
+      "extra": ""
+    },
+    {
+      "id": "ENV-E2",
+      "pass": true,
+      "label": "the chosen directory values pass a live protected connection",
+      "extra": "✓ نجح الاتصال المؤمَّن وربط حساب الخدمة."
+    },
+    {
+      "id": "ENV-E3",
+      "pass": true,
+      "label": "saved to «إعدادات التكامل» (audited); .env not touched",
+      "extra": "SAVED"
+    },
+    {
+      "id": "ENV-E3",
+      "pass": true,
+      "label": "the directory answers with the imported settings",
+      "extra": "نجح الاتصال المؤمَّن وربط حساب الخدمة."
+    },
+    {
+      "id": "ADM-E1",
+      "pass": true,
+      "label": "the screen says which directory lookup this installation can make",
+      "extra": "يبحث في الدليل حساب الخدمة المهيأ (للقراءة فقط)، فيظهر الشخص ولو لم يدخل تمركز من قبل."
+    },
+    {
+      "id": "ADM-E2",
+      "pass": true,
+      "label": "an account that never signed in is found in the directory and shown for confirmation",
+      "extra": "الاسم مستخدم اختبار e2eadm-mwvvgzyt الرقم الوظيفي E2E-e2eadm-mwvvgzyt حساب الدليل e2eadm-mwvvgzyt الوحدة — التحقق وُجد في الدليل المؤسسي الآن (حساب الخدمة للقرا"
+    },
+    {
+      "id": "ADM-E3",
+      "pass": true,
+      "label": "their first sign-in lands on the record made at confirmation, with the role",
+      "extra": "f49423f6-cc06-4379-a039-1c5f2269edb0 f49423f6-cc06-4379-a039-1c5f2269edb0"
+    },
+    {
+      "id": "CRT-E1",
+      "pass": true,
+      "label": "the https folder the configuration uses (certs/) is listed with its certificate and its key's match, never the key",
+      "extra": "مجلد شهادة https certs يستخدمه: نقطة https (proxy) ca-chain.pem localhost من localhost جذرية · RSA 2048 localhost, 127.0.0.1 تنتهي خلال 29 يوماً 25 ديسمبر 2026،"
+    },
+    {
+      "id": "CRT-E1",
+      "pass": true,
+      "label": "the https entry point serves the installed certificate",
+      "extra": "706da77ddd117942"
+    },
+    {
+      "id": "CRT-E4",
+      "pass": true,
+      "label": "a certificate that does not hold this server's key is refused before anything is written",
+      "extra": ""
+    },
+    {
+      "id": "CRT-E2",
+      "pass": true,
+      "label": "key, validity, server use, host name, chain and key strength pass",
+      "extra": "PASS,PASS,PASS,PASS,PASS,PASS"
+    },
+    {
+      "id": "CRT-E2",
+      "pass": true,
+      "label": "the private key is never shown",
+      "extra": ""
+    },
+    {
+      "id": "STEP-UP",
+      "pass": true,
+      "label": "an application with a sign-in older than five minutes asks to confirm the identity; nothing changed",
+      "extra": ""
+    },
+    {
+      "id": "CRT-E2",
+      "pass": true,
+      "label": "installed by the worker, reloaded by the https entry point, verified served",
+      "extra": "APPLIED"
+    },
+    {
+      "id": "CRT-E2",
+      "pass": true,
+      "label": "the previous certificate and key were backed up first",
+      "extra": "20261125T084819-5868bf5f"
+    },
+    {
+      "id": "CRT-E2",
+      "pass": true,
+      "label": "no temporary file left in the folder",
+      "extra": ""
+    },
+    {
+      "id": "CRT-E3",
+      "pass": true,
+      "label": "restore puts the previous certificate back and it is served again",
+      "extra": "RESTORED"
+    },
+    {
+      "id": "CRT-E5",
+      "pass": true,
+      "label": "adding a CA from certs/ to the directory's trust is tested live first",
+      "extra": "CHECKED"
+    },
+    {
+      "id": "CRT-E5",
+      "pass": true,
+      "label": "applied at once to that service alone",
+      "extra": "APPLIED"
+    },
+    {
+      "id": "CRT-E5",
+      "pass": true,
+      "label": "and restored",
+      "extra": ""
+    },
+    {
+      "id": "AUD",
+      "pass": true,
+      "label": "every step is audited and no secret is in the audit log",
+      "extra": ""
+    }
+  ]
+}

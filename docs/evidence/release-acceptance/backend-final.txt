@@ -1,0 +1,110 @@
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 24.07 s -- in ae.mover.AccessAcceptanceIT
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.122 s -- in ae.mover.AccessAdminIT
+[ERROR] Tests run: 6, Failures: 0, Errors: 6, Skipped: 0, Time elapsed: 0.257 s <<< FAILURE! -- in ae.mover.AccessScopeParityIT
+[ERROR] ae.mover.AccessScopeParityIT.addUserLookupByUsername -- Time elapsed: 0.042 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.treeStartsAtReach -- Time elapsed: 0.039 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.searchByName -- Time elapsed: 0.038 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.attachmentActive -- Time elapsed: 0.039 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.countsScoped -- Time elapsed: 0.037 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.addUserLookup -- Time elapsed: 0.040 s <<< ERROR!
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.889 s -- in ae.mover.AccessWorkspaceIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.317 s -- in ae.mover.ActiveDirectoryDirectBindTest
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.899 s -- in ae.mover.AdministrationAcceptanceIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.678 s -- in ae.mover.AdministratorDirectoryLookupIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.414 s -- in ae.mover.AdministratorLifecycleIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.837 s -- in ae.mover.AdministratorOwnLookupIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.601 s -- in ae.mover.ApprovalSignerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.763 s -- in ae.mover.assistant.AssistantServiceTest
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.936 s -- in ae.mover.AuthorizationIT
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.297 s -- in ae.mover.authz.PostureViewerScopeIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.604 s -- in ae.mover.authz.RequesterScopeIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.697 s -- in ae.mover.authz.UnitAccessManagerScopeIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.175 s -- in ae.mover.AuthzMirrorIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.358 s -- in ae.mover.BoundaryOverlapIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.557 s -- in ae.mover.CertificateCenterIT
+[ERROR] Tests run: 5, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.675 s <<< FAILURE! -- in ae.mover.CertificateInspectorTest
+[ERROR] ae.mover.CertificateInspectorTest.keyFormats -- Time elapsed: 0.244 s <<< FAILURE!
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.326 s -- in ae.mover.ChainApproverScopeIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 10.68 s -- in ae.mover.DbMigrationIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.054 s -- in ae.mover.DesktopFeedIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.517 s -- in ae.mover.DirectDirectorySignInIT
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.087 s -- in ae.mover.DirectorySignInIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.926 s -- in ae.mover.DualProviderSignInIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.370 s -- in ae.mover.EmploymentContextIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.755 s -- in ae.mover.EnterpriseSignInIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.999 s -- in ae.mover.ExecutionInFlightIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.982 s -- in ae.mover.ExecutionIntegrityIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ae.mover.hr.HrMappingTest
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.024 s -- in ae.mover.HrLinkedPeopleIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.997 s -- in ae.mover.HrOnDemandIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.90 s -- in ae.mover.HrSyncAcceptanceIT
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.258 s -- in ae.mover.IdentityScopeIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.567 s -- in ae.mover.IntegrationImportIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.426 s -- in ae.mover.IntegrationSettingsIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.118 s -- in ae.mover.knowledge.KnowledgeServiceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 12.49 s -- in ae.mover.MapScaleIT
+[INFO] Tests run: 16, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.437 s -- in ae.mover.MapWorkspaceAcceptanceIT
+[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 5.335 s <<< FAILURE! -- in ae.mover.MatrixColumnsIT
+[ERROR] ae.mover.MatrixColumnsIT.exactly8Columns -- Time elapsed: 0.223 s <<< FAILURE!
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.742 s -- in ae.mover.OperationalPostureRevisionIT
+[ERROR] Tests run: 5, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 87.32 s <<< FAILURE! -- in ae.mover.OperationalPostureScaleIT
+[ERROR] ae.mover.OperationalPostureScaleIT.postureScales -- Time elapsed: 79.16 s <<< FAILURE!
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.903 s -- in ae.mover.OracleAbsenceIT
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 40.61 s -- in ae.mover.OracleUnitImportIT
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.102 s -- in ae.mover.PlacementIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.773 s -- in ae.mover.RequestHubReachIT
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.457 s -- in ae.mover.ReservationAcceptanceIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in ae.mover.security.OidcPropertiesTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.690 s -- in ae.mover.SecurityRemediationIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.704 s -- in ae.mover.SeparationOfDutiesIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.720 s -- in ae.mover.SigningIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.132 s -- in ae.mover.SignInNotesIT
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.048 s -- in ae.mover.SiteMarkerIT
+[ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 7.973 s <<< FAILURE! -- in ae.mover.stationing.RestationingHrSyncIT
+[ERROR] ae.mover.stationing.RestationingHrSyncIT.hierarchyChangeThroughHrSync -- Time elapsed: 1.210 s <<< FAILURE!
+[ERROR] ae.mover.stationing.RestationingHrSyncIT.transfersThroughHrSync -- Time elapsed: 0.824 s <<< FAILURE!
+[ERROR] Tests run: 8, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 5.898 s <<< FAILURE! -- in ae.mover.stationing.RestationingLifecycleIT
+[ERROR] ae.mover.stationing.RestationingLifecycleIT.extension -- Time elapsed: 0.880 s <<< FAILURE!
+[ERROR] ae.mover.stationing.RestationingLifecycleIT.extensionLapses -- Time elapsed: 0.898 s <<< FAILURE!
+[ERROR] ae.mover.stationing.RestationingLifecycleIT.cancellationBeforeActivation -- Time elapsed: 0.590 s <<< FAILURE!
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.19 s -- in ae.mover.stationing.RestationingWorkflowIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.441 s -- in ae.mover.stationing.SiteDeletionIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.656 s -- in ae.mover.stationing.SiteSetupIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.036 s -- in ae.mover.stationing.StationingAdaptersIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.018 s -- in ae.mover.stationing.StationingFoundationIT
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 19.12 s -- in ae.mover.stationing.StationingNextIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.010 s -- in cross-branch units (O-03, O-03b)
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in outbound contract and sender (O-01)
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s -- in read contract scope
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in slope classification (owner stop-gate decision 2)
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s -- in terrain (O-05, O-05b, O-06)
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.013 s -- in policy validation
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.023 s -- in deployment, footprint and occupancy (O-08, O-15)
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in hierarchy drift (O-10, O-16)
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in routing from the requesting unit (O-07, O-09)
+[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.063 s -- in ae.mover.stationing.StationingRulesTest
+[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.727 s <<< FAILURE! -- in ae.mover.SupportIT
+[ERROR] ae.mover.SupportIT.assistantOff -- Time elapsed: 0.036 s <<< FAILURE!
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s -- in ae.mover.system.DbMigrationDumpTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.990 s -- in ae.mover.UnitMemberIdentityIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.126 s -- in ae.mover.UnitMemberIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 5.531 s -- in ae.mover.UpdateCenterIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.909 s -- in ae.mover.V17MigrationIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.947 s -- in ae.mover.V47MigrationIT
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.443 s -- in ae.mover.WorkflowAcceptanceIT
+[ERROR] Tests run: 40, Failures: 3, Errors: 3, Skipped: 0, Time elapsed: 21.53 s <<< FAILURE! -- in ae.mover.WorkflowGraphIT
+[ERROR] ae.mover.WorkflowGraphIT.askingWithoutReviewer -- Time elapsed: 0.096 s <<< ERROR!
+[ERROR] ae.mover.WorkflowGraphIT.finalApproverSetsEachRole -- Time elapsed: 0.077 s <<< FAILURE!
+[ERROR] ae.mover.WorkflowGraphIT.askingForPermissions -- Time elapsed: 0.086 s <<< FAILURE!
+[ERROR] ae.mover.WorkflowGraphIT.routesByTime -- Time elapsed: 0.261 s <<< ERROR!
+[ERROR] ae.mover.WorkflowGraphIT.askingWithScope -- Time elapsed: 0.083 s <<< FAILURE!
+[ERROR] ae.mover.WorkflowGraphIT.movedBeforeFinalIsRerouted -- Time elapsed: 0.080 s <<< ERROR!
+[ERROR] Tests run: 454, Failures: 12, Errors: 9, Skipped: 0
+[INFO] BUILD FAILURE
+
+# after the EC-key fix and the history-order fix (same day):
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 26.20 s -- in ae.mover.CertificateCenterIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.058 s -- in ae.mover.CertificateInspectorTest
+[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 7.822 s <<< FAILURE! -- in ae.mover.SupportIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 23.48 s -- in ae.mover.CertificateCenterIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.021 s -- in ae.mover.CertificateInspectorTest

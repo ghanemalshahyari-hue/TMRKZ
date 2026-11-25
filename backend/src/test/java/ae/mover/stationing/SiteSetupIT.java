@@ -286,7 +286,19 @@ class SiteSetupIT extends RestationingTestBase {
         assertThat(hub.path("state").asText()).as("both areas in force").isEqualTo("DEPLOYMENT_COMPLETE");
         assertThat(hub.path("site").path("id").asText()).isEqualTo(site);
 
-        JsonNode posture = login("postureViewer").get("/operational-posture").body();
+        // the default /operational-posture is the compact Site-Hub summary (ADR-094 Gate 2 §C, 7df000b): the set-up site is one
+        // complete hub there, as an activated one is …
+        JsonNode overview = login("postureViewer").get("/operational-posture").body();
+        JsonNode hubOfSite = null;
+        for (JsonNode h : overview.path("siteHubs")) {
+            if (site.equals(h.path("siteId").asText())) {
+                hubOfSite = h;
+            }
+        }
+        assertThat(hubOfSite).as(overview.toString()).isNotNull();
+        assertThat(hubOfSite.path("completeCount").asLong()).as("both areas in force").isGreaterThanOrEqualTo(1);
+        // … and the per-unit record is the ?view=UNITS shape
+        JsonNode posture = login("postureViewer").get("/operational-posture?view=UNITS").body();
         JsonNode one = null;
         for (JsonNode u : posture.path("units")) {
             if (fresh.toString().equals(u.path("id").asText())) {

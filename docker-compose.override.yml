@@ -183,6 +183,11 @@ services:
   proxy:
     image: nginx:1.28.3-alpine
     pull_policy: never
+    # ADR-105: reloads server.crt / server.key by itself when «الشهادات» installs new ones (after nginx -t accepts them)
+    entrypoint: ["/bin/sh", "/etc/tmrkz/tls-watch.sh"]
+    command: ["nginx", "-g", "daemon off;"]
+    volumes:
+      - ./ops/tls/tls-watch.sh:/etc/tmrkz/tls-watch.sh:ro
     networks: [internal, edge]
 
 
@@ -198,6 +203,12 @@ services:
     environment:
       TMRKZ_UPDATE_BACKEND_URL: http://backend:8080
       TMRKZ_UPDATE_WEB_URL: http://web
+      # ADR-105: nothing is applied when the folder's disk would keep less than this free; «الشهادات» checks https here
+      TMRKZ_UPDATE_MIN_FREE_MB: ${TMRKZ_UPDATE_MIN_FREE_MB:-200}
+      # how long the new build may take to answer before the worker restores the previous one by itself
+      TMRKZ_UPDATE_DEPLOY_MINUTES: ${TMRKZ_UPDATE_DEPLOY_MINUTES:-25}
+      TMRKZ_UPDATE_PROXY_HOST: proxy
+      TMRKZ_UPDATE_PROXY_PORT: "8443"
     volumes:
       - ./:/install
       - ./data:/install/data:ro

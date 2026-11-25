@@ -1,0 +1,13 @@
+bootstrap package: release/bootstrap (50 files, 2732 KB tar, 0 removals listed)
+PASS  BS-01 minimal package built; no key, .env, data or certificates in it
+PASS  BS-02 check is read-only (plan: replace 26, add 24, remove 0 files (application and documentation only))
+PASS  BS-03 .env, certs/, data/ and docker-compose.dc-hosts.yml byte for byte unchanged
+PASS  BS-03 public verification key, baseline and the maintenance service installed; no signing key
+PASS  BS-03 the Update Center worker is the released one
+      [bootstrap] done: backup /c/Users/ADMIN/AppData/Local/Temp/claude/9f5b532524e8b495/fc86be8c-9d50-4581-9d5c-71b9bd5811c5/scratchpad/bs2/TMRKZ/backups/bootstrap/20261125T064825Z (52 written, 0 removed)
+      [bootstrap] 0 files of the release still differ here (not in this minimal package); the first browser update brings them
+PASS  BS-04 restore returns every file exactly (2968 files)
+PASS  BS-05 a package altered after it was made is refused
+PASS  BS-05 a package smuggling .env with recomputed checksums is refused
+PASS  BS-05 the installation is unchanged by both refused attempts
+9 passed, 0 failed

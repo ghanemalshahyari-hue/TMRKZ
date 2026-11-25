@@ -62,6 +62,26 @@ export function TopNavigation({ me, view, links, more, create, onLogout, navOpen
     return () => document.removeEventListener('mousedown', close);
   }, []);
   useEffect(() => setMoreOpen(false), [view]);
+  // «المزيد» opens below the bar, but the bar clips what leaves it (it hides the items that do not fit): the menu is therefore
+  // placed in the window, under its button, kept inside the window (owner report 25 Nov 2026: «the more tab is not working»)
+  const moreBtn = useRef<HTMLButtonElement>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; right?: number; left?: number; maxHeight: number } | null>(null);
+  useEffect(() => {
+    if (!moreOpen) return;
+    const place = () => {
+      const b = moreBtn.current?.getBoundingClientRect();
+      if (!b) return;
+      const W = window.innerWidth;
+      const rtl = getComputedStyle(document.documentElement).direction === 'rtl';
+      const top = b.bottom + 8;
+      const maxHeight = Math.max(160, window.innerHeight - top - 12);
+      setMenuPos(rtl ? { top, right: Math.max(8, Math.min(W - b.right, W - 268)), maxHeight }
+        : { top, left: Math.max(8, Math.min(b.left, W - 268)), maxHeight });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [moreOpen]);
 
   const navRef = useRef<HTMLElement>(null);
   const [overflowStart, setOverflowStart] = useState(links.length);
@@ -124,13 +144,15 @@ export function TopNavigation({ me, view, links, more, create, onLogout, navOpen
           </a>
         ))}
         <div className="tz-more" ref={moreRef} style={allMore.length === 0 ? { display: 'none' } : undefined}>
-          <button className={'nav-item tz-nav-item' + (active === 'more' || overflowLinks.some(ol => active === (ol.id ?? ol.view)) ? ' active' : '')} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
+          <button ref={moreBtn} className={'nav-item tz-nav-item' + (active === 'more' || overflowLinks.some(ol => active === (ol.id ?? ol.view)) ? ' active' : '')} aria-haspopup="menu" aria-expanded={moreOpen} onClick={() => setMoreOpen((o) => !o)}>
             <Icon name="grid" />
             <span>المزيد</span>
             <Icon name="chevron" />
           </button>
           {(moreOpen || navOpen) && (
-            <div className="tz-menu" role="menu">
+            <div className="tz-menu" role="menu" data-testid="more-menu"
+              style={!navOpen && menuPos ? { position: 'fixed', top: menuPos.top, right: menuPos.right, left: menuPos.left,
+                maxHeight: menuPos.maxHeight, overflowY: 'auto' } : undefined}>
               {overflowLinks.map((l) => (
                 <a key={l.id ?? l.view} role="menuitem" className={'tz-menu-item' + (active === (l.id ?? l.view) ? ' active' : '')} href={l.href ?? '#' + l.view}>
                   <Icon name={l.icon} />

@@ -1,0 +1,42 @@
+PASS  SETUP  two fictional accounts in the stand-in directory  — adding new entry "uid=e2euser-mwvvgzyt,ou=people,dc=tmrkz,dc=local"
+PASS  SETUP  a fictional root, issuing CA, server certificate and .pfx
+PASS  UC-12  without a session every update, certificate and lookup call is refused  — 401,401,401 put 401
+PASS  UC-12  a signed-in person without global administration is refused everywhere  — 403,403,403,403
+PASS  UC-12  and does not even see «إدارة النظام»
+PASS  UC-19  the VM holds only the public verification key
+PASS  UC-19  neither the manifest nor the transfer package carries a key, .env, data or certificates  — TMRKZ-app-20261125-083922-nogit.tar 845 entries
+PASS  UC-18  neither the maintenance worker nor the backend has the Docker socket or privileges  — /tmrkz-vmsim-maintenance-1,/tmrkz-vmsim-backend-1
+PASS  UC-18  no Docker socket inside the worker
+PASS  UC-18  a file name with shell syntax is listed as an ordinary file  — docs/e2e-$(touch pwned-mwvvgzyt).md
+PASS  UC-18  it is written as a literal file and nothing is executed  — DONE 
+PASS  UC-14  a file changed on the VM since the last update is flagged and not selected by default  — docs/e2e-$(touch pwned-mwvvgzyt).md	معدّل	معدّل على هذا الجهاز بعد آخر تحديث
+PASS  UC-13  a transfer cut short is refused, nothing staged; it can be sent again  — 400 {"code":"VALIDATION_FAILED","message":"انقطع رفع الملف قبل اكتماله؛ أعد رفعه: do
+PASS  UC-15  with too little free space nothing is applied  — مساحة القرص غير كافية: المتاح 409771 MB، ويلزم 99999999 MB (النسخة الاحتياطية والملفات الجديدة وهامش 99999999 MB)؛ لم يُ
+PASS  UC-17  an update applied while the backend restarts completes and verifies  — DONE
+PASS  UC-17  the worker restarts on its own and its history is kept  — {"alive":true,"version":"c227a6fe0b5f","trustInstalled":true,"baseline":true,"lastSeen":"2026-11-25T08:41:18.179100418Z"}
+PASS  UC-16  a build that never answers is rolled back by itself and the previous one serves again  — FAILED_ROLLED_BACK
+PASS  ENV-E1  recognised and compared: a conflict kept, the CA found in this machine's folders, the same password recognised
+PASS  ENV-E1  never-imported values named only, no secret shown, the other application's Keycloak not chosen (incomplete)
+PASS  ENV-E2  applying is not possible before the test
+PASS  ENV-E2  the chosen directory values pass a live protected connection  — ✓ نجح الاتصال المؤمَّن وربط حساب الخدمة.
+PASS  ENV-E3  saved to «إعدادات التكامل» (audited); .env not touched  — SAVED
+PASS  ENV-E3  the directory answers with the imported settings  — نجح الاتصال المؤمَّن وربط حساب الخدمة.
+PASS  ADM-E1  the screen says which directory lookup this installation can make  — يبحث في الدليل حساب الخدمة المهيأ (للقراءة فقط)، فيظهر الشخص ولو لم يدخل تمركز من قبل.
+PASS  ADM-E2  an account that never signed in is found in the directory and shown for confirmation  — الاسم مستخدم اختبار e2eadm-mwvvgzyt الرقم الوظيفي E2E-e2eadm-mwvvgzyt حساب الدليل e2eadm-mwvvgzyt الوحدة — التحقق وُجد في الدليل المؤسسي الآن (حساب الخدمة للقرا
+PASS  ADM-E3  their first sign-in lands on the record made at confirmation, with the role  — f49423f6-cc06-4379-a039-1c5f2269edb0 f49423f6-cc06-4379-a039-1c5f2269edb0
+PASS  CRT-E1  the https folder the configuration uses (certs/) is listed with its certificate and its key's match, never the key  — مجلد شهادة https certs يستخدمه: نقطة https (proxy) ca-chain.pem localhost من localhost جذرية · RSA 2048 localhost, 127.0.0.1 تنتهي خلال 29 يوماً 25 ديسمبر 2026،
+PASS  CRT-E1  the https entry point serves the installed certificate  — 706da77ddd117942
+PASS  CRT-E4  a certificate that does not hold this server's key is refused before anything is written
+PASS  CRT-E2  key, validity, server use, host name, chain and key strength pass  — PASS,PASS,PASS,PASS,PASS,PASS
+PASS  CRT-E2  the private key is never shown
+PASS  STEP-UP  an application with a sign-in older than five minutes asks to confirm the identity; nothing changed
+PASS  CRT-E2  installed by the worker, reloaded by the https entry point, verified served  — APPLIED
+PASS  CRT-E2  the previous certificate and key were backed up first  — 20261125T084819-5868bf5f
+PASS  CRT-E2  no temporary file left in the folder
+PASS  CRT-E3  restore puts the previous certificate back and it is served again  — RESTORED
+PASS  CRT-E5  adding a CA from certs/ to the directory's trust is tested live first  — CHECKED
+PASS  CRT-E5  applied at once to that service alone  — APPLIED
+PASS  CRT-E5  and restored
+PASS  AUD  every step is audited and no secret is in the audit log
+
+40/40 passed — evidence in C:\Users\ADMIN\AppData\Local\Temp\claude\9f5b532524e8b495\fc86be8c-9d50-4581-9d5c-71b9bd5811c5\scratchpad\vmsim\evidence-release

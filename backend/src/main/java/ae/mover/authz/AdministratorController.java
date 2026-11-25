@@ -32,6 +32,12 @@ public class AdministratorController {
         return administrators.list(access.context(actor));
     }
 
+    /** Which verified lookups this installation can make now, and why not when it cannot (ADR-105). */
+    @GetMapping("/administrators/lookup-options")
+    public AdministratorService.LookupOptions lookupOptions(Actor actor) {
+        return administrators.lookupOptions(access.context(actor));
+    }
+
     /** Finds and shows one identity (Oracle HR by employee number, or a directory-verified account); changes nothing. */
     @PostMapping("/administrators/resolve")
     public AdministratorService.Candidate resolve(Actor actor, @RequestBody(required = false) AdministratorService.ResolveInput in) {

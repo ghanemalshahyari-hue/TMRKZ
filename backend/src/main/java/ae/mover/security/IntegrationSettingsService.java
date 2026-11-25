@@ -611,6 +611,165 @@ public class IntegrationSettingsService {
         return oidcView(ctx);
     }
 
+    // ---- certificates of a saved section (ADR-105) ---------------------------------------------------------------------
+
+    /** Whether the section ("DIRECTORY" or "OIDC") is saved here; only a saved section holds its own CA certificates. */
+    boolean sectionSaved(String kind) {
+        return switch (kind) {
+            case "DIRECTORY" -> stored("DIRECTORY", Directory.class) != null;
+            case "OIDC" -> stored("OIDC", Oidc.class) != null;
+            default -> false;
+        };
+    }
+
+    /** The CA certificates the saved section holds now (PEM; null or blank when none). */
+    String savedCaPem(String kind) {
+        return switch (kind) {
+            case "DIRECTORY" -> {
+                Stored<Directory> d = stored("DIRECTORY", Directory.class);
+                yield d == null ? null : d.form().caCertificatesPem();
+            }
+            case "OIDC" -> {
+                Stored<Oidc> o = stored("OIDC", Oidc.class);
+                yield o == null ? null : o.form().caCertificatesPem();
+            }
+            default -> null;
+        };
+    }
+
+    /** The saved directory as it would connect with other CA certificates (its other values and stored password unchanged). */
+    LdapProperties savedDirectoryWith(String pem) {
+        Stored<Directory> d = stored("DIRECTORY", Directory.class);
+        if (d == null) {
+            return null;
+        }
+        Directory f = d.form();
+        return toLdap(new Directory(f.enabled(), f.server(), f.port(), f.securityMode(), f.domain(), f.baseDn(), f.bindDn(), null,
+                f.usernameAttribute(), f.uuidAttribute(), f.employeeNumberAttribute(), f.userObjectClass(), f.rankAttribute(),
+                f.positionAttribute(), f.unitIdAttribute(), f.unitNameAttribute(), f.mainUnitIdAttribute(), pem, f.timeoutSeconds()), d.secret());
+    }
+
+    /** The saved Keycloak's automatic provider (null when not saved). */
+    OidcProperties.Provider savedOidcProvider() {
+        Stored<Oidc> o = stored("OIDC", Oidc.class);
+        return o == null ? null : toOidc(o.form(), o.secret()).automatic();
+    }
+
+    /** The saved section's server name, as the screen shows it (the directory server, or the Keycloak address). */
+    String savedServer(String kind) {
+        return switch (kind) {
+            case "DIRECTORY" -> {
+                Stored<Directory> d = stored("DIRECTORY", Directory.class);
+                yield d == null ? null : d.form().server();
+            }
+            case "OIDC" -> {
+                Stored<Oidc> o = stored("OIDC", Oidc.class);
+                yield o == null ? null : o.form().serverUrl();
+            }
+            default -> null;
+        };
+    }
+
+    /**
+     * Replaces only the CA certificates of a saved section; every other value and its encrypted secret stay as they are. The
+     * caller (the certificate screen) validates, audits and keeps the previous certificates for a restore.
+     */
+    void replaceCaPem(String kind, String pem, UUID by) {
+        Trust.parse(pem); // certificates only; a key is refused here too
+        switch (kind) {
+            case "DIRECTORY" -> {
+                Stored<Directory> d = stored("DIRECTORY", Directory.class);
+                if (d == null) {
+                    throw ApiException.validation("قسم الدليل غير محفوظ في «إعدادات التكامل».");
+                }
+                Directory f = d.form();
+                write("DIRECTORY", new Directory(f.enabled(), f.server(), f.port(), f.securityMode(), f.domain(), f.baseDn(), f.bindDn(), null,
+                        f.usernameAttribute(), f.uuidAttribute(), f.employeeNumberAttribute(), f.userObjectClass(), f.rankAttribute(),
+                        f.positionAttribute(), f.unitIdAttribute(), f.unitNameAttribute(), f.mainUnitIdAttribute(), pem, f.timeoutSeconds()),
+                        d.secret(), by);
+            }
+            case "OIDC" -> {
+                Stored<Oidc> o = stored("OIDC", Oidc.class);
+                if (o == null) {
+                    throw ApiException.validation("قسم Keycloak غير محفوظ في «إعدادات التكامل».");
+                }
+                Oidc f = o.form();
+                write("OIDC", new Oidc(f.enabled(), f.serverUrl(), f.realm(), f.clientId(), null, f.internalUrl(), f.issuer(), f.redirectUri(),
+                        pem), o.secret(), by);
+            }
+            default -> throw ApiException.validation("قسم غير معروف: " + kind);
+        }
+    }
+
+    // ---- the forms in force, for an import from a configuration file (ADR-105) -----------------------------------------
+
+    /** The saved directory form (its password is not in the form: {@link #storedDirectoryPassword}); null when not saved. */
+    Directory savedDirectoryForm() {
+        Stored<Directory> d = stored("DIRECTORY", Directory.class);
+        return d == null ? null : d.form();
+    }
+
+    Oidc savedOidcForm() {
+        Stored<Oidc> o = stored("OIDC", Oidc.class);
+        return o == null ? null : o.form();
+    }
+
+    Assistant savedAssistantForm() {
+        Stored<Assistant> a = stored("ASSISTANT", Assistant.class);
+        return a == null ? null : a.form();
+    }
+
+    /** The directory .env describes, as a form (null when .env names none); its password is {@link #envDirectoryPassword}. */
+    Directory envDirectoryForm() {
+        if (!envLdap.configured()) {
+            return null;
+        }
+        URI u = URI.create(envLdap.url());
+        boolean ldaps = "ldaps".equalsIgnoreCase(u.getScheme());
+        String p = envLdap.directBindPattern();
+        String domain = p != null && p.startsWith(LdapProperties.USERNAME_MARKER + "@") ? p.substring(LdapProperties.USERNAME_MARKER.length() + 1) : null;
+        return new Directory(true, u.getHost(), u.getPort() > 0 ? u.getPort() : ldaps ? 636 : 389, ldaps ? "ldaps" : "starttls", domain,
+                envLdap.usersDn(), envLdap.bindDn(), null, envLdap.usernameAttribute(), envLdap.uuidAttribute(), envLdap.employeeNumberAttribute(),
+                envLdap.userObjectClass(), envLdap.rankAttribute(), envLdap.positionAttribute(), envLdap.unitIdAttribute(),
+                envLdap.unitNameAttribute(), envLdap.mainUnitIdAttribute(), null, Math.max(1, envLdap.connectTimeoutMs() / 1000));
+    }
+
+    String envDirectoryPassword() {
+        return envLdap.bindCredential();
+    }
+
+    /** The enterprise Keycloak .env describes, as a form (null when none; never the local platform provider). */
+    Oidc envOidcForm() {
+        OidcProperties.Provider a = envOidc.automatic();
+        if (!a.configured() || envOidc.localIssuer() != null && envOidc.localIssuer().equals(a.issuer())) {
+            return null;
+        }
+        String issuer = a.issuer();
+        int at = issuer.indexOf("/realms/");
+        String server = at > 0 ? issuer.substring(0, at) : issuer;
+        String realm = at > 0 ? issuer.substring(at + "/realms/".length()) : null;
+        String internal = a.internalBaseUrl();
+        int ia = internal == null ? -1 : internal.indexOf("/realms/");
+        return new Oidc(true, server, realm, a.clientId(), null, ia > 0 ? internal.substring(0, ia) : internal, issuer, null, null);
+    }
+
+    String envClientSecret() {
+        return envOidc.automatic().clientSecret();
+    }
+
+    Assistant envAssistantForm() {
+        return new Assistant(envAssistant.enabled(), envAssistant.baseUrl(), envAssistant.model(), null, envAssistant.timeoutSeconds());
+    }
+
+    String envAssistantKey() {
+        return envAssistant.apiKey();
+    }
+
+    /** The CA folder every directory and Keycloak connection trusts in addition (TMRKZ_TRUSTSTORE_DIR, mounted read-only). */
+    String caDir() {
+        return envLdap.caDir();
+    }
+
     /** A trust for a test of unsaved Keycloak values. */
     SSLContext sslFor(String pem) {
         try {

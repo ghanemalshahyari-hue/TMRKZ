@@ -2982,3 +2982,89 @@ the same TMRKZ folder, PAM being kept for the first set-up and emergencies.
 `-Xlint:all` in the image; end to end `tests/acceptance/update-center.mjs` on a throw-away installation laid out like the VM
 (Compose project `tmrkz-vmsim`, started by `start.sh` without the image archive and with a third Compose file) — results in
 `docs/STATUS.md` and `docs/evidence/update-center/`.
+
+## ADR-105 Certificates and configuration import from the browser; directory lookup before a first sign-in; release acceptance (25 Nov 2026)
+
+**Context.** The owner's «Final Completion and Release Acceptance» brief (25 Nov 2026) accepted ADR-103/104 provisionally and
+asked to complete: browser certificate import and validation for the existing certificate folder and the VM's configuration
+(chains, expiry, host names, private-key matching, service-specific trust for https, Keycloak, LDAP; preview, explicit
+application, health checks, recovery; never exposing a key); import of a compatible application's configuration file (MOVER's
+`.env` names) mapped to the integration sections, with missing values and conflicts shown, tested before applying, never touching
+database credentials, signing keys or unrelated machine settings; administrator lookup of a directory account before its first
+sign-in where an authorised lookup exists, the limitation explained otherwise; classification of the 18 failing tests; Update
+Center security and reliability; UI and map regression; a minimal one-time bootstrap package. No new dependency or image, no
+PowerShell, one folder, main only.
+
+**Decision.** Accepted.
+- **Certificates («الشهادات»).** `CertificateInspector` reads PEM (certificates; PKCS#8, PKCS#1 and SEC1 keys; encrypted keys),
+  DER, PKCS#7 and PKCS#12 with the JDK and the Bouncy Castle 1.86 the signature library already brings (no new dependency). Checks:
+  key ↔ certificate by a signature made and verified (any key type), validity (expired / not yet / 30 days), server use (EKU),
+  host name against the alternative names (one-label wildcards, IP names), chain to a root with PKIX (the root the only anchor;
+  revocation not checked: offline), key strength. `CertificateService` (global administrators only):
+  - `DIRECTORY` and `OIDC` trust: each service its own CA list in its saved section of «إعدادات التكامل» (ADR-092), applied at once.
+    Before applying, a live protected connection to that server is made with the new list (chain and host name); a list that
+    breaks a connection working now is refused. After applying, the same connection is made again; the previous list returns by
+    itself when it fails. Restore on request. ADD (merge) or REPLACE.
+  - `HTTPS`: the backend checks and stages `server.crt` (leaf + issuing CAs), `ca-chain.pem` and, when uploaded, `server.key`
+    (owner-only file) in the update volume; the maintenance worker re-checks (staged certificate = the one checked, key matches,
+    valid now, the folder is still TMRKZ_TLS_DIR and is `ops/tls/…` or `certs/…`), backs up to `backups/certificates/<id>/`,
+    installs atomically, and — when https is on — waits until the https entry point serves the new certificate, else restores
+    the backup (`FAILED_ROLLED_BACK`); `APPLIED_INACTIVE` when https is off. The proxy reloads by itself (`ops/tls/tls-watch.sh`:
+    `nginx -t` then reload; a refused certificate leaves the running one) — no Docker socket anywhere.
+  - Inventory: the worker lists, every 30 s or on request, the folders the running configuration uses (TMRKZ_TLS_DIR,
+    TMRKZ_TRUSTSTORE_DIR, `certs/`), certificates as PEM, a key only as its public-key fingerprint, permissions and which
+    certificate it matches. Any listed certificate can be the source of an import.
+  - Never in a response, log or audit entry: a private key. Staged keys are deleted at the end of the request, on discard, or
+    after one hour without approval.
+- **Configuration import («استيراد ملف إعدادات»).** `IntegrationImportService` parses a dotenv file in memory (quotes, `export`,
+  comments), maps LDAP_* / KEYCLOAK_* / AI_* (MOVER's names, verified against its configuration code) and TMRKZ's own names to the
+  directory, Keycloak and assistant sections, and compares each with the value in force: NEW, SAME, CONFLICT, missing CA file. A
+  CA path is resolved by file name in the certificate folders the worker lists. Secrets are compared on the server and shown
+  only as ••••. Database URLs and passwords, secret, signing and encryption keys, OpenFGA, the local identity provider and its
+  bootstrap, platform passwords and tokens are «never imported» (names only); this application's own return address is «not
+  applicable»; everything else «unused». Conflicts, the other application's Keycloak client (registered for it, not for TMRKZ)
+  and any section the file cannot complete are never preselected. Applying needs a passed live test of that exact selection and
+  goes through each section's own audited save; `.env` is never written.
+- **Directory lookup before a first sign-in.** `DirectoryAuthenticator.lookupMode()`: `SERVICE_ACCOUNT` when the directory in force
+  has a read-only account; `OWN_ACCOUNT` with ADR-100's direct bind — the administrator, signed in with the directory, types their
+  own directory password for that one search (throttled like a step-up, never stored or audited; the bound entry must still carry
+  their linked stable identifier); `UNAVAILABLE` otherwise, explained on the screen. The entry found is shown for confirmation;
+  on confirmation the person is created through the unchanged `IdentityService.resolve` exactly as their first sign-in would
+  (HR record in Oracle mode; else LOCAL linked `DIRECTORY` by the directory's stable identifier), so their later sign-in lands on
+  the same record. A TMRKZ record already holding the login or number is refused for review. Least privilege, confirmation
+  fingerprint, audit and the last-administrator rule unchanged.
+- **Update Center hardening.** Free space checked before receiving a file and before applying (`TMRKZ_UPDATE_MIN_FREE_MB`); an
+  interrupted upload leaves nothing staged and says so; `TMRKZ_UPDATE_DEPLOY_MINUTES` configurable.
+- **Bootstrap.** `make-release.sh --bootstrap <commit>` writes `release/bootstrap/`: only the app/docs files changed since the
+  machine's commit (plus `ops/update/`), the signed full list, the Compose files for review, the public key, `bootstrap.sh`,
+  `INSTALL.txt`, `SHA256SUMS`. `bootstrap.sh check|apply|restore`: checksums, signature, every file against the signed list,
+  protected paths refused, backup of every file touched, Compose files only with `--with-config` after the diff, the public key
+  installed once (another key already trusted stops it), the baseline written; restore returns every file exactly.
+- **Defects the acceptance runs found and fixed:**
+  - «المزيد» in the top bar opened a menu nobody could see: the bar clips what leaves it (it hides the items that do not
+    fit), and the menu opens below it — reported by the owner the same day. The menu is now placed in the window under its
+    button (`TopNavigation.tsx`); the navigation test checks that each menu item is the element actually on top (the earlier
+    automated click had passed through the hidden item).
+  - On phones the «الدعم»/«المساعد الذكي» buttons sat half under the bottom sheet tabs; they rise above them
+    (`floatingAssist.css`).
+  - «مركز التحديث» reset the file selection to its defaults after each upload, dropping a change the administrator had
+    chosen by hand (a flagged one); the defaults are now made once per update (`UpdateCenter.tsx`).
+  - A decision that needs a recent sign-in (applying an update or a certificate, rolling back, restoring) only showed a
+    passing notice; it now asks to confirm the identity in place and continues (`StepUpNotice.tsx`, the same two ways as
+    «الاعتماد»).
+- **Owner requests the same day:** «إعدادات النظام» reorganised — a side menu of seven groups with search and live status
+  badges, status cards that open their group, one group at a time or «الكل» (still the default, so every section stays where
+  it was reachable) (`SettingsPage.tsx`); every map page opens on the whole country, as «الموقف العملياتي», instead of a
+  zoomed-in place, with «الخريطة كاملة» beside the map's own controls to return to it — data is no longer framed on load,
+  choosing a site, unit or request still brings it into view (`OfflineMapLibre` `fullView`, `RequestMap`, `SitesMap`,
+  `CommandMap`).
+- **The 18 failing tests** were expectations from before ADR-095 and the posture summary (ADR-094 Gate 2 §C); updated to the
+  designed behaviour without weakening any check (`docs/evidence/regression-18/CLASSIFICATION.md`). Found on the way and NOT
+  fixed (owner's choice of table): the FYI designations the final approval reads (`fyi_designation`) cannot be set from the
+  application (the screen writes `fyi_main_command`).
+
+**Tests.** `CertificateInspectorTest` 5/5, `CertificateCenterIT` 2/2, `IntegrationImportIT` 1/1, `AdministratorDirectoryLookupIT`
+1/1, `AdministratorOwnLookupIT` 1/1, the stationing classes 40/40; the full backend suite has 20 failures, all identical on an
+untouched `8800b58` (42 there) and recorded as open. Frontend 411/411. Browser on a throw-away installation laid out like the VM:
+`release-acceptance.mjs` 40/40, `ui-regression.mjs` 48/48, `update-center.mjs` 33/33; `bootstrap-test.sh` 9/9. Details and
+the acceptance matrix: `docs/STATUS.md`; guide with screenshots: `docs/guide/TMRKZ_FINAL_DELIVERY_GUIDE.html`.

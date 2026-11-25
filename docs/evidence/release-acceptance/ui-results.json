@@ -1,0 +1,611 @@
+{
+  "results": [
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1920x1080: 8 pages without overflow, overlapping panels or hidden content",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1920x1080: no script error",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1920x1080: «المزيد» opens a menu whose every item is visible and clickable",
+      "extra": "10/10"
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1920x1080: «إدارة النظام» is visible where it is clicked",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1920x1080: the navigation reaches «إدارة النظام»",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1440x900: 8 pages without overflow, overlapping panels or hidden content",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1440x900: no script error",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1440x900: «المزيد» opens a menu whose every item is visible and clickable",
+      "extra": "10/10"
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1440x900: «إدارة النظام» is visible where it is clicked",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1440x900: the navigation reaches «إدارة النظام»",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1366x768: 8 pages without overflow, overlapping panels or hidden content",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1366x768: no script error",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1366x768: «المزيد» opens a menu whose every item is visible and clickable",
+      "extra": "10/10"
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1366x768: «إدارة النظام» is visible where it is clicked",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1366x768: the navigation reaches «إدارة النظام»",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1280x800@125%: 8 pages without overflow, overlapping panels or hidden content",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1280x800@125%: no script error",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1280x800@125%: «المزيد» opens a menu whose every item is visible and clickable",
+      "extra": "10/10"
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1280x800@125%: «إدارة النظام» is visible where it is clicked",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1280x800@125%: the navigation reaches «إدارة النظام»",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1024x768: 8 pages without overflow, overlapping panels or hidden content",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "1024x768: no script error",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1024x768: «المزيد» opens a menu whose every item is visible and clickable",
+      "extra": "12/12"
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1024x768: «إدارة النظام» is visible where it is clicked through «المزيد»",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "1024x768: the navigation reaches «إدارة النظام» through «المزيد»",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "tablet-768x1024@2x: 8 pages without overflow, overlapping panels or hidden content",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "tablet-768x1024@2x: no script error",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "tablet-768x1024@2x: «إدارة النظام» is visible where it is clicked through the menu button",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "tablet-768x1024@2x: the navigation reaches «إدارة النظام» through the menu button",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "phone-390x844@3x: 8 pages without overflow, overlapping panels or hidden content",
+      "extra": ""
+    },
+    {
+      "id": "UI-01",
+      "pass": true,
+      "label": "phone-390x844@3x: no script error",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "phone-390x844@3x: «إدارة النظام» is visible where it is clicked through the menu button",
+      "extra": ""
+    },
+    {
+      "id": "UI-02",
+      "pass": true,
+      "label": "phone-390x844@3x: the navigation reaches «إدارة النظام» through the menu button",
+      "extra": ""
+    },
+    {
+      "id": "UI-03",
+      "pass": true,
+      "label": "a slow call shows its loading state, then the content",
+      "extra": "تحميل … → تنتهي قريباً 2 عامل الصيانة يعمل"
+    },
+    {
+      "id": "UI-03",
+      "pass": true,
+      "label": "the Update Center leaves its loading state",
+      "extra": "عامل الصيانة يعمل (c227a6fe0b5f)"
+    },
+    {
+      "id": "UI-04",
+      "pass": true,
+      "label": "a failed call shows its message (in place and as a notice); the rest of the page stays usable",
+      "extra": "تعذر الوصول إلى الخدمة (اختبار) | خطأ اختبار في الخادم"
+    },
+    {
+      "id": "UI-04",
+      "pass": true,
+      "label": "failed calls cause no script error",
+      "extra": ""
+    },
+    {
+      "id": "UI-05",
+      "pass": true,
+      "label": "settings: every group in «الكل», one group from the menu, search narrows, «الكل» restores",
+      "extra": "7/settings-security/settings-identity"
+    },
+    {
+      "id": "UI-05",
+      "pass": true,
+      "label": "settings: status cards open their group",
+      "extra": "5 cards"
+    },
+    {
+      "id": "MAP-B",
+      "pass": true,
+      "label": "«stationing» opens on the whole country; «الخريطة كاملة» returns to it after zooming in",
+      "extra": "true/true/true"
+    },
+    {
+      "id": "MAP-B",
+      "pass": true,
+      "label": "«siteSetup» opens on the whole country; «الخريطة كاملة» returns to it after zooming in",
+      "extra": "true/true/true"
+    },
+    {
+      "id": "MAP-B",
+      "pass": true,
+      "label": "the home map carries «الخريطة كاملة» too",
+      "extra": ""
+    },
+    {
+      "id": "MAP-A",
+      "pass": true,
+      "label": "browser 100%: the map reads the pointer where it is (worst 0.00 px) and on the synthetic points (worst 0.63 px, whole-pixel pointer; 5/5 hit)",
+      "extra": ""
+    },
+    {
+      "id": "MAP-A",
+      "pass": true,
+      "label": "browser 125%: the map reads the pointer where it is (worst 0.22 px) and on the synthetic points (worst 0.62 px, whole-pixel pointer; 5/5 hit)",
+      "extra": ""
+    },
+    {
+      "id": "MAP-A",
+      "pass": true,
+      "label": "browser 150%: the map reads the pointer where it is (worst 0.17 px) and on the synthetic points (worst 0.77 px, whole-pixel pointer; 5/5 hit)",
+      "extra": ""
+    },
+    {
+      "id": "MAP-A",
+      "pass": true,
+      "label": "browser 200%: the map reads the pointer where it is (worst 0.00 px) and on the synthetic points (worst 0.49 px, whole-pixel pointer; 5/5 hit)",
+      "extra": ""
+    },
+    {
+      "id": "MAP-A",
+      "pass": true,
+      "label": "display 125%: the map reads the pointer where it is (worst 0.22 px) and on the synthetic points (worst 0.44 px, whole-pixel pointer; 5/5 hit)",
+      "extra": ""
+    },
+    {
+      "id": "MAP-A",
+      "pass": true,
+      "label": "display 150%: the map reads the pointer where it is (worst 0.23 px) and on the synthetic points (worst 0.70 px, whole-pixel pointer; 5/5 hit)",
+      "extra": ""
+    }
+  ],
+  "timings": {
+    "note": "development machine (Docker Desktop, headless Edge); not VM measurements",
+    "summary": {
+      "home": {
+        "medianMs": 949,
+        "maxMs": 966
+      },
+      "settings": {
+        "medianMs": 499,
+        "maxMs": 510
+      },
+      "org": {
+        "medianMs": 432,
+        "maxMs": 437
+      },
+      "allRequests": {
+        "medianMs": 419,
+        "maxMs": 422
+      },
+      "posture": {
+        "medianMs": 418,
+        "maxMs": 422
+      },
+      "stationing": {
+        "medianMs": 437,
+        "maxMs": 453
+      },
+      "review": {
+        "medianMs": 419,
+        "maxMs": 423
+      },
+      "audit": {
+        "medianMs": 422,
+        "maxMs": 425
+      }
+    },
+    "all": [
+      {
+        "size": "1920x1080",
+        "view": "home",
+        "ms": 952
+      },
+      {
+        "size": "1920x1080",
+        "view": "settings",
+        "ms": 499
+      },
+      {
+        "size": "1920x1080",
+        "view": "org",
+        "ms": 435
+      },
+      {
+        "size": "1920x1080",
+        "view": "allRequests",
+        "ms": 420
+      },
+      {
+        "size": "1920x1080",
+        "view": "posture",
+        "ms": 421
+      },
+      {
+        "size": "1920x1080",
+        "view": "stationing",
+        "ms": 438
+      },
+      {
+        "size": "1920x1080",
+        "view": "review",
+        "ms": 414
+      },
+      {
+        "size": "1920x1080",
+        "view": "audit",
+        "ms": 422
+      },
+      {
+        "size": "1440x900",
+        "view": "home",
+        "ms": 951
+      },
+      {
+        "size": "1440x900",
+        "view": "settings",
+        "ms": 501
+      },
+      {
+        "size": "1440x900",
+        "view": "org",
+        "ms": 431
+      },
+      {
+        "size": "1440x900",
+        "view": "allRequests",
+        "ms": 422
+      },
+      {
+        "size": "1440x900",
+        "view": "posture",
+        "ms": 422
+      },
+      {
+        "size": "1440x900",
+        "view": "stationing",
+        "ms": 419
+      },
+      {
+        "size": "1440x900",
+        "view": "review",
+        "ms": 414
+      },
+      {
+        "size": "1440x900",
+        "view": "audit",
+        "ms": 419
+      },
+      {
+        "size": "1366x768",
+        "view": "home",
+        "ms": 966
+      },
+      {
+        "size": "1366x768",
+        "view": "settings",
+        "ms": 510
+      },
+      {
+        "size": "1366x768",
+        "view": "org",
+        "ms": 431
+      },
+      {
+        "size": "1366x768",
+        "view": "allRequests",
+        "ms": 420
+      },
+      {
+        "size": "1366x768",
+        "view": "posture",
+        "ms": 409
+      },
+      {
+        "size": "1366x768",
+        "view": "stationing",
+        "ms": 439
+      },
+      {
+        "size": "1366x768",
+        "view": "review",
+        "ms": 419
+      },
+      {
+        "size": "1366x768",
+        "view": "audit",
+        "ms": 422
+      },
+      {
+        "size": "1280x800@125%",
+        "view": "home",
+        "ms": 940
+      },
+      {
+        "size": "1280x800@125%",
+        "view": "settings",
+        "ms": 480
+      },
+      {
+        "size": "1280x800@125%",
+        "view": "org",
+        "ms": 433
+      },
+      {
+        "size": "1280x800@125%",
+        "view": "allRequests",
+        "ms": 417
+      },
+      {
+        "size": "1280x800@125%",
+        "view": "posture",
+        "ms": 416
+      },
+      {
+        "size": "1280x800@125%",
+        "view": "stationing",
+        "ms": 436
+      },
+      {
+        "size": "1280x800@125%",
+        "view": "review",
+        "ms": 423
+      },
+      {
+        "size": "1280x800@125%",
+        "view": "audit",
+        "ms": 423
+      },
+      {
+        "size": "1024x768",
+        "view": "home",
+        "ms": 942
+      },
+      {
+        "size": "1024x768",
+        "view": "settings",
+        "ms": 494
+      },
+      {
+        "size": "1024x768",
+        "view": "org",
+        "ms": 437
+      },
+      {
+        "size": "1024x768",
+        "view": "allRequests",
+        "ms": 419
+      },
+      {
+        "size": "1024x768",
+        "view": "posture",
+        "ms": 420
+      },
+      {
+        "size": "1024x768",
+        "view": "stationing",
+        "ms": 435
+      },
+      {
+        "size": "1024x768",
+        "view": "review",
+        "ms": 409
+      },
+      {
+        "size": "1024x768",
+        "view": "audit",
+        "ms": 425
+      },
+      {
+        "size": "tablet-768x1024@2x",
+        "view": "home",
+        "ms": 949
+      },
+      {
+        "size": "tablet-768x1024@2x",
+        "view": "settings",
+        "ms": 492
+      },
+      {
+        "size": "tablet-768x1024@2x",
+        "view": "org",
+        "ms": 430
+      },
+      {
+        "size": "tablet-768x1024@2x",
+        "view": "allRequests",
+        "ms": 415
+      },
+      {
+        "size": "tablet-768x1024@2x",
+        "view": "posture",
+        "ms": 418
+      },
+      {
+        "size": "tablet-768x1024@2x",
+        "view": "stationing",
+        "ms": 437
+      },
+      {
+        "size": "tablet-768x1024@2x",
+        "view": "review",
+        "ms": 420
+      },
+      {
+        "size": "tablet-768x1024@2x",
+        "view": "audit",
+        "ms": 421
+      },
+      {
+        "size": "phone-390x844@3x",
+        "view": "home",
+        "ms": 936
+      },
+      {
+        "size": "phone-390x844@3x",
+        "view": "settings",
+        "ms": 508
+      },
+      {
+        "size": "phone-390x844@3x",
+        "view": "org",
+        "ms": 432
+      },
+      {
+        "size": "phone-390x844@3x",
+        "view": "allRequests",
+        "ms": 418
+      },
+      {
+        "size": "phone-390x844@3x",
+        "view": "posture",
+        "ms": 418
+      },
+      {
+        "size": "phone-390x844@3x",
+        "view": "stationing",
+        "ms": 453
+      },
+      {
+        "size": "phone-390x844@3x",
+        "view": "review",
+        "ms": 421
+      },
+      {
+        "size": "phone-390x844@3x",
+        "view": "audit",
+        "ms": 421
+      }
+    ]
+  }
+}

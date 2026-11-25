@@ -27,6 +27,20 @@ class StationingNextIT extends RestationingTestBase {
     void noPathsLeftBehind() {
         jdbc.sql("update restationing_request set route_version_id = null where route_version_id is not null").update();
         jdbc.sql("delete from stationing_route_version").update();
+        // the organisation-wide FYI list (ADR-095 B2) is shared by every later activation in this database: leave none behind
+        if (otherSec != null) {
+            jdbc.sql("delete from fyi_designation where unit_id = :u").param("u", otherSec).update();
+        }
+    }
+
+    /**
+     * ADR-095 B2: «وحدات العلم» are configured once, organisation-wide, in {@code fyi_designation}, and every final approval
+     * distributes to them inside its own transaction. The application has no endpoint writing this table yet (ADR-095 B3 —
+     * see docs/evidence/regression-18/CLASSIFICATION.md), so the configuration is a fixture here.
+     */
+    private void designateFyi(UUID unit) {
+        jdbc.sql("insert into fyi_designation(unit_id, include_descendants, set_by) values (:u, false, :by) on conflict do nothing")
+                .param("u", unit).param("by", personId("sysadmin")).update();
     }
 
     @BeforeEach
@@ -39,7 +53,6 @@ class StationingNextIT extends RestationingTestBase {
         person("rq", role("NXREQ", "ORGANIZATION", "VIEW", "CREATE_RESTATIONING", "REQUEST_SITE_REGISTRATION"), sec);
         person("ops", role("NXOPS", "ORGANIZATION", "VIEW", "DECIDE_UNIT_OPERATIONS"), top);
         person("fin", role("NXFIN", "ORGANIZATION", "VIEW", "FINAL_APPROVE_STATIONING"), top);
-        person("fyi", role("NXFYI", "ORGANIZATION", "VIEW", "MANAGE_FYI_DISTRIBUTION"), top);
         person("opsOther", role("NXOPS2", "ORGANIZATION", "VIEW", "DECIDE_UNIT_OPERATIONS"), other);
         person("viewer", role("NXPOST", "ORGANIZATION", "VIEW_OPERATIONAL_POSTURE"), sec);
         person("outsider", role("NXPOST2", "ORGANIZATION", "VIEW_OPERATIONAL_POSTURE"), other);
@@ -96,7 +109,10 @@ class StationingNextIT extends RestationingTestBase {
         return c;
     }
 
-    /** Hierarchy, unit operations, final approval, FYI, activation: each by its own holder. */
+    /**
+     * Hierarchy, unit operations, final approval: each by its own holder. Since ADR-095 the final approval activates and
+     * distributes FYI in the same transaction — there is no separate FYI or activation step.
+     */
     private JsonNode wholeRoute(String id) {
         Res s = login("rq").post("/restationing-requests/" + id + "/submit", Map.of());
         assertThat(s.status()).as(s.toString()).isEqualTo(200);
@@ -104,11 +120,13 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(decide("apDept", id, "APPROVE").status()).isEqualTo(200);
         assertThat(decide("apTop", id, "APPROVE").status()).isEqualTo(200);
         assertThat(decide("ops", id, "APPROVE").status()).isEqualTo(200);
-        assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
-        assertThat(login("fyi").post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of())).status()).isEqualTo(200);
-        Res act = login("activator").post("/restationing-requests/" + id + "/activate", Map.of());
-        assertThat(act.status()).as(act.toString()).isEqualTo(200);
-        return act.body();
+        Res fin = decide("fin", id, "APPROVE");
+        assertThat(fin.status()).as(fin.toString()).isEqualTo(200);
+        assertThat(fin.body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
+        assertThat(fin.body().path("activation").path("by").path("id").asText()).as("the final approver activates").isEqualTo(personId("fin").toString());
+        assertThat(jdbc.sql("select fyi_done_at is not null from restationing_request where id = cast(:id as uuid)").param("id", id)
+                .query(Boolean.class).single()).as("FYI handled within the final approval").isTrue();
+        return fin.body();
     }
 
     private String areaOf(UUID unit, String role) {
@@ -201,33 +219,40 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(opsStamp.path("final").isNull()).isTrue();
         assertThat(login("fin").get("/restationing-requests/" + id).body().path("can").path("decideAs").asText()).isEqualTo("اعتماد نهائي");
         assertThat(decide("ops", id, "APPROVE").status()).as("one human decides one stage").isIn(403, 409);
-        assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+
+        // ADR-095: FYI is configured once (B2) and the final approval distributes it while it activates; the recipient
+        // holds some permission — none at all opens nothing (owner, 16 Nov 2026)
+        UUID reader = holding("reader", otherSec);
+        designateFyi(otherSec);
+        UUID parentBefore = jdbc.sql("select parent_id from organization where id = :o").param("o", fresh).query(UUID.class).single();
+        Res act = decide("fin", id, "APPROVE");
+        assertThat(act.status()).as(act.toString()).isEqualTo(200);
+        assertThat(act.body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
         JsonNode both = login("rq").get("/restationing-requests/" + id + "/stamps").body();
         assertThat(both.path("final").path("name").asText()).isEqualTo("شخص fin");
         assertThat(both.path("number").asText()).isEqualTo(login("rq").get("/restationing-requests/" + id).body().path("number").asText());
         assertThat(both.path("mainUnit").asText()).isNotBlank();
         assertThat(login("stranger").get("/restationing-requests/" + id + "/stamps").status()).as("only on a request one may see").isEqualTo(404);
 
-        // FYI comes before activation here, because the policy version says so
+        // no separate activation or FYI action remains: activation is offered to nobody, the per-request FYI endpoint is gone
         assertThat(login("activator").get("/restationing-requests/" + id).body().path("can").path("activate").asBoolean()).isFalse();
-        assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(400);
-        assertThat(login("activator").post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of(other.toString()))).status()).as("needs its own right").isEqualTo(403);
+        assertThat(login("activator").post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of(other.toString()))).status())
+                .as("ADR-095 removed the per-request FYI endpoint").isIn(404, 405);
 
-        UUID reader = holding("reader", otherSec);  // a recipient holds some permission: none at all opens nothing (owner, 16 Nov 2026)
-        Res sent = login("fyi").post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of(otherSec.toString()), "note", "للاطلاع"));
-        assertThat(sent.status()).as(sent.toString()).isEqualTo(200);
         assertThat(jdbc.sql("select count(*) from notification where person_id = :p and title like 'للعلم:%'").param("p", reader).query(Long.class).single()).isEqualTo(1);
         Api readerApi = login("reader");
         assertThat(readerApi.get("/restationing-requests/" + id).status()).as("this one request").isEqualTo(200);
         assertThat(readerApi.get("/restationing-requests/" + rs.body().path("id").asText()).status()).as("not any other").isEqualTo(404);
         assertThat(readerApi.post("/restationing-requests/" + id + "/decision", Map.of("decision", "APPROVE")).status()).isIn(400, 403);
-        assertThat(readerApi.post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(403);
+        long recordsBefore = jdbc.sql("select count(*) from org_stationing where request_id = cast(:id as uuid)").param("id", id).query(Long.class).single();
+        Res readerActivate = readerApi.post("/restationing-requests/" + id + "/activate", Map.of());
+        assertThat(readerActivate.status()).as("the retained endpoint is a no-op returning the view it may read (ADR-095): " + readerActivate).isEqualTo(200);
+        assertThat(readerActivate.body().path("readOnlyFyi").asBoolean()).isTrue();
+        assertThat(readerActivate.body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
+        assertThat(jdbc.sql("select count(*) from org_stationing where request_id = cast(:id as uuid)").param("id", id).query(Long.class).single())
+                .as("a reader's call changes nothing").isEqualTo(recordsBefore);
         assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", reader).query(Long.class).single()).as("no lasting right beyond its own").isEqualTo(1);
 
-        UUID parentBefore = jdbc.sql("select parent_id from organization where id = :o").param("o", fresh).query(UUID.class).single();
-        Res act = login("activator").post("/restationing-requests/" + id + "/activate", Map.of());
-        assertThat(act.status()).as(act.toString()).isEqualTo(200);
-        assertThat(act.body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
         assertThat(jdbc.sql("select site_id from org_stationing where organization_id = :o and valid_to is null").param("o", fresh).query(UUID.class).single()).isEqualTo(shared);
         assertThat(jdbc.sql("select count(*) from deployment_area where organization_id = :o and state = 'ACTIVE'").param("o", fresh).query(Long.class).single()).isEqualTo(2);
         assertThat(jdbc.sql("select parent_id from organization where id = :o").param("o", fresh).query(UUID.class).single()).as("Oracle's hierarchy is untouched").isEqualTo(parentBefore);
@@ -299,7 +324,9 @@ class StationingNextIT extends RestationingTestBase {
         JsonNode atOps = login("ops").get("/restationing-requests/" + id).body();
         assertThat(atOps.path("can").path("decideAs").asText()).as("straight to unit operations after the section").isEqualTo("اعتماد عمليات الوحدة");
         assertThat(decide("ops", id, "APPROVE").status()).isEqualTo(200);
-        assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).as("the final approval is never skipped").isEqualTo("APPROVED_NOT_ACTIVATED");
+        Res fin = decide("fin", id, "APPROVE");
+        assertThat(fin.body().path("state").asText()).as("the final approval is never skipped; it activates (ADR-095)").isEqualTo("ACTIVATED_PERMANENT");
+        assertThat(fin.body().path("finalApprover").path("id").asText()).as("approved by a person, never by nobody").isEqualTo(personId("fin").toString());
     }
 
     @Test
@@ -386,7 +413,7 @@ class StationingNextIT extends RestationingTestBase {
         Res again = login("rq").post("/restationing-requests/" + after + "/submit", Map.of("reason", "عدلت الطلب"));
         assertThat(again.status()).as(again.toString()).isEqualTo(200);
         assertThat(keys(again.body().path("route"))).as("the version it was sent on").containsExactly("H:" + dept);
-        assertThat(decide("apDept", after, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(decide("apDept", after, "APPROVE").body().path("state").asText()).as("its last level is final and activates (ADR-095)").isEqualTo("ACTIVATED_PERMANENT");
         JsonNode listed = admin.get("/stationing/routes").body();
         assertThat(listed.path("routes")).as("the three types that can be asked for").hasSize(3);
         assertThat(listed.path("routes").toString()).doesNotContain("INITIAL_STATIONING");
@@ -410,7 +437,9 @@ class StationingNextIT extends RestationingTestBase {
         assertThat(login("opsNear").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).isTrue();
         assertThat(decide("opsNear", id, "APPROVE").status()).isEqualTo(200);
         assertThat(decide("fin", id, "APPROVE").status()).as("the final holder over the top unit").isEqualTo(403);
-        assertThat(decide("finNear", id, "APPROVE").body().path("state").asText()).as("the nearest final holder").isEqualTo("APPROVED_NOT_ACTIVATED");
+        Res fin = decide("finNear", id, "APPROVE");
+        assertThat(fin.body().path("state").asText()).as("the nearest final holder; its approval activates (ADR-095)").isEqualTo("ACTIVATED_PERMANENT");
+        assertThat(fin.body().path("finalApprover").path("id").asText()).isEqualTo(personId("finNear").toString());
     }
 
     @Test
@@ -449,7 +478,7 @@ class StationingNextIT extends RestationingTestBase {
                 .param("s", stage).query(String.class).single()).isEqualTo("شخص seatB");
         assertThat(jdbc.sql("select count(*) from restationing_stage where request_id = cast(:r as uuid) and mark = 'APPROVED' and decided_by is not null")
                 .param("r", id).query(Long.class).single()).as("history intact").isEqualTo(4);
-        assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).as("the workflow continues").isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).as("the workflow continues to activation (ADR-095)").isEqualTo("ACTIVATED_PERMANENT");
     }
 
     @Test
@@ -530,17 +559,18 @@ class StationingNextIT extends RestationingTestBase {
         decide("apDept", id, "APPROVE");
         decide("apTop", id, "APPROVE");
         decide("ops", id, "APPROVE");
-        assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
-        String unrelated = request("DEPLOYMENT_AREAS", deployment(fresh2, 0.01), sec);
 
         // the recipients hold some unrelated permission: a person with none reaches only «طلب صلاحية» and support (owner, 16 Nov 2026)
         UUID reader = holding("fyiReader", otherSec);
         UUID parentMember = holding("fyiParent", other);
         UUID siblingMember = holding("fyiSibling", dept);
         affiliated("fyiBare", otherSec);
-        Api fyi = login("fyi");
-        Res sent = fyi.post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of(otherSec.toString()), "note", "للاطلاع"));
-        assertThat(sent.status()).as(sent.toString()).isEqualTo(200);
+        // ADR-095: the unit is configured for information once (B2); the final approval distributes to it while it activates
+        designateFyi(otherSec);
+        assertThat(decide("fin", id, "APPROVE").body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
+        String unrelated = request("DEPLOYMENT_AREAS", deployment(fresh2, 0.01), sec);
+        assertThat(jdbc.sql("select count(*) from restationing_fyi where request_id = cast(:id as uuid) and organization_id = :o and ended_at is null")
+                .param("id", id).param("o", otherSec).query(Long.class).single()).as("the configured unit, recorded for this request").isEqualTo(1);
         Api readerApi = login("fyiReader");
         Res bare = login("fyiBare").get("/restationing-requests/" + id);
         assertThat(bare.status()).as("no permission at all: not even a request sent «للعلم»").isEqualTo(403);
@@ -562,13 +592,19 @@ class StationingNextIT extends RestationingTestBase {
         for (String action : List.of("edit", "submit", "decide", "activate", "fyi")) {
             assertThat(can.path(action).asBoolean()).as(action).isFalse();
         }
-        // 4. forged mutations are refused
+        // 4. forged mutations are refused; the retained /activate is a no-op (ADR-095) and the per-request FYI endpoints are gone
+        long auditBefore = jdbc.sql("select count(*) from audit_event where entity_id = :id").param("id", id).query(Long.class).single();
         assertThat(readerApi.post("/restationing-requests/" + id + "/decision", Map.of("decision", "APPROVE")).status()).isIn(400, 403);
-        assertThat(readerApi.post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(403);
-        assertThat(readerApi.post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of())).status()).isEqualTo(403);
+        Res noOp = readerApi.post("/restationing-requests/" + id + "/activate", Map.of());
+        assertThat(noOp.status()).as(noOp.toString()).isEqualTo(200);
+        assertThat(noOp.body().path("readOnlyFyi").asBoolean()).isTrue();
+        assertThat(readerApi.post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of())).status()).isIn(404, 405);
         assertThat(readerApi.put("/restationing-requests/" + id + "/content", deployment(fresh, 0.02)).status()).isEqualTo(403);
-        assertThat(readerApi.post("/restationing-requests/" + id + "/fyi/" + otherSec + "/end", Map.of("reason", "محاولة مصنوعة")).status()).isEqualTo(403);
+        assertThat(readerApi.post("/restationing-requests/" + id + "/fyi/" + otherSec + "/end", Map.of("reason", "محاولة مصنوعة")).status()).isIn(404, 405);
         assertThat(readerApi.post("/restationing-requests", Map.of("requestingUnitId", otherSec.toString(), "purpose", "DEPLOYMENT_AREAS", "content", deployment(otherSec, 0))).status()).isEqualTo(403);
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id").param("id", id).query(Long.class).single())
+                .as("nothing the reader tried changed the request").isEqualTo(auditBefore);
+        assertThat(login("req").get("/restationing-requests/" + id).body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
 
         // no lasting right and no wider view
         assertThat(jdbc.sql("select count(*) from membership where person_id = :p").param("p", reader).query(Long.class).single()).as("only its own").isEqualTo(1);
@@ -586,14 +622,10 @@ class StationingNextIT extends RestationingTestBase {
         String audited = jdbc.sql("select detail::text from audit_event where entity_id = :id and action = 'RESTATIONING_FYI_DISTRIBUTED'").param("id", id).query(String.class).single();
         assertThat(audited).contains(otherSec.toString()).contains(reader.toString());
 
-        // 5. it ends as designed: by its holder with a reason, and a new choice opens it again
-        assertThat(fyi.post("/restationing-requests/" + id + "/fyi/" + otherSec + "/end", Map.of("reason", "x")).status()).as("a reason").isEqualTo(400);
-        assertThat(fyi.post("/restationing-requests/" + id + "/fyi/" + otherSec + "/end", Map.of("reason", "انتهت الحاجة للاطلاع")).status()).isEqualTo(200);
-        assertThat(readerApi.get("/restationing-requests/" + id).status()).isEqualTo(404);
-        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'RESTATIONING_FYI_ACCESS_ENDED'").param("id", id).query(Long.class).single()).isEqualTo(1);
-        assertThat(jdbc.sql("select count(*) from restationing_fyi where request_id = cast(:id as uuid) and ended_at is not null").param("id", id).query(Long.class).single()).as("the record stays").isEqualTo(1);
-        assertThat(fyi.post("/restationing-requests/" + id + "/fyi", Map.of("units", List.of(otherSec.toString()))).status()).isEqualTo(200);
-        assertThat(readerApi.get("/restationing-requests/" + id).status()).isEqualTo(200);
+        // 5. it ends as designed. ADR-095 removed the per-request «end» by a holder (the three FYI endpoints are gone, checked
+        // above); the record stays and the access ends with the person's unit or the request, below
+        assertThat(jdbc.sql("select count(*) from restationing_fyi where request_id = cast(:id as uuid) and ended_at is null").param("id", id).query(Long.class).single())
+                .as("the record stays").isEqualTo(1);
 
         // leaving the unit in HR ends it; so does the request being cancelled before activation
         jdbc.sql("update affiliation set valid_to = now() where person_id = :p").param("p", reader).update();
@@ -632,7 +664,9 @@ class StationingNextIT extends RestationingTestBase {
         String extra = jdbc.sql("select id::text from restationing_request where purpose = 'DEPLOYMENT_AREAS' and state = 'DRAFT' and jsonb_exists(content->'scope', :u)").param("u", fresh.toString()).query(String.class).single();
         assertThat(login("rq").post("/restationing-requests/" + extra + "/submit", Map.of()).status()).isEqualTo(400);
 
-        JsonNode posture = login("viewer").get("/operational-posture").body();
+        // the default /operational-posture is now the compact Site-Hub summary (ADR-094 Gate 2 §C, 7df000b); the per-unit
+        // records these POSTURE checks read are the ?view=UNITS shape (docs/PERFORMANCE_HARDENING.md §3, item 3)
+        JsonNode posture = login("viewer").get("/operational-posture?view=UNITS").body();
         Map<String, JsonNode> seen = new LinkedHashMap<>();
         posture.path("units").forEach(n -> seen.put(n.path("id").asText(), n));
         assertThat(seen).containsKeys(fresh.toString(), fresh2.toString(), sec.toString());
@@ -647,14 +681,14 @@ class StationingNextIT extends RestationingTestBase {
         // a unit of another branch at the same site: the viewer learns it is there, never which
         stationed(otherSec, sOther, true);
         stationed(other, shared);
-        JsonNode again = login("viewer").get("/operational-posture").body();
+        JsonNode again = login("viewer").get("/operational-posture?view=UNITS").body();
         assertThat(again.toString()).doesNotContain("وحدة OTHER");
         again.path("units").forEach(n -> {
             if (fresh.toString().equals(n.path("id").asText())) {
                 assertThat(n.path("otherUnitsAtSite").asLong()).isEqualTo(1);
             }
         });
-        JsonNode outside = login("outsider").get("/operational-posture").body();
+        JsonNode outside = login("outsider").get("/operational-posture?view=UNITS").body();
         assertThat(outside.toString()).doesNotContain(fresh.toString()).doesNotContain(firstPrimary);
 
         // read only, on the server
@@ -701,9 +735,10 @@ class StationingNextIT extends RestationingTestBase {
         String outOfScopeNumber = jdbc.sql("select number from restationing_request where id = :id").param("id", UUID.fromString(outOfScope)).query(String.class).single();
         String draftNumber = jdbc.sql("select number from restationing_request where id = :id").param("id", UUID.fromString(draft)).query(String.class).single();
 
-        // 1. VIEW_OPERATIONAL_POSTURE ALONE does NOT grant visibility into proposals (brief §13).
+        // 1. VIEW_OPERATIONAL_POSTURE ALONE does NOT grant visibility into proposals (brief §13). The pending[] array lives in
+        //    the per-unit ?view=UNITS shape; the default is the Site-Hub summary with counts only (ADR-094 Gate 2 §C).
         person("postureOnly", role("NXPOST3", "ORGANIZATION", "VIEW_OPERATIONAL_POSTURE"), sec);
-        JsonNode postureOnly = login("postureOnly").get("/operational-posture").body();
+        JsonNode postureOnly = login("postureOnly").get("/operational-posture?view=UNITS").body();
         assertThat(postureOnly.has("pending")).as("the payload carries the pending array").isTrue();
         List<String> postureOnlyNumbers = new ArrayList<>();
         postureOnly.path("pending").forEach(p -> postureOnlyNumbers.add(p.path("requestNumber").asText()));
@@ -714,7 +749,7 @@ class StationingNextIT extends RestationingTestBase {
         // 2. A real operator (VIEW + VIEW_OPERATIONAL_POSTURE on the branch) SEES their branch's proposal and the
         //    projection carries only operational-map fields (brief §12). The other-branch proposal remains hidden.
         person("postureOps", role("NXPOST5", "ORGANIZATION", "VIEW", "VIEW_OPERATIONAL_POSTURE"), sec);
-        JsonNode postureOps = login("postureOps").get("/operational-posture").body();
+        JsonNode postureOps = login("postureOps").get("/operational-posture?view=UNITS").body();
         JsonNode pending = postureOps.path("pending");
         List<String> numbers = new ArrayList<>();
         pending.forEach(p -> numbers.add(p.path("requestNumber").asText()));
@@ -729,7 +764,7 @@ class StationingNextIT extends RestationingTestBase {
 
         // 3. The other branch's operator DOES see their own proposal (visible(ctx,r) is theirs).
         person("other-posture", role("NXPOST4", "ORGANIZATION", "VIEW", "VIEW_OPERATIONAL_POSTURE"), otherSec);
-        JsonNode otherPosture = login("other-posture").get("/operational-posture").body();
+        JsonNode otherPosture = login("other-posture").get("/operational-posture?view=UNITS").body();
         List<String> otherNumbers = new ArrayList<>();
         otherPosture.path("pending").forEach(p -> otherNumbers.add(p.path("requestNumber").asText()));
         assertThat(otherNumbers).as("the other branch's operator sees their own proposal").contains(outOfScopeNumber);

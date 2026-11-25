@@ -178,6 +178,7 @@ export default function CommandMap({ sites, current, highlight, warning, inRevie
       mode={mode}
       center={[54.4, 24.4]}
       zoom={7}
+      fullView
       className="tz-overview-map"
       onReady={(m) => {
         m.addSource('cmd', {

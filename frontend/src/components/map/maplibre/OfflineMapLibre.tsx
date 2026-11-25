@@ -54,6 +54,40 @@ export function useMapThemeOverride(): MapThemeOverride {
  * sources and layers through `onReady` with {@link addOverlayLayer}; a mode switch never removes them, never changes
  * feature state and never moves the camera.
  */
+/** The whole country: the standard view every map page opens on, and where «الخريطة كاملة» returns (owner, 25 Nov 2026). */
+export const COUNTRY_BOUNDS: [[number, number], [number, number]] = [[51.5, 22.6], [56.45, 26.1]];
+
+/** Shows the whole country again, keeping the 2D/3D tilt; for the button and for pages. */
+export function showWholeCountry(map: MlMap, duration = 600): void {
+  map.fitBounds(COUNTRY_BOUNDS, { padding: 24, duration, pitch: map.getPitch(), bearing: 0 });
+}
+
+/** «الخريطة كاملة»: one button with the map's own controls, to look at one place, then the whole map, then another. */
+class FullViewControl {
+  private box: HTMLDivElement | null = null;
+
+  onAdd(map: MlMap): HTMLElement {
+    const box = document.createElement('div');
+    box.className = 'maplibregl-ctrl maplibregl-ctrl-group tz-fullview-ctrl';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'tz-fullview-btn';
+    b.title = 'عرض الدولة كاملة';
+    b.setAttribute('aria-label', 'الخريطة كاملة — عرض الدولة كاملة');
+    b.dataset.testid = 'map-full-view';
+    b.textContent = 'الخريطة كاملة';
+    b.addEventListener('click', () => showWholeCountry(map));
+    box.appendChild(b);
+    this.box = box;
+    return box;
+  }
+
+  onRemove(): void {
+    this.box?.remove();
+    this.box = null;
+  }
+}
+
 export function OfflineMapLibre({
   basemapUrl,
   fontUrl = MAP_FONT_URL,
@@ -67,6 +101,7 @@ export function OfflineMapLibre({
   maxZoom = 18,
   maxBounds,
   preserveDrawingBuffer = false,
+  fullView = false,
   onReady,
   className,
 }: {
@@ -84,6 +119,8 @@ export function OfflineMapLibre({
   maxBounds?: LngLatBoundsLike;
   /** Keeps the drawing buffer readable (pixel checks in tests); costs some speed. */
   preserveDrawingBuffer?: boolean;
+  /** A map page: opens on the whole country (not `center`/`zoom`) and carries the «الخريطة كاملة» button. */
+  fullView?: boolean;
   onReady?: (map: MlMap) => void;
   className?: string;
 }) {
@@ -107,8 +144,7 @@ export function OfflineMapLibre({
         mode: initial.current.mode,
         labels: initial.current.labels,
       }),
-      center: initial.current.center,
-      zoom: initial.current.zoom,
+      ...(fullView ? { bounds: COUNTRY_BOUNDS, fitBoundsOptions: { padding: 24 } } : { center: initial.current.center, zoom: initial.current.zoom }),
       minZoom,
       maxZoom,
       maxBounds,
@@ -116,6 +152,7 @@ export function OfflineMapLibre({
       canvasContextAttributes: { preserveDrawingBuffer },
     });
     drawGlyphsLeftToRight(map);
+    if (fullView) map.addControl(new FullViewControl(), 'bottom-right');
     mapRef.current = map;
     // the canvas follows its container whenever the layout changes it (window, fullscreen, panels, breakpoints, cards), not
     // only on a window resize; one resize per frame, the view kept as it is (no refit)

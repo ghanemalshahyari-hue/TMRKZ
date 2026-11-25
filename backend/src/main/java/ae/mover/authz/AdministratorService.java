@@ -7,6 +7,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,10 @@ import ae.mover.common.ApiException;
 import ae.mover.common.Db;
 import ae.mover.common.ErrorCode;
 import ae.mover.hr.HrPeopleService;
+import ae.mover.security.DirectoryAuthenticator;
+import ae.mover.security.IdentityService;
+import ae.mover.security.LoginThrottle;
+import ae.mover.security.OidcClient;
 import ae.mover.security.OidcProperties;
 
 /**
@@ -30,7 +35,10 @@ import ae.mover.security.OidcProperties;
  *   <li>{@code EMPLOYEE_NUMBER}: Oracle HR asked live (read-only, {@link HrPeopleService#find}); an active, unambiguous record only.
  *       A person not yet in TMRKZ is imported from that record on confirmation (never fabricated);</li>
  *   <li>{@code DIRECTORY_ACCOUNT}: an account the enterprise directory itself verified by a previous sign-in (an identity link,
- *       ADR-068/ADR-100 — no directory service account is ever used to search).</li>
+ *       ADR-068/ADR-100); or, before any sign-in (ADR-105), the directory's own entry found live — with its read-only service
+ *       account when the installation has one, otherwise with the administrator's own directory account (their password typed
+ *       for that one search, never stored). A directory that allows neither is explained, never bypassed. The person is then
+ *       created on confirmation exactly as their own first sign-in would create them ({@link IdentityService#resolve}).</li>
  * </ul>
  *
  * The resolved identity carries a confirmation fingerprint; the grant is made only when the same fingerprint comes back with a
@@ -50,7 +58,16 @@ public class AdministratorService {
                             String grantedBy, boolean platform, boolean effective) {
     }
 
-    public record ResolveInput(String method, String value) {
+    public record ResolveInput(String method, String value, String directoryPassword) {
+
+        public ResolveInput(String method, String value) {
+            this(method, value, null);
+        }
+
+        @Override
+        public String toString() {
+            return "ResolveInput[" + method + " " + value + "]"; // never the password
+        }
     }
 
     public record AddInput(String method, String value, String confirmation, String reason) {
@@ -64,7 +81,20 @@ public class AdministratorService {
                             String account, String unitName, String hrStatus, boolean alreadyAdmin, String confirmation) {
     }
 
-    private record Resolved(Candidate candidate, UUID person, HrPeopleService.HrRecord hr) {
+    private record Resolved(Candidate candidate, UUID person, HrPeopleService.HrRecord hr, DirectoryAuthenticator.DirectoryUser entry) {
+
+        Resolved(Candidate candidate, UUID person, HrPeopleService.HrRecord hr) {
+            this(candidate, person, hr, null);
+        }
+    }
+
+    /** A directory entry found live for one administrator, kept for their confirmation (never the password that found it). */
+    private record Pending(UUID actor, DirectoryAuthenticator.DirectoryUser entry, String verifiedBy, java.time.Instant until) {
+    }
+
+    /** What the screen offers (ADR-105): which lookups this installation can make, and why not when it cannot. */
+    public record LookupOptions(boolean employeeNumber, String employeeNumberMessage, String directoryMode, boolean directoryNeedsPassword,
+                                String directoryMessage) {
     }
 
     private final JdbcClient jdbc;
@@ -73,15 +103,67 @@ public class AdministratorService {
     private final GrantAdminService grants;
     private final PersonKeys keys;
     private final OidcProperties oidc;
+    private final DirectoryAuthenticator directory;
+    private final IdentityService identities;
+    private final java.time.Clock clock;
+    private final LoginThrottle throttle;
+    private final Map<String, Pending> pending = new ConcurrentHashMap<>();
 
     public AdministratorService(JdbcClient jdbc, AuditService audit, HrPeopleService hrPeople, GrantAdminService grants,
-                                PersonKeys keys, OidcProperties oidc) {
+                                PersonKeys keys, OidcProperties oidc, DirectoryAuthenticator directory, IdentityService identities,
+                                java.time.Clock clock, LoginThrottle throttle) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.hrPeople = hrPeople;
         this.grants = grants;
         this.keys = keys;
         this.oidc = oidc;
+        this.directory = directory;
+        this.identities = identities;
+        this.clock = clock;
+        this.throttle = throttle;
+    }
+
+    /** Which verified lookups this installation offers now, with the reason when one is not available. */
+    public LookupOptions lookupOptions(AccessContext ctx) {
+        requireGlobal(ctx);
+        boolean hr = hrPeople.configured();
+        DirectoryAuthenticator.LookupMode mode = directory.lookupMode();
+        boolean ownLinked = ownDirectoryLink(ctx) != null;
+        String message = switch (mode) {
+            case SERVICE_ACCOUNT -> "يبحث في الدليل حساب الخدمة المهيأ (للقراءة فقط)، فيظهر الشخص ولو لم يدخل تمركز من قبل.";
+            case OWN_ACCOUNT -> ownLinked
+                    ? "لا يوجد حساب خدمة (ADR-100): يبحث تمركز في الدليل بحسابك أنت؛ اكتب كلمة مرورك في الدليل لهذا البحث وحده، ولا تُحفظ."
+                    : "لا يوجد حساب خدمة، ودخولك الحالي ليس بحساب الدليل المؤسسي؛ لا يمكن البحث في الدليل عمن لم يدخل بعد."
+                      + " يظهر من دخل تمركز مرة واحدة بحسابه، أو استخدم الرقم الوظيفي من الموارد البشرية.";
+            case UNAVAILABLE -> "الدليل المؤسسي غير مهيأ في «إعدادات التكامل»؛ يظهر فقط من دخل تمركز من قبل بحساب تحقق منه الدليل.";
+        };
+        return new LookupOptions(hr, hr ? "يسأل مصدر الموارد البشرية (Oracle) مباشرة، للقراءة فقط."
+                : "مصدر الموارد البشرية (Oracle) غير مهيأ أو غير مفعل.", mode.name(), mode == DirectoryAuthenticator.LookupMode.OWN_ACCOUNT && ownLinked,
+                message);
+    }
+
+    /** The administrator's own directory identity link: [stable identifier, login], or null when they did not sign in with it. */
+    private String[] ownDirectoryLink(AccessContext ctx) {
+        String issuer;
+        try {
+            issuer = directory.issuer();
+        } catch (RuntimeException e) {
+            return null;
+        }
+        if (issuer == null) {
+            return null;
+        }
+        String subject = jdbc.sql("select subject from identity_link where person_id = :p and issuer = :i")
+                .param("p", ctx.personId()).param("i", issuer).query(String.class).optional().orElse(null);
+        if (subject == null) {
+            return null;
+        }
+        String login = jdbc.sql("""
+                select coalesce(d.username, p.username) from person p
+                left join person_directory_profile d on d.person_id = p.id and d.issuer = :i
+                where p.id = :p""").param("p", ctx.personId()).param("i", issuer).query(String.class).optional().orElse(null);
+        return login == null ? null : new String[]{subject, login};
     }
 
     /** Handing out or taking back the system administrator role: configuration and access management over everything. */
@@ -121,10 +203,11 @@ public class AdministratorService {
 
     public Candidate resolve(AccessContext ctx, ResolveInput in) {
         requireGlobal(ctx);
-        return resolved(ctx, in == null ? null : in.method(), in == null ? null : in.value()).candidate();
+        return resolved(ctx, in == null ? null : in.method(), in == null ? null : in.value(), in == null ? null : in.directoryPassword(),
+                null).candidate();
     }
 
-    private Resolved resolved(AccessContext ctx, String method, String raw) {
+    private Resolved resolved(AccessContext ctx, String method, String raw, String directoryPassword, String confirmation) {
         String value = raw == null ? "" : raw.trim();
         if (value.isEmpty() || value.length() > 120) {
             throw ApiException.validation("اكتب الرقم الوظيفي أو حساب الدليل المؤسسي.");
@@ -133,7 +216,7 @@ public class AdministratorService {
         if (EMPLOYEE_NUMBER.equals(method)) {
             r = byEmployeeNumber(value);
         } else if (DIRECTORY_ACCOUNT.equals(method)) {
-            r = byDirectoryAccount(value);
+            r = byDirectoryAccount(ctx, value, directoryPassword, confirmation);
         } else {
             throw ApiException.validation("طريقة التحقق غير معروفة: اختر الرقم الوظيفي (الموارد البشرية) أو حساب الدليل المؤسسي.");
         }
@@ -174,7 +257,7 @@ public class AdministratorService {
         return new Resolved(c, person, r);
     }
 
-    private Resolved byDirectoryAccount(String raw) {
+    private Resolved byDirectoryAccount(AccessContext ctx, String raw, String directoryPassword, String confirmation) {
         String login = UnitMemberService.normalLogin(raw);
         if (login == null) {
             throw ApiException.validation("حساب الدليل غير صالح: أحرف لاتينية وأرقام فقط، مثل u1234567.");
@@ -196,8 +279,7 @@ public class AdministratorService {
                 .param("l", login).query().listOfRows();
         List<Object> distinct = rows.stream().map(m -> m.get("id")).distinct().toList();
         if (distinct.isEmpty()) {
-            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "لا يوجد في تمركز حساب دليل مؤسسي بهذا الاسم تحقق منه الدليل بدخول سابق؛"
-                    + " يدخل الشخص مرة واحدة بحسابه (يتحقق الدليل من كلمة مروره دون حساب خدمة)، أو استخدم الرقم الوظيفي من الموارد البشرية.");
+            return byDirectoryLookup(ctx, login, directoryPassword, confirmation);
         }
         if (distinct.size() > 1) {
             throw ApiException.validation("حساب الدليل يطابق أكثر من سجل في تمركز؛ يراجعه مدير الصلاحيات قبل المنح.");
@@ -208,6 +290,85 @@ public class AdministratorService {
         Candidate c = candidate(DIRECTORY_ACCOUNT, login, "DIRECTORY_SIGN_IN", person, "PERSON:" + person, (String) p.get("display_name"),
                 (String) p.get("employee_no"), (String) p.get("account"), unit, null);
         return new Resolved(c, person, null);
+    }
+
+    /**
+     * ADR-105: an account nobody signed in with yet, found live in the directory. A record TMRKZ already holds for the login or the
+     * number is never duplicated: it is refused for review (as a first sign-in would be). On confirmation the entry found for THIS
+     * administrator is used again (kept for ten minutes), so the administrator's own password is never asked twice.
+     */
+    private Resolved byDirectoryLookup(AccessContext ctx, String login, String directoryPassword, String confirmation) {
+        pending.values().removeIf(p -> p.until().isBefore(clock.instant()));
+        if (confirmation != null) {
+            Pending kept = pending.get(confirmation);
+            if (kept != null && kept.actor().equals(ctx.personId()) && login.equalsIgnoreCase(kept.entry().username())) {
+                return fromEntry(login, kept.entry(), kept.verifiedBy());
+            }
+        }
+        DirectoryAuthenticator.LookupMode mode = directory.lookupMode();
+        String notFoundHere = "لا يوجد في تمركز حساب دليل بهذا الاسم تحقق منه الدليل بدخول سابق.";
+        if (mode == DirectoryAuthenticator.LookupMode.UNAVAILABLE) {
+            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, notFoundHere + " والبحث في الدليل قبل أول دخول غير متاح: الدليل المؤسسي غير مهيأ."
+                    + " يدخل الشخص مرة واحدة بحسابه، أو استخدم الرقم الوظيفي من الموارد البشرية.", Map.of("lookup", "UNAVAILABLE"));
+        }
+        String[] own = null;
+        if (mode == DirectoryAuthenticator.LookupMode.OWN_ACCOUNT) {
+            own = ownDirectoryLink(ctx);
+            if (own == null) {
+                throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, notFoundHere + " ولا يوجد حساب خدمة للدليل (ADR-100)، ودخولك الحالي ليس"
+                        + " بحساب الدليل، فلا يمكن البحث عمن لم يدخل بعد. يدخل الشخص مرة واحدة بحسابه، أو استخدم الرقم الوظيفي.",
+                        Map.of("lookup", "UNAVAILABLE_NOT_DIRECTORY_SESSION"));
+            }
+            if (directoryPassword == null || directoryPassword.isEmpty()) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "هذا الحساب لم يدخل تمركز بعد. للبحث عنه في الدليل دون حساب خدمة اكتب"
+                        + " كلمة مرورك أنت في الدليل (تُستخدم لهذا البحث وحده ولا تُحفظ).", Map.of("lookup", "PASSWORD_REQUIRED"));
+            }
+        }
+        DirectoryAuthenticator.DirectoryUser entry;
+        if (own != null) {
+            throttle.check("id:" + own[0], null); // the administrator's own password: as many tries as a step-up, no more
+        }
+        try {
+            entry = own == null ? directory.lookup(login, null, null, null) : directory.lookup(login, own[1], own[0], directoryPassword);
+            if (own != null) {
+                throttle.succeeded("id:" + own[0]);
+            }
+        } catch (DirectoryAuthenticator.DirectoryException e) {
+            if (own != null && e.failure() == DirectoryAuthenticator.Failure.INVALID_CREDENTIALS) {
+                throttle.failed("id:" + own[0], null);
+            }
+            throw switch (e.failure()) {
+                case INVALID_CREDENTIALS -> new ApiException(ErrorCode.REAUTHENTICATION_FAILED,
+                        "رفض الدليل كلمة مرورك؛ لم يُبحث عن الحساب ولم يُمنح شيء.", Map.of("lookup", "PASSWORD_REFUSED"));
+                case AMBIGUOUS -> ApiException.validation("الاسم يطابق أكثر من سجل في الدليل؛ لا يُختار أحدها آلياً.");
+                case TLS -> new ApiException(ErrorCode.DIRECTORY_TLS_FAILED, "تعذر تأمين الاتصال بالدليل (الشهادة أو اسم الخادم)؛ لم يُرسل شيء.");
+                case NOT_CONFIGURED -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND, notFoundHere + " والدليل غير مهيأ للبحث.",
+                        Map.of("lookup", "UNAVAILABLE"));
+                case UNAVAILABLE -> new ApiException(ErrorCode.DIRECTORY_UNAVAILABLE, "تعذر الوصول إلى الدليل المؤسسي الآن؛ لم يُمنح شيء.");
+            };
+        }
+        if (entry == null) {
+            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "لم يجد الدليل المؤسسي حساباً بهذا الاسم.", Map.of("lookup", "NOT_IN_DIRECTORY"));
+        }
+        String verifiedBy = own == null ? "DIRECTORY_SERVICE_LOOKUP" : "DIRECTORY_OWN_ACCOUNT_LOOKUP";
+        Resolved r = fromEntry(login, entry, verifiedBy);
+        pending.put(r.candidate().confirmation(), new Pending(ctx.personId(), entry, verifiedBy, clock.instant().plusSeconds(600)));
+        return r;
+    }
+
+    /** The candidate an entry found in the directory makes; a TMRKZ record that already holds the login or number is refused. */
+    private Resolved fromEntry(String login, DirectoryAuthenticator.DirectoryUser entry, String verifiedBy) {
+        String number = entry.employeeNumber();
+        int held = jdbc.sql("""
+                select count(*) from person where lower(username) = :l or (cast(:n as text) is not null and employee_no = cast(:n as text))""")
+                .param("l", login).param("n", number).query(Integer.class).single();
+        if (held > 0) {
+            throw ApiException.validation("اسم الدخول أو الرقم الوظيفي لهذا الحساب مسجل لسجل آخر في تمركز؛ لا يُنشأ سجل ثانٍ."
+                    + " يراجعه مدير الصلاحيات (بطاقة الحساب) قبل المنح.");
+        }
+        Candidate c = candidate(DIRECTORY_ACCOUNT, login, verifiedBy, null, "DIR:" + entry.uuid(), entry.displayName(), number,
+                entry.username(), entry.profile() == null ? null : entry.profile().unitName(), null);
+        return new Resolved(c, null, null, entry);
     }
 
     private Candidate candidate(String method, String value, String verifiedBy, UUID person, String key, String name, String number,
@@ -228,14 +389,16 @@ public class AdministratorService {
             throw ApiException.validation("اذكر سبب منح صلاحية مدير النظام.");
         }
         lock();
-        Resolved r = resolved(ctx, in.method(), in.value());
+        Resolved r = resolved(ctx, in.method(), in.value(), null, in.confirmation());
         if (in.confirmation() == null || !in.confirmation().equals(r.candidate().confirmation())) {
             throw new ApiException(ErrorCode.STALE_REVISION, "لم تُؤكد هذه الهوية كما عُرضت أو تغيرت بياناتها منذ العرض؛ اعرضها وأكدها من جديد.");
         }
         if (r.candidate().alreadyAdmin()) {
             throw ApiException.validation("هذا الشخص مدير نظام بالفعل.");
         }
-        UUID person = r.person() != null ? r.person() : hrPeople.importOne(r.hr(), ctx.actor(), "ADMINISTRATOR", null);
+        UUID person = r.person() != null ? r.person() : r.entry() != null ? fromDirectory(r.entry()) : hrPeople.importOne(r.hr(), ctx.actor(),
+                "ADMINISTRATOR", null);
+        pending.remove(in.confirmation());
         UUID anchor = anchor();
         Map<String, Object> made = grants.create(ctx, new GrantAdminService.GrantInput(person.toString(), anchor.toString(), ROLE,
                 "مدير نظام", null, null, null, null));
@@ -244,7 +407,8 @@ public class AdministratorService {
         detail.put("verifiedBy", r.candidate().verifiedBy());
         detail.put("key", r.candidate().value());
         detail.put("membershipId", made.get("id"));
-        detail.put("importedFromHr", r.person() == null);
+        detail.put("importedFromHr", r.person() == null && r.hr() != null);
+        detail.put("createdFromDirectory", r.entry() != null);
         audit.recordAs(ctx.actor(), "ADMIN_GRANTED", "PERSON", person.toString(), r.candidate().displayName(), detail, reason);
         return list(ctx).stream().filter(a -> a.personId().equals(person.toString())).findFirst()
                 .orElseThrow(() -> new IllegalStateException("administrator just granted is not listed"));
@@ -285,6 +449,18 @@ public class AdministratorService {
         String name = jdbc.sql("select display_name from person where id = :id").param("id", person).query(String.class).optional().orElse(null);
         audit.recordAs(ctx.actor(), "ADMIN_REVOKED", "PERSON", person.toString(), name,
                 Map.of("membershipIds", ids.stream().map(UUID::toString).toList()), reason);
+    }
+
+    /**
+     * The person an entry found in the directory stands for, made exactly as their own first sign-in would make them (the unchanged
+     * {@link IdentityService#resolve}: HR record when Oracle is in force, otherwise a LOCAL record linked with method DIRECTORY,
+     * duplicates refused for review). Their later sign-in finds this link by the directory's stable identifier.
+     */
+    private UUID fromDirectory(DirectoryAuthenticator.DirectoryUser u) {
+        OidcClient.Identity id = new OidcClient.Identity(directory.issuer(), u.uuid(),
+                "EMPLOYEE_NUMBER".equals(oidc.linkKey()) ? u.employeeNumber() : u.username(), u.displayName(), u.username(), clock.instant(),
+                null, "ADMIN_LOOKUP", "/", null, false, u.profile());
+        return identities.resolve(id);
     }
 
     /** Where the grant is held: a LOCAL root first — an HR unit may be retired by a sync, and a grant on a retired unit counts for nothing. */

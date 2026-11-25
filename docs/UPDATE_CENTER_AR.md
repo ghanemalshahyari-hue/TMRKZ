@@ -1,4 +1,4 @@
-# مركز التحديث ومجلد TMRKZ الواحد (ADR-104)
+# مركز التحديث ومجلد TMRKZ الواحد (ADR-104، ADR-105)
 
 ## 1. المبدأ
 
@@ -18,46 +18,41 @@
 
 ## 2. التهيئة الأولى — مرة واحدة فقط (عبر PAM)
 
-الـVM الحالية لا تحتوي مركز التحديث بعد، لذلك يُنقل أول إصدار مرة واحدة يدوياً. بعدها تصبح كل التحديثات من المتصفح.
+الـVM الحالية لا تحتوي مركز التحديث بعد، لذلك تُنقل «حزمة التهيئة» مرة واحدة يدوياً. بعدها تصبح كل التحديثات من المتصفح.
+الحزمة صغيرة (الملفات التي تغيرت منذ نسخة الـVM فقط، نحو 3 MB) وتتحقق من نفسها قبل أن تكتب شيئاً (ADR-105).
 
 ### على جهاز Windows (موجه الأوامر CMD، داخل مجلد TMRKZ)
 
 ```
 cd %USERPROFILE%\Desktop\TMRKZ
 "C:\Program Files\Git\bin\sh.exe" ops/update/make-release.sh --init-key
-"C:\Program Files\Git\bin\sh.exe" ops/update/make-release.sh --package
+"C:\Program Files\Git\bin\sh.exe" ops/update/make-release.sh --bootstrap e30c1c1
 ```
 
 - الأمر الأول ينشئ مفتاح التوقيع مرة واحدة في `ops\local\.generated\release-signing.key` (يبقى على هذا الجهاز ولا يُنسخ أبداً).
-- الأمر الثاني يكتب في `release\`: `TMRKZ-app-<الإصدار>.tar` (ملفات app وdocs فقط، بلا أي ملف محمي)، و`config\` (ملفا Compose
-  للمقارنة فقط)، و`SHA256SUMS`.
+- الأمر الثاني يكتب المجلد `release\bootstrap\` لـVM تعمل بنسخة `e30c1c1` (تحديث 24 نوفمبر): ملف `TMRKZ-bootstrap-<الإصدار>.tar`
+  (الملفات المتغيرة فقط)، وقائمة الملفات الموقعة `MANIFEST.tsv` و`RELEASE.json` و`RELEASE.sig`، و`config\` (ملفا Compose
+  للمراجعة)، و`release-trust.pub` (المفتاح العام فقط)، و`bootstrap.sh`، و`INSTALL.txt`، و`SHA256SUMS`.
 
-انقل عبر PAM هذه الملفات فقط إلى `/tmp/tmrkz-transfer/` على الـVM:
-
-- `release\TMRKZ-app-<الإصدار>.tar`
-- `release\SHA256SUMS`
-- `release\config\docker-compose.yml` و`release\config\docker-compose.override.yml`
-- `ops\local\.generated\release-signing.pub` (المفتاح العام فقط)
+انقل عبر PAM **المجلد `release\bootstrap\` كله** إلى `/data/tmrkz-bootstrap/` على الـVM. لا شيء غيره.
 
 ### على الـVM (Ubuntu، داخل PAM)
 
 ```
-cd /tmp/tmrkz-transfer && sha256sum -c SHA256SUMS
-cd /data/TMRKZ
-# 1) نسخة احتياطية لملفات التطبيق الحالية (لا تشمل البيانات)
-mkdir -p backups/pre-update-center
-tar -cf backups/pre-update-center/app-$(date +%Y%m%d%H%M).tar backend frontend ops assets map-packages start.sh RUN.md README.md docker-compose.yml docker-compose.override.yml $(ls -d docs handoff 2>/dev/null)
-# 2) ملفات التطبيق والتوثيق فقط (لا تحتوي .env ولا data ولا certs ولا الخرائط)
-tar -xf /tmp/tmrkz-transfer/TMRKZ-app-*.tar -C /data/TMRKZ
-# 3) مفتاح الثقة
-cp /tmp/tmrkz-transfer/release-signing.pub ops/local/.generated/release-trust.pub
-# 4) قارن ملفي Compose ولا تستبدل شيئاً قبل المراجعة
-diff -u docker-compose.yml /tmp/tmrkz-transfer/docker-compose.yml
-diff -u docker-compose.override.yml /tmp/tmrkz-transfer/docker-compose.override.yml
+cd /data/tmrkz-bootstrap
+sh bootstrap.sh check /data/TMRKZ                  # للقراءة فقط: المجاميع، التوقيع، الملفات، فرق ملفي Compose
+sh bootstrap.sh apply /data/TMRKZ --with-config    # بعد قراءة فرق Compose؛ بدون --with-config يبقى ملفا Compose كما هما
+cd /data/TMRKZ && sh start.sh                       # الصور نفسها؛ لا يلزم tmrkz-images.tar
+sh ops/diagnose.sh > /tmp/tmrkz-diagnose.txt        # فحص للقراءة فقط
 ```
 
-- إن لم يُظهر `diff` إلا إضافات مركز التحديث (الخدمة `maintenance` والحجم `update-staging` وسطر `update-staging:/update` في
-  خدمة `backend`) انسخ الملف الجديد. إن ظهرت تعديلات خاصة بالـVM فأضف هذه الأجزاء الثلاثة يدوياً فقط.
+- `check` لا يغير شيئاً: يتحقق من `SHA256SUMS` ومن توقيع الإصدار بالمفتاح العام، ويعرض الملفات التي ستُستبدل أو تُضاف، وفرق
+  ملفي Compose سطراً بسطر.
+- `apply` يرفض أي مسار محمي أو ملف ليس في القائمة الموقعة أو ملف تغير بعد التوقيع، ثم يحفظ نسخة من كل ملف سيكتبه في
+  `backups/bootstrap/<الوقت>/`، ويكتب الملفات، ويثبت المفتاح العام `ops/local/.generated/release-trust.pub` (إن كان مفتاح آخر
+  مثبتاً يتوقف)، ويكتب خط الأساس `backups/updates/installed-MANIFEST.tsv` ليُعرف لاحقاً أي ملف عُدل على الـVM يدوياً.
+- إن أظهر فرق Compose تعديلات خاصة بالـVM غير إضافات مركز التحديث (الخدمة `maintenance` والحجم `update-staging` وسطر
+  `update-staging:/update` في `backend` ومراقب الشهادة في `proxy`) فلا تستخدم `--with-config`، وأضف هذه الأجزاء يدوياً.
 - `docker-compose.dc-hosts.yml` لا يُمس. لكي لا يُهمل، أضف إلى `.env` (مرة واحدة) السطرين:
 
 ```
@@ -68,12 +63,8 @@ COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml:docker-compose.dc-ho
   للتأكد من الملفات التي تعمل بها الحاويات الآن:
   `docker inspect tmrkz-backend-1 --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}'`
 
-```
-# 5) التشغيل (لا يحتاج tmrkz-images.tar إذا كانت الصور محمّلة)
-sh start.sh
-# 6) فحص للقراءة فقط
-sh ops/diagnose.sh > /tmp/tmrkz-diagnose.txt
-```
+- التراجع عن التهيئة: `sh /data/tmrkz-bootstrap/bootstrap.sh restore /data/TMRKZ/backups/bootstrap/<الوقت>` ثم `sh start.sh`.
+  يعيد كل ملف كما كان بالضبط، ويزيل المفتاح العام إن كانت التهيئة هي التي ثبتته.
 
 ## 3. التحديث المعتاد — من المتصفح، بلا PAM
 
@@ -92,7 +83,10 @@ sh ops/diagnose.sh > /tmp/tmrkz-diagnose.txt
 
 ## 4. ما يُنقل وما لا يُمس وما لا يلزم
 
-- **يُنقل:** ملفات app وdocs التي اختلفت فقط، وملفا Compose فقط عند اختيارهما صراحة.
+- **يُنقل:** ملفات app وdocs التي اختلفت فقط، وملفا Compose فقط عند اختيارهما صراحة. في التهيئة الأولى: المجلد
+  `release/bootstrap/` وحده (القسم 2).
+- **الشهادات وإعدادات التكامل:** لا تُنقل بالتحديث أبداً. تُدار من «إدارة النظام ← الشهادات» و«استيراد ملف إعدادات» (ADR-105)
+  بتحقق ومعاينة واعتماد صريح ونسخة احتياطية واستعادة.
 - **لا يُمس أبداً على الـVM:** `.env`، `certs/`، `data/`، `backups/`، `map-data/`، `map-runtime/`، `docker-compose.dc-hosts.yml`،
   `ops/local/.generated/` (ومنه مفتاح الثقة)، `tmrkz-images.tar`.
 - **غير لازم للتشغيل:** `tests/`، `backend/src/test/`، `prototypes/`، `docs/audit/`، `docs/evidence/`، `.github/`، `.vscode/`،
@@ -108,7 +102,10 @@ sh ops/diagnose.sh > /tmp/tmrkz-diagnose.txt
   while read f; do [ -n "$f" ] && rm -f "/data/TMRKZ/$f"; done < added.txt
   ```
   يعيد الخادم والواجهة البناء تلقائياً بعد الاستعادة.
-- نسخة التهيئة الأولى: `backups/pre-update-center/app-*.tar`.
+- نسخة التهيئة الأولى: `backups/bootstrap/<الوقت>/` وتُعاد بـ`sh bootstrap.sh restore` (القسم 2).
+- شهادة https: كل تثبيت من «الشهادات» يحفظ الشهادة والمفتاح السابقين في `backups/certificates/<رقم الطلب>/` (المفتاح بصلاحية
+  المالك وحده). إن تعذر فتح المتصفح: انسخ `server.crt` و`server.key` و`ca-chain.pem` منها إلى مجلد `TMRKZ_TLS_DIR`، وتعيد نقطة
+  https تحميلها وحدها خلال ثوانٍ.
 
 ## 6. التحقق للقراءة فقط
 

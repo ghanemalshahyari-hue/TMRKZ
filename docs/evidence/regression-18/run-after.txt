@@ -1,0 +1,55 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< ae.mover:mover-backend >-----------------------
+[INFO] Building MOVER backend 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.5.0:clean (default-clean) @ mover-backend ---
+[INFO] Deleting /repo/backend/target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ mover-backend ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 81 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ mover-backend ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 198 source files with javac [debug parameters release 25] to target/classes
+[INFO] /repo/backend/src/main/java/ae/mover/hr/OracleUnitPayload.java: /repo/backend/src/main/java/ae/mover/hr/OracleUnitPayload.java uses unchecked or unsafe operations.
+[INFO] /repo/backend/src/main/java/ae/mover/hr/OracleUnitPayload.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ mover-backend ---
+[INFO] Copying 8 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ mover-backend ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 71 source files with javac [debug parameters release 25] to target/test-classes
+[INFO] /repo/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java: /repo/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java uses or overrides a deprecated API.
+[INFO] /repo/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java: Recompile with -Xlint:deprecation for details.
+[INFO] /repo/backend/src/test/java/ae/mover/AdministrationAcceptanceIT.java: Some input files use unchecked or unsafe operations.
+[INFO] /repo/backend/src/test/java/ae/mover/AdministrationAcceptanceIT.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ mover-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running ae.mover.stationing.RestationingWorkflowIT
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[INFO] Tests run: 17, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 27.35 s -- in ae.mover.stationing.RestationingWorkflowIT
+[INFO] Running ae.mover.stationing.SiteSetupIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.242 s -- in ae.mover.stationing.SiteSetupIT
+[INFO] Running ae.mover.stationing.StationingNextIT
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 14.76 s -- in ae.mover.stationing.StationingNextIT
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: 40, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:09 min
+[INFO] Finished at: 2026-11-25T06:12:24Z
+[INFO] ------------------------------------------------------------------------

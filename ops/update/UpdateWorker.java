@@ -119,6 +119,11 @@ public class UpdateWorker {
             } catch (Exception e) {
                 log("loop: " + e);
             }
+            try {
+                certificates();
+            } catch (Exception e) {
+                log("certificates: " + e);
+            }
             Thread.sleep(1000);
         }
     }
@@ -304,6 +309,19 @@ public class UpdateWorker {
             frontend |= p.startsWith("frontend/");
             config |= "config".equals(cls);
             self |= p.equals("ops/update/UpdateWorker.java");
+        }
+        long need = 0;
+        for (String p : approved) {
+            Map<String, String> c = changes.get(p);
+            if (!"DELETED".equals(c.get("change"))) {
+                need += Files.size(s.resolve("files").resolve(p));
+            }
+        }
+        // the backup of what is replaced and the new files, plus a margin (and the offline build's copy when the backend changes)
+        String space = freeSpaceProblem(INSTALL, 2 * need + (backend ? 300L << 20 : 0));
+        if (space != null) {
+            fail(s, space);
+            return;
         }
         if (backend && !buildCheck(s, approved, changes)) {
             return;
@@ -762,6 +780,589 @@ public class UpdateWorker {
             out.put(unq(m.group(1)), c);
         }
         return out;
+    }
+
+    /** Null when the folder's file system keeps at least {@code bytes} plus the minimum free space; else why not (nothing applied). */
+    static String freeSpaceProblem(Path where, long bytes) {
+        long min = Long.parseLong(env("TMRKZ_UPDATE_MIN_FREE_MB", "200")) << 20;
+        try {
+            long free = Files.getFileStore(where).getUsableSpace();
+            if (free < bytes + min) {
+                return "مساحة القرص غير كافية: المتاح " + (free >> 20) + " MB، ويلزم " + ((bytes + min) >> 20)
+                        + " MB (النسخة الاحتياطية والملفات الجديدة وهامش " + (min >> 20) + " MB)؛ لم يُطبق شيء.";
+            }
+            return null;
+        } catch (IOException e) {
+            return "تعذرت معرفة المساحة المتاحة: " + e.getMessage() + "؛ لم يُطبق شيء.";
+        }
+    }
+
+    // ---- certificates (ADR-105) ---------------------------------------------------------------------------------------
+
+    static final Path CERT_STAGE = STAGE.resolve("certificates");
+    static final String PROXY_HOST = env("TMRKZ_UPDATE_PROXY_HOST", "proxy");
+    static final int PROXY_PORT = Integer.parseInt(env("TMRKZ_UPDATE_PROXY_PORT", "8443"));
+    static final Duration TLS_VERIFY = Duration.ofSeconds(Long.parseLong(env("TMRKZ_UPDATE_TLS_VERIFY_SECONDS", "90")));
+    static Instant lastInventory = Instant.EPOCH;
+
+    /** The inventory every 30 s (or when the backend asks), then each certificate request the administrator approved. */
+    static void certificates() throws Exception {
+        if (Instant.now().isAfter(lastInventory.plusSeconds(30)) || Files.exists(STAGE.resolve("certificate-inventory.request"))) {
+            lastInventory = Instant.now();
+            Files.deleteIfExists(STAGE.resolve("certificate-inventory.request"));
+            inventoryCertificates();
+        }
+        if (!Files.isDirectory(CERT_STAGE)) {
+            return;
+        }
+        List<Path> list = new ArrayList<>();
+        try (DirectoryStream<Path> dirs = Files.newDirectoryStream(CERT_STAGE)) {
+            dirs.forEach(list::add);
+        }
+        list.sort(null);
+        for (Path s : list) {
+            if (!Files.isDirectory(s, LinkOption.NOFOLLOW_LINKS) || !s.getFileName().toString().matches("[0-9]{8}T[0-9]{6}-[0-9a-f]{8}")) {
+                continue;
+            }
+            if (!"HTTPS".equals(props(s.resolve("request.properties")).getProperty("target"))) {
+                continue; // the directory's and Keycloak's trust are applied by the backend itself (database settings)
+            }
+            String st = state(s);
+            if ("CHECKED".equals(st) && Files.exists(s.resolve("approval.properties"))) {
+                certApply(s);
+            } else if (("APPLIED".equals(st) || "APPLIED_INACTIVE".equals(st)) && Files.exists(s.resolve("rollback.properties"))) {
+                certRestore(s, "RESTORED", "أُعيدت شهادة الخادم السابقة بطلب مدير النظام");
+            }
+        }
+    }
+
+    /** The values of .env the certificates depend on (and only those: no secret is read). */
+    static Map<String, String> envValues() {
+        Set<String> wanted = Set.of("TMRKZ_TLS_DIR", "TMRKZ_TRUSTSTORE_DIR", "COMPOSE_PROFILES", "TMRKZ_PUBLIC_URL", "TMRKZ_IP", "TMRKZ_PORT",
+                "TMRKZ_HTTPS_PORT");
+        Map<String, String> out = new HashMap<>();
+        try {
+            for (String l : Files.readAllLines(INSTALL.resolve(".env"), StandardCharsets.UTF_8)) {
+                String t = l.strip();
+                if (t.startsWith("export ")) {
+                    t = t.substring(7).strip();
+                }
+                int eq = t.indexOf('=');
+                if (t.startsWith("#") || eq <= 0 || !wanted.contains(t.substring(0, eq).strip())) {
+                    continue;
+                }
+                String v = t.substring(eq + 1).strip();
+                if (v.length() >= 2 && (v.startsWith("\"") && v.endsWith("\"") || v.startsWith("'") && v.endsWith("'"))) {
+                    v = v.substring(1, v.length() - 1);
+                }
+                out.put(t.substring(0, eq).strip(), v);
+            }
+        } catch (IOException e) {
+            out.put("_error", "تعذرت قراءة .env");
+        }
+        return out;
+    }
+
+    static String tlsDir(Map<String, String> env) {
+        return clean(env.getOrDefault("TMRKZ_TLS_DIR", "./ops/tls/private"));
+    }
+
+    static String clean(String d) {
+        String s = d.strip().replace('\\', '/');
+        while (s.startsWith("./")) {
+            s = s.substring(2);
+        }
+        while (s.endsWith("/") && s.length() > 1) {
+            s = s.substring(0, s.length() - 1);
+        }
+        return s;
+    }
+
+    /** A certificate folder inside this installation, or null (absolute elsewhere, outside, through a link). */
+    static Path folder(String rel) {
+        if (rel.startsWith("/") || rel.contains("..") || rel.isEmpty() || rel.equals(".")) {
+            return null;
+        }
+        Path p = INSTALL.resolve(rel).normalize();
+        if (!p.startsWith(INSTALL)) {
+            return null;
+        }
+        for (Path at = p; at != null && !at.equals(INSTALL); at = at.getParent()) {
+            if (Files.isSymbolicLink(at)) {
+                return null;
+            }
+        }
+        return p;
+    }
+
+    /** Folders a certificate may be written to: the https folder only when it is one of these (never data, code or backups). */
+    static boolean certificateFolder(String rel) {
+        return rel.equals("ops/tls/private") || rel.startsWith("ops/tls/") || rel.equals("certs") || rel.startsWith("certs/");
+    }
+
+    static void inventoryCertificates() throws IOException {
+        Map<String, String> env = envValues();
+        String tls = tlsDir(env);
+        boolean override = Files.exists(INSTALL.resolve("docker-compose.override.yml"));
+        String trust = clean(env.getOrDefault("TMRKZ_TRUSTSTORE_DIR", override ? "./ops/local/.generated/truststore" : "./ops/keycloak/truststores"));
+        boolean https = (env.getOrDefault("COMPOSE_PROFILES", "")).matches("(^|.*,)\\s*tls\\s*(,.*|$)");
+        String publicUrl = env.get("TMRKZ_PUBLIC_URL");
+        if (publicUrl == null && env.get("TMRKZ_IP") != null) {
+            publicUrl = "http://" + env.get("TMRKZ_IP") + ":" + env.getOrDefault("TMRKZ_PORT", "8088");
+        }
+        String host = null;
+        try {
+            host = publicUrl == null ? null : URI.create(publicUrl).getHost();
+        } catch (RuntimeException ignored) {
+            // no host to show
+        }
+        StringBuilder out = new StringBuilder("{\"at\":").append(q(Instant.now().toString())).append(",\"config\":{");
+        out.append("\"tlsDir\":").append(q(tls)).append(",\"tlsDirSource\":").append(q(env.containsKey("TMRKZ_TLS_DIR") ? ".env" : "default"));
+        out.append(",\"trustDir\":").append(q(trust)).append(",\"trustDirSource\":").append(q(env.containsKey("TMRKZ_TRUSTSTORE_DIR") ? ".env" : "default"));
+        out.append(",\"certsDir\":\"certs\",\"httpsEnabled\":").append(https).append(",\"publicUrl\":").append(q(publicUrl));
+        out.append(",\"publicHost\":").append(q(host)).append(",\"envError\":").append(q(env.get("_error"))).append("},\"stores\":[");
+        List<String[]> stores = new ArrayList<>();
+        stores.add(new String[]{"HTTPS", tls, "نقطة https (proxy)"});
+        stores.add(new String[]{"TRUST_FOLDER", trust, "الخادم (الدليل وKeycloak المؤسسة) وKeycloak المحلي عند بدء تشغيله"});
+        if (!tls.equals("certs") && !trust.equals("certs")) {
+            stores.add(new String[]{"CERTS", "certs", "مجلد الشهادات على هذا الجهاز (مصدر للاستيراد)"});
+        }
+        int n = 0;
+        for (String[] st : stores) {
+            out.append(n++ > 0 ? "," : "").append(store(st[0], st[1], st[2]));
+        }
+        out.append("]}");
+        write(STAGE.resolve("certificate-inventory.json"), out.toString());
+    }
+
+    static String store(String id, String rel, String usedBy) {
+        StringBuilder b = new StringBuilder("{\"id\":").append(q(id)).append(",\"path\":").append(q(rel)).append(",\"usedBy\":").append(q(usedBy));
+        Path dir = folder(rel);
+        if (dir == null) {
+            return b.append(",\"exists\":false,\"visible\":false,\"writable\":false,\"note\":")
+                    .append(q("خارج مجلد التطبيق أو عبر رابط؛ لا يراه عامل الصيانة (يُدار من الخادم مباشرة)")).append(",\"files\":[]}").toString();
+        }
+        boolean exists = Files.isDirectory(dir);
+        boolean writable = exists && Files.isWritable(dir) && "HTTPS".equals(id) && certificateFolder(rel);
+        b.append(",\"exists\":").append(exists).append(",\"visible\":true,\"writable\":").append(writable);
+        if (exists && "HTTPS".equals(id) && !certificateFolder(rel)) {
+            b.append(",\"note\":").append(q("لا يكتب العامل الشهادات إلا في ops/tls/… أو certs/…"));
+        }
+        b.append(",\"files\":[");
+        if (exists) {
+            List<Path> files = new ArrayList<>();
+            try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir)) {
+                for (Path f : ds) {
+                    if (Files.isRegularFile(f, LinkOption.NOFOLLOW_LINKS) && files.size() < 100) {
+                        files.add(f);
+                    }
+                }
+            } catch (IOException e) {
+                // an unreadable folder lists nothing
+            }
+            files.sort(null);
+            List<java.security.cert.X509Certificate> all = new ArrayList<>();
+            Map<Path, List<java.security.cert.X509Certificate>> certs = new HashMap<>();
+            for (Path f : files) {
+                List<java.security.cert.X509Certificate> cs = readCertificates(f);
+                certs.put(f, cs);
+                all.addAll(cs);
+            }
+            int i = 0;
+            for (Path f : files) {
+                b.append(i++ > 0 ? "," : "").append("{\"name\":").append(q(f.getFileName().toString()));
+                long size = 0;
+                try {
+                    size = Files.size(f);
+                } catch (IOException ignored) {
+                    // shown as 0
+                }
+                b.append(",\"size\":").append(size);
+                List<java.security.cert.X509Certificate> cs = certs.get(f);
+                java.security.PrivateKey key = cs.isEmpty() ? readKey(f) : null;
+                if (!cs.isEmpty()) {
+                    StringBuilder pem = new StringBuilder();
+                    for (java.security.cert.X509Certificate c : cs) {
+                        pem.append(pem(c));
+                    }
+                    b.append(",\"kind\":\"CERTIFICATES\",\"pem\":").append(q(pem.toString()));
+                } else if (key != null || isKeyFile(f)) {
+                    b.append(",\"kind\":\"KEY\",\"keyAlgorithm\":").append(q(key == null ? null : key.getAlgorithm()));
+                    b.append(",\"publicKeySha256\":").append(q(key == null ? null : publicKeySha256(key, all)));
+                    if (key == null) {
+                        b.append(",\"note\":").append(q("مفتاح لا يقرؤه العامل (مشفر أو بصيغة EC قديمة)"));
+                    }
+                    b.append(",\"permissions\":").append(q(permissions(f)));
+                } else {
+                    b.append(",\"kind\":\"OTHER\"");
+                }
+                b.append('}');
+            }
+        }
+        return b.append("]}").toString();
+    }
+
+    static String permissions(Path f) {
+        try {
+            return java.nio.file.attribute.PosixFilePermissions.toString(Files.getPosixFilePermissions(f));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    static boolean isKeyFile(Path f) {
+        try {
+            return Files.size(f) < 64 * 1024 && new String(Files.readAllBytes(f), StandardCharsets.ISO_8859_1).contains("PRIVATE KEY");
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /** Every certificate of a PEM, DER or PKCS#7 file (none for anything else). */
+    static List<java.security.cert.X509Certificate> readCertificates(Path f) {
+        List<java.security.cert.X509Certificate> out = new ArrayList<>();
+        try {
+            if (Files.size(f) > 1024 * 1024) {
+                return out;
+            }
+            byte[] b = Files.readAllBytes(f);
+            if (new String(b, StandardCharsets.ISO_8859_1).contains("PRIVATE KEY")) {
+                return out;
+            }
+            for (java.security.cert.Certificate c : java.security.cert.CertificateFactory.getInstance("X.509")
+                    .generateCertificates(new java.io.ByteArrayInputStream(b))) {
+                out.add((java.security.cert.X509Certificate) c);
+            }
+        } catch (Exception e) {
+            out.clear();
+        }
+        return out;
+    }
+
+    /** A PEM private key (PKCS#8, or PKCS#1 RSA); null for anything else, encrypted keys included. */
+    static java.security.PrivateKey readKey(Path f) {
+        try {
+            if (Files.size(f) > 64 * 1024) {
+                return null;
+            }
+            String t = Files.readString(f, StandardCharsets.ISO_8859_1);
+            byte[] der;
+            if (t.contains("-----BEGIN PRIVATE KEY-----")) {
+                der = Base64.getMimeDecoder().decode(between(t, "-----BEGIN PRIVATE KEY-----", "-----END PRIVATE KEY-----"));
+            } else if (t.contains("-----BEGIN RSA PRIVATE KEY-----") && !t.contains("ENCRYPTED")) {
+                byte[] pkcs1 = Base64.getMimeDecoder().decode(between(t, "-----BEGIN RSA PRIVATE KEY-----", "-----END RSA PRIVATE KEY-----"));
+                byte[] alg = HexFormat.of().parseHex("300d06092a864886f70d0101010500");
+                der = derSequence(concat(HexFormat.of().parseHex("020100"), alg, derTag(0x04, pkcs1)));
+            } else {
+                return null;
+            }
+            for (String a : List.of("RSA", "EC", "Ed25519", "Ed448")) {
+                try {
+                    return KeyFactory.getInstance(a).generatePrivate(new java.security.spec.PKCS8EncodedKeySpec(der));
+                } catch (Exception ignored) {
+                    // another algorithm
+                }
+            }
+        } catch (Exception e) {
+            return null;
+        }
+        return null;
+    }
+
+    static String between(String t, String a, String b) {
+        int i = t.indexOf(a) + a.length();
+        int j = t.indexOf(b, i);
+        return t.substring(i, j).replaceAll("\\s", "");
+    }
+
+    static byte[] derSequence(byte[] content) {
+        return derTag(0x30, content);
+    }
+
+    static byte[] derTag(int tag, byte[] content) {
+        int n = content.length;
+        byte[] len;
+        if (n < 128) {
+            len = new byte[]{(byte) n};
+        } else if (n < 256) {
+            len = new byte[]{(byte) 0x81, (byte) n};
+        } else if (n < 65536) {
+            len = new byte[]{(byte) 0x82, (byte) (n >> 8), (byte) n};
+        } else {
+            len = new byte[]{(byte) 0x83, (byte) (n >> 16), (byte) (n >> 8), (byte) n};
+        }
+        return concat(new byte[]{(byte) tag}, len, content);
+    }
+
+    static byte[] concat(byte[]... parts) {
+        int n = 0;
+        for (byte[] p : parts) {
+            n += p.length;
+        }
+        byte[] out = new byte[n];
+        int at = 0;
+        for (byte[] p : parts) {
+            System.arraycopy(p, 0, out, at, p.length);
+            at += p.length;
+        }
+        return out;
+    }
+
+    /** The SHA-256 of the key's public half: from an RSA key itself, else from the certificate beside it that it signs for. */
+    static String publicKeySha256(java.security.PrivateKey key, List<java.security.cert.X509Certificate> certs) {
+        try {
+            if (key instanceof java.security.interfaces.RSAPrivateCrtKey r) {
+                PublicKey pub = KeyFactory.getInstance("RSA").generatePublic(new java.security.spec.RSAPublicKeySpec(r.getModulus(), r.getPublicExponent()));
+                return sha256(pub.getEncoded());
+            }
+            for (java.security.cert.X509Certificate c : certs) {
+                if (matches(key, c)) {
+                    return sha256(c.getPublicKey().getEncoded());
+                }
+            }
+        } catch (Exception ignored) {
+            // unknown
+        }
+        return null;
+    }
+
+    static boolean matches(java.security.PrivateKey key, java.security.cert.X509Certificate cert) {
+        String alg = switch (key.getAlgorithm().toUpperCase(java.util.Locale.ROOT)) {
+            case "RSA" -> "SHA256withRSA";
+            case "EC" -> "SHA256withECDSA";
+            case "ED25519", "EDDSA" -> "Ed25519";
+            case "ED448" -> "Ed448";
+            default -> null;
+        };
+        if (alg == null) {
+            return false;
+        }
+        try {
+            byte[] challenge = new byte[32];
+            new java.security.SecureRandom().nextBytes(challenge);
+            Signature s = Signature.getInstance(alg);
+            s.initSign(key);
+            s.update(challenge);
+            byte[] sig = s.sign();
+            Signature v = Signature.getInstance(alg);
+            v.initVerify(cert.getPublicKey());
+            v.update(challenge);
+            return v.verify(sig);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    static String pem(java.security.cert.X509Certificate c) {
+        try {
+            return "-----BEGIN CERTIFICATE-----\n" + Base64.getMimeEncoder(64, "\n".getBytes(StandardCharsets.US_ASCII)).encodeToString(c.getEncoded())
+                    + "\n-----END CERTIFICATE-----\n";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    static final List<String> TLS_FILES = List.of("server.crt", "server.key", "ca-chain.pem");
+
+    /** Re-checks what the backend staged, backs up the https folder's files, installs, and verifies what the https entry serves. */
+    static void certApply(Path s) {
+        setState(s, "APPLYING", "التحقق من الشهادة المعتمدة ثم نسخ احتياطي وتثبيت");
+        Path stagedKey = s.resolve("new/server.key");
+        try {
+            Properties plan = props(s.resolve("plan.properties"));
+            Properties approval = props(s.resolve("approval.properties"));
+            progress(s, "اعتمدها " + approval.getProperty("byName", "?") + ": " + approval.getProperty("reason", ""));
+            Map<String, String> env = envValues();
+            String rel = tlsDir(env);
+            if (!rel.equals(clean(plan.getProperty("folder", "")))) {
+                certReject(s, "تغير مجلد شهادة https في .env منذ الفحص (" + plan.getProperty("folder") + " → " + rel + ")؛ افحص من جديد.");
+                return;
+            }
+            Path dir = folder(rel);
+            if (dir == null || !certificateFolder(rel)) {
+                certReject(s, "مجلد شهادة https غير مسموح للكتابة: " + rel);
+                return;
+            }
+            List<java.security.cert.X509Certificate> crt = readCertificates(s.resolve("new/server.crt"));
+            if (crt.isEmpty() || !sha256(crt.get(0).getEncoded()).equals(plan.getProperty("leafSha256"))) {
+                certReject(s, "الشهادة المجهزة لا تطابق ما فُحص (تغيرت بعد الفحص)؛ لم يُكتب شيء.");
+                return;
+            }
+            java.security.cert.X509Certificate leaf = crt.get(0);
+            boolean newKey = Files.exists(stagedKey);
+            java.security.PrivateKey key = newKey ? readKey(stagedKey) : readKey(dir.resolve("server.key"));
+            if (key == null) {
+                certReject(s, newKey ? "تعذرت قراءة المفتاح المجهز." : "لا يقرأ العامل server.key الحالي (غير موجود أو مشفر)؛ ارفع المفتاح مع الشهادة.");
+                return;
+            }
+            if (!matches(key, leaf)) {
+                certReject(s, "المفتاح الخاص لا يطابق الشهادة؛ لم يُكتب شيء.");
+                return;
+            }
+            progress(s, "المفتاح يطابق الشهادة");
+            if (Instant.now().isAfter(leaf.getNotAfter().toInstant()) || Instant.now().isBefore(leaf.getNotBefore().toInstant())) {
+                certReject(s, "الشهادة ليست سارية الآن؛ لم يُكتب شيء.");
+                return;
+            }
+            String space = freeSpaceProblem(INSTALL, 1L << 20);
+            if (space != null) {
+                certReject(s, space);
+                return;
+            }
+            Files.createDirectories(dir);
+            Path backup = INSTALL.resolve("backups/certificates").resolve(s.getFileName());
+            Files.createDirectories(backup);
+            List<String> had = new ArrayList<>();
+            for (String f : TLS_FILES) {
+                if (Files.isRegularFile(dir.resolve(f), LinkOption.NOFOLLOW_LINKS)) {
+                    copyKeepingPrivate(dir.resolve(f), backup.resolve(f));
+                    had.add(f);
+                }
+            }
+            write(backup.resolve("had.txt"), String.join("\n", had));
+            putPrivate(dir.resolve("server.crt"), Files.readAllBytes(s.resolve("new/server.crt")), false);
+            putPrivate(dir.resolve("ca-chain.pem"), Files.readAllBytes(s.resolve("new/ca-chain.pem")), false);
+            if (newKey) {
+                putPrivate(dir.resolve("server.key"), Files.readAllBytes(stagedKey), true);
+            }
+            Files.deleteIfExists(stagedKey);
+            progress(s, "ثُبتت الشهادة في " + rel + (newKey ? " مع مفتاحها" : " (المفتاح الحالي باقٍ)") + "؛ النسخة الاحتياطية في backups/certificates/"
+                    + s.getFileName());
+            if (!https(env)) {
+                setState(s, "APPLIED_INACTIVE", "ثُبتت الشهادة وتحقق مفتاحها؛ https غير مفعل الآن، وتُستخدم عند تفعيله (ops/tls/enable.sh).");
+                return;
+            }
+            setState(s, "VERIFYING", "انتظار أن تقدم نقطة https الشهادة الجديدة …");
+            String served = waitServed(sha256(leaf.getEncoded()), plan.getProperty("host"));
+            if (served == null) {
+                setState(s, "APPLIED", "تقدم نقطة https الشهادة الجديدة الآن.");
+                return;
+            }
+            progress(s, "فشل التحقق: " + served);
+            certRestore(s, "FAILED_ROLLED_BACK", "لم تقدم نقطة https الشهادة الجديدة (" + served + ")؛ أُعيدت الشهادة السابقة تلقائياً");
+        } catch (Exception e) {
+            setState(s, "ERROR", "تعذر التثبيت: " + e.getMessage() + " — راجع backups/certificates/" + s.getFileName());
+        } finally {
+            try {
+                Files.deleteIfExists(stagedKey);
+            } catch (IOException ignored) {
+                // the backend removes it with the session's staged files
+            }
+        }
+    }
+
+    static void certReject(Path s, String why) {
+        setState(s, "REJECTED", why);
+        try {
+            Files.deleteIfExists(s.resolve("new/server.key"));
+        } catch (IOException ignored) {
+            // the backend removes it with the session's staged files
+        }
+    }
+
+    static boolean https(Map<String, String> env) {
+        return env.getOrDefault("COMPOSE_PROFILES", "").matches("(^|.*,)\\s*tls\\s*(,.*|$)");
+    }
+
+    static void certRestore(Path s, String finalState, String message) {
+        try {
+            Map<String, String> env = envValues();
+            String rel = tlsDir(env);
+            Path dir = folder(rel);
+            Path backup = INSTALL.resolve("backups/certificates").resolve(s.getFileName());
+            if (dir == null || !Files.exists(backup.resolve("had.txt"))) {
+                setState(s, "ERROR", "لا نسخة احتياطية لهذا الطلب في backups/certificates/" + s.getFileName());
+                return;
+            }
+            setState(s, "RESTORING", "استعادة الشهادة السابقة من النسخة الاحتياطية");
+            Set<String> had = new HashSet<>(Files.readAllLines(backup.resolve("had.txt"), StandardCharsets.UTF_8));
+            for (String f : TLS_FILES) {
+                if (had.contains(f)) {
+                    putPrivate(dir.resolve(f), Files.readAllBytes(backup.resolve(f)), f.endsWith(".key"));
+                } else if (!f.equals("server.key")) {
+                    Files.deleteIfExists(dir.resolve(f));
+                }
+            }
+            List<java.security.cert.X509Certificate> old = had.contains("server.crt") ? readCertificates(dir.resolve("server.crt")) : List.of();
+            if (https(env) && !old.isEmpty()) {
+                String served = waitServed(sha256(old.get(0).getEncoded()), props(s.resolve("plan.properties")).getProperty("host"));
+                if (served != null) {
+                    setState(s, "ERROR", message + "، لكن نقطة https لا تقدمها بعد: " + served + " — راجع ops/diagnose.sh");
+                    return;
+                }
+            }
+            setState(s, finalState, message);
+        } catch (Exception e) {
+            setState(s, "ERROR", "تعذرت الاستعادة: " + e.getMessage());
+        }
+    }
+
+    /** Null once the https entry point serves the certificate {@code sha}; else what it serves (or why it cannot be reached). */
+    static String waitServed(String sha, String host) throws InterruptedException {
+        Instant until = Instant.now().plus(TLS_VERIFY);
+        String last = "لا اتصال";
+        while (Instant.now().isBefore(until)) {
+            last = servedCertificate(host);
+            if (sha.equals(last)) {
+                return null;
+            }
+            Thread.sleep(3000);
+        }
+        return last.matches("[0-9a-f]{64}") ? "ما زالت تقدم شهادة أخرى (" + last.substring(0, 12) + "…)" : last;
+    }
+
+    /** The SHA-256 of the certificate the https entry point presents (any trust: only its identity is compared). */
+    static String servedCertificate(String host) {
+        try {
+            javax.net.ssl.SSLContext ctx = javax.net.ssl.SSLContext.getInstance("TLS");
+            ctx.init(null, new javax.net.ssl.TrustManager[]{new javax.net.ssl.X509TrustManager() {
+                public void checkClientTrusted(java.security.cert.X509Certificate[] c, String a) {
+                }
+
+                public void checkServerTrusted(java.security.cert.X509Certificate[] c, String a) {
+                }
+
+                public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                    return new java.security.cert.X509Certificate[0];
+                }
+            }}, null);
+            try (javax.net.ssl.SSLSocket socket = (javax.net.ssl.SSLSocket) ctx.getSocketFactory().createSocket()) {
+                socket.connect(new java.net.InetSocketAddress(PROXY_HOST, PROXY_PORT), 3000);
+                socket.setSoTimeout(5000);
+                if (host != null && !host.isBlank() && !host.matches("[0-9.:]+")) {
+                    javax.net.ssl.SSLParameters p = socket.getSSLParameters();
+                    p.setServerNames(List.of(new javax.net.ssl.SNIHostName(host)));
+                    socket.setSSLParameters(p);
+                }
+                socket.startHandshake();
+                return sha256(socket.getSession().getPeerCertificates()[0].getEncoded());
+            }
+        } catch (Exception e) {
+            return "تعذر الاتصال بنقطة https (" + PROXY_HOST + ":" + PROXY_PORT + "): " + e.getClass().getSimpleName();
+        }
+    }
+
+    static void copyKeepingPrivate(Path from, Path to) throws IOException {
+        putPrivate(to, Files.readAllBytes(from), from.getFileName().toString().endsWith(".key"));
+    }
+
+    /** Written beside the target then moved over it; a key file is readable by its owner only. */
+    static void putPrivate(Path target, byte[] content, boolean secret) throws IOException {
+        Files.createDirectories(target.getParent());
+        Path tmp = target.resolveSibling("." + target.getFileName() + ".tmrkz-cert");
+        Files.deleteIfExists(tmp);
+        if (secret) {
+            try {
+                Files.createFile(tmp, java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+                        java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
+            } catch (UnsupportedOperationException e) {
+                Files.createFile(tmp);
+            }
+            Files.write(tmp, content, StandardOpenOption.TRUNCATE_EXISTING);
+        } else {
+            Files.write(tmp, content);
+        }
+        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
     }
 
     // ---- small helpers ------------------------------------------------------------------------------------------------

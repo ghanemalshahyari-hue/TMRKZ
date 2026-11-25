@@ -97,7 +97,7 @@ function arrow(hex: string) {
 }
 
 /** The request on the offline map: current sites, the proposed site, the deployment areas, their bands and the move. */
-export function RequestMap({ request, checks, mode, view = '2d', terrain3d = null, selected = null, onMap, fitMaxZoom = 15, hideSite = false, fit = true, fitKey = 0, referenceInteractive = true, pick = null, focus = null, fitSites = false, highlight = null, occupied = null, referenceBoundaries = 'ALL', referenceLabels = 'NORMAL', registeredCatalogue = 'load' }: {
+export function RequestMap({ request, checks, mode, view = '2d', terrain3d = null, selected = null, onMap, fitMaxZoom = 15, hideSite = false, fit = true, fitKey = 0, referenceInteractive = true, pick = null, focus = null, fitSites = false, highlight = null, occupied = null, referenceBoundaries = 'ALL', referenceLabels = 'NORMAL', registeredCatalogue = 'load', fullView = true }: {
   request: RestationingRequest;
   checks: RestationingChecks | null;
   mode: BasemapMode;
@@ -138,6 +138,8 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
   focus?: { siteId: string; key: number } | null;
   /** With nothing of the request to frame yet, frame every registered site once. */
   fitSites?: boolean;
+  /** Opens on the whole country with «الخريطة كاملة» (the standard of every map page, owner 25 Nov 2026). */
+  fullView?: boolean;
   /** A site kept highlighted (the request's current site) while clicks still open information cards. */
   highlight?: string | null;
   /** Occupied ground while the new site is placed: sites of units other than the moving ones, in red. */
@@ -245,7 +247,8 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
   }, [map, focus?.key]); // eslint-disable-line react-hooks/exhaustive-deps
   const sitesFramed = useRef(false);
   useEffect(() => {
-    if (!map || !fitSites || sitesFramed.current || !registered.loaded) return;
+    // ADR-105 (owner, 25 Nov 2026): a map page opens on the whole country; the sites are not framed on load any more
+    if (!map || !fitSites || sitesFramed.current || !registered.loaded || fullView) return;
     const e = sitesExtent(refData);
     if (e) {
       sitesFramed.current = true;
@@ -305,6 +308,7 @@ export function RequestMap({ request, checks, mode, view = '2d', terrain3d = nul
       mode={mode}
       center={initial}
       zoom={12}
+      fullView={fullView}
       className="tz-request-map"
       onReady={(m) => {
         // read by the headless acceptance script to place a click on a registered site (project coordinates to pixels)

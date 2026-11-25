@@ -42,7 +42,8 @@ class RestationingWorkflowIT extends RestationingTestBase {
         assertThat(decide("apTop", id, "APPROVE").status()).as("the nearest covering approver, not any above").isEqualTo(403);
         assertThat(decide("apDept", id, "APPROVE").status()).as("the section has nobody: the department's approver decides it").isEqualTo(200);
         assertThat(decide("apDept", id, "APPROVE").status()).as("and then his own level").isEqualTo(200);
-        assertThat(decide("apTop", id, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        // ADR-095: the final approver's APPROVE activates in the same transaction
+        assertThat(decide("apTop", id, "APPROVE").body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
     }
 
     @Test
@@ -67,16 +68,29 @@ class RestationingWorkflowIT extends RestationingTestBase {
         assertThat(alias).isNotNull();
         assertThat(decide("aliasApSec", id, "APPROVE").code()).as("the same human's second record").isEqualTo("SEPARATION_OF_DUTIES");
         assertThat(decide("apDept", id, "APPROVE").status()).isEqualTo(200);
+        // ADR-095: activation is the final approver's own act, inside the same transaction as the final APPROVE; the
+        // retired D1 rule («the final approver cannot activate») and the separate «مفعل التمركز» are gone by construction
         Res fin = decide("apTop", id, "APPROVE");
-        assertThat(fin.body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(fin.status()).as(fin.toString()).isEqualTo(200);
+        assertThat(fin.body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
         assertThat(fin.body().path("finalApprover").path("id").asText()).isEqualTo(personId("apTop").toString());
+        assertThat(fin.body().path("activation").path("by").path("id").asText()).as("activated by the final approver").isEqualTo(personId("apTop").toString());
+        assertThat(fin.body().path("can").path("activate").asBoolean()).as("no separate activation action").isFalse();
+        UUID site = UUID.fromString(fin.body().path("activation").path("site").path("id").asText());
 
-        assertThat(login("apTop").post("/restationing-requests/" + id + "/activate", Map.of()).code()).isEqualTo("SEPARATION_OF_DUTIES");
-        assertThat(login("req").post("/restationing-requests/" + id + "/activate", Map.of()).code()).isEqualTo("SEPARATION_OF_DUTIES");
-        Res act = login("activator").post("/restationing-requests/" + id + "/activate", Map.of("reason", "جاهز للتفعيل"));
-        assertThat(act.status()).as(act.toString()).isEqualTo(200);
-        assertThat(act.body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
-        UUID site = UUID.fromString(act.body().path("activation").path("site").path("id").asText());
+        // the retained /activate endpoint is an idempotent no-op for anyone (ADR-095 API compatibility): nothing moves
+        long stationingBefore = jdbc.sql("select count(*) from org_stationing where request_id = :r").param("r", UUID.fromString(id)).query(Long.class).single();
+        long auditBefore = jdbc.sql("select count(*) from audit_event where entity_id = :id").param("id", id).query(Long.class).single();
+        for (String who : List.of("apTop", "req", "activator")) {
+            Res again = login(who).post("/restationing-requests/" + id + "/activate", Map.of("reason", "محاولة تفعيل ثانية"));
+            assertThat(again.status()).as(who + " " + again).isEqualTo(200);
+            assertThat(again.body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
+        }
+        assertThat(login("stranger").post("/restationing-requests/" + id + "/activate", Map.of()).status()).as("not visible to it").isEqualTo(404);
+        assertThat(jdbc.sql("select count(*) from org_stationing where request_id = :r").param("r", UUID.fromString(id)).query(Long.class).single())
+                .as("no second activation").isEqualTo(stationingBefore);
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id").param("id", id).query(Long.class).single())
+                .as("the no-op writes nothing").isEqualTo(auditBefore);
 
         for (UUID unit : List.of(sec, team)) {
             List<Map<String, Object>> rows = jdbc.sql("""
@@ -132,7 +146,9 @@ class RestationingWorkflowIT extends RestationingTestBase {
         assertThat(texts(rev.path("carried"))).containsExactly("H:" + dept);
         decide("apSec", id, "APPROVE");
         Res done = decide("apTop", id, "APPROVE");
-        assertThat(done.body().path("state").asText()).as("the carried stage is not decided again").isEqualTo("APPROVED_NOT_ACTIVATED");
+        // ADR-095: the final APPROVE activates; a temporary starting in three days is scheduled
+        assertThat(done.body().path("state").asText()).as("the carried stage is not decided again").isEqualTo("TEMPORARY_SCHEDULED");
+        assertThat(marks(done.body().path("route"))).as("the carried stage stays carried").containsExactly("APPROVED", "CARRIED", "APPROVED");
     }
 
     // ---- «الاعتماد الجزئي» (owner brief §6, phase 8; ADR-090) -------------------------------------------------
@@ -193,7 +209,7 @@ class RestationingWorkflowIT extends RestationingTestBase {
         assertThat(login("apTop").post(path, Map.of("parts", Map.of("ALTERNATIVE", "APPROVE"))).status()).isEqualTo(400);
         Res done = login("apTop").post(path, Map.of("parts", Map.of("PRIMARY", "APPROVE", "ALTERNATIVE", "APPROVE")));
         assertThat(done.status()).as(done.toString()).isEqualTo(200);
-        assertThat(done.body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(done.body().path("state").asText()).as("ADR-095: the final approval activates").isEqualTo("ACTIVATED_PERMANENT");
         assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'RESTATIONING_STAGE_APPROVED' and jsonb_exists(detail, 'parts')")
                 .param("id", id).query(Long.class).single()).isPositive();
     }
@@ -225,29 +241,54 @@ class RestationingWorkflowIT extends RestationingTestBase {
         assertThat(decide("apOther", id, "APPROVE").status()).isEqualTo(200);
     }
 
+    /** Submitted and approved by every stage but the final one (ADR-095: the final APPROVE is the activation). */
+    private String awaitingFinal(List<UUID> scope) {
+        String id = create("req", permanent(scope));
+        Res submitted = login("req").post("/restationing-requests/" + id + "/submit", Map.of());
+        assertThat(submitted.status()).as(submitted.toString()).isEqualTo(200);
+        assertThat(decide("apSec", id, "APPROVE").status()).isEqualTo(200);
+        assertThat(decide("apDept", id, "APPROVE").status()).isEqualTo(200);
+        assertThat(login("apTop").get("/restationing-requests/" + id).body().path("can").path("decide").asBoolean()).as("the final stage is next").isTrue();
+        return id;
+    }
+
     @Test
-    @DisplayName("Activation on a drifted hierarchy is refused and the request paused (O-16)")
+    @DisplayName("Activation on a drifted hierarchy is refused and the request paused (O-16): since ADR-095 the refusal is of the final approval that activates")
     void activationRefusedOnDrift() {
-        String id = approvedPermanent(List.of(team));
+        String id = awaitingFinal(List.of(team));
         moveUnder(sec, other);
-        Res act = login("activator").post("/restationing-requests/" + id + "/activate", Map.of());
+        Res act = decide("apTop", id, "APPROVE");
         assertThat(act.status()).isEqualTo(400);
         assertThat(act.body().path("message").asText()).contains(HierarchyDrift.MESSAGE);
         assertThat(login("req").get("/restationing-requests/" + id).body().path("state").asText()).isEqualTo("PAUSED_HIERARCHY_CHANGED");
         assertThat(jdbc.sql("select count(*) from org_stationing where organization_id = :o and origin = 'REQUEST'").param("o", team)
                 .query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("select activated_at is null from restationing_request where id = cast(:id as uuid)").param("id", id)
+                .query(Boolean.class).single()).as("never activated").isTrue();
     }
 
     @Test
-    @DisplayName("Activation re-checks the geography: ground occupied since approval refuses it")
+    @DisplayName("Activation re-checks the geography: ground occupied since the earlier approvals refuses the final approval that activates (ADR-095), and nothing is recorded")
     void activationRefusedWhenGroundTakenSinceApproval() {
-        String id = approvedPermanent(List.of(sec, team));
-        // after the approval another unit is stationed on a site lying under the proposed site
+        String id = awaitingFinal(List.of(sec, team));
+        // after the earlier approvals another unit is stationed on a site lying under the proposed site
         UUID late = siteWithBoundary("LATE", lat0 - 0.01, lng0, other);
         stationed(otherSec, late, true);
-        Res act = login("activator").post("/restationing-requests/" + id + "/activate", Map.of());
-        assertThat(act.status()).isEqualTo(400);
+        Res act = decide("apTop", id, "APPROVE");
+        assertThat(act.status()).as(act.toString()).isEqualTo(400);
         assertThat(act.body().path("message").asText()).contains("تغيّر إشغال الأرض");
+        // the final decision and its activation are one transaction: both are refused together
+        JsonNode view = login("req").get("/restationing-requests/" + id).body();
+        assertThat(view.path("state").asText()).isEqualTo("UNDER_REVIEW");
+        assertThat(view.path("activation").isMissingNode()).isTrue();
+        assertThat(jdbc.sql("select count(*) from restationing_stage where request_id = cast(:id as uuid) and mark = 'APPROVED' and decided_by = :p")
+                .param("id", id).param("p", personId("apTop")).query(Long.class).single()).as("the final stage stays undecided").isZero();
+        for (UUID unit : List.of(sec, team)) {
+            assertThat(jdbc.sql("select count(*) from org_stationing where organization_id = :o and origin = 'REQUEST'").param("o", unit)
+                    .query(Long.class).single()).isZero();
+        }
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action in ('RESTATIONING_ACTIVATED', 'RESTATIONING_FINAL_APPROVAL')")
+                .param("id", id).query(Long.class).single()).isZero();
     }
 
     // ---- temporary --------------------------------------------------------------------------------------------
@@ -351,7 +392,7 @@ class RestationingWorkflowIT extends RestationingTestBase {
         // … then, sent again unchanged, approval
         Res again = login("req").post("/restationing-requests/" + mid + "/submit", Map.of("reason", "الطريق الوحيد؛ أبقيت المنطقة"));
         assertThat(again.status()).as(again.toString()).isEqualTo(200);
-        assertThat(decide("apTop", mid, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(decide("apTop", mid, "APPROVE").body().path("state").asText()).as("ADR-095: the final approval activates").isEqualTo("ACTIVATED_PERMANENT");
         assertThat(jdbc.sql("select detail::text from audit_event where entity_id = :id and action = 'RESTATIONING_STAGE_APPROVED' and detail->>'stage' = :st")
                 .param("id", mid).param("st", "H:" + top).query(String.class).single()).contains("exceedsPolicy");
 
@@ -383,7 +424,7 @@ class RestationingWorkflowIT extends RestationingTestBase {
         decide("apDept", id, "APPROVE");
         assertThat(decide("apTop", id, "APPROVE").status()).as("the other unit decides first").isEqualTo(403);
         assertThat(decide("apOsec", id, "APPROVE").status()).isEqualTo(200);
-        assertThat(decide("apTop", id, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(decide("apTop", id, "APPROVE").body().path("state").asText()).as("ADR-095: the final approval activates").isEqualTo("ACTIVATED_PERMANENT");
     }
 
     @Test

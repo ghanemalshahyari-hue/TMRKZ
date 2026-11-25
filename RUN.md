@@ -213,6 +213,16 @@ updates. Details, the one-time set-up and the recovery steps: `docs/UPDATE_CENTE
 `.env`, `certs/`, `data/`, `backups/`, `map-data/`, `map-runtime/`, `docker-compose.dc-hosts.yml` and `ops/local/.generated/`
 are never touched by an update; the Compose files change only when you select them.
 
+A machine without the Update Center gets it once with the minimal bootstrap package (ADR-105):
+`"C:\Program Files\Git\bin\sh.exe" ops/update/make-release.sh --bootstrap <commit the machine runs>` → copy `release\bootstrap\`
+→ on the machine `sh bootstrap.sh check /data/TMRKZ`, then `apply … --with-config`, then `sh start.sh`
+(`docs/UPDATE_CENTER_AR.md` §2; step-by-step with screenshots: `docs/guide/TMRKZ_FINAL_DELIVERY_GUIDE.html`).
+
+**Certificates and configuration from the browser (ADR-105):** «إدارة النظام ← الشهادات» lists the certificate folders in use
+and renews the https certificate or a service's CA list after checking the key, validity, host name and chain, with a backup
+and «استعادة الشهادات السابقة». «استيراد ملف إعدادات» takes another application's `.env`, shows what it recognises, tests it
+and saves it in «إعدادات التكامل» — `.env` itself is never written.
+
 ## 6. Changing the code
 
 1. **Edit** files in `backend/` (Java) or `frontend/` (React/TypeScript) and save.

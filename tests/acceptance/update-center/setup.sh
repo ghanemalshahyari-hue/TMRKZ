@@ -38,6 +38,11 @@ TMRKZ_IP=localhost
 TMRKZ_PORT=$PORT
 TMRKZ_MAP_ROOT=$MAPS
 TMRKZ_STATIONING_V3=true
+COMPOSE_PROFILES=tls
+TMRKZ_TLS_DIR=./certs
+TMRKZ_HTTPS_PORT=8543
+TMRKZ_HTTP_REDIRECT_PORT=8180
+TMRKZ_UPDATE_DEPLOY_MINUTES=6
 EOF
 cat > "$VM/docker-compose.dc-hosts.yml" <<'EOF'
 # VM-specific (fictional for the acceptance test): the directory servers by name
@@ -48,6 +53,11 @@ services:
 EOF
 mkdir -p "$VM/certs" "$VM/backups" "$VM/map-runtime"
 printf 'fictional certificate for the acceptance test\n' > "$VM/certs/vm-test.pem"
+# the https entry point reads its certificate from certs/ here (ADR-105: the machine's external certificate folder); a
+# throw-away self-signed one for «localhost» to start with
+(cd "$VM/certs" && openssl req -x509 -newkey rsa:2048 -nodes -days 30 -subj "/CN=localhost/O=TMRKZ acceptance" \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" -addext "extendedKeyUsage=serverAuth" \
+  -keyout server.key -out server.crt 2>/dev/null && cp server.crt ca-chain.pem)
 
 # 3. a release key on the «Desktop» copy; its public key installed once on the VM (the one-time bootstrap step)
 (cd "$DESK" && sh ops/update/make-release.sh --init-key >/dev/null)

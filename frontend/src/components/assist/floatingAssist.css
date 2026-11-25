@@ -5,6 +5,9 @@
 .fa-fab .icon { width: 24px; height: 24px; }
 .fa-fab.fa-assistant { bottom: 18px; left: 18px; background: var(--accent); color: #fff; border-color: transparent; }
 .fa-fab.fa-support { bottom: 18px; left: 80px; }
+/* ADR-105 (UI regression): on phones a work page shows its sheet tabs along the bottom (58 px, shell.css); the buttons then sit
+   above them instead of half under them. A button the person dragged keeps the place they chose (inline style). */
+@media (max-width: 760px) { body:has(.tz-sheet-tabs) .fa-fab { bottom: 76px; } }
 .fa-fab.on { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); }
 .fa-fab:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .fa-panel { position: fixed; z-index: 1210; bottom: 82px; left: 18px; width: min(420px, calc(100vw - 32px)); max-height: min(640px, calc(100vh - 110px));

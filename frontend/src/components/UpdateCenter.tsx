@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, type UpdateChange, type UpdateOverview, type UpdateSession } from '../api/client';
+import { ApiError, api, type UpdateChange, type UpdateOverview, type UpdateSession } from '../api/client';
 import { useApp } from '../lib/app';
 import { fullTime } from '../lib/dates';
 import { sha256File } from '../lib/sha256';
+import { StepUpNotice, takeResume } from './StepUpNotice';
 
 const STATE: Record<string, string> = {
   RECEIVED: 'استُلم الإصدار',
@@ -65,9 +66,17 @@ export function UpdateCenter() {
   const [busy, setBusy] = useState('');
   const [offline, setOffline] = useState(false);
   const picker = useRef<HTMLInputElement>(null);
+  // the default selection is made once per update; later refreshes (after an upload) keep what the administrator chose
+  const defaultsFor = useRef<string | null>(null);
+  const [stepUp, setStepUp] = useState<null | { action: 'approve' | 'rollback'; reason: string }>(null);
 
   const loadOverview = () => api.updatesOverview().then(setOverview).catch((e: Error) => app.toast(e.message));
-  useEffect(() => { void loadOverview(); }, []);
+  useEffect(() => {
+    void loadOverview();
+    const back = takeResume('update:');
+    if (back) api.updateSession(back).then(setSession).catch(() => undefined);
+  }, []);
+  const needsStepUp = (e: unknown) => e instanceof ApiError && e.code === 'REAUTHENTICATION_REQUIRED';
 
   // follow the worker while it works; the backend may restart in between (a new build), so errors are expected for a while
   useEffect(() => {
@@ -94,6 +103,8 @@ export function UpdateCenter() {
         if (stop) return;
       }
       setCheck(out);
+      if (defaultsFor.current === session.id) return;
+      defaultsFor.current = session.id;
       const pick = new Set<string>();
       for (const c of changes) {
         const flagged = c.flags.includes('CONFIG') || c.flags.includes('LOCALLY_MODIFIED') || c.flags.includes('MASS_DELETION');
@@ -147,20 +158,24 @@ export function UpdateCenter() {
     setBusy('اعتماد …');
     try {
       setSession(await api.approveUpdate(session.id, Array.from(selected), reason.trim()));
+      setStepUp(null);
     } catch (e) {
-      app.toast((e as Error).message);
+      if (needsStepUp(e)) setStepUp({ action: 'approve', reason: reason.trim() });
+      else app.toast((e as Error).message);
     } finally {
       setBusy('');
     }
   };
 
-  const rollback = async (id: string) => {
-    const why = window.prompt('سبب الرجوع إلى الإصدار السابق؟');
+  const rollback = async (id: string, given?: string) => {
+    const why = given ?? window.prompt('سبب الرجوع إلى الإصدار السابق؟');
     if (!why || !why.trim()) return;
     try {
       setSession(await api.rollbackUpdate(id, why.trim()));
+      setStepUp(null);
     } catch (e) {
-      app.toast((e as Error).message);
+      if (needsStepUp(e)) setStepUp({ action: 'rollback', reason: why.trim() });
+      else app.toast((e as Error).message);
     }
   };
 
@@ -207,6 +222,10 @@ export function UpdateCenter() {
           <div className="key-value"><span>الحالة</span><b data-testid="update-state" data-state={session.state}>{STATE[session.state] ?? session.state}</b></div>
           {session.message && <p className="micro" data-testid="update-message">{session.message}</p>}
           {offline && <p className="micro muted">الخادم يعيد التشغيل بالبناء الجديد …</p>}
+          {stepUp && (
+            <StepUpNotice resume={'update:' + session.id} onCancel={() => setStepUp(null)}
+              onConfirmed={() => (stepUp.action === 'approve' ? approve() : rollback(session.id, stepUp.reason))} />
+          )}
 
           {session.compare && session.state === 'COMPARED' && (
             <>

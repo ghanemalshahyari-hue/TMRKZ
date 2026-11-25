@@ -9,6 +9,9 @@
 #   sh ops/update/make-release.sh --package    also the one-time transfer package for a machine without the Update Center:
 #                                              release/TMRKZ-app-<id>.tar (app + docs files only, never a protected one),
 #                                              release/config/ (the Compose files, to compare with the machine's, never extracted)
+#   sh ops/update/make-release.sh --bootstrap <commit>   the MINIMAL one-time package for a machine running <commit> (ADR-105):
+#                                              release/bootstrap/ (changed files only, signed list, Compose files for review,
+#                                              public key, bootstrap.sh, INSTALL.txt, SHA256SUMS)
 #   Windows CMD:  "C:\Program Files\Git\bin\sh.exe" ops/update/make-release.sh
 #
 # Needs sh, awk, sha256sum and openssl (Git for Windows and Ubuntu have them). Nothing is downloaded; nothing outside
@@ -38,6 +41,12 @@ if [ "${1:-}" = "--init-key" ]; then
 fi
 PACKAGE=false
 [ "${1:-}" = "--package" ] && PACKAGE=true
+# --bootstrap <commit>: the minimal one-time package for a machine at that commit (ADR-105), see the end of this script
+SINCE=""
+if [ "${1:-}" = "--bootstrap" ]; then
+  SINCE="${2:?usage: sh ops/update/make-release.sh --bootstrap <commit the machine runs, e.g. e30c1c1>}"
+  git rev-parse --verify --quiet "$SINCE^{commit}" >/dev/null || { echo "unknown commit: $SINCE" >&2; exit 2; }
+fi
 [ -f "$KEY" ] || { echo "no signing key: run  sh ops/update/make-release.sh --init-key  first" >&2; exit 2; }
 [ -f "$RULES" ] || { echo "missing $RULES" >&2; exit 2; }
 
@@ -136,6 +145,38 @@ if [ "$PACKAGE" = true ]; then
 ' ' ')"
 fi
 ( cd "$OUT" && sha256sum $SUMS > SHA256SUMS )
+if [ -n "$SINCE" ]; then
+  # the minimal bootstrap (ADR-105): only the application and documentation files changed since the machine's commit (plus
+  # the Update Center itself), the signed full list to check them against, the Compose files for review, the PUBLIC key, and
+  # ops/update/bootstrap.sh. Never the signing key, .env, data, certificates or maps.
+  BS="$OUT/bootstrap"
+  rm -rf "$BS"; mkdir -p "$BS/config"
+  { git -c core.quotepath=off diff --name-only --no-renames "$SINCE" -- . ; git -c core.quotepath=off ls-files -o --exclude-standard; } | sort -u > "$TMP/changed"
+  awk -F '	' 'NR == FNR {c[$0] = 1; next} ($1 == "app" || $1 == "docs") && ($4 in c || $4 ~ /^ops\/update\//) {print $4}' \
+    "$TMP/changed" "$OUT/MANIFEST.tsv" > "$TMP/bootstrap.list"
+  # application and documentation files that existed at that commit and are gone now
+  git -c core.quotepath=off diff --name-only --no-renames --diff-filter=D "$SINCE" -- backend frontend ops docs map-packages assets handoff \
+    | grep -v -e '^ops/local/\.generated/' -e '^backend/src/test/' > "$BS/REMOVED.txt" || true
+  tar -cf "$BS/TMRKZ-bootstrap-$ID.tar" -T "$TMP/bootstrap.list"
+  awk -F '	' '$1 == "config" {print $4}' "$OUT/MANIFEST.tsv" | while read -r f; do cp "$f" "$BS/config/"; done
+  cp "$OUT/MANIFEST.tsv" "$OUT/RELEASE.json" "$OUT/RELEASE.sig" "$BS/"
+  cp "$PUB" "$BS/release-trust.pub"
+  cp ops/update/bootstrap.sh "$BS/bootstrap.sh"
+  cat > "$BS/INSTALL.txt" <<EOF
+TMRKZ one-time bootstrap $ID (for a machine at commit $SINCE)
+
+Copy this whole folder to the machine, e.g. /data/tmrkz-bootstrap-$ID, then as the maintenance account (PAM, once):
+  cd /data/tmrkz-bootstrap-$ID
+  sh bootstrap.sh check /data/TMRKZ                    # read-only preview: checksums, signature, files, Compose diff
+  sh bootstrap.sh apply /data/TMRKZ --with-config      # after reading the Compose diff; without it the Compose files stay
+  cd /data/TMRKZ && sh start.sh                        # the images are unchanged; no tmrkz-images.tar is needed
+Then in the browser: «إدارة النظام ← مركز التحديث» must show «عامل الصيانة يعمل». Later updates go through the browser only.
+Undo: sh bootstrap.sh restore /data/TMRKZ/backups/bootstrap/<time printed by apply>   then  sh start.sh
+Never copied here and never needed on the machine: the release signing key, .env, data/, certs/, map-data/, map-runtime/.
+EOF
+  ( cd "$BS" && sha256sum TMRKZ-bootstrap-"$ID".tar MANIFEST.tsv RELEASE.json RELEASE.sig release-trust.pub bootstrap.sh REMOVED.txt INSTALL.txt config/* > SHA256SUMS )
+  echo "bootstrap package: $BS ($(grep -c . "$TMP/bootstrap.list") files, $(du -k "$BS/TMRKZ-bootstrap-$ID.tar" | cut -f1) KB tar, $(grep -c . "$BS/REMOVED.txt" || true) removals listed)"
+fi
 echo "release $ID: $FILES files, $BYTES bytes$( [ "$DIRTY" = true ] && echo ', includes changes not yet committed')"
 [ -z "$LARGE" ] || echo "note: larger than the browser upload limit (24 MB), transferred by the operator instead: $LARGE"
 echo "written: $OUT/RELEASE.json  $OUT/MANIFEST.tsv  $OUT/RELEASE.sig  $OUT/SHA256SUMS"

@@ -33,11 +33,9 @@ export function SitesMap({ sites, current, mode, selectedId, onSelect }: {
   useEffect(() => {
     if (!map) return;
     setSiteData(map, data);
-    const e = sitesExtent(data);
-    if (e && !framed.current) {
-      framed.current = true;
-      map.fitBounds([[e[0], e[1]], [e[2], e[3]]], { padding: 50, maxZoom: 13, duration: 0 });
-    }
+    // ADR-105 (owner, 25 Nov 2026): the map opens on the whole country — the sites are not framed on load; a site chosen in
+    // the list still comes into view (below), and «الخريطة كاملة» returns to the country
+    framed.current = true;
   }, [map, data]);
   // a site chosen elsewhere (the list, an address) is brought into view
   useEffect(() => {
@@ -54,6 +52,7 @@ export function SitesMap({ sites, current, mode, selectedId, onSelect }: {
         mode={mode}
         center={[54.4, 24.4]}
         zoom={7}
+        fullView
         className="tz-sites-map"
         onReady={(m) => {
           // read by the headless acceptance script to place a click on a site (project coordinates to pixels)

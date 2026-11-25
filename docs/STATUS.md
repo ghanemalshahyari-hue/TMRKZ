@@ -1442,6 +1442,54 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 | Folder comparison | Implemented (ADR-104): signed release vs installed files, local modifications since the last update flagged | UC-01, UC-07 |
 | Staged merging | Implemented (ADR-104): per-file selection, Compose files only by explicit choice, staged uploads checked against the signature | UC-01, UC-02, UC-04 |
 | Controlled maintenance | Implemented (ADR-104): restricted worker, offline build check, backup, verification, automatic and requested rollback | UC-03, UC-06, UC-08 |
-| Certificate import | **Open** — not implemented (certificates stay under `certs/` and `ops/local/.generated/`, protected from updates) | — |
-| ENV import | **Open** — not implemented (`.env` is protected; changed by the operator only) | — |
+| Certificate import | Implemented (ADR-105): inventory, import, checks, per-service trust, https install with backup, verification and restore; verified on the simulated VM only | `CertificateCenterIT`, CRT-E1…E5 |
+| ENV import | Implemented (ADR-105): recognised, mapped, compared, tested before saving to «إعدادات التكامل»; `.env` never written; verified on the simulated VM only | `IntegrationImportIT`, ENV-E1…E3 |
 | Embedding allowlist live reload | Implemented in ADR-102 (poller); not re-verified here | — |
+
+## Final completion and release acceptance (25 Nov 2026; ADR-105)
+
+- **Delivered:** «الشهادات» (inventory of the folders in use, import from files or from `certs/`, chain/expiry/host name/key checks,
+  per-service trust for the directory and Keycloak applied at once after a live test, https installed by the worker with backup,
+  served-certificate verification and automatic restore, restore on request, keys never exposed); «استيراد ملف إعدادات» (a
+  compatible application's `.env` recognised, mapped, compared, tested before applied, credentials and keys never imported, `.env`
+  never written); directory lookup of an account before its first sign-in (service account, or the administrator's own directory
+  password for that search; explained when impossible); Update Center hardening (free space, interrupted uploads, configurable
+  deploy timeout); minimal bootstrap package (`make-release.sh --bootstrap`, `ops/update/bootstrap.sh check|apply|restore`); the
+  proxy's certificate watcher; `diagnose.sh` reports the https folder and key match. Guide with screenshots:
+  `docs/guide/TMRKZ_FINAL_DELIVERY_GUIDE.html`.
+- **The 18 failing tests:** obsolete expectations (ADR-095; ADR-094 Gate 2 §C), updated without weakening checks; 40/40.
+  `docs/evidence/regression-18/CLASSIFICATION.md`.
+- **Checks (development machine and a throw-away installation laid out like the VM, project `tmrkz-vmsim`, fictional data):**
+  backend: the full suite (454 tests, real PostgreSQL + PostGIS, OpenFGA in the loop) — 20 failures, every one identical
+  on an untouched `8800b58` (42 failures there; `docs/evidence/regression-18/PRE-EXISTING-OTHERS.md`); the new classes
+  `CertificateInspectorTest` 5/5, `CertificateCenterIT` 2/2, `IntegrationImportIT` 1/1, `AdministratorDirectoryLookupIT` 1/1,
+  `AdministratorOwnLookupIT` 1/1; the three stationing classes 40/40. Frontend 411/411 (59 files), type check and build clean.
+  Browser, on a throw-away installation laid out like the VM (project `tmrkz-vmsim`, https from its `certs/`):
+  `update-center.mjs` 33/33 (before the last UI fixes; its flows re-run by the release suite), `release-acceptance.mjs`
+  40/40 (UC-12…UC-19, STEP-UP, CRT-E1…E5, ENV-E1…E3, ADM-E1…E3, audit), `ui-regression.mjs` 48/48 (seven sizes and
+  scalings, navigation including «المزيد», loading and error states, settings groups, whole-country maps, pointer alignment
+  ≤ 0.23 px read-back at browser zoom 100–200 % and display scaling 125–150 %). Bootstrap `bootstrap-test.sh` 9/9 on a copy of
+  an `e30c1c1` installation. Evidence: `docs/evidence/release-acceptance/`. Timings are development-machine measurements only.
+- **Fixed on the way:** «المزيد» opened a menu clipped by the top bar (owner report); the phone's floating buttons under the
+  sheet tabs; the Update Center dropped a hand-chosen file after uploads; a decision needing a recent sign-in only showed a
+  passing notice; an EC key refused when Bouncy Castle is a JVM provider; certificate history order within one second.
+- **Owner requests the same day:** «إعدادات النظام» in groups with a side menu, search and status cards; every map page opens
+  on the whole country with «الخريطة كاملة».
+- **Found, not fixed (owner's choice):** the FYI units the final approval informs (`fyi_designation`) cannot be set from the
+  application; the screen «الجهات الرئيسية للعلم» writes `fyi_main_command`.
+- **Limits:** nothing was run on the real VM. Production acceptance waits for the VM checklist (guide, Step 3): bootstrap, first
+  browser update, the VM's own certificate folders, the import against the real directory and the lookup against the real AD.
+  Keycloak's own truststore (its directory federation, which needs a service account) is read at its start only.
+
+### Acceptance matrix — ADR-105 brief (owner, 25 Nov 2026)
+
+| # | Requirement | Development / simulated VM | Real VM | Evidence |
+|---|---|---|---|---|
+| 1 | Repository integrity (docs restored, audit evidence kept, no secrets tracked) | Verified | n/a | `git ls-files`, `git diff --name-status e30c1c1` |
+| 2 | Certificate management | Verified | Pending | `CertificateInspectorTest`, `CertificateCenterIT`, CRT-E1…E5 |
+| 3 | ENV import | Verified | Pending | `IntegrationImportIT`, ENV-E1…E3 |
+| 4 | Administrator lookup before first sign-in | Verified | Pending | `AdministratorDirectoryLookupIT`, `AdministratorOwnLookupIT`, ADM-E1…E3 |
+| 5 | 18 failing tests classified | Verified (40/40) | n/a | `CLASSIFICATION.md` |
+| 6 | Update Center security and reliability | Verified | Pending | UC-00…UC-19 |
+| 7 | UI and map pointer alignment | Verified (development machine only) | Pending | `ui-regression.mjs` |
+| 8 | Bootstrap package, instructions, checksums, recovery | Verified | Pending | `bootstrap-test.sh` BS-01…BS-05 |

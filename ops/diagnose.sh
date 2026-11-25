@@ -123,7 +123,17 @@ done
 line "mount check" "done (only problems are listed)"
 
 section "8. Certificates"
-for f in ops/local/.generated/certs/ca.crt ops/local/.generated/certs/ldap.crt $(ls ops/local/.generated/truststore/*.pem certs/*.crt certs/*.pem 2>/dev/null); do
+TLSD="$(value TMRKZ_TLS_DIR)"; TLSD="${TLSD:-./ops/tls/private}"; TLSD="${TLSD#./}"
+TRUSTD="$(value TMRKZ_TRUSTSTORE_DIR)"; TRUSTD="${TRUSTD:-./ops/local/.generated/truststore}"; TRUSTD="${TRUSTD#./}"
+line "https folder (TMRKZ_TLS_DIR)" "$TLSD $( [ -d "$TLSD" ] && echo present || echo absent ); https $(printf '%s' "$(value COMPOSE_PROFILES)" | grep -qw tls && echo ON || echo off)"
+line "shared trust folder (TMRKZ_TRUSTSTORE_DIR)" "$TRUSTD $( [ -d "$TRUSTD" ] && echo present || echo absent )"
+if [ -f "$TLSD/server.key" ] && [ -f "$TLSD/server.crt" ] && command -v openssl >/dev/null; then
+  k="$(openssl pkey -in "$TLSD/server.key" -pubout 2>/dev/null | sha256sum | cut -c1-16)"
+  c="$(openssl x509 -in "$TLSD/server.crt" -noout -pubkey 2>/dev/null | sha256sum | cut -c1-16)"
+  line "https key matches certificate" "$( [ -n "$k" ] && [ "$k" = "$c" ] && echo yes || echo "NO or unreadable" ) (the key itself is never printed)"
+fi
+line "certificate changes (backups/certificates)" "$(ls -d backups/certificates/*/ 2>/dev/null | wc -l | tr -d ' ')"
+for f in ops/local/.generated/certs/ca.crt ops/local/.generated/certs/ldap.crt $(ls "$TLSD"/*.crt "$TLSD"/*.pem "$TRUSTD"/*.pem certs/*.crt certs/*.pem 2>/dev/null | sort -u); do
   [ -f "$f" ] || continue
   if command -v openssl >/dev/null; then
     end="$(openssl x509 -noout -enddate -in "$f" 2>/dev/null | cut -d= -f2)"

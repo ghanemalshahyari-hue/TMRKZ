@@ -592,9 +592,54 @@ export type UpdateOverview = {
 export type AdminLookup = 'EMPLOYEE_NUMBER' | 'DIRECTORY_ACCOUNT';
 /** The identity shown before the grant; {@code personId} is null for an HR employee imported on confirmation. */
 export type AdminCandidate = {
-  method: AdminLookup; value: string; verifiedBy: 'ORACLE_HR' | 'DIRECTORY_SIGN_IN'; personId: string | null; displayName: string;
+  method: AdminLookup; value: string;
+  verifiedBy: 'ORACLE_HR' | 'DIRECTORY_SIGN_IN' | 'DIRECTORY_SERVICE_LOOKUP' | 'DIRECTORY_OWN_ACCOUNT_LOOKUP'; personId: string | null; displayName: string;
   employeeNumber: string | null; account: string | null; unitName: string | null; hrStatus: string | null; alreadyAdmin: boolean; confirmation: string;
 };
+/** ADR-105: which verified lookups this installation can make now, and why not. */
+export type AdminLookupOptions = {
+  employeeNumber: boolean; employeeNumberMessage: string;
+  directoryMode: 'SERVICE_ACCOUNT' | 'OWN_ACCOUNT' | 'UNAVAILABLE'; directoryNeedsPassword: boolean; directoryMessage: string;
+};
+/** ADR-105 «الشهادات»: one certificate as the server describes it (public facts only). */
+export type CertificateInfo = {
+  subject: string; subjectCn: string; issuer: string; issuerCn: string; serial: string; notBefore: string; notAfter: string; daysLeft: number;
+  health: 'VALID' | 'EXPIRING' | 'EXPIRED' | 'NOT_YET_VALID'; dnsNames: string[]; ipAddresses: string[]; sha256: string; publicKeySha256: string;
+  ca: boolean; selfSigned: boolean; serverAuth: boolean | null; keyAlgorithm: string; keyBits: number; role: 'ROOT' | 'INTERMEDIATE' | 'LEAF';
+};
+export type CertificateFile = {
+  name: string; size: number; kind: 'CERTIFICATES' | 'KEY' | 'OTHER'; certificates?: CertificateInfo[]; keyAlgorithm?: string | null;
+  publicKeySha256?: string | null; matches?: string[]; permissions?: string | null; note?: string | null; error?: string;
+};
+export type CertificateStore = {
+  id: 'HTTPS' | 'TRUST_FOLDER' | 'CERTS' | 'DIRECTORY' | 'OIDC'; path?: string; usedBy?: string; exists?: boolean; visible?: boolean;
+  writable?: boolean; note?: string; files?: CertificateFile[]; saved?: boolean; server?: string | null; certificates?: CertificateInfo[]; error?: string;
+};
+export type CertificateOverview = {
+  worker: { alive: boolean; inventoryAt: string };
+  config: { tlsDir?: string; tlsDirSource?: string; trustDir?: string; trustDirSource?: string; httpsEnabled?: boolean; publicUrl?: string | null; publicHost?: string | null };
+  stores: CertificateStore[];
+  summary: { expired: number; expiring: number };
+  sessions: { id: string; target: string; state: string; message: string | null; createdAt: string; createdBy: string }[];
+};
+export type CertificateCheck = { code: string; status: 'PASS' | 'WARN' | 'FAIL' | 'INFO'; message: string };
+export type CertificateSession = {
+  id: string; target: 'HTTPS' | 'DIRECTORY' | 'OIDC'; mode: 'ADD' | 'REPLACE'; files: string; keyProvided: boolean; state: string; message: string | null;
+  checks: CertificateCheck[]; plan: Record<string, unknown>; certificates: CertificateInfo[];
+  approval: null | { by: string; at: string; reason: string }; progress: { at: string; text: string }[]; canRestore: boolean;
+};
+/** ADR-105 «استيراد ملف إعدادات». */
+export type ImportField = {
+  path: string; field: string; label: string; secret: boolean; required: boolean; current: string | null; imported: string | null;
+  sourceKey?: string; status: 'NEW' | 'SAME' | 'CONFLICT' | 'ABSENT' | 'MISSING_FILE'; warning: string | null; selectable: boolean;
+  selectedByDefault: boolean; certificate?: { store: string; folder: string; file: string; certificates: CertificateInfo[] } | null;
+};
+export type ImportPreview = {
+  importId: string; fileName: string; format: 'TMRKZ' | 'COMPATIBLE' | 'UNKNOWN'; settingsInFile: number; recognised: number; problems: string[];
+  sections: { section: 'DIRECTORY' | 'OIDC' | 'ASSISTANT'; label: string; source: 'SAVED' | 'ENV' | 'NONE'; inFile: boolean; fields: ImportField[]; missing: string[] }[];
+  protectedKeys: string[]; notApplicableKeys: string[]; ignoredKeys: string[]; expiresAt: string;
+};
+export type ImportTest = { results: Record<string, { ok: boolean; message?: string; step?: string; target?: string }> };
 export type DutyPermit = {
   id: string;
   person: { id: string; displayName: string; employeeNo: string };
@@ -751,7 +796,24 @@ export const api = {
   },
   approveUpdate: (id: string, paths: string[], reason: string) => post<UpdateSession>(`/updates/sessions/${id}/approve`, { paths, reason }),
   rollbackUpdate: (id: string, reason: string) => post<UpdateSession>(`/updates/sessions/${id}/rollback`, { reason }),
-  resolveAdministrator: (method: AdminLookup, value: string) => post<AdminCandidate>('/administrators/resolve', { method, value }),
+  resolveAdministrator: (method: AdminLookup, value: string, directoryPassword?: string) =>
+    post<AdminCandidate>('/administrators/resolve', { method, value, directoryPassword: directoryPassword || undefined }),
+  adminLookupOptions: () => get<AdminLookupOptions>('/administrators/lookup-options'),
+  // «الشهادات» (ADR-105)
+  certificates: () => get<CertificateOverview>('/settings/certificates'),
+  checkCertificates: (body: { target: string; mode?: string; hostname?: string; password?: string;
+    files: { name: string; contentBase64: string }[]; fromInventory?: { store: string; file: string }[] }) =>
+    post<CertificateSession>('/settings/certificates/check', body),
+  certificateSession: (id: string) => get<CertificateSession>(`/settings/certificates/sessions/${id}`),
+  applyCertificates: (id: string, reason: string) => post<CertificateSession>(`/settings/certificates/sessions/${id}/apply`, { reason }),
+  restoreCertificates: (id: string, reason: string) => post<CertificateSession>(`/settings/certificates/sessions/${id}/restore`, { reason }),
+  discardCertificates: (id: string) => post<CertificateSession>(`/settings/certificates/sessions/${id}/discard`, {}),
+  // «استيراد ملف إعدادات» (ADR-105)
+  previewImport: (fileName: string, text: string) => post<ImportPreview>('/settings/integration/import/preview', { fileName, text }),
+  testImport: (id: string, fields: string[]) => post<ImportTest>(`/settings/integration/import/${id}/test`, { fields }),
+  applyImport: (id: string, fields: string[], reason: string) =>
+    post<{ saved: string[]; fields: string[] }>(`/settings/integration/import/${id}/apply`, { fields, reason }),
+  discardImport: (id: string) => del<void>(`/settings/integration/import/${id}`),
   addAdministrator: (c: AdminCandidate, reason: string) =>
     post<Administrator>('/administrators', { method: c.method, value: c.value, confirmation: c.confirmation, reason }),
   endAdministrator: (personId: string, reason: string) => post<void>(`/administrators/${personId}/end`, { reason }),

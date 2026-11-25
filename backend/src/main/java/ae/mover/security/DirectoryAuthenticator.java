@@ -231,6 +231,86 @@ public class DirectoryAuthenticator {
         return verify(props().uuidAttribute(), uuid, password);
     }
 
+    /** How a directory lookup before a first sign-in could be made here (ADR-105). */
+    public enum LookupMode { SERVICE_ACCOUNT, OWN_ACCOUNT, UNAVAILABLE }
+
+    /**
+     * Which lookup the directory in force allows: its read-only service account when one is configured; otherwise (direct bind,
+     * ADR-100: no service account) only a search made with the administrator's own directory account, whose password the
+     * administrator types for that one search; a directory that is not configured allows none.
+     */
+    public LookupMode lookupMode() {
+        LdapProperties p = props();
+        if (!p.configured()) {
+            return LookupMode.UNAVAILABLE;
+        }
+        if (p.bindDn() != null && p.bindCredential() != null) {
+            return LookupMode.SERVICE_ACCOUNT;
+        }
+        return p.direct() ? LookupMode.OWN_ACCOUNT : LookupMode.UNAVAILABLE;
+    }
+
+    /**
+     * Finds exactly one directory entry for {@code targetLogin} before that person ever signed in (ADR-105), for an administrator
+     * who must confirm who it is. With a service account: that account's read-only search. Without one: the administrator's own
+     * bind ({@code asLogin}/{@code asPassword}, their linked login), whose entry must still carry the administrator's linked stable
+     * identifier {@code asUuid}; then the same authenticated connection searches. Nothing is stored; the password is used for this
+     * bind only. Null when the directory holds no entry for the login; several entries is a refusal.
+     */
+    public DirectoryUser lookup(String targetLogin, String asLogin, String asUuid, String asPassword) throws DirectoryException {
+        if (targetLogin == null || !DIRECT_LOGIN.matcher(targetLogin.trim()).matches()) {
+            throw invalid();
+        }
+        String target = bare(targetLogin.trim().toLowerCase(Locale.ROOT));
+        LookupMode mode = lookupMode();
+        if (mode == LookupMode.UNAVAILABLE) {
+            throw new DirectoryException(Failure.NOT_CONFIGURED, "no directory lookup available", null);
+        }
+        checkAttributes(props().usernameAttribute());
+        LdapContext ctx;
+        if (mode == LookupMode.SERVICE_ACCOUNT) {
+            ctx = connect(props().bindDn(), props().bindCredential(), false);
+        } else {
+            if (asLogin == null || asUuid == null || asPassword == null || asPassword.isEmpty() || asPassword.length() > 1024) {
+                throw invalid();
+            }
+            String own = bare(asLogin.trim());
+            if (!DIRECT_LOGIN.matcher(own).matches()) {
+                throw invalid();
+            }
+            String principal = props().directBindPattern().replace(LdapProperties.USERNAME_MARKER, own);
+            ctx = connect(principal, asPassword, true);
+            try {
+                SearchResult self = props().upnSuffix() != null ? uniqueAd(ctx, own, principal) : unique(ctx, props().usernameAttribute(), own);
+                if (!user(self).uuid().equalsIgnoreCase(asUuid.trim())) {
+                    log.warn("Directory lookup refused: the administrator's login now names another directory entry");
+                    close(ctx);
+                    throw invalid();
+                }
+            } catch (NamingException e) {
+                close(ctx);
+                throw translate(e);
+            }
+        }
+        try {
+            SearchResult entry;
+            try {
+                entry = props().upnSuffix() != null ? uniqueAd(ctx, target, target + "@" + props().upnSuffix())
+                        : unique(ctx, props().usernameAttribute(), target);
+            } catch (DirectoryException e) {
+                if (e.failure() == Failure.INVALID_CREDENTIALS) {
+                    return null; // the administrator's bind succeeded: no entry for this login
+                }
+                throw e;
+            }
+            return user(entry);
+        } catch (NamingException e) {
+            throw translate(e);
+        } finally {
+            close(ctx);
+        }
+    }
+
     /**
      * Direct user bind (ADR-070): the person's own bind over the protected channel, then, on that same authenticated
      * connection, exactly one entry for the login under the users DN.

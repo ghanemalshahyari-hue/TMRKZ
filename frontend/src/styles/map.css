@@ -305,3 +305,9 @@
   .map-toolbar,.map-popover,.map-admin-links,.browse-panel,.request-drawer,.site-menu,.detail-actions,.stats-strip{display:none!important}
   .map-grid{grid-template-columns:1fr}
 }
+
+/* «الخريطة كاملة» (owner, 25 Nov 2026): with the map's own controls, back to the whole country after looking at one place */
+.maplibregl-ctrl-group.tz-fullview-ctrl button.tz-fullview-btn { width: auto; height: 30px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px;
+  font: 600 12px/1 Arabic, Tahoma, Arial, sans-serif; white-space: nowrap; color: #1d2433; background: #fff; }
+.maplibregl-ctrl-group.tz-fullview-ctrl button.tz-fullview-btn::before { content: '⤢'; font-size: 14px; }
+.maplibregl-ctrl-group.tz-fullview-ctrl button.tz-fullview-btn:hover { background: #f1f3f6; }
