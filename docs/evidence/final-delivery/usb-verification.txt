@@ -1,0 +1,38 @@
+USB delivery verification — 2026-11-25T10:28:17Z
+Drive F: «PRIVATE_USB», DL Sentry 5-M (USB, FAT32, 15.7 GB); the only removable drive; nothing on it deleted or overwritten
+Folder: F:\TMRKZ_FINAL_20261125_9c280bf (release 20261125-102411-9c280bf, commit 9c280bff0df7a416f3f0d56e4e13a15f9e2d6c79)
+
+== check of every file read back from the USB against the hash of its source
+OK: 873 files, 0 mismatches
+
+== the signed release files for the first browser update, against the signed manifest
+OK: 843 files as signed
+
+== secret review (names, places and contents, tar members included)
+scanned 874 files (tar members included): 0 private-key blocks
+files named *.key *.p12 *.pfx *.jks .env* release-signing*: 0
+
+== contents
+START_HERE.txt                  16K  1 files
+SHA256SUMS.txt                 128K  1 files
+1_VM_BOOTSTRAP                 6.9M  14 files
+2_FIRST_BROWSER_UPDATE          27M  847 files
+3_GUIDE                        2.9M  1 files
+4_ACCEPTANCE_AND_RECOVERY      176K  10 files
+total 37M, 874 files
+
+== 1_VM_BOOTSTRAP
+       132  BASE-COMMIT.txt
+     70204  BASE.tsv
+      1265  INSTALL.txt
+    244602  KNOWN.tsv
+    100693  MANIFEST.tsv
+       351  RELEASE.json
+        88  RELEASE.sig
+         0  REMOVED.txt
+      1091  SHA256SUMS
+   6553600  TMRKZ-bootstrap-20261125-102411-9c280bf.tar
+     16978  bootstrap.sh
+     10374  config/docker-compose.override.yml
+     13723  config/docker-compose.yml
+       116  release-trust.pub

@@ -1,0 +1,54 @@
+TMRKZ release verification — 2026-11-25T10:26:45Z (development PC, read-only checks)
+
+== repository
+## main...origin/main [ahead 1]
+HEAD 9c280bff0df7a416f3f0d56e4e13a15f9e2d6c79
+C:/Users/ADMIN/Desktop/TMRKZ 9c280bf [main]
+main
+tracked-file changes not committed: 0
+
+== release/RELEASE.json
+{"format":1,"release":"20261125-102411-9c280bf","createdAt":"2026-11-25T10:24:11Z","commit":"9c280bff0df7a416f3f0d56e4e13a15f9e2d6c79","localChanges":false,"files":843,"bytes":18734627,"manifestSha256":"b62d5c4af83fd636cc6ddf6ff125a1cfb09a420fbf5f3dfd47e72c171b32b5c8","rulesSha256":"854b0d4f29d2cba958e3d2cfae32cce7c93d31b3cae8133030a59f2f06958040"}
+
+== signature (Ed25519, public key ops/local/.generated/release-trust.pub)
+Signature Verified Successfully
+manifest sha256 b62d5c4af83fd636cc6ddf6ff125a1cfb09a420fbf5f3dfd47e72c171b32b5c8
+MANIFEST.tsv: OK
+RELEASE.json: OK
+RELEASE.sig: OK
+
+== bootstrap package (release/bootstrap)
+TMRKZ-bootstrap-20261125-102411-9c280bf.tar: OK
+MANIFEST.tsv: OK
+RELEASE.json: OK
+RELEASE.sig: OK
+release-trust.pub: OK
+bootstrap.sh: OK
+REMOVED.txt: OK
+INSTALL.txt: OK
+BASE.tsv: OK
+KNOWN.tsv: OK
+BASE-COMMIT.txt: OK
+config/docker-compose.override.yml: OK
+config/docker-compose.yml: OK
+
+== dependencies changed since e30c1c1 (pom.xml, package.json, package-lock.json)
+(none listed = no new library)
+
+== images named by Compose, present locally
+OK      nginx:1.28.3-alpine
+OK      openfga/openfga:v1.8.16
+OK      osixia/openldap:1.5.0
+OK      postgis/postgis:17-3.5-alpine
+OK      tmrkz/folder-backend:1
+OK      tmrkz/folder-web:1
+OK      tmrkz/keycloak:26.7.5-2
+
+== rehearsal: this package on a clean copy of an e30c1c1 installation
+[bootstrap] package checksums: OK
+[bootstrap] release signature: OK (20261125-102411-9c280bf)
+[bootstrap] this machine compared with release 20261125-102411-9c280bf (package made for commit e30c1c1):
+[bootstrap]   766 released files identical, 28 not present here; differing: 49 as at that commit, 0 an earlier committed version, 0 changed on this machine
+[bootstrap] plan: replace 48, add 28, remove 0 files (application and documentation only); 0 of them changed on this machine
+[bootstrap] done: backup /tmp/rehearsal/TMRKZ/backups/bootstrap/20261125T102610Z (78 written, 0 removed)
+[bootstrap] 0 files of the release still differ here (not in this minimal package); the first browser update brings them
