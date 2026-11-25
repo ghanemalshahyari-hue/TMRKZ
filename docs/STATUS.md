@@ -1475,8 +1475,8 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
   passing notice; an EC key refused when Bouncy Castle is a JVM provider; certificate history order within one second.
 - **Owner requests the same day:** «إعدادات النظام» in groups with a side menu, search and status cards; every map page opens
   on the whole country with «الخريطة كاملة».
-- **Found, not fixed (owner's choice):** the FYI units the final approval informs (`fyi_designation`) cannot be set from the
-  application; the screen «الجهات الرئيسية للعلم» writes `fyi_main_command`.
+- **Found, then resolved by ADR-106 (V69):** the FYI units the final approval informs (`fyi_designation`) could not be set from
+  the application; the screen «الجهات الرئيسية للعلم» writes `fyi_main_command`, now the one source.
 - **Limits:** nothing was run on the real VM. Production acceptance waits for the VM checklist (guide, Step 3): bootstrap, first
   browser update, the VM's own certificate folders, the import against the real directory and the lookup against the real AD.
   Keycloak's own truststore (its directory federation, which needs a service account) is read at its start only.
@@ -1493,3 +1493,19 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 | 6 | Update Center security and reliability | Verified | Pending | UC-00…UC-19 |
 | 7 | UI and map pointer alignment | Verified (development machine only) | Pending | `ui-regression.mjs` |
 | 8 | Bootstrap package, instructions, checksums, recovery | Verified | Pending | `bootstrap-test.sh` BS-01…BS-05 |
+
+## Final USB delivery and illustrated handover (25 Nov 2026; ADR-106)
+
+- **Delivered:** the bootstrap compares the VM with the release before applying (each differing file as at the package's
+  commit, an earlier committed version, or changed on the machine; stops before replacing a hand edit unless `--keep-local` /
+  `--overwrite-local`; the baseline flags kept edits for the Update Center); deployment areas stop at their farthest allowed
+  distance (base maximum + what the ground adds + exception margin) while placed, moved, drawn or edited, and are brought back to
+  the ground's own maximum after the server's terrain assessment; a site setup boundary above the policy's maximum footprint is
+  refused; new requests open at step 1 with nothing chosen and the posture map no longer zooms by itself; one FYI source
+  (`fyi_main_command`, V69, «وما دونها», audited); the 20 remaining backend failures investigated (11 obsolete expectations,
+  9 fixture or measurement defects, no application defect; `docs/evidence/regression-18/REMAINING-20.md`); Arabic offline
+  guide `docs/guide/TMRKZ_FINAL_DELIVERY_GUIDE.html`; recovery `docs/evidence/final-delivery/RECOVERY_AR.md`.
+- **Checks:** see `docs/evidence/final-delivery/ACCEPTANCE_REPORT.md` (the final numbers of this delivery).
+- **Open:** the posture reach confirms each reached unit with OpenFGA one by one (~9 s for 5,000 units on the development
+  machine; owner's decision on a batch confirmation). Nothing was run on the real VM: production acceptance waits for the VM
+  checklist of the guide (bootstrap check and apply, first browser update, certificates, import, administrator lookup).

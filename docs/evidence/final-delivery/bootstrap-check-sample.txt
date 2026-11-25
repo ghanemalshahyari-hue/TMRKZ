@@ -1,0 +1,150 @@
+[bootstrap] package checksums: OK
+[bootstrap] release signature: OK (20261125-101848-12f9415-local)
+[bootstrap] this machine compared with release 20261125-101848-12f9415-local (package made for commit e30c1c1):
+[bootstrap]   765 released files identical, 28 not present here; differing: 47 as at that commit, 1 an earlier committed version, 2 changed on this machine
+[bootstrap]   earlier committed versions (not edited here; the first browser update brings them up to date):
+    docs/ARCHITECTURE_DECISIONS.md   from 65f0e92 2026-11-24
+[bootstrap]   CHANGED ON THIS MACHINE (no committed version has these bytes):
+    backend/src/main/java/ae/mover/common/ApiException.java
+    frontend/src/pages/DeploymentAreasRequest.tsx
+[bootstrap] Compose file differs: docker-compose.override.yml (applied only with --with-config):
+    --- /data/TMRKZ/docker-compose.override.yml	2026-11-24 22:12:09.000000000 +0400
+    +++ config/docker-compose.override.yml	2026-11-25 14:18:50.594817900 +0400
+    @@ -122,6 +122,8 @@
+           - ./data/files:/var/lib/tmrkz
+           # the migration center's backup gate (ADR-094) reads the manifests ops/backup.sh writes; dumps go to data/files/migration-inbox
+           - ./backups:/var/lib/tmrkz/backups:ro
+    +      # «مركز التحديث» (ADR-104): what the administrator sends, for the maintenance worker; never the application folder itself
+    +      - update-staging:/update
+         healthcheck:
+           test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/system/health"]
+           interval: 10s
+    @@ -181,9 +183,40 @@
+       proxy:
+         image: nginx:1.28.3-alpine
+         pull_policy: never
+    +    # ADR-105: reloads server.crt / server.key by itself when «الشهادات» installs new ones (after nginx -t accepts them)
+    +    entrypoint: ["/bin/sh", "/etc/tmrkz/tls-watch.sh"]
+    +    command: ["nginx", "-g", "daemon off;"]
+    +    volumes:
+    +      - ./ops/tls/tls-watch.sh:/etc/tmrkz/tls-watch.sh:ro
+         networks: [internal, edge]
+     
+     
+    +  # «مركز التحديث» (ADR-104): the only process that writes application files during a browser update — the existing backend image
+    +  # (its Java and its offline Maven libraries), no Docker socket, no published port, the internal network only. It writes the
+    +  # files ops/update/managed-paths.conf manages and nothing it protects; the data, the generated secrets and .env are also
+    +  # mounted read-only over the folder here. Backups of every replaced file go to backups/updates/.
+    +  maintenance:
+    +    image: tmrkz/folder-backend:1
+    +    pull_policy: never
+    +    restart: unless-stopped
+    +    entrypoint: ["java", "-XX:MaxRAMPercentage=25", "-Dfile.encoding=UTF-8", "/install/ops/update/UpdateWorker.java"]
+    +    environment:
+    +      TMRKZ_UPDATE_BACKEND_URL: http://backend:8080
+    +      TMRKZ_UPDATE_WEB_URL: http://web
+    +      # ADR-105: nothing is applied when the folder's disk would keep less than this free; «الشهادات» checks https here
+    +      TMRKZ_UPDATE_MIN_FREE_MB: ${TMRKZ_UPDATE_MIN_FREE_MB:-200}
+    +      # how long the new build may take to answer before the worker restores the previous one by itself
+    +      TMRKZ_UPDATE_DEPLOY_MINUTES: ${TMRKZ_UPDATE_DEPLOY_MINUTES:-25}
+    +      TMRKZ_UPDATE_PROXY_HOST: proxy
+    +      TMRKZ_UPDATE_PROXY_PORT: "8443"
+    +    volumes:
+    +      - ./:/install
+    +      - ./data:/install/data:ro
+    +      - ./ops/local/.generated:/install/ops/local/.generated:ro
+    +      - ./.env:/install/.env:ro
+    +      - update-staging:/update
+    +    networks: [internal]
+    +
+     networks:
+       # the servers' network has no route out of the machine; the backend, web and the https proxy also join «edge»
+       internal:
+    @@ -194,3 +227,4 @@
+     volumes:
+       web-html:
+       web-docs:
+    +  update-staging:
+[bootstrap] plan: replace 48, add 28, remove 0 files (application and documentation only); 1 of them changed on this machine
+    REPLACE	RUN.md
+    REPLACE	backend/src/main/java/ae/mover/authz/AccessAdminController.java
+    REPLACE	backend/src/main/java/ae/mover/authz/AccessAdminService.java
+    REPLACE	backend/src/main/java/ae/mover/authz/AccessController.java
+    ADD	backend/src/main/java/ae/mover/authz/AdministratorController.java
+    ADD	backend/src/main/java/ae/mover/authz/AdministratorService.java
+    REPLACE	backend/src/main/java/ae/mover/authz/GrantAdminService.java
+    REPLACE	backend/src/main/java/ae/mover/authz/UnitMemberService.java
+    REPLACE	backend/src/main/java/ae/mover/org/OrgController.java
+    REPLACE	backend/src/main/java/ae/mover/org/OrganizationService.java
+    REPLACE	backend/src/main/java/ae/mover/security/AuthService.java
+    ADD	backend/src/main/java/ae/mover/security/CertificateController.java
+    ADD	backend/src/main/java/ae/mover/security/CertificateInspector.java
+    ADD	backend/src/main/java/ae/mover/security/CertificateService.java
+    REPLACE	backend/src/main/java/ae/mover/security/DirectoryAuthenticator.java
+    ADD	backend/src/main/java/ae/mover/security/IntegrationImportController.java
+    ADD	backend/src/main/java/ae/mover/security/IntegrationImportService.java
+    REPLACE	backend/src/main/java/ae/mover/security/IntegrationSettingsService.java
+    REPLACE	backend/src/main/java/ae/mover/security/SessionFilter.java
+    ADD	backend/src/main/java/ae/mover/stationing/FyiMainCommands.java
+    REPLACE	backend/src/main/java/ae/mover/stationing/PlaceInfo.java
+    REPLACE	backend/src/main/java/ae/mover/stationing/RequestHubService.java
+    REPLACE	backend/src/main/java/ae/mover/stationing/RestationingChecks.java
+    REPLACE	backend/src/main/java/ae/mover/stationing/RestationingService.java
+    REPLACE	backend/src/main/java/ae/mover/stationing/SiteSetupService.java
+    ADD	backend/src/main/java/ae/mover/update/UpdateController.java
+    ADD	backend/src/main/java/ae/mover/update/UpdateService.java
+    ADD	backend/src/main/resources/db/migration/V69__fyi_one_source_main_command.sql
+    REPLACE	backend/src/main/resources/openapi.json
+    REPLACE	docs/ARCHITECTURE_DECISIONS.md
+    REPLACE	docs/STATUS.md
+    REPLACE	docs/TRACEABILITY.md
+    ADD	docs/UPDATE_CENTER_AR.md
+    ADD	docs/VM_INCIDENT_2026-11-25.md
+    REPLACE	docs/api/openapi.json
+    ADD	docs/guide/TMRKZ_FINAL_DELIVERY_GUIDE.html
+    REPLACE	frontend/src/api/client.ts
+    REPLACE	frontend/src/components/AdminLifecycle.tsx
+    ADD	frontend/src/components/CertificateCenter.tsx
+    ADD	frontend/src/components/EnvImport.tsx
+    ADD	frontend/src/components/StepUpNotice.tsx
+    ADD	frontend/src/components/UpdateCenter.tsx
+    REPLACE	frontend/src/components/access/AccessAdmin.tsx
+    REPLACE	frontend/src/components/access/UnitRouting.tsx
+    REPLACE	frontend/src/components/assist/floatingAssist.css
+    REPLACE	frontend/src/components/map/maplibre/OfflineMapLibre.tsx
+    REPLACE	frontend/src/components/map/maplibre/SiteEditor.ts
+    REPLACE	frontend/src/components/shell/TopNavigation.tsx
+    REPLACE	frontend/src/components/workspace/CommandMap.tsx
+    REPLACE	frontend/src/components/workspace/RequestMap.tsx
+    REPLACE	frontend/src/components/workspace/SitesMap.tsx
+    ADD	frontend/src/lib/certificateFiles.test.ts
+    ADD	frontend/src/lib/certificateFiles.ts
+    REPLACE	frontend/src/lib/deploymentAreasFlow.test.ts
+    REPLACE	frontend/src/lib/deploymentAreasFlow.ts
+    REPLACE	frontend/src/lib/geo.ts
+    ADD	frontend/src/lib/sha256.test.ts
+    ADD	frontend/src/lib/sha256.ts
+    REPLACE	frontend/src/pages/DeploymentAreasRequest.tsx   ← changed on this machine
+    REPLACE	frontend/src/pages/NewRequestPage.tsx
+    REPLACE	frontend/src/pages/PosturePage.tsx
+    REPLACE	frontend/src/pages/SettingsPage.tsx
+    REPLACE	frontend/src/pages/SiteSetupPage.tsx
+    REPLACE	frontend/src/styles/app.css
+    REPLACE	frontend/src/styles/map.css
+    ADD	ops/diagnose.sh
+    REPLACE	ops/local/map-worker.sh
+    REPLACE	ops/local/workspace/backend-run.sh
+    REPLACE	ops/local/workspace/web-run.sh
+    ADD	ops/tls/tls-watch.sh
+    REPLACE	ops/tools/gen-openapi.py
+    ADD	ops/update/UpdateWorker.java
+    ADD	ops/update/bootstrap.sh
+    ADD	ops/update/make-release.sh
+    ADD	ops/update/managed-paths.conf
+    REPLACE	start.sh
+[bootstrap] files changed on this machine that this package would replace or remove (1):
+    frontend/src/pages/DeploymentAreasRequest.tsx
+[bootstrap]   compare each with the release first (e.g. tar -xOf TMRKZ-bootstrap-20261125-101848-12f9415-local.tar <path> | diff -u /data/TMRKZ/<path> -), then apply with ONE of:
+[bootstrap]     --keep-local       leave them as they are (the Update Center lists them as «معدل محلياً» until you decide)
+[bootstrap]     --overwrite-local  replace them (the machine's version is kept in backups/bootstrap/<time>/before/)
+[bootstrap] check only: nothing changed

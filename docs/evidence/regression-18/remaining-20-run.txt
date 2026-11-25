@@ -1,0 +1,176 @@
+REMAINING-20 run log (25 Nov 2026). Isolated runner: throw-away PostgreSQL 17 + PostGIS and OpenFGA, private copy of backend/.
+Only the summary and failure lines of each Maven run are kept.
+
+==== 1. BEFORE - the seven classes with the tests unchanged (iso3-run1)
+[ERROR] Tests run: 6, Failures: 0, Errors: 6, Skipped: 0, Time elapsed: 58.69 s <<< FAILURE! -- in ae.mover.AccessScopeParityIT
+[ERROR] ae.mover.AccessScopeParityIT.addUserLookupByUsername -- Time elapsed: 3.241 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.treeStartsAtReach -- Time elapsed: 0.047 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.searchByName -- Time elapsed: 0.044 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.attachmentActive -- Time elapsed: 0.043 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.countsScoped -- Time elapsed: 0.043 s <<< ERROR!
+[ERROR] ae.mover.AccessScopeParityIT.addUserLookup -- Time elapsed: 0.050 s <<< ERROR!
+[ERROR] Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 17.52 s <<< FAILURE! -- in ae.mover.MatrixColumnsIT
+[ERROR] ae.mover.MatrixColumnsIT.exactly8Columns -- Time elapsed: 1.368 s <<< FAILURE!
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 76.66 s -- in ae.mover.OperationalPostureScaleIT
+[ERROR] Tests run: 2, Failures: 2, Errors: 0, Skipped: 0, Time elapsed: 22.95 s <<< FAILURE! -- in ae.mover.stationing.RestationingHrSyncIT
+[ERROR] ae.mover.stationing.RestationingHrSyncIT.hierarchyChangeThroughHrSync -- Time elapsed: 3.200 s <<< FAILURE!
+[ERROR] ae.mover.stationing.RestationingHrSyncIT.transfersThroughHrSync -- Time elapsed: 0.748 s <<< FAILURE!
+[ERROR] Tests run: 8, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 4.870 s <<< FAILURE! -- in ae.mover.stationing.RestationingLifecycleIT
+[ERROR] ae.mover.stationing.RestationingLifecycleIT.extension -- Time elapsed: 0.711 s <<< FAILURE!
+[ERROR] ae.mover.stationing.RestationingLifecycleIT.extensionLapses -- Time elapsed: 0.654 s <<< FAILURE!
+[ERROR] ae.mover.stationing.RestationingLifecycleIT.cancellationBeforeActivation -- Time elapsed: 0.432 s <<< FAILURE!
+[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.654 s <<< FAILURE! -- in ae.mover.SupportIT
+[ERROR] ae.mover.SupportIT.assistantOff -- Time elapsed: 0.067 s <<< FAILURE!
+[ERROR] Tests run: 40, Failures: 3, Errors: 3, Skipped: 0, Time elapsed: 16.44 s <<< FAILURE! -- in ae.mover.WorkflowGraphIT
+[ERROR] ae.mover.WorkflowGraphIT.askingWithoutReviewer -- Time elapsed: 0.226 s <<< ERROR!
+[ERROR] ae.mover.WorkflowGraphIT.finalApproverSetsEachRole -- Time elapsed: 0.117 s <<< FAILURE!
+[ERROR] ae.mover.WorkflowGraphIT.askingForPermissions -- Time elapsed: 0.124 s <<< FAILURE!
+[ERROR] ae.mover.WorkflowGraphIT.routesByTime -- Time elapsed: 0.136 s <<< ERROR!
+[ERROR] ae.mover.WorkflowGraphIT.askingWithScope -- Time elapsed: 0.097 s <<< FAILURE!
+[ERROR] ae.mover.WorkflowGraphIT.movedBeforeFinalIsRerouted -- Time elapsed: 0.121 s <<< ERROR!
+[ERROR]   MatrixColumnsIT.exactly8Columns:112 [matrix exposes exactly the 8 canonical roles in the brief's order (ADR-095)] 
+[ERROR]   SupportIT.assistantOff:161 
+[ERROR]   WorkflowGraphIT.askingForPermissions:1044 
+[ERROR]   WorkflowGraphIT.askingWithScope:1158 [the whole system is never asked for] 
+[ERROR]   WorkflowGraphIT.finalApproverSetsEachRole:1257 [400 {"code":"VALIDATION_FAILED","message":"اختر صلاحية واحدة على الأقل من القائمة.","details":{},"traceId":"990c487e-bb38"}] 
+[ERROR]   RestationingHrSyncIT.hierarchyChangeThroughHrSync:156 
+[ERROR]   RestationingHrSyncIT.transfersThroughHrSync:230 
+[ERROR]   RestationingLifecycleIT.cancellationBeforeActivation:60 [400 {"code":"VALIDATION_FAILED","message":"يُطلب الإلغاء قبل التفعيل فقط.","details":{},"traceId":"49682d30-78f4"}] 
+[ERROR]   RestationingLifecycleIT.extension:216->approvedExtension:279 
+[ERROR]   RestationingLifecycleIT.extensionLapses:248->approvedExtension:279 
+[ERROR]   AccessScopeParityIT.fixtures:69 » DataIntegrityViolation PreparedStatementCallback; SQL [update unit_member set ended_at = now() where person_id = ?]; ERROR: new row for relation "unit_member" violates check constraint "unit_member_check1"
+[ERROR]   AccessScopeParityIT.fixtures:69 » DataIntegrityViolation PreparedStatementCallback; SQL [update unit_member set ended_at = now() where person_id = ?]; ERROR: new row for relation "unit_member" violates check constraint "unit_member_check1"
+[ERROR]   AccessScopeParityIT.fixtures:69 » DataIntegrityViolation PreparedStatementCallback; SQL [update unit_member set ended_at = now() where person_id = ?]; ERROR: new row for relation "unit_member" violates check constraint "unit_member_check1"
+[ERROR]   AccessScopeParityIT.fixtures:69 » DataIntegrityViolation PreparedStatementCallback; SQL [update unit_member set ended_at = now() where person_id = ?]; ERROR: new row for relation "unit_member" violates check constraint "unit_member_check1"
+[ERROR]   AccessScopeParityIT.fixtures:69 » DataIntegrityViolation PreparedStatementCallback; SQL [update unit_member set ended_at = now() where person_id = ?]; ERROR: new row for relation "unit_member" violates check constraint "unit_member_check1"
+[ERROR]   AccessScopeParityIT.fixtures:69 » DataIntegrityViolation PreparedStatementCallback; SQL [update unit_member set ended_at = now() where person_id = ?]; ERROR: new row for relation "unit_member" violates check constraint "unit_member_check1"
+[ERROR]   WorkflowGraphIT.askingWithoutReviewer:1212 » IllegalArgument Invalid UUID string: 
+[ERROR]   WorkflowGraphIT.movedBeforeFinalIsRerouted:1349 » IllegalArgument Invalid UUID string: 
+[ERROR]   WorkflowGraphIT.routesByTime:931->IntegrationTest.requestType:141->IntegrationTest.lambda$requestType$0:155 » Api تعريف التدفق غير صالح.
+[ERROR] Tests run: 67, Failures: 10, Errors: 9, Skipped: 0
+[INFO] BUILD FAILURE
+
+==== 2. WorkflowGraphIT alone on a fresh database, tests unchanged (iso3-run2): routesByTime passes alone
+[ERROR] Tests run: 40, Failures: 3, Errors: 2, Skipped: 0, Time elapsed: 78.37 s <<< FAILURE! -- in ae.mover.WorkflowGraphIT
+[ERROR] ae.mover.WorkflowGraphIT.askingWithoutReviewer -- Time elapsed: 10.22 s <<< ERROR!
+[ERROR] ae.mover.WorkflowGraphIT.finalApproverSetsEachRole -- Time elapsed: 0.171 s <<< FAILURE!
+[ERROR] ae.mover.WorkflowGraphIT.askingForPermissions -- Time elapsed: 0.141 s <<< FAILURE!
+[ERROR] ae.mover.WorkflowGraphIT.askingWithScope -- Time elapsed: 0.101 s <<< FAILURE!
+[ERROR] ae.mover.WorkflowGraphIT.movedBeforeFinalIsRerouted -- Time elapsed: 0.101 s <<< ERROR!
+[ERROR]   WorkflowGraphIT.askingForPermissions:1047 [{"code":"VALIDATION_FAILED","message":"اختر صلاحية واحدة على الأقل من القائمة.","details":{},"traceId":"77051b3a-9e2a"}] 
+[ERROR]   WorkflowGraphIT.askingWithScope:1158 [the whole system is never asked for] 
+[ERROR]   WorkflowGraphIT.finalApproverSetsEachRole:1257 [400 {"code":"VALIDATION_FAILED","message":"اختر صلاحية واحدة على الأقل من القائمة.","details":{},"traceId":"66c1e7d3-2ea7"}] 
+[ERROR]   WorkflowGraphIT.askingWithoutReviewer:1212 » IllegalArgument Invalid UUID string: 
+[ERROR]   WorkflowGraphIT.movedBeforeFinalIsRerouted:1349 » IllegalArgument Invalid UUID string: 
+[ERROR] Tests run: 40, Failures: 3, Errors: 2, Skipped: 0
+[INFO] BUILD FAILURE
+
+==== 3. OperationalPostureScaleIT alone with auto_explain (iso3-run3), old global measurement
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 179.5 s -- in ae.mover.OperationalPostureScaleIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+
+==== 3a. posture-scale.txt of run 3 (old measurement; no posture statement over 40 ms in the auto_explain log)
+POSTURE-SCALE n=100 sites=2 bytes=773 median_ms=227 max_ms=246 scanDelta=0 jdbcDelta=11 dataRevision=43|17
+POSTURE-SCALE n=1000 sites=20 bytes=5984 median_ms=1672 max_ms=1791 scanDelta=6 jdbcDelta=12 dataRevision=87|79
+POSTURE-SCALE n=5000 sites=100 bytes=29187 median_ms=9228 max_ms=9921 scanDelta=6 jdbcDelta=15 dataRevision=291|381
+POSTURE-SCALE time-ratio 5000/100 = 40.65 (median: 100=227 ms, 1000=1672 ms, 5000=9228 ms)
+POSTURE-SCALE scan-ratio 5000/100 = 6.00 (100=0, 1000=6, 5000=6)
+POSTURE-SCALE jdbc-ratio 5000/100 = 1.36 (100=11, 1000=12, 5000=15)
+POSTURE-SCALE size: 100=773 bytes, 1000=5984 bytes, 5000=29187 bytes
+POSTURE-SCALE plan contains org_stationing_org_idx: false
+
+==== 4. AFTER, intermediate - seven classes (iso3-run4); AccessScopeParityIT then reached three assertions that had never run
+[ERROR] Tests run: 6, Failures: 3, Errors: 0, Skipped: 0, Time elapsed: 100.9 s <<< FAILURE! -- in ae.mover.AccessScopeParityIT
+[ERROR] ae.mover.AccessScopeParityIT.searchByName -- Time elapsed: 0.199 s <<< FAILURE!
+[ERROR] ae.mover.AccessScopeParityIT.countsScoped -- Time elapsed: 0.143 s <<< FAILURE!
+[ERROR] ae.mover.AccessScopeParityIT.addUserLookup -- Time elapsed: 0.154 s <<< FAILURE!
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 33.47 s -- in ae.mover.MatrixColumnsIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 126.3 s -- in ae.mover.OperationalPostureScaleIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 42.06 s -- in ae.mover.stationing.RestationingHrSyncIT
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 7.583 s -- in ae.mover.stationing.RestationingLifecycleIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.692 s -- in ae.mover.SupportIT
+[INFO] Tests run: 40, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 24.55 s -- in ae.mover.WorkflowGraphIT
+[ERROR]   AccessScopeParityIT.addUserLookup:124 [hidden 93a47d78-f87c-4dff-b9d2-b3485f725381] 
+[ERROR]   AccessScopeParityIT.countsScoped:166 
+[ERROR]   AccessScopeParityIT.searchByName:108 
+[ERROR] Tests run: 67, Failures: 3, Errors: 0, Skipped: 0
+[INFO] BUILD FAILURE
+
+==== 4a. posture-scale.txt of run 4 - the final OperationalPostureScaleIT code (exact per-transaction scans)
+POSTURE-SCALE n=100 sites=2 bytes=774 median_ms=223 max_ms=232 scanDelta=24 jdbcDelta=11 exactScans=5 reach_ms=240 overview_ms=7 dataRevision=197|60
+POSTURE-SCALE n=1000 sites=20 bytes=5986 median_ms=1765 max_ms=1894 scanDelta=6 jdbcDelta=12 exactScans=6 reach_ms=1643 overview_ms=8 dataRevision=241|122
+POSTURE-SCALE n=5000 sites=100 bytes=29187 median_ms=8986 max_ms=9079 scanDelta=6 jdbcDelta=16 exactScans=6 reach_ms=8977 overview_ms=27 dataRevision=445|424
+POSTURE-SCALE time-ratio 5000/100 = 40.30 (median: 100=223 ms, 1000=1765 ms, 5000=8986 ms)
+POSTURE-SCALE exact-scan-ratio 5000/100 = 1.20 (100=5, 1000=6, 5000=6)
+POSTURE-SCALE global-scan-delta, all backends, indicative only (100=24, 1000=6, 5000=6)
+POSTURE-SCALE reach confirmation ms (one OpenFGA check per unit): 100=240, 1000=1643, 5000=8977; overview with the confirmations known, ms: 100=7, 1000=8, 5000=27
+POSTURE-SCALE jdbc-ratio 5000/100 = 1.45 (100=11, 1000=12, 5000=16)
+POSTURE-SCALE size: 100=774 bytes, 1000=5986 bytes, 5000=29187 bytes
+POSTURE-SCALE plan contains org_stationing_org_idx: false
+
+==== 5. AFTER - AccessScopeParityIT + WorkflowGraphIT with the final fixtures (iso3-run5)
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 99.11 s -- in ae.mover.AccessScopeParityIT
+[INFO] Tests run: 40, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 25.13 s -- in ae.mover.WorkflowGraphIT
+[INFO] Tests run: 46, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+
+==== 6. Full suite attempt (iso3-full): the forked JVM was killed (exit 137, out of memory in the Docker VM, where another project's containers held ~11.4 GiB of 15.5 GiB). The private tree holds backend/ only, so the tests that read ../docs, ../ops or the map packages fail there; none of them is among the 20
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 101.8 s -- in ae.mover.AccessAcceptanceIT
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.878 s -- in ae.mover.AccessAdminIT
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.903 s -- in ae.mover.AccessScopeParityIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.448 s -- in ae.mover.AccessWorkspaceIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.396 s -- in ae.mover.ActiveDirectoryDirectBindTest
+[ERROR] Tests run: 8, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.494 s <<< FAILURE! -- in ae.mover.AdministrationAcceptanceIT
+[ERROR] ae.mover.AdministrationAcceptanceIT.mapCoverage -- Time elapsed: 0.165 s <<< FAILURE!
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 40.12 s -- in ae.mover.AdministratorDirectoryLookupIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 26.89 s -- in ae.mover.AdministratorLifecycleIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 22.68 s -- in ae.mover.AdministratorOwnLookupIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.607 s -- in ae.mover.ApprovalSignerTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.275 s -- in ae.mover.assistant.AssistantServiceTest
+[ERROR] Tests run: 10, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 17.10 s <<< FAILURE! -- in ae.mover.AuthorizationIT
+[ERROR] ae.mover.AuthorizationIT.modelPublished -- Time elapsed: 1.213 s <<< ERROR!
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.152 s -- in ae.mover.authz.PostureViewerScopeIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.267 s -- in ae.mover.authz.RequesterScopeIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.347 s -- in ae.mover.authz.UnitAccessManagerScopeIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.354 s -- in ae.mover.AuthzMirrorIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.734 s -- in ae.mover.BoundaryOverlapIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 23.78 s -- in ae.mover.CertificateCenterIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.945 s -- in ae.mover.CertificateInspectorTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.841 s -- in ae.mover.ChainApproverScopeIT
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 12.66 s <<< FAILURE! -- in ae.mover.DbMigrationIT
+[ERROR] ae.mover.DbMigrationIT.migrationCenter -- Time elapsed: 0.004 s <<< ERROR!
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.137 s -- in ae.mover.DesktopFeedIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 21.63 s -- in ae.mover.DirectDirectorySignInIT
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 30.84 s -- in ae.mover.DirectorySignInIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 23.09 s -- in ae.mover.DualProviderSignInIT
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 24.83 s -- in ae.mover.EmploymentContextIT
+[INFO] Tests run: 9, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 26.72 s -- in ae.mover.EnterpriseSignInIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.581 s -- in ae.mover.ExecutionInFlightIT
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.164 s -- in ae.mover.ExecutionIntegrityIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.005 s -- in ae.mover.hr.HrMappingTest
+[ERROR] Tests run: 6, Failures: 0, Errors: 1, Skipped: 0, Time elapsed: 25.05 s <<< FAILURE! -- in ae.mover.HrLinkedPeopleIT
+[ERROR] ae.mover.HrLinkedPeopleIT.pruneRemovesOnlyUnreferenced -- Time elapsed: 0.422 s <<< ERROR!
+[ERROR]   AdministrationAcceptanceIT.mapCoverage:202 
+[ERROR]   AuthorizationIT.modelPublished:357 » NoSuchFile ../docs/authz/model.fga
+[ERROR]   DbMigrationIT.migrationCenter » UnsatisfiedDependency Error creating bean with name 'ae.mover.DbMigrationIT': Unsatisfied dependency expressed through field 'auth': No qualifying bean of type 'ae.mover.security.AuthService' available: expected at lea
+[ERROR]   HrLinkedPeopleIT.pruneRemovesOnlyUnreferenced:519->prune:454 » NoSuchFile ../ops/hr-prune-unlinked.sql
+[ERROR] Tests run: 149, Failures: 1, Errors: 3, Skipped: 0
+[INFO] BUILD FAILURE
+[ERROR] Process Exit Code: 137
+[ERROR] Crashed tests:
+[ERROR] Process Exit Code: 137
+[ERROR] Crashed tests:
+
+==== 7. FINAL - the seven classes with the final code (iso3-final): 66 of 67 pass. OperationalPostureScaleIT.postureScales got 503 inside its unchanged HTTP loop (line 238): OpenFGA HttpTimeoutException while another project containers used about 19 CPUs and 13 GiB of the Docker VM; one per-unit check timing out fails the call closed. The same test code passed in run 4 (section 4a)
+[INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 125.6 s -- in ae.mover.AccessScopeParityIT
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 36.23 s -- in ae.mover.MatrixColumnsIT
+[ERROR] Tests run: 5, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 166.3 s <<< FAILURE! -- in ae.mover.OperationalPostureScaleIT
+[ERROR] ae.mover.OperationalPostureScaleIT.postureScales -- Time elapsed: 132.6 s <<< FAILURE!
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 48.93 s -- in ae.mover.stationing.RestationingHrSyncIT
+[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 16.86 s -- in ae.mover.stationing.RestationingLifecycleIT
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.517 s -- in ae.mover.SupportIT
+[INFO] Tests run: 40, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 55.63 s -- in ae.mover.WorkflowGraphIT
+[ERROR]   OperationalPostureScaleIT.postureScales:104->measure:238 
+[ERROR] Tests run: 67, Failures: 1, Errors: 0, Skipped: 0
+[INFO] BUILD FAILURE

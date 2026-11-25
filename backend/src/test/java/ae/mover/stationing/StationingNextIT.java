@@ -22,29 +22,49 @@ import com.fasterxml.jackson.databind.JsonNode;
 class StationingNextIT extends RestationingTestBase {
 
     UUID fresh, fresh2, shared;
+    /** «الجهات الرئيسية للعلم» as earlier classes left it in this shared database: cleared for each test, put back after. */
+    private List<Map<String, Object>> fyiListBefore;
+    private boolean fyiAdmin;
 
     @org.junit.jupiter.api.AfterEach
     void noPathsLeftBehind() {
         jdbc.sql("update restationing_request set route_version_id = null where route_version_id is not null").update();
         jdbc.sql("delete from stationing_route_version").update();
-        // the organisation-wide FYI list (ADR-095 B2) is shared by every later activation in this database: leave none behind
-        if (otherSec != null) {
-            jdbc.sql("delete from fyi_designation where unit_id = :u").param("u", otherSec).update();
+        // the organisation-wide FYI list (ADR-095 B2, one source since V69) is read by every later final approval in this
+        // database: leave it exactly as it was found
+        if (fyiListBefore == null) {
+            return; // the snapshot was never taken: leave the list alone
+        }
+        jdbc.sql("delete from fyi_main_command").update();
+        for (Map<String, Object> row : fyiListBefore) {
+            jdbc.sql("""
+                    insert into fyi_main_command(organization_id, include_descendants, added_by, added_at)
+                    values (cast(:o as uuid), :d, cast(:b as uuid), cast(:a as timestamptz))""")
+                    .param("o", row.get("o")).param("d", row.get("d")).param("b", row.get("b")).param("a", row.get("a")).update();
         }
     }
 
     /**
-     * ADR-095 B2: «وحدات العلم» are configured once, organisation-wide, in {@code fyi_designation}, and every final approval
-     * distributes to them inside its own transaction. The application has no endpoint writing this table yet (ADR-095 B3 —
-     * see docs/evidence/regression-18/CLASSIFICATION.md), so the configuration is a fixture here.
+     * ADR-095 B2: «وحدات العلم» are configured once, organisation-wide, and every final approval distributes to them inside
+     * its own transaction. Since V69 the configuration goes through the real path, the screen's endpoint
+     * {@code PUT /access/fyi-mains/{unit}} held by an access manager whose scope is everything (ADR-042), instead of an SQL
+     * fixture.
      */
     private void designateFyi(UUID unit) {
-        jdbc.sql("insert into fyi_designation(unit_id, include_descendants, set_by) values (:u, false, :by) on conflict do nothing")
-                .param("u", unit).param("by", personId("sysadmin")).update();
+        if (!fyiAdmin) {
+            person("fyiAdmin", "SYSTEM_ADMIN", top);
+            fyiAdmin = true;
+        }
+        Res set = login("fyiAdmin").put("/access/fyi-mains/" + unit, Map.of("includeDescendants", false, "reason", "وحدة علم للاختبار"));
+        assertThat(set.status()).as(set.toString()).isEqualTo(204);
     }
 
     @BeforeEach
     void next() {
+        fyiListBefore = jdbc.sql("select organization_id::text as o, include_descendants as d, added_by::text as b, added_at::text as a from fyi_main_command")
+                .query().listOfRows();
+        jdbc.sql("delete from fyi_main_command").update();
+        fyiAdmin = false;
         UUID snapshot = publishedSnapshot();
         fresh = hrOrg("FRESH", sec, 10, snapshot);
         fresh2 = hrOrg("FRESH2", sec, 10, snapshot);

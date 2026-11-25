@@ -2,7 +2,7 @@ import type { GeoJSONSource, Map as MlMap, MapLayerMouseEvent, MapLayerTouchEven
 import type { SiteGeometry } from '../../../api/types';
 import { clickVertex, finishDraw, readout, removeLast, sideLabel, startDraw, type DrawReadout, type DrawState } from '../../../lib/drawState';
 import { formatMeters } from '../../../lib/footprint';
-import { bearing, destination, distanceM, type LatLng } from '../../../lib/geo';
+import { bearing, destination, distanceM, withinM, type LatLng } from '../../../lib/geo';
 import {
   SiteHistory,
   anchorOf,
@@ -114,6 +114,8 @@ export class SiteEditor {
   // on-map overlays, as the retired editor's divIcons
   private symbolHtml = NEUTRAL_PIN;
   private origin: { at: LatLng; label: string | null } | null = null;
+  // the farthest the shape's centre may be from a point (owner, 25 Nov 2026): placing, moving, drawing and editing stop there
+  private reach: { at: LatLng; maxM: number } | null = null;
   private conflict = false;
   // what is edited: the re-stationing site («مقترح» with the organisation's symbol) or a deployment area (its own tag)
   private look: EditorLook = SITE_LOOK;
@@ -277,6 +279,27 @@ export class SiteEditor {
     this.renderOverlays();
   }
 
+  /**
+   * The farthest the shape's centre may be from {@code at} (a deployment area's leg, owner 25 Nov 2026): a move or a
+   * placement stops at it along its bearing, a drawn corner is placed no farther, and an edit that would take the centre
+   * beyond it is not made. A shape already beyond it (a saved draft) is left as it is until it is moved. Null: no limit.
+   */
+  setReach(reach: { at: LatLng; maxM: number } | null) {
+    this.reach = reach;
+  }
+
+  /** A point brought back within the reach along its bearing (unchanged without one). */
+  private within(p: LatLng): LatLng {
+    return this.reach ? withinM(this.reach.at, p, this.reach.maxM) : p;
+  }
+
+  /** An edit is kept when it leaves the centre within the reach, or no farther than it already is. */
+  private keeps(next: Part[]): boolean {
+    if (!this.reach || !next.length || !this.parts.length) return true;
+    const d = distanceM(this.reach.at, anchorOf(next));
+    return d <= this.reach.maxM || d <= distanceM(this.reach.at, anchorOf(this.parts)) + 0.01;
+  }
+
   /** The shape being edited: the re-stationing site, or a deployment area with its own tag and colour. */
   setLook(look: EditorLook) {
     this.look = look;
@@ -297,7 +320,7 @@ export class SiteEditor {
   moveTo(p: LatLng) {
     if (!this.parts.length || this.drawing) return;
     this.history.push(this.copy(this.parts));
-    this.parts = rebuildGroup(groupOffsets(this.parts, anchorOf(this.parts)), p);
+    this.parts = rebuildGroup(groupOffsets(this.parts, anchorOf(this.parts)), this.within(p));
     this.render(true);
   }
 
@@ -383,7 +406,7 @@ export class SiteEditor {
   /** The next vertex typed as coordinates (an optional, precise alternative to a map click). */
   addVertex(p: LatLng) {
     if (!this.drawing) return;
-    this.drawing = { vertices: [...this.drawing.vertices, p] };
+    this.drawing = { vertices: [...this.drawing.vertices, this.within(p)] };
     this.drawRedo = [];
     this.afterVertex();
   }
@@ -425,7 +448,8 @@ export class SiteEditor {
       (p) => {
         if (!this.drawing) return;
         onMoved();
-        this.drawing = { vertices: this.drawing.vertices.map((v, j) => (j === i ? p : v)) };
+        const q = this.within(p);
+        this.drawing = { vertices: this.drawing.vertices.map((v, j) => (j === i ? q : v)) };
         this.renderDraw(false);
       },
       () => this.renderDraw(),
@@ -494,7 +518,8 @@ export class SiteEditor {
       const p = this.map.project([first.lng, first.lat]);
       onFirst = Math.hypot(p.x - e.point.x, p.y - e.point.y) <= 12;
     }
-    const r = clickVertex(this.drawing, { lat: e.lngLat.lat, lng: e.lngLat.lng }, onFirst);
+    // a corner beyond the reach is placed at it, on the same bearing: the drawn shape stays within the limit
+    const r = clickVertex(this.drawing, this.within({ lat: e.lngLat.lat, lng: e.lngLat.lng }), onFirst);
     if (r.state !== this.drawing) this.drawRedo = [];
     this.drawing = r.state;
     // the shape closes on the first vertex, or by itself once the chosen number of vertices is placed
@@ -504,7 +529,7 @@ export class SiteEditor {
 
   private readonly onDrawMove = (e: MapMouseEvent) => {
     if (!this.drawing) return;
-    this.pointer = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+    this.pointer = this.within({ lat: e.lngLat.lat, lng: e.lngLat.lng });
     if (this.frame) return;
     this.frame = requestAnimationFrame(() => {
       this.frame = 0;
@@ -608,8 +633,10 @@ export class SiteEditor {
   /** One vertex set from the coordinates table (an optional, precise alternative to dragging it). */
   setVertex(part: number, ring: number, index: number, p: LatLng) {
     if (!this.parts[part]?.[ring]?.[index]) return;
+    const next = moveVertex(this.parts, part, ring, index, p);
+    if (!this.keeps(next)) return;
     this.history.push(this.copy(this.parts));
-    this.parts = moveVertex(this.parts, part, ring, index, p);
+    this.parts = next;
     this.vertexEdited = true;
     this.activeVertex = ring === 0 ? index : null;
     this.render(true);
@@ -669,11 +696,13 @@ export class SiteEditor {
     let moved = false;
     this.drag(
       (p) => {
+        const next = before.map((part) => part.map((ring) => resizeBy(ring, f, i, p)));
+        if (!this.keeps(next)) return;
         if (!moved) {
           this.history.push(before);
           moved = true;
         }
-        this.parts = before.map((part) => part.map((ring) => resizeBy(ring, f, i, p)));
+        this.parts = next;
         this.render(false, true);
       },
       () => this.render(true),
@@ -690,13 +719,15 @@ export class SiteEditor {
     let moved = false;
     this.drag(
       (p) => {
+        const by = angleFrom(f.c, p) - start;
+        const next = before.map((part) => part.map((ring) => rotateBy(ring, f.c, by)));
+        if (!this.keeps(next)) return;
         if (!moved) {
           this.history.push(before);
           moved = true;
         }
-        const by = angleFrom(f.c, p) - start;
         this.boxAngle = a0 + by;
-        this.parts = before.map((part) => part.map((ring) => rotateBy(ring, f.c, by)));
+        this.parts = next;
         this.render(false, false);
       },
       () => this.render(true),
@@ -759,7 +790,8 @@ export class SiteEditor {
           moved = true;
         }
         const d = distanceM(grab, p);
-        this.parts = rebuildGroup(offs, d < 0.01 ? base : destination(base, bearing(grab, p), d));
+        // the whole shape stops at the reach: its centre goes no farther along the drag's bearing
+        this.parts = rebuildGroup(offs, d < 0.01 ? base : this.within(destination(base, bearing(grab, p), d)));
         // a rigid move keeps the validity and areas; only the occupied-ground check (and the server's) can change
         this.render(false, false);
       },
@@ -775,12 +807,15 @@ export class SiteEditor {
     this.render(false, false);
     this.drag(
       (p) => {
+        const next = moveVertex(this.parts, part, ring, index, p);
+        // a corner that would take the centre beyond the reach stays where it last was within it
+        if (!this.keeps(next)) return;
         if (!moved) {
           this.history.push(before);
           moved = true;
           this.vertexEdited = true;
         }
-        this.parts = moveVertex(this.parts, part, ring, index, p);
+        this.parts = next;
         const areas = this.parts.map((pt, i) => (i === part ? partArea(pt) : this.last.partAreas[i] ?? partArea(pt)));
         const bad = vertexConflicts(this.parts, part, ring, index);
         this.last = { ...this.last, ok: !bad && this.last.ok, problems: bad ? ['حدود متقاطعة أو متداخلة'] : this.last.problems, partAreas: areas, areaM2: areas.reduce((s, a) => s + a, 0) };

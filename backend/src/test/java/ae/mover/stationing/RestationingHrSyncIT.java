@@ -120,7 +120,8 @@ class RestationingHrSyncIT extends IntegrationTest {
         person("apA", seat, deptA);
         person("apB", seat, deptB);
         person("apTop", seat, top);
-        person("activator", role("GACT", "ORGANIZATION", "ACTIVATE_STATIONING", "VIEW"), top);
+        // ADR-095: there is no «مفعل التمركز» (ACTIVATE_STATIONING deleted, V62); kept as a bystander calling the retained no-op
+        person("activator", role("GACT", "ORGANIZATION", "VIEW"), top);
         person("sysadmin", role("GPOL", "ALL", "CONFIGURE"), top);
         stationed(sec, siteWithBoundary("GSEC", lat0, lng0, sec));
         Res published = publishPolicy();
@@ -153,7 +154,11 @@ class RestationingHrSyncIT extends IntegrationTest {
         Res refused = decide("apTop", id);
         assertThat(refused.status()).isEqualTo(400);
         assertThat(refused.body().path("message").asText()).contains(HierarchyDrift.MESSAGE);
-        assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(400);
+        // ADR-095: /activate is retained as an idempotent no-op; it never moves a paused request
+        Res noop = login("activator").post("/restationing-requests/" + id + "/activate", Map.of());
+        assertThat(noop.status()).as(noop.toString()).isEqualTo(200);
+        assertThat(noop.body().path("state").asText()).isEqualTo("PAUSED_HIERARCHY_CHANGED");
+        assertThat(stationings(id)).as("nothing activated while paused").isZero();
 
         // 7–9. reconfirmation (a reason is required) derives a new route from the same requesting unit; the old one is kept
         assertThat(login("req").post("/restationing-requests/" + id + "/submit", Map.of()).status()).isEqualTo(400);
@@ -167,16 +172,22 @@ class RestationingHrSyncIT extends IntegrationTest {
         assertThat(keys(previous)).containsExactly("H:" + sec, "H:" + deptA, "H:" + top);
         assertThat(marks(previous)).containsExactly("APPROVED", "APPROVED", "null");
 
-        // 10–11. every approval runs again; activation stays blocked until they are done
+        // 10–11. every approval runs again; activation waits for them: since ADR-095 it is the final approver's APPROVE itself
         assertThat(decide("apA", id).status()).as("the earlier route's seat no longer decides").isIn(403, 404);
         assertThat(decide("apSec", id).status()).isEqualTo(200);
-        assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(400);
+        assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).body().path("state").asText())
+                .as("the no-op activates nothing").isEqualTo("UNDER_REVIEW");
+        assertThat(stationings(id)).isZero();
         assertThat(decide("apB", id).status()).isEqualTo(200);
-        assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(400);
-        assertThat(decide("apTop", id).status()).isEqualTo(200);
-        Res activated = login("activator").post("/restationing-requests/" + id + "/activate", Map.of());
+        assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).body().path("state").asText())
+                .as("not before the final approval").isEqualTo("UNDER_REVIEW");
+        assertThat(stationings(id)).isZero();
+        Res activated = decide("apTop", id);
         assertThat(activated.status()).as(activated.toString()).isEqualTo(200);
         assertThat(activated.body().path("state").asText()).isEqualTo("ACTIVATED_PERMANENT");
+        assertThat(activated.body().path("activation").path("by").path("id").asText()).as("activated by the final approver")
+                .isEqualTo(jdbc.sql("select id from person where username = :u").param("u", "apTop-" + sfx).query(UUID.class).single().toString());
+        assertThat(stationings(id)).as("activated once, on the new route's final approval").isPositive();
 
         // restored through the same synchronisation path
         exec("update " + schema + ".units_t set parent_id = '" + u("DEPT_A") + "' where id = '" + u("SEC") + "'");
@@ -316,8 +327,12 @@ class RestationingHrSyncIT extends IntegrationTest {
         src.put("password", "Reader#" + sfx);
         src.put("unitView", schema + ".units_v");
         src.put("personView", schema + ".people_v");
+        // this journey moves people through the sync run (the earlier rule); ADR-094 (V55) keeps that behind «peopleSync», off
+        // by default (people otherwise refreshed on demand) — as HrSyncAcceptanceIT and HrLinkedPeopleIT do
+        src.put("peopleSync", true);
         Res saved = admin.put("/hr/source", src);
         assertThat(saved.status()).as(saved.toString()).isEqualTo(200);
+        assertThat(saved.body().path("peopleSync").asBoolean()).as("the linked people are read in every run").isTrue();
         List<Map<String, Object>> fields = new ArrayList<>(List.of(
                 field("UNIT", "external_unit_id", "ID"), field("UNIT", "name", "NAME"), field("UNIT", "parent_external_unit_id", "PARENT_ID"),
                 field("UNIT", "status", "STATUS"), field("UNIT", "code", "CODE"), field("UNIT", "level", "LVL"),
@@ -357,6 +372,10 @@ class RestationingHrSyncIT extends IntegrationTest {
     }
 
     // ---- the request -----------------------------------------------------------------------------------------
+
+    private long stationings(String id) {
+        return jdbc.sql("select count(*) from org_stationing where request_id = cast(:id as uuid)").param("id", id).query(Long.class).single();
+    }
 
     private Res decide(String user, String id) {
         return login(user).post("/restationing-requests/" + id + "/decision", Map.of("decision", "APPROVE"));

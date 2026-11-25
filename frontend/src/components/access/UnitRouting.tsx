@@ -4,11 +4,17 @@ import { useApp } from '../../lib/app';
 import { Icon } from '../ui';
 import { OrgPick } from './pickers';
 
-/** «الجهات الرئيسية للعلم»: chosen explicitly. Holders of «للعلم» covering one read every finally approved request. */
+/**
+ * «الجهات الرئيسية للعلم»: chosen explicitly, one list for every final approval (V69). For requests, holders of «للعلم»
+ * covering one read it; for re-stationing, deployment areas and site registration, the members of the unit are informed.
+ * Each addition, change and removal is audited with its reason.
+ */
 export function FyiMains() {
   const app = useApp();
-  const [mains, setMains] = useState<{ id: string; name: string }[] | null>(null);
+  const [mains, setMains] = useState<{ id: string; name: string; includeDescendants: boolean }[] | null>(null);
   const [pick, setPick] = useState<{ id: string; name: string } | null>(null);
+  const [below, setBelow] = useState(false);
+  const [reason, setReason] = useState('');
   const [adding, setAdding] = useState(false);
   const load = () => api.fyiMains().then(setMains).catch(() => setMains(null));
   useEffect(() => {
@@ -16,25 +22,57 @@ export function FyiMains() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [app.revision]);
   if (!mains) return null;
-  const act = (work: Promise<unknown>) => work.then(load).catch((e: Error) => app.toast(e.message));
+  const why = reason.trim();
+  const act = (work: Promise<unknown>) =>
+    work.then(() => (setReason(''), load())).catch((e: Error) => {
+      app.toast(e.message);
+      throw e;
+    });
+  const needReason = why ? undefined : 'اكتب السبب أولاً؛ يُسجَّل مع التغيير';
   return (
     <div className="padding" data-testid="fyi-mains">
       <h4>الجهات الرئيسية للعلم</h4>
-      <p className="micro muted">من يحمل «للعلم» ويشمل نطاقه إحداها يرى كل طلب بعد اعتماده النهائي. وخارجها يصل للعلم حسب الوحدة والمكان.</p>
+      <p className="micro muted">
+        قائمة واحدة لكل اعتماد نهائي. في الطلبات يراها من يحمل «للعلم» ويشمل نطاقه إحدى هذه الجهات، وفي طلبات التمركز ومناطق الانتشار وتسجيل
+        المواقع يُبلَّغ أفراد الجهة نفسها. وخارجها يصل للعلم حسب الوحدة والمكان.
+      </p>
       <ul className="scope-targets">
         {mains.map((m) => (
           <li key={m.id}>
             {m.name}
-            <button className="button compact" aria-label={'إزالة ' + m.name} onClick={() => act(api.removeFyiMain(m.id))}><Icon name="close" /></button>
+            {m.includeDescendants && <span className="micro muted"> — وما دونها</span>}
+            <button
+              className="button compact"
+              aria-label={'إزالة ' + m.name}
+              title={needReason}
+              disabled={!why}
+              onClick={() => act(api.removeFyiMain(m.id, why)).catch(() => undefined)}
+            >
+              <Icon name="close" />
+            </button>
           </li>
         ))}
         {mains.length === 0 && <li className="muted micro">لم تُحدد جهة بعد.</li>}
       </ul>
+      <label className="field">
+        <span>السبب (يُسجَّل مع كل إضافة أو إزالة)</span>
+        <input value={reason} maxLength={500} onChange={(e) => setReason(e.target.value)} data-testid="fyi-mains-reason" />
+      </label>
       {adding ? (
         <>
-          <OrgPick selected={pick} withBranches={false} onPick={setPick} onWithBranches={() => undefined} revision={app.revision} branchOption={false} />
-          <button className="button compact" disabled={!pick} onClick={() => pick && act(api.addFyiMain(pick.id)).then(() => (setAdding(false), setPick(null)))}>
-            <Icon name="plus" /> أضف {pick ? '«' + pick.name + '»' : ''}
+          <OrgPick selected={pick} withBranches={below} onPick={setPick} onWithBranches={setBelow} revision={app.revision} />
+          <button
+            className="button compact"
+            disabled={!pick || !why}
+            title={needReason}
+            onClick={() =>
+              pick &&
+              act(api.addFyiMain(pick.id, below, why))
+                .then(() => (setAdding(false), setPick(null), setBelow(false)))
+                .catch(() => undefined)
+            }
+          >
+            <Icon name="plus" /> أضف {pick ? '«' + pick.name + '»' + (below ? ' وما دونها' : '') : ''}
           </button>
         </>
       ) : (

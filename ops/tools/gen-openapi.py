@@ -81,6 +81,7 @@ doc = {
     "paths": dict(sorted(paths.items())),
 }
 out = json.dumps(doc, ensure_ascii=False, indent=2)
-(ROOT / "docs" / "api" / "openapi.json").write_text(out + "\n", encoding="utf-8")
-(ROOT / "backend" / "src" / "main" / "resources" / "openapi.json").write_text(out + "\n", encoding="utf-8")
+# LF on every platform (Path.write_text would write CRLF on Windows; the release hashes the bytes in the folder)
+(ROOT / "docs" / "api" / "openapi.json").write_text(out + "\n", encoding="utf-8", newline="\n")
+(ROOT / "backend" / "src" / "main" / "resources" / "openapi.json").write_text(out + "\n", encoding="utf-8", newline="\n")
 print(f"{sum(len(v) for v in paths.values())} operations across {len(paths)} paths")

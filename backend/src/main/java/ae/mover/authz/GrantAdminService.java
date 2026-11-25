@@ -1115,26 +1115,64 @@ public class GrantAdminService {
         return routes(ctx, command);
     }
 
-    /** «الجهات الرئيسية للعلم»: chosen explicitly and audited. Holders covering one read every finally approved request. */
+    /**
+     * «الجهات الرئيسية للعلم»: chosen explicitly and audited. The one list every final approval informs (one source since
+     * V69): requests through {@code PlaceInfo}, re-stationing through {@code RestationingService.autoFyi}, both read by
+     * {@code FyiMainCommands}.
+     */
     public List<Map<String, Object>> fyiMains(AccessContext ctx) {
         ctx.require(Permission.MANAGE_ACCESS);
         return jdbc.sql("""
-                select f.organization_id, o.name from fyi_main_command f join organization o on o.id = f.organization_id order by o.name""")
-                .query((rs, n) -> Map.<String, Object>of("id", rs.getString(1), "name", rs.getString(2))).list();
+                select f.organization_id, o.name, f.include_descendants from fyi_main_command f join organization o on o.id = f.organization_id
+                 order by o.name""")
+                .query((rs, n) -> Map.<String, Object>of("id", rs.getString(1), "name", rs.getString(2), "includeDescendants", rs.getBoolean(3)))
+                .list();
     }
 
+    /** A change to «الجهات الرئيسية للعلم»: «وما دونها» and the reason recorded with it; both optional. */
+    public record FyiMainInput(Boolean includeDescendants, String reason) {
+    }
+
+    /**
+     * Adds, changes or removes one unit of «الجهات الرئيسية للعلم». Only an access manager whose scope is everything may (as
+     * before V69). Each change is audited with who, when and the reason — {@code FYI_MAIN_COMMAND_ADDED}, {@code _CHANGED}
+     * («وما دونها» switched) or {@code _REMOVED}; a call that changes nothing records nothing.
+     */
     @Transactional
-    public void setFyiMain(AccessContext ctx, UUID orgId, boolean chosen) {
+    public void setFyiMain(AccessContext ctx, UUID orgId, boolean chosen, boolean includeDescendants, String reason) {
         if (!ctx.canEverywhere(Permission.MANAGE_ACCESS)) {
             throw ApiException.forbidden("يحدد الجهات الرئيسية للعلم مسؤول الصلاحيات العام فقط.");
         }
-        if (chosen) {
-            jdbc.sql("insert into fyi_main_command(organization_id, added_by) values (:o, :p) on conflict do nothing")
-                    .param("o", orgId).param("p", ctx.personId()).update();
-        } else {
-            jdbc.sql("delete from fyi_main_command where organization_id = :o").param("o", orgId).update();
+        String why = reason == null || reason.isBlank() ? null : reason.trim();
+        if (why != null && why.length() > 500) {
+            throw ApiException.validation("السبب أطول من 500 حرف.");
         }
-        audit.recordAs(ctx.actor(), chosen ? "FYI_MAIN_COMMAND_ADDED" : "FYI_MAIN_COMMAND_REMOVED", "ORGANIZATION", orgId.toString(), null, Map.of(), null);
+        String name = jdbc.sql("select name from organization where id = :o").param("o", orgId).query(String.class).optional()
+                .orElseThrow(() -> ApiException.validation("الجهة غير موجودة."));
+        Boolean before = jdbc.sql("select include_descendants from fyi_main_command where organization_id = :o for update")
+                .param("o", orgId).query(Boolean.class).optional().orElse(null);
+        String action;
+        if (chosen) {
+            if (before != null && before == includeDescendants) {
+                return;
+            }
+            jdbc.sql("""
+                    insert into fyi_main_command(organization_id, include_descendants, added_by) values (:o, :d, :p)
+                    on conflict (organization_id) do update set include_descendants = excluded.include_descendants""")
+                    .param("o", orgId).param("d", includeDescendants).param("p", ctx.personId()).update();
+            action = before == null ? "FYI_MAIN_COMMAND_ADDED" : "FYI_MAIN_COMMAND_CHANGED";
+        } else {
+            if (before == null) {
+                return;
+            }
+            jdbc.sql("delete from fyi_main_command where organization_id = :o").param("o", orgId).update();
+            action = "FYI_MAIN_COMMAND_REMOVED";
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("includeDescendantsBefore", before);
+        detail.put("includeDescendants", chosen ? includeDescendants : null);
+        detail.put("appliesTo", "كل اعتماد نهائي: الطلبات وطلبات التمركز");
+        audit.recordAs(ctx.actor(), action, "ORGANIZATION", orgId.toString(), name, detail, why);
     }
 
     public String describe(RawGrant g) {

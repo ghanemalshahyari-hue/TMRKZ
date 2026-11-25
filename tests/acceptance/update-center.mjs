@@ -127,6 +127,7 @@ try {
     return page.locator('[data-testid=update-worker]').innerText();
   };
   ok((await workerText()).includes('عامل الصيانة يعمل'), 'UC-00', 'the maintenance worker is running');
+  await shot('uc-00-worker.png');
 
   // UC-01
   const compared = await choose(DESK);
@@ -152,6 +153,7 @@ try {
   // UC-03
   const startedBefore = (await liveness()).startedAt;
   await page.locator('[data-testid=update-reason]').fill(`اختبار التحديث ${stamp}`);
+  await shot('uc-02-ready.png');
   await page.locator('[data-testid=update-approve]').click();
   const done = await stateWait(['DONE', 'DONE_RESTART_REQUIRED', 'FAILED_ROLLED_BACK', 'REJECTED', 'ERROR'], 30);
   await shot('uc-03-applied.png');

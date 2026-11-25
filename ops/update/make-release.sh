@@ -162,19 +162,33 @@ if [ -n "$SINCE" ]; then
   cp "$OUT/MANIFEST.tsv" "$OUT/RELEASE.json" "$OUT/RELEASE.sig" "$BS/"
   cp "$PUB" "$BS/release-trust.pub"
   cp ops/update/bootstrap.sh "$BS/bootstrap.sh"
+  # what the machine may hold (ADR-106), as git ids of file bytes (the machine computes them without git): each released or
+  # removed file as at <commit> (BASE.tsv), and every version of it ever committed (KNOWN.tsv: id, path, commit, date) — so
+  # the bootstrap tells a file changed on the machine from one left at an earlier release
+  { awk -F '	' '{print $4}' "$OUT/MANIFEST.tsv"; cat "$BS/REMOVED.txt"; } | sort -u > "$TMP/known.paths"
+  git -c core.quotepath=off ls-tree -r "$SINCE" \
+    | awk -F '	' 'NR == FNR {w[$0] = 1; next} {split($1, a, " "); if (a[2] == "blob" && ($2 in w)) print a[3] "\t" $2}' "$TMP/known.paths" - > "$BS/BASE.tsv"
+  git -c core.quotepath=off log --format='@%h %cs' --raw --no-abbrev --no-renames HEAD \
+    | awk -F '	' 'NR == FNR {w[$0] = 1; next} /^@/ {split(substr($0, 2), c, " "); next}
+        /^:/ {split($1, a, " "); if (a[4] !~ /^0+$/ && ($2 in w)) print a[4] "\t" $2 "\t" substr(c[1], 1, 7) "\t" c[2]}' "$TMP/known.paths" - \
+    | sort -u > "$BS/KNOWN.tsv"
+  printf '%s\n%s\n' "$(git rev-parse --short "$SINCE")" "$(git log -1 --format='%H %cs %s' "$SINCE")" > "$BS/BASE-COMMIT.txt"
   cat > "$BS/INSTALL.txt" <<EOF
 TMRKZ one-time bootstrap $ID (for a machine at commit $SINCE)
 
 Copy this whole folder to the machine, e.g. /data/tmrkz-bootstrap-$ID, then as the maintenance account (PAM, once):
   cd /data/tmrkz-bootstrap-$ID
-  sh bootstrap.sh check /data/TMRKZ                    # read-only preview: checksums, signature, files, Compose diff
-  sh bootstrap.sh apply /data/TMRKZ --with-config      # after reading the Compose diff; without it the Compose files stay
+  sh bootstrap.sh check /data/TMRKZ                    # read-only: checksums, signature, what this machine holds compared
+                                                       # with the release (files changed here are named), the Compose diff
+  sh bootstrap.sh apply /data/TMRKZ --with-config      # after reading the check; it stops if a file changed here would be
+                                                       # replaced: add --keep-local (leave them) or --overwrite-local
   cd /data/TMRKZ && sh start.sh                        # the images are unchanged; no tmrkz-images.tar is needed
 Then in the browser: «إدارة النظام ← مركز التحديث» must show «عامل الصيانة يعمل». Later updates go through the browser only.
 Undo: sh bootstrap.sh restore /data/TMRKZ/backups/bootstrap/<time printed by apply>   then  sh start.sh
 Never copied here and never needed on the machine: the release signing key, .env, data/, certs/, map-data/, map-runtime/.
 EOF
-  ( cd "$BS" && sha256sum TMRKZ-bootstrap-"$ID".tar MANIFEST.tsv RELEASE.json RELEASE.sig release-trust.pub bootstrap.sh REMOVED.txt INSTALL.txt config/* > SHA256SUMS )
+  ( cd "$BS" && sha256sum TMRKZ-bootstrap-"$ID".tar MANIFEST.tsv RELEASE.json RELEASE.sig release-trust.pub bootstrap.sh REMOVED.txt INSTALL.txt \
+      BASE.tsv KNOWN.tsv BASE-COMMIT.txt config/* > SHA256SUMS )
   echo "bootstrap package: $BS ($(grep -c . "$TMP/bootstrap.list") files, $(du -k "$BS/TMRKZ-bootstrap-$ID.tar" | cut -f1) KB tar, $(grep -c . "$BS/REMOVED.txt" || true) removals listed)"
 fi
 echo "release $ID: $FILES files, $BYTES bytes$( [ "$DIRTY" = true ] && echo ', includes changes not yet committed')"

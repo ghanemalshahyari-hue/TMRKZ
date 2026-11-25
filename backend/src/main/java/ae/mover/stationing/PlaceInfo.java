@@ -22,7 +22,7 @@ import ae.mover.common.Db;
 /**
  * Who is told for information once a request is finally approved (ADR-042, as in the movement programme). The parties: the
  * requesting unit and its main unit, the units located at the place and their main units, the units the requester chose, and
- * the main commands chosen explicitly. A unit may stand at this place while its main unit is elsewhere, so both are told, and
+ * the main commands chosen explicitly («الجهات الرئيسية للعلم», {@link FyiMainCommands}, the same list re-stationing reads). A unit may stand at this place while its main unit is elsewhere, so both are told, and
  * the notice names the unit and its main unit. Walking up from the place, the first level at which units are located answers.
  *
  * <p>A holder of {@value #ROLE} whose scope covers a party gets one row in {@code request_fyi}: who is told is who may read. It
@@ -55,7 +55,7 @@ public class PlaceInfo {
         Map<UUID, String> parties = parties(List.of(owner), sites);
         jdbc.sql("select organization_id from request_participant where request_id = :r and relation = 'INFO'")
                 .param("r", requestId).query(UUID.class).list().forEach(o -> parties.putIfAbsent(o, "CHOSEN"));
-        jdbc.sql("select organization_id from fyi_main_command").query(UUID.class).list().forEach(o -> parties.putIfAbsent(o, "MAIN_COMMAND"));
+        FyiMainCommands.effectiveUnits(jdbc).forEach(o -> parties.putIfAbsent(o, "MAIN_COMMAND"));
         Map<UUID, Set<UUID>> upward = new LinkedHashMap<>();
         parties.keySet().forEach(o -> upward.put(o, ancestry(o)));
         List<String> reached = new ArrayList<>();

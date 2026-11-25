@@ -51,6 +51,15 @@ export function clampToRange(center: LatLng, p: LatLng, min: number, max: number
   return { point: p, clamped: null };
 }
 
+/**
+ * The point no farther than {@code max} metres from the centre, on the same bearing; a nearer point is unchanged. The
+ * same margin as {@link clampToRange}, so a point brought back to the limit is never refused by the server's ellipsoid.
+ */
+export function withinM(center: LatLng, p: LatLng, max: number): LatLng {
+  const limit = max - Math.max(10, max * 0.005);
+  return distanceM(center, p) > limit ? destination(center, bearing(center, p), Math.max(0, limit)) : p;
+}
+
 function inRing(p: LatLng, ring: number[][]): boolean {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {

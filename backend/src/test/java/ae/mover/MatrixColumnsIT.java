@@ -51,6 +51,9 @@ class MatrixColumnsIT extends IntegrationTest {
             "UNIT_ACCESS_MANAGER",
             "ACCESS_FINAL_APPROVER");
 
+    /** MOVER's facility roles, seeded only with {@code tmrkz.access.legacy-facility-roles=true} (Bootstrap.LEGACY_FACILITY_ROLES; ADR-095 Q3). */
+    private static final List<String> LEGACY_TEST_ENV_ROLES = List.of("REQUESTER", "FACILITIES_REVIEWER", "ORG_MANAGER", "APPROVER", "LIMITED_VIEWER");
+
     private static final List<String> BANNED = List.of(
             "RESTATIONING_REQUESTER",
             "STATIONING_REGISTER_OFFICER",
@@ -84,12 +87,24 @@ class MatrixColumnsIT extends IntegrationTest {
                 default -> throw new IllegalStateException(code);
             };
             String scope = "ACCESS_FINAL_APPROVER".equals(code) ? "ALL" : "ORGANIZATION";
+            // the names ADR-095 lists (a role first created here must not carry its code as its name into other classes)
+            String name = switch (code) {
+                case "STATIONING_REQUESTER" -> "مقدم الطلب";
+                case "CHAIN_APPROVER" -> "معتمد السلسلة الهرمية";
+                case "UNIT_OPERATIONS_APPROVER" -> "معتمد عمليات الوحدة";
+                case "FINAL_APPROVER" -> "المعتمد النهائي";
+                case "FYI_RECEIVER" -> "للعلم";
+                case "POSTURE_VIEWER" -> "متابعة الموقف العملياتي";
+                case "UNIT_ACCESS_MANAGER" -> "مدير صلاحيات الوحدة";
+                case "ACCESS_FINAL_APPROVER" -> "معتمد طلبات الصلاحية";
+                default -> throw new IllegalStateException(code);
+            };
             jdbc.sql("""
                     insert into role_def(code, name, permissions, scope, summary_only, system, sort_order, grantable_roles)
                     values (:c, :n, string_to_array(:p, ','), :s, false, false, :o, '{}')
                     on conflict (code) do update set permissions = excluded.permissions, scope = excluded.scope,
                                                      sort_order = excluded.sort_order, summary_only = excluded.summary_only""")
-                    .param("c", code).param("n", code).param("p", permissions).param("s", scope).param("o", 100 + i).update();
+                    .param("c", code).param("n", name).param("p", permissions).param("s", scope).param("o", 100 + i).update();
         }
 
         UUID org = org("MATRIX", null);
@@ -108,8 +123,17 @@ class MatrixColumnsIT extends IntegrationTest {
         List<String> codes = new ArrayList<>();
         for (JsonNode c : cols) codes.add(c.path("code").asText());
 
-        // Exactly the 8 canonical codes, in order.
-        assertThat(codes).as("matrix exposes exactly the 8 canonical roles in the brief's order (ADR-095)").isEqualTo(CANONICAL);
+        // The 8 canonical codes come first, in the brief's order, whatever else the database holds.
+        assertThat(codes.subList(0, Math.min(codes.size(), CANONICAL.size())))
+                .as("the 8 canonical roles lead the matrix in the brief's order (ADR-095)").isEqualTo(CANONICAL);
+        // The suite shares one database across test classes and Spring contexts: the property above only stops THIS context's
+        // Bootstrap from seeding MOVER's facility roles, it cannot remove the rows other contexts (IntegrationTest sets the flag
+        // true) seeded before, and other classes add their own roles through IntegrationTest.role() ("T_" codes). Neither can
+        // exist on production (V64 deletes the facility roles; Bootstrap never seeds them with the flag off; "T_" roles are
+        // test fixtures). With exactly those rows set aside, the matrix must still be EXACTLY the 8 canonical roles: any other
+        // role — seeded, restored or re-created — fails here. On a fresh database nothing is set aside.
+        List<String> production = codes.stream().filter(c -> !c.startsWith("T_") && !LEGACY_TEST_ENV_ROLES.contains(c)).toList();
+        assertThat(production).as("matrix exposes exactly the 8 canonical roles in the brief's order (ADR-095)").isEqualTo(CANONICAL);
 
         // No banned code may appear anywhere in the response.
         for (String banned : BANNED) {

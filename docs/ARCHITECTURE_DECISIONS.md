@@ -3068,3 +3068,65 @@ PowerShell, one folder, main only.
 untouched `8800b58` (42 there) and recorded as open. Frontend 411/411. Browser on a throw-away installation laid out like the VM:
 `release-acceptance.mjs` 40/40, `ui-regression.mjs` 48/48, `update-center.mjs` 33/33; `bootstrap-test.sh` 9/9. Details and
 the acceptance matrix: `docs/STATUS.md`; guide with screenshots: `docs/guide/TMRKZ_FINAL_DELIVERY_GUIDE.html`.
+
+## ADR-106 Final USB delivery: VM compatibility check, areas stopped at their farthest distance, one FYI source, the 20 remaining tests (25 Nov 2026)
+
+**Context.** The owner's «Final USB Delivery and Complete Illustrated Handover» brief (25 Nov 2026) asked to verify the
+release; prepare the USB (bootstrap package, the guide, START_HERE.txt, checksums, acceptance and recovery records, and the
+signed files for the first browser update; no secret, data, certificate, cache, image archive or map dataset); complete the
+illustrated offline guide in Arabic; verify the VM layout without assuming its files match `e30c1c1` («the existing VM has had
+local modifications»), explaining how compatibility is checked before applying; resolve the FYI inconsistency (ADR-105) from
+the implementation and its data; investigate all 20 remaining backend failures without weakening a security or
+authorisation test. The same day the owner reported: a new request page chose the location and moved to the next step by
+itself («it also happened everywhere»); a 14.8 km measuring line from a registered site; and «منطقة الانتشار الفرعية لا يسمح له
+بالرسم عن الحد، فقط يضع السهم عند أقصى مسافة ممكنة مع نسبة التغيير في طبيعة الأرض».
+
+**Decision.** Accepted.
+- **VM compatibility before applying.** `make-release.sh --bootstrap <commit>` also writes `BASE.tsv` (git's id of every
+  released or removed file as at `<commit>`), `KNOWN.tsv` (every version of those files ever committed, with commit and date)
+  and `BASE-COMMIT.txt`. `bootstrap.sh check` computes the same id of each machine file without git (`blob <size>\0` + bytes,
+  sha1; checked equal to `git hash-object` under dash), and places every released file that differs from the release, and
+  every file the release removes: as at that commit (also when copied from Windows with CRLF line ends), an earlier committed
+  version (named with its commit), or CHANGED ON THIS MACHINE. `apply` stops before replacing or removing a file changed on the
+  machine (or a Compose file changed there, with `--with-config`) until the operator chooses `--keep-local` (left as it is) or
+  `--overwrite-local` (replaced; the machine's version in the backup). The baseline the Update Center compares with now records
+  a released file as signed, a file of an earlier release as installed (so the first browser update replaces it as an
+  ordinary update), and a kept hand edit as a mark no file has — the Update Center then shows it «معدّل على هذا الجهاز» and never
+  preselects it (before, a file that differed had no baseline entry, so a hand edit could be replaced unflagged). `BASE.tsv`
+  and `KNOWN.tsv` are covered by `SHA256SUMS`, not by the release signature: they only decide what is reported and when to
+  stop, never what is installed (every installed file is still checked against the signed list).
+- **Deployment areas stop at their farthest distance (owner).** The farthest an area may be is its leg's base maximum, what the
+  ground adds (the leg's own extra, else a slope class's allowance — the server's `StationingPolicy.terrainAddM`) and the
+  exception margin when the policy gives one (ADR-078). While an area is placed, moved, drawn or edited, the editor uses the most
+  any ground can add: the pointer's arrow stops there and says so; a ready shape or copy is placed no farther along the click's
+  bearing; a drag stops; each drawn corner is placed within the circle (so the drawn shape and its centre are within it); a
+  vertex, resize or rotation that would take the centre beyond it is not made (`SiteEditor.setReach`). Once placed, the
+  server's read-only terrain assessment of that shape gives the ground's own maximum (`effectiveMaxM`); an area beyond it is
+  brought back along its bearing (a few times at most, each step nearer) and the panel says why. A saved area opened as it was
+  is never moved. The server's check on save is unchanged.
+- **A site setup boundary above the policy's maximum footprint is refused** (`SiteSetupService.evaluate`, with or without
+  units). The setup has no approver to decide it, unlike a request's proposed site (ADR-087). A 271 km² boundary had been
+  registered against a 0.5 km² maximum, and every area was then measured from its far edge. The setup editor draws such a
+  boundary red. The registered site itself is left as it is (the owner redraws it).
+- **Pages never choose or move by themselves (owner).** A new «طلب مناطق انتشار» / «طلب إعادة تمركز» opens at step 1 with nothing
+  chosen (an explicitly opened unit or site is preselected, and still «التالي» moves on); «الموقف العملياتي» no longer zooms when
+  units load or on its first filter run — only «الحدود والمناطق» or a choice moves the view.
+- **One FYI source (V69).** From the implementation and its data: `fyi_main_command` (V26, ADR-042) is the one the screen writes,
+  audits and the migration centre carries; `fyi_designation` (V64) was read by the re-stationing final approval and written by
+  nothing. `fyi_main_command` is authoritative and gains «وما دونها» (`include_descendants`); V69 copies every `fyi_designation`
+  row into it (union, idempotent, audited once as `FYI_MAIN_COMMAND_MERGED`) and keeps the old table, superseded.
+  `FyiMainCommands` is the one reader of both distributions; changes stay with a global access manager, audited with who, when
+  and reason. Evidence: `docs/evidence/regression-18/FYI-RESOLUTION.md`.
+- **The 20 remaining backend failures** (`docs/evidence/regression-18/REMAINING-20.md`): 11 obsolete expectations of documented
+  design changes (ADR-095 activation at final approval; ADR-094 V55 people not read in bulk; the assistant OFF mode; the V64
+  access-request offer list) and 9 test fixture or measurement defects (a fixture violating `unit_member_check1`; a summary URL
+  that never existed; role definitions leaking between test classes through the shared database; the posture scan gate
+  reading a server-wide counter instead of its own transaction's). No application defect among them; no test deleted, skipped
+  or loosened; no bound raised; three scope assertions strengthened (`WorkflowGraphIT.askingWithScope` now proves the 403 comes
+  from the scope rule, for a role that is on the offer list).
+- **Found, not changed (owner's decision):** the posture reach asks OpenFGA once per reached unit (`RestationingService.reach`):
+  about 0.2 s at 100 units, 1.6 s at 1,000 and 9 s at 5,000 on the development machine; its SQL stays at 5–6 scans and under
+  30 ms. A faster confirmation (an OpenFGA batch check, or one confirmation per grant subtree) changes how authorisation is
+  confirmed and is left for the owner.
+- **Release hygiene.** `gen-openapi.py` writes LF on every platform (it wrote CRLF on Windows, so the release hashed bytes
+  differing from the commit).

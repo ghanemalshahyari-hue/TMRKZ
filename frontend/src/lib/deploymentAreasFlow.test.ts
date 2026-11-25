@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   AREA_NAME, RESTATION_STEPS, areaStepProblem, areaVerdict, campTree, flowStepProblem, isFlowPurpose, measuredFrom, overReason, requestIntoFlow, requestingUnitOf, restationingChoices, siteShapeKind, startStep, unitChoices, unitForest, verdictOf,
+  largestTerrainAddM, reachOf, reachText,
 } from './deploymentAreasFlow';
+import { destination, distanceM, withinM } from './geo';
 
 const unit = (id: string, state: string, site = true) => ({ id, name: 'وحدة ' + id, state, site: site ? { id: 's' + id, name: 'موقع ' + id } : null });
 
@@ -44,7 +46,8 @@ describe('«طلب مناطق انتشار» (owner brief §4, phase 3)', () => 
   });
 
   it('starts by itself at the main area when one unit may have it; otherwise the unit is chosen first', () => {
-    expect(startStep(unitChoices([unit('a', 'DEPLOYMENT_MISSING'), unit('c', 'DEPLOYMENT_REQUEST_PENDING')]))).toEqual({ step: 2, unitId: 'a' });
+    // owner, 25 Nov 2026: never chosen and never moved on by itself, even with one eligible unit
+    expect(startStep(unitChoices([unit('a', 'DEPLOYMENT_MISSING'), unit('c', 'DEPLOYMENT_REQUEST_PENDING')]))).toEqual({ step: 1, unitId: null });
     expect(startStep(unitChoices([unit('a', 'DEPLOYMENT_MISSING'), unit('b', 'DEPLOYMENT_COMPLETE')]))).toEqual({ step: 1, unitId: null });
     expect(startStep(unitChoices([]))).toEqual({ step: 1, unitId: null });
   });
@@ -171,5 +174,41 @@ describe('a saved request in the map-first editor (release closure, 20 Nov 2026)
     expect(isFlowPurpose('DEPLOYMENT_AREAS')).toBe(true);
     expect(isFlowPurpose('SITE_REGISTRATION')).toBe(false);
     expect(isFlowPurpose(undefined)).toBe(false);
+  });
+});
+
+describe('the farthest an area may be (owner, 25 Nov 2026)', () => {
+  const allowances = { FLAT: 0, UNDULATING: 500, ROLLING: 1000, HILLY: 1500, MOUNTAINOUS: 2000 };
+  const policy = { terrainAllowancesM: allowances, exception: { allowed: false, maxExtraM: 0 } };
+  const primary = { minM: 5000, maxM: 8000, terrainApplies: true };
+
+  it('is the base maximum with the most any ground can add before the place is known', () => {
+    expect(largestTerrainAddM(primary, policy)).toBe(2000);
+    expect(reachOf(primary, policy)).toEqual({ baseMaxM: 8000, terrainM: 2000, exceptionM: 0, maxM: 10000, assessed: false });
+    expect(reachText(reachOf(primary, policy))).toContain('حتى');
+  });
+
+  it("is the server's effective maximum for the ground under a placed area, never less than the base", () => {
+    expect(reachOf(primary, policy, 9000)).toEqual({ baseMaxM: 8000, terrainM: 1000, exceptionM: 0, maxM: 9000, assessed: true });
+    expect(reachOf(primary, policy, 8000).maxM).toBe(8000);
+    expect(reachText(reachOf(primary, policy, 9000))).not.toContain('حتى');
+  });
+
+  it("adds nothing when the terrain does not apply, a leg's own extra when it has one, and the exception margin when allowed", () => {
+    expect(reachOf({ ...primary, terrainApplies: false }, policy).maxM).toBe(8000);
+    expect(largestTerrainAddM({ ...primary, terrainExtra: { kind: 'PERCENT', value: 25 } }, policy)).toBe(2000);
+    expect(largestTerrainAddM({ ...primary, terrainExtra: { kind: 'ABSOLUTE', value: 700 } }, policy)).toBe(700);
+    expect(reachOf(primary, { ...policy, exception: { allowed: true, maxExtraM: 1000 } }).maxM).toBe(11000);
+  });
+
+  it('brings a point beyond the limit back on its own bearing, just inside it, and leaves a nearer point alone', () => {
+    const o = { lat: 24.4, lng: 54.4 };
+    const far = destination(o, 60, 22_200);
+    const back = withinM(o, far, 7000);
+    expect(distanceM(o, back)).toBeLessThan(7000);
+    expect(distanceM(o, back)).toBeGreaterThan(6900);
+    expect(distanceM(far, back)).toBeCloseTo(22_200 - distanceM(o, back), -1);
+    const near = destination(o, 60, 4000);
+    expect(withinM(o, near, 7000)).toBe(near);
   });
 });

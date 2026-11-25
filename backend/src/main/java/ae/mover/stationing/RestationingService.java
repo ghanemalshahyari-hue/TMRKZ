@@ -706,8 +706,8 @@ public class RestationingService {
     /**
      * ADR-095 D1: the final-approval body for a non-extension request. Invoked inside {@link #settle} in the same transaction
      * as the final approver's decision and never exposed as its own endpoint — no separation-of-duties guard, no FYI gate.
-     * The units informed are read afterwards from the organisation-wide {@code fyi_designation} table (ADR-095 B2, matches
-     * MOVER's «الجهات الرئيسية للعلم»).
+     * The units informed are read afterwards from «الجهات الرئيسية للعلم» ({@code fyi_main_command}, ADR-095 B2, one
+     * source since V69 — {@link #autoFyi}).
      */
     void applyApprovedDecision(AccessContext ctx, Req r, Instant now) {
         UUID id = r.id();
@@ -908,29 +908,22 @@ public class RestationingService {
     // ---- FYI distribution (ADR-095 unit configuration) ---------------------------------------------------------
 
     /**
-     * Owner, 21 Nov 2026 (ADR-095 B2): the units informed after final approval are read from the organisation-wide
-     * {@code fyi_designation} table, which matches MOVER's «الجهات الرئيسية للعلم» shape: a flat list of
-     * {@code (unit_id, include_descendants)} pairs. The effective FYI set is the union of every row's unit plus
-     * (when {@code include_descendants} is true) its active descendant units at the moment of distribution.
+     * Owner, 21 Nov 2026 (ADR-095 B2): the units informed after final approval are one organisation-wide flat list,
+     * «الجهات الرئيسية للعلم». Since V69 (owner brief 25 Nov 2026, item 5) it is read from the one table the screen of that
+     * name writes, {@code fyi_main_command}, through {@link FyiMainCommands} — the same reader the requests' FYI uses; the
+     * V64 table {@code fyi_designation}, which nothing wrote, is superseded. The effective FYI set is every chosen unit plus
+     * (when chosen with «وما دونها») its active descendant units at the moment of distribution.
      * {@link #applyApprovedDecision} and {@link #applyApprovedExtensionDecision} call this inside the same transaction
      * as the activation, so the recipients are written atomically with the stationing.
      */
     void autoFyi(AccessContext ctx, Req r, Instant now) {
-        List<UUID> units = jdbc.sql("""
-                with recursive descendants as (
-                  select d.unit_id as uid, d.include_descendants, d.unit_id as source from fyi_designation d
-                  union all
-                  select o.id as uid, true, dd.source
-                    from organization o join descendants dd on o.parent_id = dd.uid
-                   where dd.include_descendants = true and o.status = 'ACTIVE')
-                select distinct uid from descendants""")
-                .query(UUID.class).list();
+        List<UUID> units = FyiMainCommands.effectiveUnits(jdbc);
         if (units.isEmpty()) {
             jdbc.sql("""
                     update restationing_request set fyi_done_at = :now, fyi_done_by = :by, fyi_note = :note,
                            updated_at = :now, version = version + 1 where id = :id""")
                     .param("now", Db.ts(now)).param("by", ctx.personId())
-                    .param("note", "لا وحدات علم مهيأة للوحدة الطالبة (ADR-095).").param("id", r.id()).update();
+                    .param("note", "لا جهات محددة في «الجهات الرئيسية للعلم» (ADR-095).").param("id", r.id()).update();
             return;
         }
         for (UUID unit : units) {
@@ -958,13 +951,13 @@ public class RestationingService {
                 update restationing_request set fyi_done_at = :now, fyi_done_by = :by, fyi_note = :note,
                        updated_at = :now, version = version + 1 where id = :id""")
                 .param("now", Db.ts(now)).param("by", ctx.personId())
-                .param("note", "موزّع تلقائياً من وحدات العلم المهيأة للوحدة الطالبة (ADR-095).").param("id", r.id()).update();
+                .param("note", "موزّع تلقائياً على «الجهات الرئيسية للعلم» (ADR-095).").param("id", r.id()).update();
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("units", units.stream().map(UUID::toString).toList());
         detail.put("recipients", recipients.stream().map(UUID::toString).toList());
         detail.put("access", "قراءة هذا الطلب فقط");
         detail.put("purpose", r.purpose());
-        detail.put("source", "unit_fyi_target configuration (ADR-095)");
+        detail.put("source", "fyi_main_command «الجهات الرئيسية للعلم» (V69)");
         audit.recordAs(ctx.actor(), "RESTATIONING_FYI_DISTRIBUTED", "RESTATIONING_REQUEST", r.id().toString(), r.number(), detail, null);
     }
 

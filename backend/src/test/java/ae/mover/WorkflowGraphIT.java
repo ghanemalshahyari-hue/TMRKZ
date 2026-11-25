@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,17 @@ class WorkflowGraphIT extends IntegrationTest {
     private ae.mover.stationing.PlaceInfo placeInfo;
 
     UUID root, branch, unit, other, site, res;
+
+    @AfterEach
+    void restoreOffer() {
+        if (offerBefore != null) {
+            // every column as it was (audience, description, scope modes, default scope)
+            jdbc.sql("delete from access_request_offer").update();
+            jdbc.sql("insert into access_request_offer select * from json_populate_recordset(null::access_request_offer, cast(:j as json))")
+                    .param("j", offerBefore).update();
+            offerBefore = null;
+        }
+    }
 
     @BeforeEach
     void fixtures() {
@@ -922,7 +934,8 @@ class WorkflowGraphIT extends IntegrationTest {
         opsHierarchy();
         jdbc.sql("""
                 insert into role_def(code, name, permissions, scope, summary_only, sort_order) values ('UNIT_OPERATIONS_APPROVER', 'معتمد عمليات الوحدة', array['VIEW','REVIEW'], 'ORGANIZATION', false, 951)
-                on conflict (code) do nothing""").update();
+                on conflict (code) do update set name = excluded.name, permissions = excluded.permissions, scope = excluded.scope,
+                                                 summary_only = excluded.summary_only""").update(); // see ROLE_DEFINITIONS_NOTE
         UUID dayUnit = hrUnit("DAYU", main, 5, false);
         UUID nightUnit = hrUnit("NIGHTU", main, 5, false);
         scoped("uoDay", "UNIT_OPERATIONS_APPROVER", dayUnit, unitTarget(main, true));
@@ -1012,6 +1025,15 @@ class WorkflowGraphIT extends IntegrationTest {
         throw new AssertionError("not in the inbox: " + request);
     }
 
+    /*
+     * ROLE_DEFINITIONS_NOTE. The suite shares one database: other classes (MatrixColumnsIT, the authz scope ITs, SiteSetupIT …)
+     * seed the same canonical role codes with their own names and permissions, and with "on conflict do nothing" whichever
+     * class ran first decided what these journeys saw (MatrixColumnsIT, which runs earlier, names each role by its code and
+     * gives UNIT_OPERATIONS_APPROVER no REVIEW, so the facilities step assigned to it could not be published). The journeys
+     * here set the definitions they are written for, as on a fresh database. WorkflowGraphIT runs last in the suite.
+     */
+    private String offerBefore;
+
     private void accessRoles() {
         jdbc.sql("""
                 insert into role_def(code, name, permissions, scope, summary_only, sort_order) values
@@ -1020,7 +1042,19 @@ class WorkflowGraphIT extends IntegrationTest {
                   ('FYI_RECEIVER', 'للعلم', array['VIEW_SUMMARY'], 'SITE', false, 953),
                   ('UNIT_ACCESS_MANAGER', 'مدير صلاحيات الوحدة', array['MANAGE_ACCESS','REVIEW'], 'ORGANIZATION', false, 954),
                   ('ACCESS_FINAL_APPROVER', 'معتمد طلبات الصلاحية', array['REVIEW','APPROVE'], 'ALL', false, 955)
-                on conflict (code) do nothing""").update();
+                on conflict (code) do update set name = excluded.name, permissions = excluded.permissions, scope = excluded.scope,
+                                                 summary_only = excluded.summary_only""").update();
+        // What a person may ask for is the system administrator's setting (ADR-044, V29). V64 (ADR-095 Q3) removed MOVER's
+        // facility roles from that list on every installation — and V49 (ADR-078) had already put «مقدم الطلب» in REQUESTER's
+        // place — while the test environment still keeps REQUESTER for the facilities engine (legacy-facility-roles=true).
+        // These journeys ask for REQUESTER, so the administrator offers it to everyone here, through the same endpoint, beside
+        // the three roles V29 offers; the list is restored after the test.
+        if (offerBefore == null) {
+            offerBefore = jdbc.sql("select coalesce(json_agg(o), '[]'::json)::text from access_request_offer o").query(String.class).single();
+        }
+        Res offered = login("admin").put("/access-requests/offer", Map.of("REQUESTER", "EVERYONE", "CHAIN_APPROVER", "EVERYONE",
+                "UNIT_OPERATIONS_APPROVER", "EVERYONE", "FYI_RECEIVER", "EVERYONE"));
+        assertThat(offered.status()).as(String.valueOf(offered.body())).isEqualTo(200);
         jdbc.sql("update request_type set active = false where kind = 'ACCESS'").update();
         requestType("ACCESS", flow(
                 List.of(node("st", "start"), approval("rev", false, place("UNIT_ACCESS_MANAGER", "BY_SCOPE")),
@@ -1154,8 +1188,13 @@ class WorkflowGraphIT extends IntegrationTest {
         person("mgrScope", "UNIT_ACCESS_MANAGER", section);
         person("finScope", "ACCESS_FINAL_APPROVER", root);
         Api me = login("scoped");
-        assertThat(me.post("/access-requests", Map.of("roles", List.of("REQUESTER"), "reason", "أحتاجها لعملي في الوحدة", "scope", Map.of("mode", "ALL"))).status())
-                .as("the whole system is never asked for").isEqualTo(403);
+        // the role is on the person's list, so the refusal below can only be the scope rule's
+        assertThat(me.get("/access-requests/mine").body().path("requestable").toString()).contains("\"code\":\"REQUESTER\"");
+        Res whole = me.post("/access-requests", Map.of("roles", List.of("REQUESTER"), "reason", "أحتاجها لعملي في الوحدة", "scope", Map.of("mode", "ALL")));
+        assertThat(whole.status()).as("the whole system is never asked for").isEqualTo(403);
+        assertThat(whole.body().path("message").asText()).isEqualTo("النطاق الشامل يمنحه مدير صلاحيات عام عند الاعتماد النهائي فقط.");
+        assertThat(jdbc.sql("select count(*) from access_request where person_id = :p").param("p", asker).query(Long.class).single())
+                .as("nothing is recorded for a refused scope").isZero();
         assertThat(me.post("/access-requests", Map.of("roles", List.of("REQUESTER"), "reason", "أحتاجها لعملي في الوحدة", "scope", Map.of("mode", "UNITS", "ids", List.of(root.toString())))).status())
                 .as("units of the person's own branch").isEqualTo(400);
         Res sent = me.post("/access-requests", Map.of("roles", List.of("REQUESTER"), "reason", "أحتاجها لعملي في الوحدة", "scope", Map.of("mode", "UNIT_TREE")));

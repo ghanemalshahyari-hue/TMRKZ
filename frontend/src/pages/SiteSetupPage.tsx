@@ -142,6 +142,7 @@ export function SiteSetupPage() {
   const [mapReady, setMapReady] = useState(false);
   const listeners = useRef(new Set<(l: SiteLive) => void>());
   const targetRef = useRef<EditTarget>('site');
+  const maxFootprintRef = useRef<number | null>(null);
   const loadedKey = useRef('site');
   const placingAreaRef = useRef(false);
   placingAreaRef.current = placingArea;
@@ -198,7 +199,8 @@ export function SiteSetupPage() {
         if (t === 'site') setGeometry(l.geometry ?? null);
         else setPlan((p) => withArea(p, t.unit, t.role, l.geometry && l.geometry.type === 'Polygon' ? (l.geometry as unknown as GeoPolygon) : null));
       },
-      maxAreaM2: () => null,
+      // the site's boundary within the policy's maximum footprint (ADR-106): drawn red above it; the server refuses it
+      maxAreaM2: () => (targetRef.current === 'site' ? maxFootprintRef.current : null),
     });
     m.on('click', (e: MapMouseEvent) => {
       if (pickRef.current) {
@@ -394,6 +396,11 @@ export function SiteSetupPage() {
   const areaDefault = resolveAreaDefault((policy?.values as { deploymentAreaDefault?: AreaDefault | null } | undefined)?.deploymentAreaDefault ?? null);
   const areaDefaultRef = useRef(areaDefault);
   areaDefaultRef.current = areaDefault;
+  maxFootprintRef.current = policy?.values.maxFootprintAreaM2 ?? null;
+  // the site drawn before the policy was read is measured again against its maximum
+  useEffect(() => {
+    if (mapReady) editor.current?.refresh();
+  }, [mapReady, policy?.version]); // eslint-disable-line react-hooks/exhaustive-deps
   // what the editor holds: the site, or at steps 4 and 5 the area of the unit chosen there
   const areaRole: 'primary' | 'alternative' | null = adding && admin && !made ? (step === 4 ? 'primary' : step === 5 ? 'alternative' : null) : null;
   const activeUnit = plan.find((u) => u.id === active) ?? plan[0] ?? null;

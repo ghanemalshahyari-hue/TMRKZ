@@ -23,10 +23,10 @@ import ae.mover.security.Actor;
  * The lifecycle of a re-stationing request (ADR-034; owner-approved model D9, D10, D12, D16, A4, A5, A6) on the
  * disposable PostgreSQL + PostGIS with OpenFGA in the loop: cancellation before activation, cancellation of an activated
  * temporary before its start (including a start held by a pending cancellation, a refusal after the approved start and a
- * window that ends without a start), early return, extension with its separate activation, and an extension that lapses.
+ * window that ends without a start), early return, extension activated by its final approval (ADR-095), and an extension that lapses.
  * Since ADR-078 none of these is a permission of its own: a requester of the requesting unit starts each, the unit's final
- * approver (the nearest holder of «الاعتماد النهائي») decides it, never the human who started it, and «تفعيل التمركز» activates
- * an approved extension. Time-dependent steps run the scheduler and the decisions at explicit instants.
+ * approver (the nearest holder of «الاعتماد النهائي») decides it, never the human who started it; since ADR-095 the final
+ * APPROVE of an extension activates it in the same transaction. Time-dependent steps run the scheduler and the decisions at explicit instants.
  */
 class RestationingLifecycleIT extends RestationingTestBase {
 
@@ -53,9 +53,22 @@ class RestationingLifecycleIT extends RestationingTestBase {
     // ---- cancellation before activation (D9, D16) ---------------------------------------------------------
 
     @Test
-    @DisplayName("Cancellation before activation: started by a requester of the unit; pending blocks activation; decided by the unit's final approver, never by who started it; rejection restores")
+    @DisplayName("Cancellation before activation: started by a requester of the unit; pending blocks the final approval that activates (ADR-095); decided by the unit's final approver, never by who started it; rejection restores")
     void cancellationBeforeActivation() {
-        String id = approvedPermanent(List.of(team));
+        // ADR-095 (commit 7df000b): the final APPROVE activates in the same transaction, so APPROVED_NOT_ACTIVATED is never
+        // reached. An activated request has no «cancellation before activation» any more; the window before activation is the
+        // review up to the final decision, and that decision is what a pending cancellation blocks.
+        String activated = approvedPermanent(List.of(team));
+        Res late = login("req").post("/restationing-requests/" + activated + "/cancellation", Map.of("reason", "لم تعد الحاجة قائمة"));
+        assertThat(late.status()).as("an activated request is not cancelled before activation").isEqualTo(400);
+        assertThat(late.body().path("message").asText()).isEqualTo("يُطلب الإلغاء قبل التفعيل فقط.");
+        assertThat(state(activated)).isEqualTo("ACTIVATED_PERMANENT");
+
+        String id = create("req", permanent(List.of(team)));
+        assertThat(login("req").post("/restationing-requests/" + id + "/submit", Map.of()).status()).isEqualTo(200);
+        decide("apSec", id, "APPROVE");
+        decide("apDept", id, "APPROVE");
+        // only the final stage, whose APPROVE activates, is left
         Res asked = login("req").post("/restationing-requests/" + id + "/cancellation", Map.of("reason", "لم تعد الحاجة قائمة"));
         assertThat(asked.status()).as(asked.toString()).isEqualTo(200);
         assertThat(asked.body().path("state").asText()).isEqualTo("CANCELLATION_PENDING");
@@ -63,8 +76,11 @@ class RestationingLifecycleIT extends RestationingTestBase {
         assertThat(login("finalApprover").get("/restationing-requests/" + id).body().path("can").path("decideAction").asText()).isEqualTo(action);
         assertThat(login("finalTop").get("/restationing-requests/" + id).body().path("can").path("decideAction").isNull())
                 .as("a wider final approver has no turn: the nearest decides").isTrue();
-        assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).status()).as("a pending cancellation blocks activation")
-                .isEqualTo(400);
+        Res blocked = decide("apTop", id, "APPROVE");
+        assertThat(blocked.status()).as("a pending cancellation blocks the final approval, which activates").isEqualTo(400);
+        assertThat(state(id)).isEqualTo("CANCELLATION_PENDING");
+        assertThat(jdbc.sql("select count(*) from org_stationing where request_id = cast(:id as uuid)").param("id", id).query(Long.class).single())
+                .as("nothing activated while the cancellation is pending").isZero();
         Res self = decideAction("req", id, action, "APPROVE", null);
         assertThat(self.status()).isEqualTo(403);
         assertThat(self.code()).isEqualTo("SEPARATION_OF_DUTIES");
@@ -73,7 +89,7 @@ class RestationingLifecycleIT extends RestationingTestBase {
         assertThat(decideAction("finalTop", id, action, "APPROVE", null).status()).as("nor a wider final approver").isEqualTo(403);
         assertThat(decideAction("finalApprover", id, action, "REJECT", null).status()).as("a rejection needs a reason").isEqualTo(400);
         Res rejected = decideAction("finalApprover", id, action, "REJECT", "الطلب ما زال مطلوباً");
-        assertThat(rejected.body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(rejected.body().path("state").asText()).as("the rejection restores the review where it was").isEqualTo("UNDER_REVIEW");
 
         assertThat(login("apSec").post("/restationing-requests/" + id + "/cancellation", Map.of("reason", "ليس من مقدمي الطلب")).status())
                 .as("only a requester of the unit starts it").isEqualTo(403);
@@ -84,8 +100,15 @@ class RestationingLifecycleIT extends RestationingTestBase {
         assertThat(own.code()).as("whoever started an action never decides it").isEqualTo("SEPARATION_OF_DUTIES");
         Res cancelled = decideAction("finalApprover", id, again, "APPROVE", null);
         assertThat(cancelled.body().path("state").asText()).isEqualTo("CANCELLED_BEFORE_ACTIVATION");
-        assertThat(login("activator").post("/restationing-requests/" + id + "/activate", Map.of()).status()).isEqualTo(400);
+        assertThat(decide("apTop", id, "APPROVE").status()).as("a cancelled request is never finally approved, so never activated").isEqualTo(400);
+        // the retained /activate is an idempotent no-op (ADR-095 API compatibility): it changes nothing
+        Res noop = login("activator").post("/restationing-requests/" + id + "/activate", Map.of());
+        assertThat(noop.status()).as(noop.toString()).isEqualTo(200);
+        assertThat(noop.body().path("state").asText()).isEqualTo("CANCELLED_BEFORE_ACTIVATION");
+        assertThat(state(id)).isEqualTo("CANCELLED_BEFORE_ACTIVATION");
         assertThat(jdbc.sql("select count(*) from org_stationing where request_id = cast(:id as uuid)").param("id", id).query(Long.class).single()).isZero();
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'RESTATIONING_ACTIVATED'")
+                .param("id", id).query(Long.class).single()).isZero();
         assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action like 'RESTATIONING_PRE_ACTIVATION_CANCELLATION_%'")
                 .param("id", id).query(Long.class).single()).isEqualTo(2);
     }
@@ -206,22 +229,32 @@ class RestationingLifecycleIT extends RestationingTestBase {
     // ---- extension (D10, A5) --------------------------------------------------------------------------------
 
     @Test
-    @DisplayName("Extension: its own approval, a separate activation with «تفعيل التمركز» (never by its requester); the stationing runs on to the new end")
+    @DisplayName("Extension: its own approval, whose final APPROVE activates it in the same transaction (ADR-095, D10); /activate is a no-op for anyone; the stationing runs on to the new end")
     void extension() {
         Instant start = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plus(Duration.ofHours(1));
         Instant end = start.plus(Duration.ofHours(2));
         Instant extended = end.plus(Duration.ofHours(2));
         String id = activatedTemporary(start, end);
         service.runTemporaryLifecycle(start.plus(Duration.ofMinutes(5)));
-        String ext = approvedExtension(id, extended);
-        assertThat(login("req").post("/restationing-requests/" + ext + "/activate", Map.of()).code()).as("its requester never activates it")
-                .isEqualTo("SEPARATION_OF_DUTIES");
-        assertThat(login("finalApprover").post("/restationing-requests/" + ext + "/activate", Map.of()).status())
-                .as("deciding is not activating").isEqualTo(403);
-        assertThat(login("activator").get("/restationing-requests/" + ext).body().path("can").path("activate").asBoolean()).isTrue();
-        Res act = login("activator").post("/restationing-requests/" + ext + "/activate", Map.of());
-        assertThat(act.status()).as(act.toString()).isEqualTo(200);
-        assertThat(act.body().path("state").asText()).isEqualTo("EXTENSION_ACTIVATED");
+        // ADR-095: «An approved extension's activation runs the same way inside the final approver's transaction (D10)»; the
+        // separate «تفعيل التمركز» and its separation-of-duties rule are retired by construction
+        String ext = activatedExtension(id, extended);
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'RESTATIONING_EXTENSION_ACTIVATED'")
+                .param("id", ext).query(Long.class).single()).as("activated once, by the final approval").isEqualTo(1);
+        long recordsBefore = jdbc.sql("select count(*) from org_stationing where organization_id = :o and kind = 'TEMPORARY'").param("o", team)
+                .query(Long.class).single();
+        long auditBefore = jdbc.sql("select count(*) from audit_event where entity_id = :id").param("id", ext).query(Long.class).single();
+        for (String who : List.of("req", "finalApprover", "activator", "apTop")) {
+            assertThat(login(who).get("/restationing-requests/" + ext).body().path("can").path("activate").asBoolean())
+                    .as(who + ": no separate activation action").isFalse();
+            Res again = login(who).post("/restationing-requests/" + ext + "/activate", Map.of());
+            assertThat(again.status()).as(who + " " + again).isEqualTo(200);
+            assertThat(again.body().path("state").asText()).isEqualTo("EXTENSION_ACTIVATED");
+        }
+        assertThat(jdbc.sql("select count(*) from org_stationing where organization_id = :o and kind = 'TEMPORARY'").param("o", team)
+                .query(Long.class).single()).as("no second activation").isEqualTo(recordsBefore);
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id").param("id", ext).query(Long.class).single())
+                .as("the no-op writes nothing").isEqualTo(auditBefore);
         List<Map<String, Object>> recs = jdbc.sql("""
                 select request_id, end_reason, valid_from, valid_to, planned_end from org_stationing
                  where organization_id = :o and kind = 'TEMPORARY' order by valid_from""").param("o", team).query().listOfRows();
@@ -239,19 +272,30 @@ class RestationingLifecycleIT extends RestationingTestBase {
     }
 
     @Test
-    @DisplayName("Extension not activated before the end lapses (A5) and can no longer be activated")
+    @DisplayName("Extension not activated before the end lapses (A5) and can no longer be approved, so never activated")
     void extensionLapses() {
         Instant start = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plus(Duration.ofHours(1));
         Instant end = start.plus(Duration.ofHours(2));
         String id = activatedTemporary(start, end);
         service.runTemporaryLifecycle(start.plus(Duration.ofMinutes(5)));
-        String ext = approvedExtension(id, end.plus(Duration.ofHours(1)));
+        // ADR-095: an extension is activated by its final APPROVE, so the one not yet activated is still under review —
+        // here every stage but the final one has approved when the temporary stationing ends
+        String ext = reviewedExtension(id, end.plus(Duration.ofHours(1)));
         service.runTemporaryLifecycle(end.plus(Duration.ofMinutes(5)));
         assertThat(state(id)).isEqualTo("TEMPORARY_RETURNED");
         assertThat(state(ext)).isEqualTo("LAPSED_NOT_ACTIVATED");
         assertThat(jdbc.sql("select lapse_reason from restationing_request where id = cast(:id as uuid)").param("id", ext).query(String.class).single())
                 .isNotBlank();
-        assertThat(login("activator").post("/restationing-requests/" + ext + "/activate", Map.of()).status()).isEqualTo(400);
+        assertThat(decide("apTop", ext, "APPROVE").status()).as("a lapsed extension is never finally approved").isEqualTo(400);
+        // the retained /activate is an idempotent no-op (ADR-095): it changes nothing
+        Res noop = login("activator").post("/restationing-requests/" + ext + "/activate", Map.of());
+        assertThat(noop.status()).as(noop.toString()).isEqualTo(200);
+        assertThat(state(ext)).isEqualTo("LAPSED_NOT_ACTIVATED");
+        assertThat(jdbc.sql("select count(*) from org_stationing where request_id = cast(:id as uuid)").param("id", ext).query(Long.class).single())
+                .as("a lapsed extension adds no stationing").isZero();
+        assertThat(jdbc.sql("select count(*) from audit_event where entity_id = :id and action = 'RESTATIONING_EXTENSION_ACTIVATED'")
+                .param("id", ext).query(Long.class).single()).isZero();
+        assertThat(kindsInForce(end.plus(Duration.ofMinutes(10)))).containsExactly("PERMANENT");
     }
 
     // ---- helpers -------------------------------------------------------------------------------------------
@@ -267,16 +311,28 @@ class RestationingLifecycleIT extends RestationingTestBase {
         return id;
     }
 
-    private String approvedExtension(String parent, Instant newEnd) {
+    /** An extension approved by every stage but the final one: still under review, not activated. */
+    private String reviewedExtension(String parent, Instant newEnd) {
         Res created = login("req").post("/restationing-requests/" + parent + "/extensions", Map.of("end", newEnd.toString(), "reason", "امتد النشاط"));
         assertThat(created.status()).as(created.toString()).isEqualTo(200);
         assertThat(created.body().path("requestKind").asText()).isEqualTo("EXTENSION");
         String ext = created.body().path("id").asText();
         Res submitted = login("req").post("/restationing-requests/" + ext + "/submit", Map.of());
         assertThat(submitted.status()).as(submitted.toString()).isEqualTo(200);
-        decide("apSec", ext, "APPROVE");
-        decide("apDept", ext, "APPROVE");
-        assertThat(decide("apTop", ext, "APPROVE").body().path("state").asText()).isEqualTo("APPROVED_NOT_ACTIVATED");
+        assertThat(decide("apSec", ext, "APPROVE").status()).isEqualTo(200);
+        assertThat(decide("apDept", ext, "APPROVE").status()).isEqualTo(200);
+        assertThat(state(ext)).isEqualTo("UNDER_REVIEW");
+        return ext;
+    }
+
+    /** ADR-095 (D10): the extension's final APPROVE activates it in the same transaction, by the final approver. */
+    private String activatedExtension(String parent, Instant newEnd) {
+        String ext = reviewedExtension(parent, newEnd);
+        Res fin = decide("apTop", ext, "APPROVE");
+        assertThat(fin.status()).as(fin.toString()).isEqualTo(200);
+        assertThat(fin.body().path("state").asText()).isEqualTo("EXTENSION_ACTIVATED");
+        assertThat(fin.body().path("activation").path("by").path("id").asText()).as("activated by the final approver")
+                .isEqualTo(personId("apTop").toString());
         return ext;
     }
 

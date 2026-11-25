@@ -27,14 +27,19 @@ import com.fasterxml.jackson.databind.JsonNode;
  *   └── MAIN-B
  *       └── B1
  *
- *   P1 posted at A1                 — visible to M1
- *   P2 posted at A1-1               — visible to M1
- *   P3 posted at A2                 — hidden
- *   P4 posted at MAIN-A             — hidden
- *   P5 posted at B1                 — hidden
- *   P6 HR at B1 but added to A1     — visible to M1 (attachment inside reach)
- *   P7 HR at B1 attached then ended — hidden
+ *   P1 posted at A1, user of A1          — visible to M1
+ *   P2 posted at A1-1, user of A1-1      — visible to M1
+ *   P3 posted at A2, user of A2          — hidden
+ *   P4 posted at MAIN-A, user of MAIN-A  — hidden
+ *   P5 posted at B1, user of B1          — hidden
+ *   P6 HR at B1 but added to A1          — visible to M1 (attachment inside reach)
+ *   P7 HR at B1 attached then ended      — hidden
  * </pre>
+ *
+ * <p>Since ADR-061 (owner, 16 Nov 2026) a unit's users are those added («إضافة مستخدم», an approved access request or a
+ * direct grant); an HR posting alone lists no one in the counts, the tree, the people search or the unit file. P1–P5 are
+ * therefore users of the unit they are posted at, added by the administrator, so the hidden ones are real users that a
+ * global manager sees (checked) and that M1 must not.
  */
 class AccessScopeParityIT extends IntegrationTest {
 
@@ -60,13 +65,23 @@ class AccessScopeParityIT extends IntegrationTest {
         p3 = hrPersonAt(a2, "p3");
         p4 = hrPersonAt(mainA, "p4");
         p5 = hrPersonAt(b1, "p5");
+        // users of the units they are posted at (ADR-061: a posting alone makes no one a user)
+        attach(p1, a1);
+        attach(p2, a11);
+        attach(p3, a2);
+        attach(p4, mainA);
+        attach(p5, b1);
         // P6: posted at B1, local attachment ACTIVE at A1 — visible to M1
         p6 = hrPersonAt(b1, "p6");
         attach(p6, a1);
         // P7: posted at B1, attachment to A1 ENDED — not visible to M1
         p7 = hrPersonAt(b1, "p7");
         attach(p7, a1);
-        jdbc.sql("update unit_member set ended_at = now() where person_id = :p").param("p", p7).update();
+        // Ended exactly as UnitMemberService ends an entry: V33 requires ended_by with ended_at (unit_member_check1) and
+        // ended_at >= added_at (unit_member_check).
+        jdbc.sql("""
+                update unit_member set ended_at = greatest(now(), added_at), ended_by = :by, ended_reason = 'اختبار: انتهى الإلحاق'
+                where person_id = :p and ended_at is null""").param("p", p7).param("by", admin).update();
         // M1 is also in the unit_member directory of A1 (so search sees them)
         attach(m1, a1);
         m1Api = login("m1_" + sfx);
@@ -103,6 +118,9 @@ class AccessScopeParityIT extends IntegrationTest {
         List<String> ids = idsOf(r.body());
         assertThat(ids).contains(p1.toString(), p2.toString(), p6.toString());
         assertThat(ids).doesNotContain(p3.toString(), p4.toString(), p5.toString(), p7.toString());
+        // control: the hidden ones are real users, found by a manager over everything
+        List<String> global = idsOf(login("scope_admin_" + sfx).get("/access/workspace/search?kind=PEOPLE&q=" + urlEncode("الموظف")).body());
+        assertThat(global).contains(p1.toString(), p2.toString(), p3.toString(), p4.toString(), p5.toString(), p6.toString());
     }
 
     @Test
@@ -117,7 +135,9 @@ class AccessScopeParityIT extends IntegrationTest {
             Res out = m1Api.get("/access/unit-members/lookup?organizationId=" + a1 + "&key=" + empOf(hidden));
             Res bogus = m1Api.get("/access/unit-members/lookup?organizationId=" + a1 + "&key=BOGUS-" + sfx);
             assertThat(out.status()).as("hidden " + hidden).isEqualTo(bogus.status());
-            assertThat(out.body()).as("hidden " + hidden).isEqualTo(bogus.body());
+            // the whole answer is the same; only the per-request trace id differs
+            assertThat(withoutTrace(out.body())).as("hidden " + hidden).isEqualTo(withoutTrace(bogus.body()));
+            assertThat(out.body().path("traceId").asText()).as("each answer carries its own trace id").isNotEqualTo(bogus.body().path("traceId").asText());
         }
     }
 
@@ -156,19 +176,34 @@ class AccessScopeParityIT extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("SCOPE-06 unit summary counts only reach people (P1, P2 and P6 at the subtree); not P3 / P4 / P5 / P7")
+    @DisplayName("SCOPE-06 the counters count only reach people (P1, P2 and P6 at the subtree, and M1); not P3 / P4 / P5 / P7")
     void countsScoped() {
-        Res r = m1Api.get("/access/workspace/units/" + a1 + "/summary");
+        // the workspace counters over the manager's reach (GET /access/workspace/summary; there is no per-unit /summary)
+        Res r = m1Api.get("/access/workspace/summary");
         assertThat(r.status()).isEqualTo(200);
-        long people = r.body().path("people").asLong();
-        assertThat(people).as("P1@A1 + P2@A1-1 + P6 attached, plus M1 themselves (4)").isLessThanOrEqualTo(6);
-        assertThat(people).isGreaterThanOrEqualTo(3);
+        assertThat(r.body().path("global").asBoolean()).isFalse();
+        assertThat(r.body().path("units").asLong()).as("A1 and A1-1").isEqualTo(2);
+        assertThat(r.body().path("people").asLong()).as("P1@A1 + P2@A1-1 + P6 attached + M1 themselves").isEqualTo(4);
+        // the unit file of A1 counts A1's own users: P1, P6 and M1
+        Res unit = m1Api.get("/access/workspace/units/" + a1);
+        assertThat(unit.status()).isEqualTo(200);
+        assertThat(unit.body().path("people").asLong()).as("P1 + P6 + M1").isEqualTo(3);
+        // a unit outside the reach is not opened at all
+        assertThat(m1Api.get("/access/workspace/units/" + b1).status()).isIn(403, 404);
     }
 
     // ---- helpers ----------------------------------------------------------------------------------------------------
 
     private static String urlEncode(String s) {
         return java.net.URLEncoder.encode(s, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    private static JsonNode withoutTrace(JsonNode body) {
+        JsonNode copy = body.deepCopy();
+        if (copy instanceof com.fasterxml.jackson.databind.node.ObjectNode o) {
+            o.remove("traceId");
+        }
+        return copy;
     }
 
     private static List<String> idsOf(JsonNode body) {

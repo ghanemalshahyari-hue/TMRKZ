@@ -32,7 +32,8 @@ cd %USERPROFILE%\Desktop\TMRKZ
 - الأمر الأول ينشئ مفتاح التوقيع مرة واحدة في `ops\local\.generated\release-signing.key` (يبقى على هذا الجهاز ولا يُنسخ أبداً).
 - الأمر الثاني يكتب المجلد `release\bootstrap\` لـVM تعمل بنسخة `e30c1c1` (تحديث 24 نوفمبر): ملف `TMRKZ-bootstrap-<الإصدار>.tar`
   (الملفات المتغيرة فقط)، وقائمة الملفات الموقعة `MANIFEST.tsv` و`RELEASE.json` و`RELEASE.sig`، و`config\` (ملفا Compose
-  للمراجعة)، و`release-trust.pub` (المفتاح العام فقط)، و`bootstrap.sh`، و`INSTALL.txt`، و`SHA256SUMS`.
+  للمراجعة)، و`release-trust.pub` (المفتاح العام فقط)، و`bootstrap.sh`، و`INSTALL.txt`، و`BASE.tsv` و`KNOWN.tsv` و`BASE-COMMIT.txt`
+  (لمقارنة ملفات الـVM)، و`SHA256SUMS`.
 
 انقل عبر PAM **المجلد `release\bootstrap\` كله** إلى `/data/tmrkz-bootstrap/` على الـVM. لا شيء غيره.
 
@@ -48,6 +49,12 @@ sh ops/diagnose.sh > /tmp/tmrkz-diagnose.txt        # فحص للقراءة فق
 
 - `check` لا يغير شيئاً: يتحقق من `SHA256SUMS` ومن توقيع الإصدار بالمفتاح العام، ويعرض الملفات التي ستُستبدل أو تُضاف، وفرق
   ملفي Compose سطراً بسطر.
+- **توافق الـVM (ADR-106):** لا يُفترض أن ملفات الـVM تطابق `e30c1c1`. يضع `check` كل ملف مختلف في واحدة من ثلاث، بمعرّف git
+  لبايتاته (يحسبه دون git) مقابل `BASE.tsv` و`KNOWN.tsv` في الحزمة: «as at that commit» (كما في ذلك الإيداع، ولو نُسخ من Windows
+  بنهايات CRLF)، أو «an earlier committed version» (نسخة أقدم مودعة، يُذكر إيداعها)، أو «CHANGED ON THIS MACHINE» (تعديل يدوي على
+  الـVM). إن كان تعديل يدوي سيُستبدل أو يُحذف يتوقف `apply` ولا يغير شيئاً، حتى تختار صراحة: `--keep-local` (يبقى كما هو، ويعرضه
+  مركز التحديث «معدّل على هذا الجهاز» ولا يختاره تلقائياً) أو `--overwrite-local` (يُستبدل، ونسخة الـVM في النسخة الاحتياطية).
+  للمقارنة قبل القرار: `tar -xOf TMRKZ-bootstrap-*.tar <المسار> | diff -u /data/TMRKZ/<المسار> -`
 - `apply` يرفض أي مسار محمي أو ملف ليس في القائمة الموقعة أو ملف تغير بعد التوقيع، ثم يحفظ نسخة من كل ملف سيكتبه في
   `backups/bootstrap/<الوقت>/`، ويكتب الملفات، ويثبت المفتاح العام `ops/local/.generated/release-trust.pub` (إن كان مفتاح آخر
   مثبتاً يتوقف)، ويكتب خط الأساس `backups/updates/installed-MANIFEST.tsv` ليُعرف لاحقاً أي ملف عُدل على الـVM يدوياً.

@@ -859,9 +859,11 @@ export const api = {
   unitOpsRoutes: (commandId: string) => get<UnitOpsRoute[]>('/access/unit-ops-routes' + query({ commandId })),
   saveUnitOpsRoutes: (commandId: string, routes: { name: string; from: string; to: string; days: number[]; active: boolean; targets: string[] }[]) =>
     put<UnitOpsRoute[]>('/access/unit-ops-routes' + query({ commandId }), routes),
-  fyiMains: () => get<{ id: string; name: string }[]>('/access/fyi-mains'),
-  addFyiMain: (id: string) => put<void>(`/access/fyi-mains/${id}`, {}),
-  removeFyiMain: (id: string) => del<void>(`/access/fyi-mains/${id}`),
+  // «الجهات الرئيسية للعلم»: one list for every final approval, re-stationing included (V69); each change audited with its reason
+  fyiMains: () => get<{ id: string; name: string; includeDescendants: boolean }[]>('/access/fyi-mains'),
+  addFyiMain: (id: string, includeDescendants: boolean, reason: string) =>
+    put<void>(`/access/fyi-mains/${id}`, { includeDescendants, reason }),
+  removeFyiMain: (id: string, reason: string) => del<void>(`/access/fyi-mains/${id}` + query({ reason })),
   explainAccess: (q: { personId: string; organizationId?: string; siteId?: string; resourceId?: string }) =>
     get<AccessExplain>('/access/explain' + query(q)),
 

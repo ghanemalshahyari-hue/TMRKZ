@@ -404,11 +404,22 @@ public class SiteSetupService {
         if (anyArea && pv.isEmpty()) {
             problems.add("لا توجد سياسة تمركز نافذة؛ ينشرها مسؤول النظام قبل تهيئة مناطق الانتشار.");
         }
+        boolean drawn = in.boundary() != null && in.boundary().geometry() != null;
+        String siteGeo = pv.isPresent() && (drawn || !ids.isEmpty()) ? sitePlace(in, problems) : null;
+        // ADR-106 (owner, 25 Nov 2026): a site's boundary larger than the policy's maximum footprint is refused here, with or
+        // without units — the setup has no approver to decide it, unlike a request (ADR-087); a site of 271 km² against a
+        // 0.5 km² maximum had been registered and every area was then measured from its far edge
+        if (siteGeo != null && drawn) {
+            double[] f = checks.footprint(siteGeo, pv.get().values(), pv.get().version());
+            if (f[0] > f[1] + 0.5) {
+                problems.add("مساحة حدود الموقع " + area(f[0]) + " أكبر من الحد الأقصى في سياسة التمركز (" + area(f[1])
+                        + ")؛ ارسم حدود الموقع الفعلية، أو يرفع مسؤول النظام الحد في السياسة.");
+            }
+        }
         List<UnitCheck> units = new ArrayList<>();
         if (!ids.isEmpty() && pv.isPresent()) {
             StationingPolicy policy = pv.get().values();
             int version = pv.get().version();
-            String siteGeo = sitePlace(in, problems);
             Map<UUID, UnitInput> byUnit = new LinkedHashMap<>();
             given.stream().filter(u -> u != null && u.organizationId() != null).forEach(u -> byUnit.putIfAbsent(u.organizationId(), u));
             for (UUID id : ids) {
@@ -435,6 +446,12 @@ public class SiteSetupService {
             ids.stream().filter(names::containsKey).forEach(id -> units.add(new UnitCheck(id, names.get(id), List.of(), List.of())));
         }
         return new Evaluation(problems, units, pv.orElse(null), effective);
+    }
+
+    /** An area as people read it: square metres up to a square kilometre, then square kilometres. */
+    static String area(double m2) {
+        return m2 >= 1_000_000 ? String.format(java.util.Locale.ROOT, "%.1f كم²", m2 / 1_000_000)
+                : String.format(java.util.Locale.ROOT, "%,.0f م²", m2);
     }
 
     /** Where the primary area is measured from: the boundary as the register will hold it, else the site's point. */

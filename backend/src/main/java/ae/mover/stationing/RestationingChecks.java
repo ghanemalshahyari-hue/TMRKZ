@@ -641,6 +641,14 @@ public class RestationingChecks {
     }
 
     /**
+     * The area of a site and the largest the policy allows there (with the terrain extra when the policy has one), as a
+     * request's proposed site is measured: [area m², maximum m²]. Used by the site setup (ADR-106).
+     */
+    public double[] footprint(String siteGeo, StationingPolicy policy, Integer policyVersion) {
+        return new double[]{geo.areaM2(siteGeo), maxFootprintFor(siteGeo, policy, policyVersion)};
+    }
+
+    /**
      * The largest footprint at the proposed place: more on ground that is not flat when the policy says so. Without a
      * terrain answer for the place (no dataset, or an unresolved tie) it is the base maximum: nothing is assumed.
      */

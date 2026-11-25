@@ -94,10 +94,12 @@ export function unitForest<U extends UnitLike & { parentId?: string | null }>(ch
   return roots;
 }
 
-/** The first step to open: straight to the main area when exactly one unit may have the request (it starts by itself). */
-export function startStep(choices: readonly UnitChoice<UnitLike>[]): { step: AreaStep; unitId: string | null } {
-  const ok = choices.filter((c) => c.eligible);
-  return ok.length === 1 ? { step: 2, unitId: ok[0].unit.id } : { step: 1, unitId: null };
+/**
+ * The first step to open: always the first, with nothing chosen (owner, 25 Nov 2026: the page must not choose the location and
+ * move to the next step by itself — even when only one unit may have the request, the person chooses it and presses «التالي»).
+ */
+export function startStep(_choices: readonly UnitChoice<UnitLike>[]): { step: AreaStep; unitId: string | null } {
+  return { step: 1, unitId: null };
 }
 
 export type AreaState = { unitId: string | null; primary: unknown | null; alternative: unknown | null };
@@ -299,4 +301,42 @@ export function overReason(distanceM: number, leg: { minM: number; maxM: number;
   if (distanceM < leg.minM) return `أقرب بـ${kmChip(leg.minM - distanceM)} من الحد الأدنى.`;
   if (distanceM > leg.maxM) return `أبعد بـ${kmChip(distanceM - leg.maxM)} من الحد الأقصى الأساسي` + (leg.terrainApplies ? '؛ قد تسمح به طبيعة الأرض عند الفحص.' : '.');
   return '';
+}
+
+/** A leg's distance rules as the policy holds them (StationingPolicy.Leg). */
+export type ReachLeg = { minM: number; maxM: number; terrainApplies?: boolean; terrainExtra?: { kind: 'ABSOLUTE' | 'PERCENT'; value: number } | null };
+/** The parts of the policy the farthest distance depends on. */
+export type ReachPolicy = { terrainAllowancesM?: Record<string, number> | null; exception?: { allowed: boolean; maxExtraM: number } | null };
+export type Reach = { baseMaxM: number; terrainM: number; exceptionM: number; maxM: number; assessed: boolean };
+
+/**
+ * The most any ground can add to a leg's maximum, as the server adds it (StationingPolicy.terrainAddM): the leg's own
+ * extra (an amount, or a percentage of its maximum), else the largest allowance of a slope class; nothing when the
+ * terrain does not apply to this leg.
+ */
+export function largestTerrainAddM(leg: ReachLeg, policy: ReachPolicy): number {
+  if (!leg.terrainApplies) return 0;
+  if (leg.terrainExtra) return leg.terrainExtra.kind === 'PERCENT' ? (leg.maxM * leg.terrainExtra.value) / 100 : leg.terrainExtra.value;
+  return Math.max(0, ...Object.values(policy.terrainAllowancesM ?? {}));
+}
+
+/**
+ * The farthest an area of this leg can be from where it is measured (owner, 25 Nov 2026): the base maximum, what the
+ * ground adds — the place's own allowance once the server has assessed it ({@code assessedMaxM}, the server's effective
+ * maximum there), else the most any ground can add — and the exception margin when the policy gives one (ADR-078). The
+ * map never places, moves or draws an area beyond it; the server checks again on every save.
+ */
+export function reachOf(leg: ReachLeg, policy: ReachPolicy, assessedMaxM?: number | null): Reach {
+  const exceptionM = policy.exception?.allowed ? Math.max(0, policy.exception.maxExtraM) : 0;
+  const assessed = assessedMaxM != null && Number.isFinite(assessedMaxM);
+  const terrainM = assessed ? Math.max(0, assessedMaxM - leg.maxM) : largestTerrainAddM(leg, policy);
+  return { baseMaxM: leg.maxM, terrainM, exceptionM, maxM: leg.maxM + terrainM + exceptionM, assessed };
+}
+
+/** «الحد الأقصى 9 كم (8 كم + 1 كم لطبيعة الأرض)» — what the pointer and the panel say at the limit. */
+export function reachText(r: Reach): string {
+  const parts = [kmChip(r.baseMaxM)];
+  if (r.terrainM > 0) parts.push((r.assessed ? '' : 'حتى ') + kmChip(r.terrainM) + ' لطبيعة الأرض');
+  if (r.exceptionM > 0) parts.push(kmChip(r.exceptionM) + ' استثناء');
+  return 'الحد الأقصى ' + kmChip(r.maxM) + (parts.length > 1 ? ' (' + parts.join(' + ') + ')' : '');
 }

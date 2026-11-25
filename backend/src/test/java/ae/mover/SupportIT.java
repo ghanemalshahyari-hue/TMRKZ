@@ -152,14 +152,20 @@ class SupportIT extends IntegrationTest {
     }
 
     @Test
-    @DisplayName("AI-3: with the model off the assistant answers from the guides the person may see; audited without the question")
+    @DisplayName("AI-3: with the model off the assistant gives no answer, only links to the guides the person may see; audited without the question")
     void assistantOff() {
         Api u = login("suser");
         assertThat(u.get("/assistant/status").body().path("enabled").asBoolean()).isFalse();
         String question = "كيف افعل اشعارات سطح المكتب " + sfx;
-        JsonNode a = u.post("/assistant/ask", Map.of("question", question, "screen", "home")).body();
-        assertThat(a.path("mode").asText()).isEqualTo("GUIDE");
+        Res asked = u.post("/assistant/ask", Map.of("question", question, "screen", "home"));
+        assertThat(asked.status()).as(asked.toString()).isEqualTo(200);
+        JsonNode a = asked.body();
+        // ADR-095 «the assistant never answers from a preprogrammed template» (owner, 20 Nov 2026; 410b5f4): with the model
+        // off the answer is null (mode OFF, degraded naming the reason); the matching OKF guides stay as links only
+        assertThat(a.path("mode").asText()).isEqualTo("OFF");
         assertThat(a.path("degraded").asText()).isEqualTo("OFF");
+        assertThat(a.path("answer").isNull() || a.path("answer").isMissingNode()).as("no prose presented as an answer").isTrue();
+        assertThat(a.path("model").isNull() || a.path("model").isMissingNode()).isTrue();
         assertThat(a.path("sources").get(0).path("resource").asText()).isEqualTo("tmrkz://okf/how-to/desktop-notifications");
         JsonNode adminOnly = u.post("/assistant/ask", Map.of("question", "كيف اضيف مستخدم للوحده")).body();
         assertThat(adminOnly.toString()).doesNotContain("tmrkz://okf/how-to/add-user");

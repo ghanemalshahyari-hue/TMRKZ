@@ -591,8 +591,18 @@ export function PosturePage() {
   useEffect(() => setFit((k) => k + 1), [revealedUnitId]);
   useEffect(() => setFit((k) => k + 1), [siteInfoId]);
   useEffect(() => setFit((k) => k + 1), [selectedRequestId]);
-  useEffect(() => setFit((k) => k + 1), [filter]);
-  useEffect(() => { if (units && units.length > 0) setFit((k) => k + 1); }, [units]);
+  // owner, 25 Nov 2026: the page opens on the whole country — the overview is framed only when asked («الحدود والمناطق», or a
+  // filter changed by the person), never when the units arrive; choosing a unit, site or request still frames it
+  const askedOverview = useRef(false);
+  const firstFilter = useRef(true);
+  useEffect(() => {
+    if (firstFilter.current) {
+      firstFilter.current = false;
+      return;
+    }
+    askedOverview.current = true;
+    setFit((k) => k + 1);
+  }, [filter]);
 
   /**
    * Geometry-driven camera fit (owner, 21 Nov 2026: «A fixed zoom cannot represent a site/deployment area that may be
@@ -664,7 +674,9 @@ export function PosturePage() {
       }
       if (fitFromPts(safePadding, 16)) return;
     }
-    // Overview: fit to every visible site-hub centroid.
+    // Overview: fit to every visible site-hub centroid — only when the person asked for it.
+    if (!askedOverview.current) return;
+    askedOverview.current = false;
     for (const f of siteHubsFC.features) {
       const c = (f.geometry as GeoJSON.Point).coordinates as [number, number];
       if (c) pts.push(c);
@@ -1514,7 +1526,7 @@ export function PosturePage() {
         <div className="tz-posture3-mapctl" aria-label="أدوات الخريطة">
           <MapModeSwitcher mode={mode} setMode={setMode} />
           <ViewSwitcher view={view} setView={setView} available={!!terrain3d} />
-          <button type="button" className="tz-posture3-mapctl-btn" onClick={() => setFit((k) => k + 1)} title="الحدود والمناطق">
+          <button type="button" className="tz-posture3-mapctl-btn" onClick={() => { askedOverview.current = true; setFit((k) => k + 1); }} title="الحدود والمناطق">
             <Icon name="target" />
           </button>
         </div>

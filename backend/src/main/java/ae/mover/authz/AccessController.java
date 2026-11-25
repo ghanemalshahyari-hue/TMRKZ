@@ -183,14 +183,16 @@ public class AccessController {
     }
 
     @PutMapping("/fyi-mains/{id}")
-    public ResponseEntity<Void> addFyiMain(Actor actor, @PathVariable UUID id) {
-        grants.setFyiMain(access.context(actor), id, true);
+    public ResponseEntity<Void> addFyiMain(Actor actor, @PathVariable UUID id,
+                                           @RequestBody(required = false) GrantAdminService.FyiMainInput in) {
+        grants.setFyiMain(access.context(actor), id, true, in != null && Boolean.TRUE.equals(in.includeDescendants()),
+                in == null ? null : in.reason());
         return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/fyi-mains/{id}")
-    public ResponseEntity<Void> removeFyiMain(Actor actor, @PathVariable UUID id) {
-        grants.setFyiMain(access.context(actor), id, false);
+    public ResponseEntity<Void> removeFyiMain(Actor actor, @PathVariable UUID id, @RequestParam(required = false) String reason) {
+        grants.setFyiMain(access.context(actor), id, false, false, reason);
         return ResponseEntity.noContent().build();
     }
 

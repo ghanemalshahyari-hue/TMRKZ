@@ -1,0 +1,20 @@
+bootstrap package: release/bootstrap (76 files, 9000 KB tar, 0 removals listed)
+PASS  BS-01 minimal package built with the commit's file ids; no key, .env, data or certificates in it
+PASS  BS-02 check is read-only (plan: replace 48, add 28, remove 0 files (application and documentation only); 1 of them changed on this machine)
+PASS  BS-02 check names both hand edits, the file of an earlier commit (not as an edit), a CRLF copy as unchanged
+      [bootstrap] this machine compared with release 20261125-101848-12f9415-local (package made for commit e30c1c1):
+      [bootstrap]   765 released files identical, 28 not present here; differing: 47 as at that commit, 1 an earlier committed version, 2 changed on this machine
+PASS  BS-03 apply stops before replacing a file changed on this machine, and changes nothing
+PASS  BS-03 .env, certs/, data/, docker-compose.dc-hosts.yml and both hand-edited files byte for byte unchanged (--keep-local)
+PASS  BS-03 public verification key, baseline and the maintenance service installed; no signing key
+PASS  BS-03 baseline: the kept hand edits marked as changed locally; the earlier-commit and CRLF files as installed (not edits)
+PASS  BS-03 the Update Center worker is the released one
+      [bootstrap] done: backup /data/TMRKZ/backups/bootstrap/20261125T102040Z (77 written, 0 removed)
+      [bootstrap] 2 files of the release still differ here (not in this minimal package); the first browser update brings them
+      [bootstrap] 2 files changed on this machine were kept; the Update Center lists them as «معدل محلياً» and asks before replacing them
+PASS  BS-04 restore returns every file exactly (2968 files)
+PASS  BS-05 a package altered after it was made is refused
+PASS  BS-05 a package smuggling .env with recomputed checksums is refused
+PASS  BS-05 the installation is unchanged by both refused attempts
+PASS  BS-06 --overwrite-local replaces the changed file in the package (the machine's version kept in the backup); others stay
+13 passed, 0 failed

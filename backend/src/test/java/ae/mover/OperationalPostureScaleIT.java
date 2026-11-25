@@ -4,8 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
@@ -16,7 +18,13 @@ import org.springframework.context.annotation.Import;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import ae.mover.access.AccessContext;
+import ae.mover.access.AccessService;
+import ae.mover.access.Permission;
+import ae.mover.security.Actor;
 import ae.mover.stationing.OperationalPostureReadModel;
+import ae.mover.stationing.RequestHubService;
+import ae.mover.stationing.RestationingService;
 
 /**
  * Regression gate for ADR-094: {@code GET /operational-posture} must answer in time that is not proportional to
@@ -26,6 +34,10 @@ import ae.mover.stationing.OperationalPostureReadModel;
  * drops with scale. This test asserts the ratio rather than an absolute statement count: the real target is that
  * the time-per-unit does not regress to the old O(N) shape, and that is independent of test hardware.
  *
+ * <p>Measured 25 Nov 2026 (REMAINING-20): the SQL is constant, but the wall-clock time still grows with the unit count
+ * (about 0.2 s at 100 units, 9 s at 5,000), because {@code RestationingService.reach} confirms every reached unit with its
+ * own OpenFGA check. The reach and overview times are reported separately so that cost stays visible; it is not asserted.
+ *
  * <p>Separate from {@link MapScaleIT}, which covers the map features endpoint.
  */
 @Import(CountingDataSourceConfig.class)
@@ -33,6 +45,12 @@ class OperationalPostureScaleIT extends IntegrationTest {
 
     @Autowired
     OperationalPostureReadModel readModel;
+    @Autowired
+    AccessService access;
+    @Autowired
+    RequestHubService hub;
+    @Autowired
+    RestationingService requests;
 
     /**
      * Tables whose per-request scan count is a direct proxy for "how many SQL calls did this response cost" —
@@ -56,6 +74,27 @@ class OperationalPostureScaleIT extends IntegrationTest {
                 .param("t", String.join(",", PROXY_TABLES)).query(Long.class).single();
     }
 
+    /**
+     * The same sum, but from {@code pg_stat_xact_user_tables}: this backend's own counters for the CURRENT transaction,
+     * read before anything is flushed. Called inside one transaction around one posture computation, the delta is
+     * exactly that computation's scans of the proxy tables: nothing another backend does can enter it, and none of
+     * its own scans can be missed.
+     *
+     * <p>Why the gate reads this rather than {@code pg_stat_user_tables} (25 Nov 2026, REMAINING-20): the global view
+     * is shared by every backend, and each backend flushes its counters at most once a second, deferring the rest up to
+     * ten seconds. A delta taken around one HTTP call therefore drops the call's own deferred scans and picks up whatever
+     * other backends flush meanwhile; in the full suite, that includes the schedulers of every cached Spring context
+     * (stationing lifecycle, outbox, authorisation poll) on the same tables. Measured on {@code 8800b58}: 0 / 494 / 61
+     * at 100 / 1,000 / 5,000 units in the full suite against 0 / 6 / 6 alone, while the JDBC count stayed 11 / 12 / 15.
+     */
+    long xactScanCount() {
+        return jdbc.sql("""
+                select coalesce(sum(seq_scan + idx_scan), 0) as c
+                  from pg_stat_xact_user_tables
+                 where relname = any(string_to_array(:t, ','))""")
+                .param("t", String.join(",", PROXY_TABLES)).query(Long.class).single();
+    }
+
     @Test
     @DisplayName("Scale: /operational-posture (Site-Hub summary) at 100/1,000/5,000 units — JDBC count stays near-constant")
     void postureScales() throws Exception {
@@ -70,12 +109,17 @@ class OperationalPostureScaleIT extends IntegrationTest {
         // wall-clock is reported but not asserted as the primary signal. We emit every measurement to stdout
         // + target/posture-scale.txt FIRST so the artefact is complete even when an assertion later fires.
         double timeRatio = m5k.medianMs / Math.max(1.0, m100.medianMs);
-        double scanRatio = m5k.scanDelta / Math.max(1.0, m100.scanDelta);
+        double scanRatio = m5k.exactScans / Math.max(1.0, m100.exactScans);
         double jdbcRatio = m5k.jdbcDelta / Math.max(1.0, m100.jdbcDelta);
         lines.add(String.format("POSTURE-SCALE time-ratio 5000/100 = %.2f (median: 100=%d ms, 1000=%d ms, 5000=%d ms)",
                 timeRatio, m100.medianMs, m1k.medianMs, m5k.medianMs));
-        lines.add(String.format("POSTURE-SCALE scan-ratio 5000/100 = %.2f (100=%d, 1000=%d, 5000=%d)",
-                scanRatio, m100.scanDelta, m1k.scanDelta, m5k.scanDelta));
+        lines.add(String.format("POSTURE-SCALE exact-scan-ratio 5000/100 = %.2f (100=%d, 1000=%d, 5000=%d)",
+                scanRatio, m100.exactScans, m1k.exactScans, m5k.exactScans));
+        lines.add(String.format("POSTURE-SCALE global-scan-delta, all backends, indicative only (100=%d, 1000=%d, 5000=%d)",
+                m100.scanDelta, m1k.scanDelta, m5k.scanDelta));
+        lines.add(String.format("POSTURE-SCALE reach confirmation ms (one OpenFGA check per unit): 100=%d, 1000=%d, 5000=%d;"
+                + " overview with the confirmations known, ms: 100=%d, 1000=%d, 5000=%d",
+                m100.reachMs, m1k.reachMs, m5k.reachMs, m100.overviewMs, m1k.overviewMs, m5k.overviewMs));
         lines.add(String.format("POSTURE-SCALE jdbc-ratio 5000/100 = %.2f (100=%d, 1000=%d, 5000=%d)",
                 jdbcRatio, m100.jdbcDelta, m1k.jdbcDelta, m5k.jdbcDelta));
         lines.add(String.format("POSTURE-SCALE size: 100=%d bytes, 1000=%d bytes, 5000=%d bytes",
@@ -105,16 +149,21 @@ class OperationalPostureScaleIT extends IntegrationTest {
         assertThat(jdbcRatio)
                 .as("JDBC statement count must not scale with unit count (Gate 2.5 §F)")
                 .isLessThan(3.0);
-        // Secondary gate: SQL scan-count proxy (pg_stat_user_tables deltas). Catches a sequential-scan N+1 that
-        // might slip past the JDBC count by batching statements internally. An absolute bound is more robust
-        // than a ratio when the 100-unit case may hit zero scans (which inflates the ratio arbitrarily).
-        assertThat(m5k.scanDelta)
+        // Secondary gate: SQL scan count of the posture computation (seq + index scans of the proxy tables). Catches a
+        // nested-loop N+1 inside one statement that the JDBC count cannot see: an inner index scan repeated per unit or
+        // per site counts once per repetition. Read per transaction (xactScanCount), so it is the computation's own
+        // count. The bound is unchanged; the second check adds that it does not grow from 100 to 5,000 units.
+        assertThat(m5k.exactScans)
                 .as("SQL scan count at 5,000 units must stay bounded (Gate 2 §I)")
                 .isLessThan(50L);
+        assertThat(m5k.exactScans)
+                .as("SQL scan count must not grow with the unit count (100 to 5,000 units)")
+                .isLessThanOrEqualTo(m100.exactScans + 5);
     }
 
     /** One measurement row: median wall-clock across 5 calls, response bytes, SQL-scan + JDBC-exec deltas attributable to one call. */
-    private record Measurement(long medianMs, int bytes, long scanDelta, long jdbcDelta, int sitesTotal, long unitsTotal) {
+    private record Measurement(long medianMs, int bytes, long scanDelta, long jdbcDelta, int sitesTotal, long unitsTotal,
+                               long exactScans, long reachMs, long overviewMs) {
     }
 
     /**
@@ -194,14 +243,35 @@ class OperationalPostureScaleIT extends IntegrationTest {
         long max = ms.get(4);
         int sitesTotal = body.path("sitesTotal").asInt();
         long unitsTotal = body.path("unitsTotal").asLong();
-        lines.add(String.format("POSTURE-SCALE n=%d sites=%d bytes=%d median_ms=%d max_ms=%d scanDelta=%d jdbcDelta=%d dataRevision=%s",
-                n, sitesTotal, last.raw().length, median, max, scanDelta, jdbcDelta, body.path("dataRevision").asText("-")));
+
+        // The exact scan count of one posture computation (see xactScanCount): the same overview the endpoint serves, for
+        // the same viewer, computed on this thread inside one transaction. The viewer's per-unit confirmations are asked
+        // first (reach), so the overview's own time is the read model's. Both times are reported, not asserted.
+        AccessContext ctx = access.context(new Actor(recordedBy, "viewer-" + n + "-" + sfx, "viewer " + n, null));
+        long r0 = System.nanoTime();
+        int reached = requests.reach(ctx, Permission.VIEW_OPERATIONAL_POSTURE).size();
+        long reachMs = (System.nanoTime() - r0) / 1_000_000;
+        long[] exact = new long[2];
+        Map<String, Object> computed = tx.execute(s -> {
+            long before = xactScanCount();
+            long o0 = System.nanoTime();
+            Map<String, Object> o = hub.postureOverview(ctx, Instant.now());
+            exact[1] = (System.nanoTime() - o0) / 1_000_000;
+            exact[0] = xactScanCount() - before;
+            return o;
+        });
+        assertThat(reached).as("the viewer reaches the measured units").isGreaterThanOrEqualTo(n);
+        assertThat(((Number) computed.get("unitsTotal")).longValue()).as("the computation measured is the endpoint's overview")
+                .isEqualTo(unitsTotal);
+        lines.add(String.format("POSTURE-SCALE n=%d sites=%d bytes=%d median_ms=%d max_ms=%d scanDelta=%d jdbcDelta=%d exactScans=%d"
+                + " reach_ms=%d overview_ms=%d dataRevision=%s", n, sitesTotal, last.raw().length, median, max, scanDelta, jdbcDelta,
+                exact[0], reachMs, exact[1], body.path("dataRevision").asText("-")));
         assertThat(sitesTotal).as("Site-Hub overview reports the distinct sites in reach").isEqualTo(siteCount);
         assertThat(unitsTotal).as("Site-Hub overview carries the authorised unit count").isGreaterThanOrEqualTo(n);
         assertThat(body.path("dataRevision").isTextual()).as("posture carries a data revision").isTrue();
         assertThat(body.path("siteHubs").isArray()).as("overview carries site hubs, not per-unit records").isTrue();
         assertThat(body.has("units")).as("overview must NOT carry per-unit records").isFalse();
-        return new Measurement(median, last.raw().length, scanDelta, jdbcDelta, sitesTotal, unitsTotal);
+        return new Measurement(median, last.raw().length, scanDelta, jdbcDelta, sitesTotal, unitsTotal, exact[0], reachMs, exact[1]);
     }
 
     @Test
