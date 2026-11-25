@@ -1,0 +1,5 @@
+[bootstrap] package checksums: OK
+[bootstrap] release signature: OK (20261125-085112-881bb1b)
+[bootstrap] plan: replace 34, add 25, remove 0 files (application and documentation only)
+[bootstrap] Compose file differs: docker-compose.override.yml (applied only with --with-config):
+[bootstrap] check only: nothing changed

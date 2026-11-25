@@ -1,0 +1,10 @@
+TMRKZ one-time bootstrap 20261125-085112-881bb1b (for a machine at commit e30c1c1)
+
+Copy this whole folder to the machine, e.g. /data/tmrkz-bootstrap-20261125-085112-881bb1b, then as the maintenance account (PAM, once):
+  cd /data/tmrkz-bootstrap-20261125-085112-881bb1b
+  sh bootstrap.sh check /data/TMRKZ                    # read-only preview: checksums, signature, files, Compose diff
+  sh bootstrap.sh apply /data/TMRKZ --with-config      # after reading the Compose diff; without it the Compose files stay
+  cd /data/TMRKZ && sh start.sh                        # the images are unchanged; no tmrkz-images.tar is needed
+Then in the browser: «إدارة النظام ← مركز التحديث» must show «عامل الصيانة يعمل». Later updates go through the browser only.
+Undo: sh bootstrap.sh restore /data/TMRKZ/backups/bootstrap/<time printed by apply>   then  sh start.sh
+Never copied here and never needed on the machine: the release signing key, .env, data/, certs/, map-data/, map-runtime/.

@@ -98,7 +98,7 @@ matrix = [
     ('2. Certificate management', 'Inventory of the folders in use; import (PEM/DER/P7B/PFX, from files or from certs/); chain, expiry, host name, key matching; per-service trust (https, directory, Keycloak); preview, explicit application, health check, automatic and requested restore; keys never exposed.', state_of([rel], ['CRT-']), 'CertificateInspectorTest, CertificateCenterIT, CRT-E1…E5'),
     ('3. ENV import', 'Compatible file recognised and mapped; conflicts and missing values shown; never-imported values named only; tested before applied; .env never written.', state_of([rel], ['ENV-']), 'IntegrationImportIT, ENV-E1…E3'),
     ('4. Administrator lookup', 'Before a first sign-in: service account, or the administrator\'s own directory password for that search; limitation explained otherwise; confirmation, least privilege, audit, duplicate and last-admin protection.', state_of([rel], ['ADM-']), 'AdministratorDirectoryLookupIT, AdministratorOwnLookupIT, ADM-E1…E3'),
-    ('5. 18 failing tests', '18 obsolete expectations (ADR-095 / posture summary) updated without weakening checks; 0 application defects among them; 1 separate defect found and left open (FYI designations).', 'PASS' if cfg.get('regression18Pass') else 'FAIL', 'docs/evidence/regression-18/CLASSIFICATION.md'),
+    ('5. 18 failing tests', '18 obsolete expectations (ADR-095 / posture summary) updated without weakening checks; 0 application defects among them. Open: 1 separate defect (FYI designations) and 20 further pre-existing backend failures the full suite found, identical on 8800b58 (PRE-EXISTING-OTHERS.md).', 'PASS' if cfg.get('regression18Pass') else 'FAIL', 'docs/evidence/regression-18/CLASSIFICATION.md'),
     ('6. Update Center security', 'Signed release, tampering, unauthorised users, interrupted upload, conflicting change, failed build, disk space, service failure with automatic rollback, application restart, no Docker access or command execution, signing key on the development machine only.', state_of([uc, rel], ['UC-']), 'update-center.mjs UC-00…UC-11, release-acceptance.mjs UC-12…UC-19'),
     ('7. UI and map', 'Seven window sizes and scalings, navigation, loading states, error messages; map pointer alignment at browser zoom 100–200 % and display scaling 125–150 %. Development-machine measurements only.', state_of([ui], ['UI-', 'MAP-']), 'ui-regression.mjs'),
     ('8. Delivery', 'Same folder and runtime for development, test and deployment; no new dependency, image, PowerShell or permanent folder; minimal bootstrap package with checksums, instructions and recovery.', state_of([[*boot_rows]], ['BS-']), 'bootstrap-test.sh BS-01…BS-05'),
@@ -149,7 +149,7 @@ ADR-104 (commit <code>8800b58</code>) and delivered as <b>ADR-105</b> in commit 
 installation laid out exactly like the VM's <code>/data/TMRKZ</code> (Compose project <code>tmrkz-vmsim</code>, fictional data). The real
 VM has not been touched. Production acceptance needs the VM checks in <a href="#verify">Step 3</a> to pass.</div>
 <table><thead><tr><th>Brief item</th><th>What was done</th><th>Development / simulated VM</th><th>Real VM</th><th>Evidence</th></tr></thead><tbody>
-{''.join(f'<tr><td><b>{E(a)}</b></td><td>{E(b)}</td><td>{pill(c)}</td><td>{pill("Pending VM")}</td><td class="detail">{E(d)}</td></tr>' for a, b, c, d in matrix)}
+{''.join(f'<tr><td><b>{E(a)}</b></td><td>{E(b)}</td><td>{pill(c)}</td><td>{pill("n/a") if a[0] in "15" else pill("Pending VM")}</td><td class="detail">{E(d)}</td></tr>' for a, b, c, d in matrix)}
 </tbody></table>
 <h3>Automated test totals</h3>
 <table><tbody>
@@ -368,6 +368,9 @@ section('open', 'Still open', """
 <li><b>Real-VM acceptance</b> of everything in this guide (bootstrap, first browser update, certificate inventory against the VM's
 own <code>certs/</code> and <code>.env</code>, ENV import against the real directory, administrator lookup with the real AD).</li>
 <li><b>FYI designations</b> (above) — the owner's choice of table.</li>
+<li><b>20 pre-existing backend test failures</b> outside the 18 (AccessScopeParityIT, WorkflowGraphIT, RestationingLifecycleIT,
+RestationingHrSyncIT, MatrixColumnsIT, OperationalPostureScaleIT, SupportIT), identical on 8800b58, unchanged and listed with a
+preliminary reading in <code>docs/evidence/regression-18/PRE-EXISTING-OTHERS.md</code>.</li>
 <li>A Compose-file change still needs one <code>docker compose up -d</code> by the operator (the worker has no Docker socket by design).</li>
 <li>Files over 24&nbsp;MB and new npm libraries are not delivered through the browser (new images would be needed).</li>
 <li>Keycloak's own truststore (its directory federation, which needs a service account) is read at its start only; TMRKZ's own
