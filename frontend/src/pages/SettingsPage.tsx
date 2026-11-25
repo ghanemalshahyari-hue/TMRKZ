@@ -9,6 +9,7 @@ import { AdminLifecycle } from '../components/AdminLifecycle';
 import { SiteSetupAccessSettings } from '../components/SiteSetupAccessSettings';
 import { DbMigrationCenter } from '../components/DbMigrationCenter';
 import { ManagementCenter } from '../components/ManagementCenter';
+import { UpdateCenter } from '../components/UpdateCenter';
 import { useApp } from '../lib/app';
 import { formatBytes, fullTime } from '../lib/dates';
 import { INTEGRATION_STATUS } from '../lib/labels';
@@ -232,6 +233,7 @@ export function SettingsPage() {
             <ManagementCenter />
           </>
         )}
+        {app.can('CONFIGURE') && app.can('MANAGE_ACCESS') && <UpdateCenter />}
       </div>
     </>
   );

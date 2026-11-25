@@ -2886,3 +2886,99 @@ alignment fix and Arabic operational documentation.
 - **No new dependencies.** All changes reuse existing images and libraries.
 
 **Tests.** `DbMigrationIT` 1/1 (V68), `AdministrationAcceptanceIT` 8/8; frontend build clean; deployment to :8088 verified.
+
+## ADR-103 Authorisation and identity regressions of the VM incident report; verified administrator management (25 Nov 2026)
+
+**Context.** A VM incident report (24–25 Nov 2026; the server was not inspected from development) diagnosed «expired
+permissions», pushed every `authz_tuple` holder whose `valid_to` was in the past to 2099, copied an administrator's mirror rows
+to another person, inserted an HR row by hand and removed the HR uniqueness refusal at `UnitMemberService` line 253. The owner
+asked for the decision path to be reviewed and every symptom reproduced with synthetic identities before changing code.
+
+**Findings (reproduced on `e30c1c1`).**
+- The business database is the only source of truth: `GrantSource` reads memberships, delegations, responsibility seats, unit
+  grants and duty permits (each only for an ACTIVE person not switched off, on an ACTIVE unit). `authz_tuple` is the mirror of
+  what OpenFGA holds; `AuthzSync` rewrites it from the grants and its full reconciliation undoes any hand edit.
+- An open-ended grant is stored in the mirror with `valid_to = valid_from` and `open_ended = true` (`AuthzTuples`); the OpenFGA
+  condition is `now >= valid_from && (open_ended || now < valid_to)`. The report's «expired» rows were open-ended, valid grants.
+- «رقم المستخدم هذا مستخدم لحساب خارج نطاقك» was raised for any existing account whose employee number did not start with
+  `USER-` — every account made by a first directory sign-in (ADR-068: the directory's number or `DIR-login`), even for the
+  global administrator — and for a removed account. The scope bound itself was right.
+- «سجل الشخص غير نشط في مصدر الموارد البشرية» was the message for any non-ACTIVE person, including a local account removed by
+  «حذف الحساب», for which no way back existed except SQL.
+- ADR-102's «＋ مدير جديد» inserted a `membership_scope_target` of kind `ALL`, which the table refuses: every add failed (500).
+- The request hub listed the first 300 units of the reach in tree order, retired ones included: with 23,674 units a stationed
+  unit further down — the only kind «طلب مناطق انتشار» is made for — was never offered.
+
+**Decision.** Accepted.
+- `UnitMemberService.requireAddableAccount`: an existing account is a user account when LOCAL and made here (`USER-`) or by
+  the person's own directory sign-in (identity link `DIRECTORY`); system accounts, other records, removed accounts and accounts
+  outside the reach each get their own message. HR identity uniqueness (the line-253 refusal) is kept.
+- `AuthService` names the cause of a refused sign-in: `ACCOUNT_REMOVED` (removed in TMRKZ) or `HR_INACTIVE`.
+- «إعادة الحساب» (`POST /access/workspace/people/{id}/reinstate`): a global manager, with a reason, audited
+  (`PERSON_REINSTATED`); only the account returns, no grant.
+- «مديرو النظام» rebuilt (`AdministratorService`; `/administrators`, `/administrators/resolve`, `/administrators/{id}/end`):
+  two verified lookups — the employee number asked live from Oracle HR (no fallback record; unconfigured or unreachable HR is a
+  clear refusal) or a directory account the directory verified by a previous sign-in (no service account, ADR-100) — shown with a
+  confirmation fingerprint, granted only with that fingerprint and a reason through `GrantAdminService.create` (self-grant,
+  bootstrap identity, audit, outbox); configuration AND global access management required; held on a LOCAL root unit first; the
+  last effective administrator and platform accounts are not removed; an advisory lock serialises the check and the change.
+- Request hub: ACTIVE units only; every unit holding a stationing now and the units above it first, then the rest in tree order
+  up to 300; `unitsShown`/`unitsTotal` stated. `requestableUnits`: ACTIVE units only.
+- `ops/diagnose.sh`: the read-only, redacted procedure for the VM (release and local drift, whether a source edit was compiled,
+  mirror consistency including hand edits, identities, HR synchronisation, error codes, units). No production repair is
+  automated: a correction is proposed, reviewed, backed up and made through audited application paths.
+
+**Tests.** `AuthzMirrorIT` 3/3, `UnitMemberIdentityIT` 4/4, `RequestHubReachIT` 1/1, `AdministratorLifecycleIT` 4/4 (six of
+these failed on `e30c1c1` as reproductions). With the affected classes: `UnitMemberIT` 4/4, `AccessAdminIT` 7/7,
+`AdministrationAcceptanceIT` 8/8, `AuthorizationIT` 10/10, `RequesterScopeIT` 9/9, `PostureViewerScopeIT` 7/7,
+`OperationalPostureScaleIT` 5/5, `SiteMarkerIT` 8/8, `EmploymentContextIT` 1/1, `DirectorySignInIT` 10/10, `HrLinkedPeopleIT`
+6/6, `HrOnDemandIT` 4/4, `SignInNotesIT` 1/1. Pre-existing and unchanged by this work (the same failures on an untouched
+`e30c1c1` extract): `RestationingWorkflowIT` 8, `StationingNextIT` 9, `SiteSetupIT` 1 — they still expect
+«APPROVED_NOT_ACTIVATED» after ADR-095 merged activation into the final approval.
+
+## ADR-104 One TMRKZ folder everywhere; the browser «مركز التحديث» applies signed releases through a restricted worker (25 Nov 2026)
+
+**Context.** The VM installs `/data/TMRKZ` (assets, backend, certs, data, the two Compose files plus
+`docker-compose.dc-hosts.yml`, .env, frontend, map-data, map-packages, map-runtime, ops, README, RUN, start.sh, tests). The owner
+requires one folder, one source, one repository, the same images, libraries, build, start scripts and mounts on every machine —
+only machine settings, addresses, credentials, certificates and data differ — and routine updates from the browser by choosing
+the same TMRKZ folder, PAM being kept for the first set-up and emergencies.
+
+**Decision.** Accepted.
+- `ops/update/managed-paths.conf` classifies every path: `protected` (never read or written by an update: `.env`, `certs/`,
+  `data/`, `backups/`, `map-data/`, `map-runtime/`, `ops/local/.generated/`, any extra `docker-compose.*.yml`, the image
+  archive), `dev` (never transferred: tests, prototypes, audit and evidence), `config` (the two Compose files: shown, written only
+  when selected explicitly, one container restart), `app` and `docs`.
+- `ops/update/make-release.sh` signs the list of app/config/docs files with their SHA-256 (Ed25519 with `openssl`; the key stays
+  on the machine that makes releases; its public key is installed once as `ops/local/.generated/release-trust.pub`).
+  `--package` also writes the one-time transfer tar (app + docs only), the Compose files apart, and `SHA256SUMS`.
+- `ops/update/UpdateWorker.java` is the Compose service `maintenance` in the existing image `tmrkz/folder-backend:1` (Java and the
+  offline Maven libraries), internal network only, no Docker socket, no shell offered. It verifies the signature; classifies with
+  the installed rules plus a hard-coded protected list; compares (added, modified, deleted, locally modified since the last
+  update, too large, new npm dependency); after approval re-checks every staged file, builds the backend offline when its sources
+  change (nothing is applied if it does not build), backs up to `backups/updates/<id>/`, applies (in place for files
+  bind-mounted one by one), verifies that the backend restarted with the new build and the web was republished, and rolls back
+  by itself when verification fails; a finished update is rolled back on request. `data/`, `.env` and the generated secrets are
+  also mounted read-only into it.
+- Backend broker `ae.mover.update` (`/updates/*`): global administrator only, step-up for approve and rollback; it accepts only
+  the compared files with their signed SHA-256 and audits received/approved/rollback and each outcome once;
+  `/system/liveness` (public) gives the backend's start time. Frontend «مركز التحديث» (settings): folder picker, SHA-256 in the
+  browser (a built-in implementation where `crypto.subtle` is missing on plain http), selection (Compose and locally modified
+  files never preselected), upload of the differing files only, approval with a reason, progress through the backend restart,
+  history and rollback.
+- Only what changed restarts: the backend and the web rebuild themselves on source changes (ADR-091); `backend-run.sh` and
+  `web-run.sh` run their new copy when an update changes them; nginx reloads a changed `nginx.conf` after `nginx -t`.
+- `start.sh`: an installation whose images are loaded starts without `tmrkz-images.tar` or its checksum; an extra
+  `docker-compose.*.yml` not named in `COMPOSE_FILE` stops the start with the exact lines to add (before, it was silently left
+  out and the containers would have been recreated without it).
+- Found by the end-to-end run and fixed: `start.sh` now takes its own Compose project from the configuration (it counted only
+  «tmrkz» as its own on the port), waits for `keycloak-setup` and runs it once more after a transient Keycloak error (a sign-in
+  right after start was refused); a release that would delete more than a tenth of the installation flags every deletion
+  `MASS_DELETION` and never preselects it; the page follows `APPROVED`/`ROLLBACK_REQUESTED`; the worker's heartbeat has its own
+  thread.
+- No new dependency, no new image, no PowerShell. Owner guide: `docs/UPDATE_CENTER_AR.md`.
+
+**Tests.** `UpdateCenterIT` 3/3; frontend `sha256.test.ts` (FIPS 180-4 vectors) within 407/407; the worker compiles with
+`-Xlint:all` in the image; end to end `tests/acceptance/update-center.mjs` on a throw-away installation laid out like the VM
+(Compose project `tmrkz-vmsim`, started by `start.sh` without the image archive and with a third Compose file) — results in
+`docs/STATUS.md` and `docs/evidence/update-center/`.

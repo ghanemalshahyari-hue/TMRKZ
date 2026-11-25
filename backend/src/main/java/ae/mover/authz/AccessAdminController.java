@@ -87,6 +87,12 @@ public class AccessAdminController {
         return admin.retire(access.context(actor), id, in);
     }
 
+    /** «إعادة الحساب» of a local account ended by «حذف الحساب» (ADR-103). */
+    @PostMapping("/access/workspace/people/{id}/reinstate")
+    public Map<String, Object> reinstate(Actor actor, @PathVariable UUID id, @RequestBody AccessAdminService.EndInput in) {
+        return admin.reinstate(access.context(actor), id, in);
+    }
+
     @GetMapping("/access/workspace/departments")
     public List<Map<String, Object>> departments(Actor actor) {
         return admin.departments(access.context(actor));

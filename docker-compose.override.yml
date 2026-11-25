@@ -122,6 +122,8 @@ services:
       - ./data/files:/var/lib/tmrkz
       # the migration center's backup gate (ADR-094) reads the manifests ops/backup.sh writes; dumps go to data/files/migration-inbox
       - ./backups:/var/lib/tmrkz/backups:ro
+      # «مركز التحديث» (ADR-104): what the administrator sends, for the maintenance worker; never the application folder itself
+      - update-staging:/update
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8080/api/v1/system/health"]
       interval: 10s
@@ -184,6 +186,26 @@ services:
     networks: [internal, edge]
 
 
+  # «مركز التحديث» (ADR-104): the only process that writes application files during a browser update — the existing backend image
+  # (its Java and its offline Maven libraries), no Docker socket, no published port, the internal network only. It writes the
+  # files ops/update/managed-paths.conf manages and nothing it protects; the data, the generated secrets and .env are also
+  # mounted read-only over the folder here. Backups of every replaced file go to backups/updates/.
+  maintenance:
+    image: tmrkz/folder-backend:1
+    pull_policy: never
+    restart: unless-stopped
+    entrypoint: ["java", "-XX:MaxRAMPercentage=25", "-Dfile.encoding=UTF-8", "/install/ops/update/UpdateWorker.java"]
+    environment:
+      TMRKZ_UPDATE_BACKEND_URL: http://backend:8080
+      TMRKZ_UPDATE_WEB_URL: http://web
+    volumes:
+      - ./:/install
+      - ./data:/install/data:ro
+      - ./ops/local/.generated:/install/ops/local/.generated:ro
+      - ./.env:/install/.env:ro
+      - update-staging:/update
+    networks: [internal]
+
 networks:
   # the servers' network has no route out of the machine; the backend, web and the https proxy also join «edge»
   internal:
@@ -194,3 +216,4 @@ networks:
 volumes:
   web-html:
   web-docs:
+  update-staging:

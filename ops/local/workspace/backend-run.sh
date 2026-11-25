@@ -33,6 +33,8 @@ build() {
 start() { java $JAVA_OPTS -jar "$JAR" & PID=$!; }
 stop() { [ -n "$PID" ] && { kill "$PID" 2>/dev/null; wait "$PID" 2>/dev/null; }; PID=""; }
 trap 'stop; exit 0' TERM INT
+# ADR-104: when an update changes this script, the new copy takes over at the next check (no container restart)
+SELF="$(md5sum < "$0")"
 
 if [ "${TMRKZ_BUILD_ONLY:-}" = 1 ]; then build; exit $?; fi
 last="$(state)"
@@ -48,6 +50,7 @@ fi
 start
 while :; do
   sleep "$POLL" & wait $!
+  if [ "$(md5sum < "$0")" != "$SELF" ]; then echo "[backend] this script was updated: running the new copy"; stop; exec sh "$0"; fi
   now="$(state)"
   if [ "$now" = "$last" ]; then
     if ! kill -0 "$PID" 2>/dev/null; then echo "[backend] the application stopped; starting it again in 15 s"; sleep 15; start; fi

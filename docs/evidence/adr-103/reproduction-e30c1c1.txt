@@ -1,0 +1,750 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< ae.mover:mover-backend >-----------------------
+[INFO] Building MOVER backend 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.5.0:clean (default-clean) @ mover-backend ---
+[INFO] Deleting /repo/backend/target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ mover-backend ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 81 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ mover-backend ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 194 source files with javac [debug parameters release 25] to target/classes
+[INFO] /repo/backend/src/main/java/ae/mover/hr/OracleUnitPayload.java: /repo/backend/src/main/java/ae/mover/hr/OracleUnitPayload.java uses unchecked or unsafe operations.
+[INFO] /repo/backend/src/main/java/ae/mover/hr/OracleUnitPayload.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ mover-backend ---
+[INFO] Copying 8 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ mover-backend ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 70 source files with javac [debug parameters release 25] to target/test-classes
+[INFO] /repo/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java: /repo/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java uses or overrides a deprecated API.
+[INFO] /repo/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java: Recompile with -Xlint:deprecation for details.
+[INFO] /repo/backend/src/test/java/ae/mover/AdministrationAcceptanceIT.java: Some input files use unchecked or unsafe operations.
+[INFO] /repo/backend/src/test/java/ae/mover/AdministrationAcceptanceIT.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ mover-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running ae.mover.AdminLegacyReproIT
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 32.90 s <<< FAILURE! -- in ae.mover.AdminLegacyReproIT
+[ERROR] ae.mover.AdminLegacyReproIT.legacyAdd -- Time elapsed: 2.707 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+[{"code":"INTERNAL_ERROR","message":"حدث خطأ غير متوقع في الخادم. لم يُسجل أي إجراء جزئي.","details":{},"traceId":"9a79c088-c397"}] 
+expected: 200
+ but was: 500
+	at ae.mover.AdminLegacyReproIT.legacyAdd(AdminLegacyReproIT.java:33)
+
+[INFO] Running ae.mover.AuthzMirrorIT
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.353 s -- in ae.mover.AuthzMirrorIT
+[INFO] Running ae.mover.RequestHubReachIT
+[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 1.278 s <<< FAILURE! -- in ae.mover.RequestHubReachIT
+[ERROR] ae.mover.RequestHubReachIT.stationedUnitsBeyondTheCapAreOffered -- Time elapsed: 1.255 s <<< FAILURE!
+java.lang.AssertionError: 
+[the stationed unit, beyond position 300] 
+Expecting HashSet:
+  ["f94309d7-2748-4f28-9239-115df80e4252",
+    "be927e28-14ed-40cc-b578-400ffc21097d",
+    "a6b41cb3-1b0b-440e-b2ba-fb076795b811",
+    "d6eecb6f-6127-41fa-a48b-dcd13b29ebec",
+    "2e466452-6c4f-4303-b89b-b3603359814a",
+    "3799a2ac-af8d-4ca5-b278-387517dcf988",
+    "77db536e-c8f2-4a1c-88e5-1b2372743a65",
+    "99041f19-35de-4de0-a905-bc6c085ae646",
+    "191b0cdd-0496-402e-ae22-08feccbdfe05",
+    "641588d1-8e5c-4af4-a9a5-495fc691e1d3",
+    "921a09b5-ccc4-4dc0-912d-859772ec9b30",
+    "940e3763-637b-4588-868b-2617b910a52b",
+    "267ceb5c-3d37-4e1d-b661-b04e5c68ae82",
+    "361cbdbf-5a86-4c1d-aab2-4d6b6f651d39",
+    "63c6df33-ab7e-4379-b242-6b4e85ffb959",
+    "4bf82120-affd-4c58-bc69-85f361628ac3",
+    "9a43d4ba-da58-4c5f-a19a-ab1d87fa3c00",
+    "ab0b04d5-6836-46f1-8034-8a8af63a116c",
+    "e446b367-1530-4ead-8452-a3a3cc6a96fa",
+    "f5e7e170-8855-4d30-b849-09945d39e21d",
+    "d357fdd8-18bb-4c08-899f-90a423966279",
+    "2795cbec-47ce-48dd-aa78-84fcfd8be1ad",
+    "7895d53e-fc4f-4100-9c3a-744aa0237175",
+    "c87e1129-b420-44a2-ad18-4e2806c69c2a",
+    "c6eba3cb-be07-4de5-be64-04b4a2b64cac",
+    "03262c5a-e26c-4bc4-b588-5ae388a0dc3e",
+    "4bdf3b4a-94ff-4702-82e1-0a29548e6cde",
+    "5e54f9f8-fb89-4b9b-9bea-01aec6bd2b34",
+    "eab7faea-046e-4c04-84f5-0ed4a1fdf386",
+    "18a42c4b-eb3d-4656-a852-b7e6c2195553",
+    "255e7860-da39-4448-b3ee-9e7fe45b4cd1",
+    "fa5a97fe-1565-4456-8dc8-b5db8384ce88",
+    "3bb0685f-ec31-4bd9-808d-5ef1013fa619",
+    "e1f89bb7-eb1a-4d23-9ab5-94afd947caba",
+    "3dbfceae-c003-4ea7-ac2c-82e0b0153e51",
+    "f1c362b0-ac56-4a27-b297-30baf0307fd8",
+    "25824601-de47-4088-92e9-d0e0e2a3ebf2",
+    "814a0f26-b447-49b9-a648-f08c4e9e5ca8",
+    "42dbe828-2b48-43c7-ab0b-89e85d007d9d",
+    "e07a2be7-2bce-4094-8299-5d99841143dc",
+    "4a953272-c0e6-4664-88ca-2df0a4e8a7d8",
+    "f10e26a2-d377-49ba-b9a0-e1fd57d2b646",
+    "ffd5954d-01b5-4df8-8e38-95ab59b7f7a2",
+    "a659d4d1-4c24-44ed-92f9-f4df2124701c",
+    "eb2b6e63-0cf3-4ecf-a57a-d96c674959e9",
+    "0f8cc841-c70f-4f3c-8546-c154f49df690",
+    "b9fe78fc-6ef9-405c-b53c-a8a569b5180d",
+    "623952de-3bcd-4f43-a9fa-32701d06dc2e",
+    "41b2f5f3-a90d-406b-a487-e406d861603e",
+    "3df84b6f-50e1-4f4b-af2c-2dad6102021f",
+    "413b664f-891b-468f-9790-5e0371414487",
+    "3313f32d-3965-47d6-a957-453c3f705f5b",
+    "f9c377bf-25b1-41be-8866-2c2f31ab9059",
+    "addfc6e4-bfc2-4a8a-bd43-0f90f768f057",
+    "c196c4f5-c0a2-4aa7-b637-c44c45897816",
+    "3e1de159-4661-4e05-a1ff-ab567a7ddcbc",
+    "e2d6e88d-91a2-4f7c-ad98-73773300cef3",
+    "fb0981a4-8400-43ed-9423-cb1570cd56a1",
+    "af881239-372d-4e9a-a136-c8d0a1b25cfe",
+    "dc2c9eee-d70c-4f1d-b1ff-7a53d83df982",
+    "500cfad6-555b-4721-bccf-5dd6b14401b2",
+    "86cfb4b3-b31f-4036-97a9-183aec871667",
+    "1e309276-83ae-44d9-a7c5-aed7e72e8ec5",
+    "95d91dd9-745d-4229-ac72-1cc4d9963218",
+    "5147a7e5-dd82-4c7b-a848-67eeb2f32800",
+    "10295046-b716-49c7-8db9-c3f200849c80",
+    "b03acf40-b339-430b-8b93-3528c7564240",
+    "6ef4cfd7-2eb0-490c-87f4-cee598579b34",
+    "6de8f78d-9251-4056-bb99-6481c889f254",
+    "8fecdbf8-dfb2-438c-84ee-1fffc0032986",
+    "4833d3b3-ac35-4e74-b2a7-f00d79ed31da",
+    "2be19f50-c03d-462f-bddb-831475732438",
+    "cb13a601-d979-4dda-9cb2-d02f531347a9",
+    "609e9846-ee20-4be4-be2c-897279536cab",
+    "014e45a5-3e97-4d6c-b3f4-ddbc39acd7ee",
+    "3f2c44dd-35e3-4a73-bfbf-dfb83383df7c",
+    "f56b923a-4134-4a16-95e8-4689668a3863",
+    "65488b79-f227-4970-9769-adc0aa753a69",
+    "59bc90e0-f176-4a02-b89d-e25fa3791eba",
+    "224939b9-7881-4479-9333-2834ee5aaf22",
+    "c5faa9ec-8693-4ef5-ba28-251e2424fb4f",
+    "f081c223-61d8-46e1-8315-f2fa086677c1",
+    "f2311020-adc6-44bc-8b77-404c2a29e35c",
+    "21492af0-246a-4dce-82ee-8ba0b099f478",
+    "0814fe75-c336-4894-a69a-fc7878f0a511",
+    "a41e6021-4116-4808-b8dd-8219a28d06be",
+    "efb60bed-9eac-4a04-b052-b6f300356522",
+    "4b228806-47ec-45c0-b1d9-05b48b13f349",
+    "3f3cabc2-b91d-4b91-94ab-45256fc63179",
+    "a625bb81-907c-4094-a529-45dc1afa5c90",
+    "7ccdf96a-6cfb-4853-a8a4-21e3c4d493f5",
+    "0e8d2a26-efc6-4208-a6b5-73ee7cbdecbf",
+    "c1e2f6d3-4014-4072-aa38-8cafe1396887",
+    "169fa058-d625-45da-b2c6-818c9d507000",
+    "de1768a8-cd00-4cf7-8536-a43c05e987c6",
+    "53f9dc91-06c8-4449-80cb-ba6ff24c19ea",
+    "921a547b-9ba5-43dd-b117-3edf37c17f11",
+    "32af7c1d-0a89-4e1e-833e-19e4f80e73ed",
+    "210e5311-6a4e-44d7-8b90-944c15468545",
+    "31dfe3d0-0392-45cb-8e75-0ce6f08602f0",
+    "3498a04b-fa67-4580-b040-333793947821",
+    "b13775bd-98be-45b3-9193-f2302808b044",
+    "790f33a2-dc3b-4660-9555-fced39f81303",
+    "a4172b6d-64bb-4966-b6d9-d2bc271bd626",
+    "1e74d5ad-3b0e-4780-8f44-5117e952c735",
+    "ef83206c-6c5c-420e-9da3-18b415928c82",
+    "64750f14-e682-48eb-bec1-644006fbc86e",
+    "9ee7cce6-72ff-4068-ba35-4fe59b534d3d",
+    "0fbf62e2-6be8-459b-9b91-42be117d6d15",
+    "a85e1a06-bcb0-49a7-965f-bcc8d31b4e81",
+    "69ddf77b-8f20-4d7d-8c3e-220bca5b340a",
+    "a958c5f7-3531-433e-8ff0-11015e7e035c",
+    "9acfeab4-fb18-4397-be77-c4d4ba1897e4",
+    "afa158c1-4cf4-41be-a23c-6178ed4d4a54",
+    "0d1b19c6-f7b0-4fcb-bf5f-e81eaa89d49b",
+    "1fcaafec-eb90-4202-88c9-744368f44ffe",
+    "12772e5d-d169-473a-b98f-3eb041d7a12b",
+    "2ea810a0-6f8b-42a3-a4aa-6086986fce59",
+    "7890f496-ba45-4550-bc37-3ec022cada29",
+    "939ff552-0dcf-47d1-a3e5-f68bb023f477",
+    "7bb4ad58-997f-4e3c-81a2-182d5ee7645b",
+    "52223d74-5e25-410a-b2b9-aeef28590d53",
+    "50f86277-5661-4499-a9c3-f6f0dcd7a15f",
+    "c2eebe74-7635-490b-8c0a-8d9579a5a6bd",
+    "8532877a-3d09-4b56-88ff-f871de2c8038",
+    "f5dc1c94-abba-4167-b6c2-ff4742451ebd",
+    "9c6b57ab-6eae-4f66-86ab-1ce4eb757358",
+    "1761551b-812d-4e4e-820f-9a7204ec28b8",
+    "f7f6bb4e-2bf6-40fc-81e5-6b4c91264245",
+    "de9b182e-6a43-4699-ac34-98b9ed896501",
+    "ee9d23d4-2de1-4bfc-8001-7d3de45e4828",
+    "6cdae75b-42bd-431b-9dd4-647da944fc16",
+    "37c6b9fa-22e7-48da-aca2-5181bffc320b",
+    "0f2a0fc7-f307-4712-b25b-58a3725cb29e",
+    "6d7252f7-b843-4012-a04d-6aa2061a0bd1",
+    "769e7fe2-c8d2-4632-aded-2d865869e15a",
+    "842ac61b-d393-413b-a327-0441e2d97f6b",
+    "a46339ec-70e5-40b2-9fdb-a64dd0c4a429",
+    "3ca9cf69-0f30-4af8-aaf3-d40fc85e7b08",
+    "7ea37b4a-5c35-49e0-b01a-b22b5bd2b411",
+    "9c66235c-2407-4b6b-adcc-4508680a95d1",
+    "db8171b7-20a0-4707-88e1-a24cfaad20ec",
+    "0aa8faa2-8105-4379-a2cb-6b598396d4cf",
+    "67106729-5be9-4cca-962a-135c26d0a48e",
+    "9a55d34a-d669-4c9f-932c-feda2427cba5",
+    "79963f17-0936-4072-a166-8c8b2f1555f9",
+    "ddeb0c07-3bee-4d78-b990-53d0af332bc3",
+    "86893974-2398-4739-a812-fd44520fb61c",
+    "fa243eb1-ef69-4784-9fa6-8f0a6f47e244",
+    "1b9e2ca8-5466-4b19-b3ca-0c51a4aa48c9",
+    "873695aa-865b-4cbb-9211-a4fdd31d9682",
+    "27f20a8c-7d18-4441-b875-72a7d0682e8c",
+    "22badc2f-5f32-4f7f-8824-8757f39ed50a",
+    "5dbf21bd-3439-4aef-8332-5acdfa9305ad",
+    "8d740ab7-3f36-4842-bcaf-e26bfc0f582a",
+    "607aa9f3-88ec-4d77-a5e2-b5dadd3a3de5",
+    "b9f801bb-d5b0-43ae-8896-12aede0b5fdd",
+    "7acc51cc-5b43-4ed5-b48a-1b5d19de9c5a",
+    "9bdf784e-90f1-4349-9566-d4b751d0f123",
+    "80be9a40-8ca9-4f4b-830e-be3ae484da92",
+    "7d4a74fc-15f2-4502-a568-d41ea6d46b17",
+    "ecfdc2a5-fb4c-46bf-9764-b89a869f118a",
+    "a9a695c7-d583-4e38-a73a-633b002faeea",
+    "0502c943-c8c0-46d2-9ad0-21624dccf131",
+    "fe492403-74ff-47e7-a480-6fc30c22b0ba",
+    "ea9ce631-b4c9-4ae7-8004-f59245c5226e",
+    "628b9c10-e682-41cb-a39e-4be089a77429",
+    "5a72bf0f-c9f4-4907-aba9-b3190a83ede2",
+    "a1230f78-e369-4130-942b-489f74debe78",
+    "829f9aef-de8e-4806-8c0c-78f440b5bbb1",
+    "78ac0fbe-0ea4-43cf-bcd6-7b2d9e8024b4",
+    "254a5b35-f737-4cb2-a0c0-0e69873c5416",
+    "72cdeaec-b974-41fd-86a0-673d932b936b",
+    "84083a71-50d6-49f6-9cdd-d55185c9d158",
+    "d165c059-89f6-4014-b61a-918c9b830140",
+    "83b49b6e-404b-498e-a715-f60360289207",
+    "f3b28bc3-5b10-4d0c-923b-a149f9f02b0f",
+    "eb179137-ce4a-4aa9-9d99-57feeeb3708e",
+    "30205937-6907-4591-967b-871f6b149fa3",
+    "971f907c-9e35-4254-acd4-3825a0445e27",
+    "5896d59c-7550-4dbc-8951-23f356798a3e",
+    "0bfc1efa-bfcd-48aa-8a05-fe14538001c0",
+    "e71cdf1c-3336-4620-a38b-f02f80d56815",
+    "277fee3a-2aad-4c82-a44e-9c5147138c77",
+    "493f2be6-4c42-4204-9695-97a27f5d70e4",
+    "c3a55f38-d521-4e7a-aa4c-60cb41bdc5b5",
+    "e09a9683-b7ed-4805-aaf1-d7be1df1d069",
+    "0c64eb1a-7549-48c5-b749-49fec98a13b4",
+    "7f5e8eaa-b869-4243-97ec-1760102dfafd",
+    "5fb17cfd-eaf0-4941-a170-8e289db51911",
+    "4db1f394-7737-40b2-a077-d27cceddadfe",
+    "ce952195-30a5-4b93-9e54-a36737b57218",
+    "d6a059dd-28d8-4d1a-9a07-06b7020d5777",
+    "8b4f968e-c3b4-4b17-89c5-19a0a2ae495a",
+    "659d63db-4fc6-49f5-a0ac-83cffb576902",
+    "aadc73ef-1a18-4631-99eb-b5750bc28e14",
+    "cedac0b8-44be-45b1-8436-2362f0d70fe5",
+    "a087f81b-94c2-4acb-9042-e46369420e55",
+    "74a288f3-2ec5-4dba-9ff2-f0a3ee752319",
+    "f7bf5683-8235-4722-9140-50d69447540f",
+    "64775abc-634e-44cd-825d-bcdb6844568f",
+    "ad2a82a4-c0b8-4236-bf88-3ec775012756",
+    "c7119663-a7c8-4e52-acbb-7ed91e0969b2",
+    "4ef58a48-6a7b-4bba-9b80-ddf0eb8d7916",
+    "0617f3a7-7982-4cce-87f9-52817b190d0b",
+    "0196dc8d-6749-4bc6-aded-4a022d3503a8",
+    "44c3bda4-b0b4-47cb-826c-571ec0a3e611",
+    "3159951e-0987-454c-9b51-72657a82e765",
+    "b168a9dd-9457-49b0-877d-072f954d1095",
+    "d745af50-c2cd-4ed7-a940-578e08163eef",
+    "1af04a71-f677-4cb2-8252-54a07a3124ae",
+    "f46d1977-addc-4a3a-8628-8d6903736e00",
+    "c08a5010-704d-48dd-b9d9-9556d4f0cb9b",
+    "d23c28aa-78b5-4bbd-b5a9-8ade45552c37",
+    "4a329bd3-fe81-47db-818a-0ae3d1f2353e",
+    "0fc63739-3576-491a-a1d3-e9d01339a4ca",
+    "ec8beee0-05ba-46e2-8c38-cbbbf7de4f7f",
+    "0bd01a1a-a481-48d4-98ff-c3d242158ba5",
+    "bb74161a-295c-4189-8afd-7c31d115d2bc",
+    "7404ef32-fdc6-439d-aaf9-616cdc5071f9",
+    "c95595cd-88df-482c-a002-64a32e7b2660",
+    "85da2eab-8f07-46ab-abea-226650e08d99",
+    "9c14f3a9-1686-48e9-ae94-d3d2b162aeff",
+    "352f8590-5cd6-48bf-bdcc-797e85187444",
+    "bd113856-6881-49ec-8b09-a92ace7da49c",
+    "585a74b9-82be-4bd7-8d36-c55382498432",
+    "0c77baf8-7463-40da-bfce-db7a2fc7fd79",
+    "027e72d8-3226-4bec-b379-abc4316fa14d",
+    "f757cc53-5d1b-4ef8-b952-4caf8c75a73c",
+    "714c207c-3d12-4a54-9e0b-09850db6a121",
+    "22a5bb82-76ef-470d-8b2f-59c881a011ba",
+    "3449cccd-a68e-47b7-9eb0-5bdd80eb5237",
+    "33e89bb0-acbf-45da-9403-3328ca6c4c09",
+    "5356ab5f-a923-49f5-a3a3-9e7c71e5c35f",
+    "307cae8d-1d16-49bf-a542-9dae2a38414b",
+    "3ee997e7-883f-49dd-8192-fdc30f0ed866",
+    "865467d0-2352-40ee-a0cf-eb99ff132e38",
+    "5f08dd5c-5370-45ea-bf58-57c6b1cc8ebd",
+    "ceb8c08b-6e70-4172-8523-3108d57cfa03",
+    "39a93799-26de-4b2f-a08b-bb09ab8229ab",
+    "5851932b-435c-48e4-a8be-7d0b602b7ea2",
+    "0df427eb-5a41-4a00-87d7-2bef8c48a672",
+    "294452f0-815c-46c7-ad4b-ae0c4cd5af29",
+    "620327f1-95b0-41f9-9803-09fa1bf32287",
+    "15862df6-ce40-4281-9efb-714d451e853d",
+    "b0277c05-21ad-4bf5-8069-e71f12f7a21a",
+    "75e991fb-accd-4085-bcb5-a07b63c11bb8",
+    "b0597f4e-d563-4476-9b92-f25c2ffd4551",
+    "2c317e94-232a-454c-a099-6cd31fc61f27",
+    "d7de1ad3-0e94-4fea-adb8-34005bb6011c",
+    "68c87b80-2260-4083-b9cc-aa3720367257",
+    "8598a807-e4d3-4980-985b-4ac123cbe6ff",
+    "93673600-d721-48b4-9561-a6479444fd62",
+    "2f3b9244-5fea-43e5-b60c-fcbd7d904973",
+    "266a1583-7219-4e16-a5f6-eb1dd0fcdf4d",
+    "dfd29329-8706-4305-81dc-252d48bf53e9",
+    "3aea91e3-a0dd-4390-b5b2-ca3952282026",
+    "ce47cae6-8a39-4d5a-8c45-0f93c64edeb7",
+    "bf4f3c84-7421-4ced-8ed2-b2f8eeba12df",
+    "c9df9bd1-dc76-4ebf-b705-9a723ea9c188",
+    "d621f882-f102-4719-afca-708ae42d38c5",
+    "489e28c5-05f3-41cd-8316-fbb058eaea72",
+    "3ce2a553-9387-4ad3-b0bb-06ff61051f1c",
+    "9f44205f-0588-4fd6-a4d3-a03f6da6585e",
+    "bc055f0c-85b3-4ef0-8388-8e5e046c9390",
+    "1dbc2432-aef9-40b1-9309-077ac12aea9d",
+    "298a61ad-bf03-4736-989a-52e8119f9726",
+    "e0b744f5-3d3e-4f68-8bb3-fb32e1d926e4",
+    "9c702d40-1996-40dd-afd2-6d0817311d6a",
+    "47644d70-764f-4b89-8e3d-4d1f2f53ec45",
+    "bd9f7320-f288-4362-9427-68ac26f1b640",
+    "108ea79f-06bf-4316-aefd-110ebbc55118",
+    "ccfdfdce-0d5c-4b90-95c4-264a81d00f45",
+    "7128afdd-673d-40f7-8d8e-9ff9a2afbb23",
+    "521a9878-8b9e-4677-8095-6564481e3b59",
+    "19ad83a6-23ab-49e7-9084-b6c887872920",
+    "838fc460-a9c7-4c56-899e-3f6b9c785594",
+    "3151df01-6978-44b4-9860-6dc03f07d80b",
+    "0d6f6638-24b2-48b8-b9ff-df905183d84c",
+    "176d20f3-28f7-467c-954f-d0623027f025",
+    "421c9d9c-301a-4e35-b59b-f779e74c8b8d",
+    "988b3fd3-c0e9-4884-9063-1c9e26e3e113",
+    "4c74668f-e68c-45b3-85c5-21501924356c",
+    "e545b6e2-7db0-45f5-ab56-fa14f60bd624",
+    "0f7cf03d-f4da-4018-89ed-b6fff2e8fcf8",
+    "6aaff2d4-802d-455e-b505-5fd7d59d9137",
+    "0ecd35fd-93f1-403b-94c8-a118bf19b50d",
+    "f02678b3-f66b-4804-997e-13ac7cacc2e9",
+    "f480c005-1666-4985-a84b-17810d3919f4",
+    "0f8615d0-0079-459c-9537-a29860afe4bd",
+    "7ca2d6b5-ce17-4451-97c9-3041f25ff80c",
+    "d4675496-3f19-415a-abed-ce8d08c5e7e0",
+    "8dfcdbab-d34a-4ec0-9f4a-370f5be748d5",
+    "7239df38-caba-4a15-b775-52bcc1a369d5",
+    "dd6566ce-fb6f-4537-bf4d-d94ea2235edf",
+    "08155b36-b57d-4a99-bb00-49db983adaca",
+    "0d7e25da-361a-436d-a6e1-03c49915a160",
+    "e3fec670-da9f-493f-8b67-cde7dea4f57f",
+    "3bbb8eb0-f897-452f-955b-49d1098e977e",
+    "c6469adf-44ee-48ac-b0d3-e4c0ceebb3f5"]
+to contain:
+  ["41ae3bee-8e8f-4939-a5dc-4fcfb58c6b64"]
+but could not find the following element(s):
+  ["41ae3bee-8e8f-4939-a5dc-4fcfb58c6b64"]
+
+	at ae.mover.RequestHubReachIT.stationedUnitsBeyondTheCapAreOffered(RequestHubReachIT.java:59)
+
+[INFO] Running ae.mover.UnitMemberIdentityIT
+[ERROR] Tests run: 4, Failures: 4, Errors: 0, Skipped: 0, Time elapsed: 0.534 s <<< FAILURE! -- in ae.mover.UnitMemberIdentityIT
+[ERROR] ae.mover.UnitMemberIdentityIT.signInRefusalNamesTheCause -- Time elapsed: 0.261 s <<< FAILURE!
+java.lang.AssertionError: 
+
+Expecting actual:
+  "سجل الشخص غير نشط في مصدر الموارد البشرية."
+not to contain:
+  "الموارد البشرية"
+
+	at ae.mover.UnitMemberIdentityIT.lambda$signInRefusalNamesTheCause$1(UnitMemberIdentityIT.java:126)
+	at ae.mover.UnitMemberIdentityIT.signInRefusalNamesTheCause(UnitMemberIdentityIT.java:125)
+
+[ERROR] ae.mover.UnitMemberIdentityIT.refusalsStateTheirReason -- Time elapsed: 0.096 s <<< FAILURE!
+java.lang.AssertionError: 
+[the account was removed, not out of scope] 
+Expecting actual:
+  "رقم المستخدم هذا مستخدم لحساب خارج نطاقك؛ يضيفه مدير صلاحيات يشمل نطاقه صاحبه."
+not to contain:
+  "خارج نطاقك"
+
+	at ae.mover.UnitMemberIdentityIT.refusalsStateTheirReason(UnitMemberIdentityIT.java:103)
+
+[ERROR] ae.mover.UnitMemberIdentityIT.removedAccountReinstated -- Time elapsed: 0.099 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+Expecting value to be true but was false
+	at ae.mover.UnitMemberIdentityIT.removedAccountReinstated(UnitMemberIdentityIT.java:154)
+
+[ERROR] ae.mover.UnitMemberIdentityIT.directoryProvisionedPersonAddedByUserId -- Time elapsed: 0.058 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+[{"code":"VALIDATION_FAILED","message":"رقم المستخدم هذا مستخدم لحساب خارج نطاقك؛ يضيفه مدير صلاحيات يشمل نطاقه صاحبه.","details":{},"traceId":"d106d54c-9797"}] 
+expected: 200
+ but was: 400
+	at ae.mover.UnitMemberIdentityIT.directoryProvisionedPersonAddedByUserId(UnitMemberIdentityIT.java:82)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   AdminLegacyReproIT.legacyAdd:33 [{"code":"INTERNAL_ERROR","message":"حدث خطأ غير متوقع في الخادم. لم يُسجل أي إجراء جزئي.","details":{},"traceId":"9a79c088-c397"}] 
+expected: 200
+ but was: 500
+[ERROR]   RequestHubReachIT.stationedUnitsBeyondTheCapAreOffered:59 [the stationed unit, beyond position 300] 
+Expecting HashSet:
+  ["f94309d7-2748-4f28-9239-115df80e4252",
+    "be927e28-14ed-40cc-b578-400ffc21097d",
+    "a6b41cb3-1b0b-440e-b2ba-fb076795b811",
+    "d6eecb6f-6127-41fa-a48b-dcd13b29ebec",
+    "2e466452-6c4f-4303-b89b-b3603359814a",
+    "3799a2ac-af8d-4ca5-b278-387517dcf988",
+    "77db536e-c8f2-4a1c-88e5-1b2372743a65",
+    "99041f19-35de-4de0-a905-bc6c085ae646",
+    "191b0cdd-0496-402e-ae22-08feccbdfe05",
+    "641588d1-8e5c-4af4-a9a5-495fc691e1d3",
+    "921a09b5-ccc4-4dc0-912d-859772ec9b30",
+    "940e3763-637b-4588-868b-2617b910a52b",
+    "267ceb5c-3d37-4e1d-b661-b04e5c68ae82",
+    "361cbdbf-5a86-4c1d-aab2-4d6b6f651d39",
+    "63c6df33-ab7e-4379-b242-6b4e85ffb959",
+    "4bf82120-affd-4c58-bc69-85f361628ac3",
+    "9a43d4ba-da58-4c5f-a19a-ab1d87fa3c00",
+    "ab0b04d5-6836-46f1-8034-8a8af63a116c",
+    "e446b367-1530-4ead-8452-a3a3cc6a96fa",
+    "f5e7e170-8855-4d30-b849-09945d39e21d",
+    "d357fdd8-18bb-4c08-899f-90a423966279",
+    "2795cbec-47ce-48dd-aa78-84fcfd8be1ad",
+    "7895d53e-fc4f-4100-9c3a-744aa0237175",
+    "c87e1129-b420-44a2-ad18-4e2806c69c2a",
+    "c6eba3cb-be07-4de5-be64-04b4a2b64cac",
+    "03262c5a-e26c-4bc4-b588-5ae388a0dc3e",
+    "4bdf3b4a-94ff-4702-82e1-0a29548e6cde",
+    "5e54f9f8-fb89-4b9b-9bea-01aec6bd2b34",
+    "eab7faea-046e-4c04-84f5-0ed4a1fdf386",
+    "18a42c4b-eb3d-4656-a852-b7e6c2195553",
+    "255e7860-da39-4448-b3ee-9e7fe45b4cd1",
+    "fa5a97fe-1565-4456-8dc8-b5db8384ce88",
+    "3bb0685f-ec31-4bd9-808d-5ef1013fa619",
+    "e1f89bb7-eb1a-4d23-9ab5-94afd947caba",
+    "3dbfceae-c003-4ea7-ac2c-82e0b0153e51",
+    "f1c362b0-ac56-4a27-b297-30baf0307fd8",
+    "25824601-de47-4088-92e9-d0e0e2a3ebf2",
+    "814a0f26-b447-49b9-a648-f08c4e9e5ca8",
+    "42dbe828-2b48-43c7-ab0b-89e85d007d9d",
+    "e07a2be7-2bce-4094-8299-5d99841143dc",
+    "4a953272-c0e6-4664-88ca-2df0a4e8a7d8",
+    "f10e26a2-d377-49ba-b9a0-e1fd57d2b646",
+    "ffd5954d-01b5-4df8-8e38-95ab59b7f7a2",
+    "a659d4d1-4c24-44ed-92f9-f4df2124701c",
+    "eb2b6e63-0cf3-4ecf-a57a-d96c674959e9",
+    "0f8cc841-c70f-4f3c-8546-c154f49df690",
+    "b9fe78fc-6ef9-405c-b53c-a8a569b5180d",
+    "623952de-3bcd-4f43-a9fa-32701d06dc2e",
+    "41b2f5f3-a90d-406b-a487-e406d861603e",
+    "3df84b6f-50e1-4f4b-af2c-2dad6102021f",
+    "413b664f-891b-468f-9790-5e0371414487",
+    "3313f32d-3965-47d6-a957-453c3f705f5b",
+    "f9c377bf-25b1-41be-8866-2c2f31ab9059",
+    "addfc6e4-bfc2-4a8a-bd43-0f90f768f057",
+    "c196c4f5-c0a2-4aa7-b637-c44c45897816",
+    "3e1de159-4661-4e05-a1ff-ab567a7ddcbc",
+    "e2d6e88d-91a2-4f7c-ad98-73773300cef3",
+    "fb0981a4-8400-43ed-9423-cb1570cd56a1",
+    "af881239-372d-4e9a-a136-c8d0a1b25cfe",
+    "dc2c9eee-d70c-4f1d-b1ff-7a53d83df982",
+    "500cfad6-555b-4721-bccf-5dd6b14401b2",
+    "86cfb4b3-b31f-4036-97a9-183aec871667",
+    "1e309276-83ae-44d9-a7c5-aed7e72e8ec5",
+    "95d91dd9-745d-4229-ac72-1cc4d9963218",
+    "5147a7e5-dd82-4c7b-a848-67eeb2f32800",
+    "10295046-b716-49c7-8db9-c3f200849c80",
+    "b03acf40-b339-430b-8b93-3528c7564240",
+    "6ef4cfd7-2eb0-490c-87f4-cee598579b34",
+    "6de8f78d-9251-4056-bb99-6481c889f254",
+    "8fecdbf8-dfb2-438c-84ee-1fffc0032986",
+    "4833d3b3-ac35-4e74-b2a7-f00d79ed31da",
+    "2be19f50-c03d-462f-bddb-831475732438",
+    "cb13a601-d979-4dda-9cb2-d02f531347a9",
+    "609e9846-ee20-4be4-be2c-897279536cab",
+    "014e45a5-3e97-4d6c-b3f4-ddbc39acd7ee",
+    "3f2c44dd-35e3-4a73-bfbf-dfb83383df7c",
+    "f56b923a-4134-4a16-95e8-4689668a3863",
+    "65488b79-f227-4970-9769-adc0aa753a69",
+    "59bc90e0-f176-4a02-b89d-e25fa3791eba",
+    "224939b9-7881-4479-9333-2834ee5aaf22",
+    "c5faa9ec-8693-4ef5-ba28-251e2424fb4f",
+    "f081c223-61d8-46e1-8315-f2fa086677c1",
+    "f2311020-adc6-44bc-8b77-404c2a29e35c",
+    "21492af0-246a-4dce-82ee-8ba0b099f478",
+    "0814fe75-c336-4894-a69a-fc7878f0a511",
+    "a41e6021-4116-4808-b8dd-8219a28d06be",
+    "efb60bed-9eac-4a04-b052-b6f300356522",
+    "4b228806-47ec-45c0-b1d9-05b48b13f349",
+    "3f3cabc2-b91d-4b91-94ab-45256fc63179",
+    "a625bb81-907c-4094-a529-45dc1afa5c90",
+    "7ccdf96a-6cfb-4853-a8a4-21e3c4d493f5",
+    "0e8d2a26-efc6-4208-a6b5-73ee7cbdecbf",
+    "c1e2f6d3-4014-4072-aa38-8cafe1396887",
+    "169fa058-d625-45da-b2c6-818c9d507000",
+    "de1768a8-cd00-4cf7-8536-a43c05e987c6",
+    "53f9dc91-06c8-4449-80cb-ba6ff24c19ea",
+    "921a547b-9ba5-43dd-b117-3edf37c17f11",
+    "32af7c1d-0a89-4e1e-833e-19e4f80e73ed",
+    "210e5311-6a4e-44d7-8b90-944c15468545",
+    "31dfe3d0-0392-45cb-8e75-0ce6f08602f0",
+    "3498a04b-fa67-4580-b040-333793947821",
+    "b13775bd-98be-45b3-9193-f2302808b044",
+    "790f33a2-dc3b-4660-9555-fced39f81303",
+    "a4172b6d-64bb-4966-b6d9-d2bc271bd626",
+    "1e74d5ad-3b0e-4780-8f44-5117e952c735",
+    "ef83206c-6c5c-420e-9da3-18b415928c82",
+    "64750f14-e682-48eb-bec1-644006fbc86e",
+    "9ee7cce6-72ff-4068-ba35-4fe59b534d3d",
+    "0fbf62e2-6be8-459b-9b91-42be117d6d15",
+    "a85e1a06-bcb0-49a7-965f-bcc8d31b4e81",
+    "69ddf77b-8f20-4d7d-8c3e-220bca5b340a",
+    "a958c5f7-3531-433e-8ff0-11015e7e035c",
+    "9acfeab4-fb18-4397-be77-c4d4ba1897e4",
+    "afa158c1-4cf4-41be-a23c-6178ed4d4a54",
+    "0d1b19c6-f7b0-4fcb-bf5f-e81eaa89d49b",
+    "1fcaafec-eb90-4202-88c9-744368f44ffe",
+    "12772e5d-d169-473a-b98f-3eb041d7a12b",
+    "2ea810a0-6f8b-42a3-a4aa-6086986fce59",
+    "7890f496-ba45-4550-bc37-3ec022cada29",
+    "939ff552-0dcf-47d1-a3e5-f68bb023f477",
+    "7bb4ad58-997f-4e3c-81a2-182d5ee7645b",
+    "52223d74-5e25-410a-b2b9-aeef28590d53",
+    "50f86277-5661-4499-a9c3-f6f0dcd7a15f",
+    "c2eebe74-7635-490b-8c0a-8d9579a5a6bd",
+    "8532877a-3d09-4b56-88ff-f871de2c8038",
+    "f5dc1c94-abba-4167-b6c2-ff4742451ebd",
+    "9c6b57ab-6eae-4f66-86ab-1ce4eb757358",
+    "1761551b-812d-4e4e-820f-9a7204ec28b8",
+    "f7f6bb4e-2bf6-40fc-81e5-6b4c91264245",
+    "de9b182e-6a43-4699-ac34-98b9ed896501",
+    "ee9d23d4-2de1-4bfc-8001-7d3de45e4828",
+    "6cdae75b-42bd-431b-9dd4-647da944fc16",
+    "37c6b9fa-22e7-48da-aca2-5181bffc320b",
+    "0f2a0fc7-f307-4712-b25b-58a3725cb29e",
+    "6d7252f7-b843-4012-a04d-6aa2061a0bd1",
+    "769e7fe2-c8d2-4632-aded-2d865869e15a",
+    "842ac61b-d393-413b-a327-0441e2d97f6b",
+    "a46339ec-70e5-40b2-9fdb-a64dd0c4a429",
+    "3ca9cf69-0f30-4af8-aaf3-d40fc85e7b08",
+    "7ea37b4a-5c35-49e0-b01a-b22b5bd2b411",
+    "9c66235c-2407-4b6b-adcc-4508680a95d1",
+    "db8171b7-20a0-4707-88e1-a24cfaad20ec",
+    "0aa8faa2-8105-4379-a2cb-6b598396d4cf",
+    "67106729-5be9-4cca-962a-135c26d0a48e",
+    "9a55d34a-d669-4c9f-932c-feda2427cba5",
+    "79963f17-0936-4072-a166-8c8b2f1555f9",
+    "ddeb0c07-3bee-4d78-b990-53d0af332bc3",
+    "86893974-2398-4739-a812-fd44520fb61c",
+    "fa243eb1-ef69-4784-9fa6-8f0a6f47e244",
+    "1b9e2ca8-5466-4b19-b3ca-0c51a4aa48c9",
+    "873695aa-865b-4cbb-9211-a4fdd31d9682",
+    "27f20a8c-7d18-4441-b875-72a7d0682e8c",
+    "22badc2f-5f32-4f7f-8824-8757f39ed50a",
+    "5dbf21bd-3439-4aef-8332-5acdfa9305ad",
+    "8d740ab7-3f36-4842-bcaf-e26bfc0f582a",
+    "607aa9f3-88ec-4d77-a5e2-b5dadd3a3de5",
+    "b9f801bb-d5b0-43ae-8896-12aede0b5fdd",
+    "7acc51cc-5b43-4ed5-b48a-1b5d19de9c5a",
+    "9bdf784e-90f1-4349-9566-d4b751d0f123",
+    "80be9a40-8ca9-4f4b-830e-be3ae484da92",
+    "7d4a74fc-15f2-4502-a568-d41ea6d46b17",
+    "ecfdc2a5-fb4c-46bf-9764-b89a869f118a",
+    "a9a695c7-d583-4e38-a73a-633b002faeea",
+    "0502c943-c8c0-46d2-9ad0-21624dccf131",
+    "fe492403-74ff-47e7-a480-6fc30c22b0ba",
+    "ea9ce631-b4c9-4ae7-8004-f59245c5226e",
+    "628b9c10-e682-41cb-a39e-4be089a77429",
+    "5a72bf0f-c9f4-4907-aba9-b3190a83ede2",
+    "a1230f78-e369-4130-942b-489f74debe78",
+    "829f9aef-de8e-4806-8c0c-78f440b5bbb1",
+    "78ac0fbe-0ea4-43cf-bcd6-7b2d9e8024b4",
+    "254a5b35-f737-4cb2-a0c0-0e69873c5416",
+    "72cdeaec-b974-41fd-86a0-673d932b936b",
+    "84083a71-50d6-49f6-9cdd-d55185c9d158",
+    "d165c059-89f6-4014-b61a-918c9b830140",
+    "83b49b6e-404b-498e-a715-f60360289207",
+    "f3b28bc3-5b10-4d0c-923b-a149f9f02b0f",
+    "eb179137-ce4a-4aa9-9d99-57feeeb3708e",
+    "30205937-6907-4591-967b-871f6b149fa3",
+    "971f907c-9e35-4254-acd4-3825a0445e27",
+    "5896d59c-7550-4dbc-8951-23f356798a3e",
+    "0bfc1efa-bfcd-48aa-8a05-fe14538001c0",
+    "e71cdf1c-3336-4620-a38b-f02f80d56815",
+    "277fee3a-2aad-4c82-a44e-9c5147138c77",
+    "493f2be6-4c42-4204-9695-97a27f5d70e4",
+    "c3a55f38-d521-4e7a-aa4c-60cb41bdc5b5",
+    "e09a9683-b7ed-4805-aaf1-d7be1df1d069",
+    "0c64eb1a-7549-48c5-b749-49fec98a13b4",
+    "7f5e8eaa-b869-4243-97ec-1760102dfafd",
+    "5fb17cfd-eaf0-4941-a170-8e289db51911",
+    "4db1f394-7737-40b2-a077-d27cceddadfe",
+    "ce952195-30a5-4b93-9e54-a36737b57218",
+    "d6a059dd-28d8-4d1a-9a07-06b7020d5777",
+    "8b4f968e-c3b4-4b17-89c5-19a0a2ae495a",
+    "659d63db-4fc6-49f5-a0ac-83cffb576902",
+    "aadc73ef-1a18-4631-99eb-b5750bc28e14",
+    "cedac0b8-44be-45b1-8436-2362f0d70fe5",
+    "a087f81b-94c2-4acb-9042-e46369420e55",
+    "74a288f3-2ec5-4dba-9ff2-f0a3ee752319",
+    "f7bf5683-8235-4722-9140-50d69447540f",
+    "64775abc-634e-44cd-825d-bcdb6844568f",
+    "ad2a82a4-c0b8-4236-bf88-3ec775012756",
+    "c7119663-a7c8-4e52-acbb-7ed91e0969b2",
+    "4ef58a48-6a7b-4bba-9b80-ddf0eb8d7916",
+    "0617f3a7-7982-4cce-87f9-52817b190d0b",
+    "0196dc8d-6749-4bc6-aded-4a022d3503a8",
+    "44c3bda4-b0b4-47cb-826c-571ec0a3e611",
+    "3159951e-0987-454c-9b51-72657a82e765",
+    "b168a9dd-9457-49b0-877d-072f954d1095",
+    "d745af50-c2cd-4ed7-a940-578e08163eef",
+    "1af04a71-f677-4cb2-8252-54a07a3124ae",
+    "f46d1977-addc-4a3a-8628-8d6903736e00",
+    "c08a5010-704d-48dd-b9d9-9556d4f0cb9b",
+    "d23c28aa-78b5-4bbd-b5a9-8ade45552c37",
+    "4a329bd3-fe81-47db-818a-0ae3d1f2353e",
+    "0fc63739-3576-491a-a1d3-e9d01339a4ca",
+    "ec8beee0-05ba-46e2-8c38-cbbbf7de4f7f",
+    "0bd01a1a-a481-48d4-98ff-c3d242158ba5",
+    "bb74161a-295c-4189-8afd-7c31d115d2bc",
+    "7404ef32-fdc6-439d-aaf9-616cdc5071f9",
+    "c95595cd-88df-482c-a002-64a32e7b2660",
+    "85da2eab-8f07-46ab-abea-226650e08d99",
+    "9c14f3a9-1686-48e9-ae94-d3d2b162aeff",
+    "352f8590-5cd6-48bf-bdcc-797e85187444",
+    "bd113856-6881-49ec-8b09-a92ace7da49c",
+    "585a74b9-82be-4bd7-8d36-c55382498432",
+    "0c77baf8-7463-40da-bfce-db7a2fc7fd79",
+    "027e72d8-3226-4bec-b379-abc4316fa14d",
+    "f757cc53-5d1b-4ef8-b952-4caf8c75a73c",
+    "714c207c-3d12-4a54-9e0b-09850db6a121",
+    "22a5bb82-76ef-470d-8b2f-59c881a011ba",
+    "3449cccd-a68e-47b7-9eb0-5bdd80eb5237",
+    "33e89bb0-acbf-45da-9403-3328ca6c4c09",
+    "5356ab5f-a923-49f5-a3a3-9e7c71e5c35f",
+    "307cae8d-1d16-49bf-a542-9dae2a38414b",
+    "3ee997e7-883f-49dd-8192-fdc30f0ed866",
+    "865467d0-2352-40ee-a0cf-eb99ff132e38",
+    "5f08dd5c-5370-45ea-bf58-57c6b1cc8ebd",
+    "ceb8c08b-6e70-4172-8523-3108d57cfa03",
+    "39a93799-26de-4b2f-a08b-bb09ab8229ab",
+    "5851932b-435c-48e4-a8be-7d0b602b7ea2",
+    "0df427eb-5a41-4a00-87d7-2bef8c48a672",
+    "294452f0-815c-46c7-ad4b-ae0c4cd5af29",
+    "620327f1-95b0-41f9-9803-09fa1bf32287",
+    "15862df6-ce40-4281-9efb-714d451e853d",
+    "b0277c05-21ad-4bf5-8069-e71f12f7a21a",
+    "75e991fb-accd-4085-bcb5-a07b63c11bb8",
+    "b0597f4e-d563-4476-9b92-f25c2ffd4551",
+    "2c317e94-232a-454c-a099-6cd31fc61f27",
+    "d7de1ad3-0e94-4fea-adb8-34005bb6011c",
+    "68c87b80-2260-4083-b9cc-aa3720367257",
+    "8598a807-e4d3-4980-985b-4ac123cbe6ff",
+    "93673600-d721-48b4-9561-a6479444fd62",
+    "2f3b9244-5fea-43e5-b60c-fcbd7d904973",
+    "266a1583-7219-4e16-a5f6-eb1dd0fcdf4d",
+    "dfd29329-8706-4305-81dc-252d48bf53e9",
+    "3aea91e3-a0dd-4390-b5b2-ca3952282026",
+    "ce47cae6-8a39-4d5a-8c45-0f93c64edeb7",
+    "bf4f3c84-7421-4ced-8ed2-b2f8eeba12df",
+    "c9df9bd1-dc76-4ebf-b705-9a723ea9c188",
+    "d621f882-f102-4719-afca-708ae42d38c5",
+    "489e28c5-05f3-41cd-8316-fbb058eaea72",
+    "3ce2a553-9387-4ad3-b0bb-06ff61051f1c",
+    "9f44205f-0588-4fd6-a4d3-a03f6da6585e",
+    "bc055f0c-85b3-4ef0-8388-8e5e046c9390",
+    "1dbc2432-aef9-40b1-9309-077ac12aea9d",
+    "298a61ad-bf03-4736-989a-52e8119f9726",
+    "e0b744f5-3d3e-4f68-8bb3-fb32e1d926e4",
+    "9c702d40-1996-40dd-afd2-6d0817311d6a",
+    "47644d70-764f-4b89-8e3d-4d1f2f53ec45",
+    "bd9f7320-f288-4362-9427-68ac26f1b640",
+    "108ea79f-06bf-4316-aefd-110ebbc55118",
+    "ccfdfdce-0d5c-4b90-95c4-264a81d00f45",
+    "7128afdd-673d-40f7-8d8e-9ff9a2afbb23",
+    "521a9878-8b9e-4677-8095-6564481e3b59",
+    "19ad83a6-23ab-49e7-9084-b6c887872920",
+    "838fc460-a9c7-4c56-899e-3f6b9c785594",
+    "3151df01-6978-44b4-9860-6dc03f07d80b",
+    "0d6f6638-24b2-48b8-b9ff-df905183d84c",
+    "176d20f3-28f7-467c-954f-d0623027f025",
+    "421c9d9c-301a-4e35-b59b-f779e74c8b8d",
+    "988b3fd3-c0e9-4884-9063-1c9e26e3e113",
+    "4c74668f-e68c-45b3-85c5-21501924356c",
+    "e545b6e2-7db0-45f5-ab56-fa14f60bd624",
+    "0f7cf03d-f4da-4018-89ed-b6fff2e8fcf8",
+    "6aaff2d4-802d-455e-b505-5fd7d59d9137",
+    "0ecd35fd-93f1-403b-94c8-a118bf19b50d",
+    "f02678b3-f66b-4804-997e-13ac7cacc2e9",
+    "f480c005-1666-4985-a84b-17810d3919f4",
+    "0f8615d0-0079-459c-9537-a29860afe4bd",
+    "7ca2d6b5-ce17-4451-97c9-3041f25ff80c",
+    "d4675496-3f19-415a-abed-ce8d08c5e7e0",
+    "8dfcdbab-d34a-4ec0-9f4a-370f5be748d5",
+    "7239df38-caba-4a15-b775-52bcc1a369d5",
+    "dd6566ce-fb6f-4537-bf4d-d94ea2235edf",
+    "08155b36-b57d-4a99-bb00-49db983adaca",
+    "0d7e25da-361a-436d-a6e1-03c49915a160",
+    "e3fec670-da9f-493f-8b67-cde7dea4f57f",
+    "3bbb8eb0-f897-452f-955b-49d1098e977e",
+    "c6469adf-44ee-48ac-b0d3-e4c0ceebb3f5"]
+to contain:
+  ["41ae3bee-8e8f-4939-a5dc-4fcfb58c6b64"]
+but could not find the following element(s):
+  ["41ae3bee-8e8f-4939-a5dc-4fcfb58c6b64"]
+
+[ERROR]   UnitMemberIdentityIT.directoryProvisionedPersonAddedByUserId:82 [{"code":"VALIDATION_FAILED","message":"رقم المستخدم هذا مستخدم لحساب خارج نطاقك؛ يضيفه مدير صلاحيات يشمل نطاقه صاحبه.","details":{},"traceId":"d106d54c-9797"}] 
+expected: 200
+ but was: 400
+[ERROR]   UnitMemberIdentityIT.refusalsStateTheirReason:103 [the account was removed, not out of scope] 
+Expecting actual:
+  "رقم المستخدم هذا مستخدم لحساب خارج نطاقك؛ يضيفه مدير صلاحيات يشمل نطاقه صاحبه."
+not to contain:
+  "خارج نطاقك"
+
+[ERROR]   UnitMemberIdentityIT.removedAccountReinstated:154 
+Expecting value to be true but was false
+[ERROR]   UnitMemberIdentityIT.signInRefusalNamesTheCause:125->lambda$signInRefusalNamesTheCause$1:126 
+Expecting actual:
+  "سجل الشخص غير نشط في مصدر الموارد البشرية."
+not to contain:
+  "الموارد البشرية"
+
+[INFO] 
+[ERROR] Tests run: 9, Failures: 6, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:03 min
+[INFO] Finished at: 2026-11-25T02:07:00Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project mover-backend: There are test failures.
+[ERROR] 
+[ERROR] See /repo/backend/target/surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+exit=1

@@ -67,7 +67,7 @@ if [ -n "$(docker ps -aq --filter label=com.docker.compose.project=tmrkz-mover 2
   docker volume rm tmrkz-mover_web-html tmrkz-mover_web-docs >/dev/null 2>&1 || true
 fi
 # the same folder everywhere (RUN.md, «The folder»): anything else at the top is named, nothing is moved or deleted
-extra="$(ls -A | grep -vxE '\.env|\.gitignore|\.gitattributes|\.github|\.vscode|\.zcode|\.git|AGENTS\.md|CLAUDE\.md|FINAL_HANDOFF_2026-11-18\.md|FONT-LICENSE\.txt|README\.md|RUN\.md|assets|backend|backups|data|docker-compose\.yml|docker-compose\.override\.yml|docs|frontend|handoff|map-data|map-packages|ops|prototypes|start\.sh|tests|tmrkz-images\.tar|tmrkz-images\.tar\.sha256' | tr '\n' ' ' || true)"
+extra="$(ls -A | grep -vxE '\.env|\.gitignore|\.gitattributes|\.github|\.vscode|\.zcode|\.git|AGENTS\.md|CLAUDE\.md|FINAL_HANDOFF_2026-11-18\.md|FONT-LICENSE\.txt|README\.md|RUN\.md|\.dockerignore|assets|backend|backups|certs|data|docker-compose\.yml|docker-compose\.override\.yml|docker-compose\.[A-Za-z0-9_-]+\.yml|docs|frontend|handoff|map-data|map-packages|map-runtime|ops|prototypes|release|start\.sh|tests|tmrkz-images\.tar|tmrkz-images\.tar\.sha256' | tr '\n' ' ' || true)"
 [ -z "$extra" ] || echo "  note: not part of the TMRKZ folder — move to its place (RUN.md, «The folder»): $extra"
 
 # 1. the address
@@ -90,8 +90,9 @@ until echo "$PORT" | grep -Eq '^[0-9]+$' && [ "$PORT" -ge 1 ] && [ "$PORT" -le 6
   n=$((n + 1)); [ $n -le 3 ] || { echo "no valid port"; exit 2; }
   printf '  Port [%s]: ' "$CUR_PORT"; read -r PORT || true; PORT="${PORT:-$CUR_PORT}"
 done
-# another container on the port — this installation's own (project tmrkz) do not count
-own=" $(docker ps -q --filter label=com.docker.compose.project=tmrkz 2>/dev/null | tr '\n' ' ') "
+# another container on the port — this installation's own do not count (its project: COMPOSE_PROJECT_NAME or «name:», ADR-104)
+PROJECT="$(docker compose config --no-interpolate 2>/dev/null | sed -n 's/^name: //p' | head -n 1)"; PROJECT="${PROJECT:-tmrkz}"
+own=" $(docker ps -q --filter label=com.docker.compose.project="$PROJECT" 2>/dev/null | tr '\n' ' ') "
 busy="$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' | grep -E ":$PORT->" | awk -v own="$own" '$1 && index(own," "$1" ")==0{print $2;exit}' || true)"
 [ -z "$busy" ] || { echo "port $PORT is already used by the container $busy; choose another"; exit 2; }
 setenv TMRKZ_IP "$IP"; setenv TMRKZ_PORT "$PORT"
@@ -99,21 +100,46 @@ setenv TMRKZ_IP "$IP"; setenv TMRKZ_PORT "$PORT"
 [ -n "$HTTPS" ] || setenv TMRKZ_PUBLIC_URL "http://$IP:$PORT"
 setenv TMRKZ_HTTP_PORT "$PORT"
 
-# 2. the images: loaded when one is missing or tmrkz-images.tar is newer than the last one loaded here
+# 2. the images (ADR-104): an installation whose images are all loaded starts without tmrkz-images.tar or its checksum file.
+#    The archive is loaded when an image is missing, or when an archive is present that differs from the last one loaded here.
 LOADED=ops/local/.generated/images-loaded.sha256
 mkdir -p ops/local/.generated data/db data/files data/ldap-data data/ldap-config
-missing=0
+missing=""
 for img in tmrkz/folder-backend:1 tmrkz/folder-web:1 postgis/postgis:17-3.5-alpine tmrkz/keycloak:26.7.5-2 openfga/openfga:v1.8.16 osixia/openldap:1.5.0 nginx:1.28.3-alpine; do
-  docker image inspect "$img" >/dev/null 2>&1 || missing=1
+  docker image inspect "$img" >/dev/null 2>&1 || missing="$missing $img"
 done
-if [ $missing = 1 ] || ! cmp -s tmrkz-images.tar.sha256 "$LOADED" 2>/dev/null; then
-  [ -f tmrkz-images.tar ] || { echo "tmrkz-images.tar is not in this folder (make it on a connected machine: sh ops/local/workspace/pack-images.sh)"; exit 1; }
+load_images() {
+  [ -f tmrkz-images.tar.sha256 ] || { echo "tmrkz-images.tar.sha256 is missing: the archive is not loaded without its checksum"; exit 1; }
   echo "  checking tmrkz-images.tar …"
   (sha256sum -c tmrkz-images.tar.sha256 >/dev/null 2>&1 || shasum -a 256 -c tmrkz-images.tar.sha256 >/dev/null) || { echo "tmrkz-images.tar is damaged (checksum)"; exit 1; }
   echo "  docker load -i tmrkz-images.tar"; docker load -q -i tmrkz-images.tar >/dev/null && cp tmrkz-images.tar.sha256 "$LOADED"
+}
+if [ -n "$missing" ]; then
+  [ -f tmrkz-images.tar ] || { echo "images not loaded on this machine:$missing"; echo "bring tmrkz-images.tar and tmrkz-images.tar.sha256 (made on a connected machine: sh ops/local/workspace/pack-images.sh)"; exit 1; }
+  load_images
+elif [ -f tmrkz-images.tar ] && [ -f tmrkz-images.tar.sha256 ] && ! cmp -s tmrkz-images.tar.sha256 "$LOADED" 2>/dev/null; then
+  load_images
+else
+  echo "  images already loaded (tmrkz-images.tar not needed)"
 fi
 
-# 3. start (the first start builds the backend and the web from the source: a few minutes)
+# 3. the Compose files (ADR-104): plain «docker compose» reads only docker-compose.yml and docker-compose.override.yml. Another
+#    docker-compose.*.yml here (the VM's docker-compose.dc-hosts.yml) is used only when .env names it in COMPOSE_FILE; it is never
+#    silently left out — starting without it would recreate the containers without its settings.
+CF="$(value COMPOSE_FILE | tr ';' ':')"
+running="$(docker ps -a --filter label=com.docker.compose.project="$PROJECT" --format '{{.Label "com.docker.compose.project.config_files"}}' 2>/dev/null | head -n 1)"
+for f in $(ls docker-compose.*.yml 2>/dev/null | grep -vx 'docker-compose.override.yml'); do
+  case ":$CF:" in *":$f:"*|*"/$f:"*|*"\\$f:"*) continue ;; esac
+  echo "  $f is in this folder, but .env does not name it in COMPOSE_FILE: docker compose would leave it out."
+  echo "  add these two lines to .env, then run start.sh again:"
+  echo "    COMPOSE_PATH_SEPARATOR=:"
+  echo "    COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml:$f"
+  [ -n "$running" ] && echo "  (the containers now running were started with: $running)"
+  exit 2
+done
+[ -z "$CF" ] || echo "  Compose files (COMPOSE_FILE): $CF"
+
+# 4. start (the first start builds the backend and the web from the source: a few minutes)
 docker compose up -d
 URL="${HTTPS:-http://$IP:$PORT}"; LOCAL="http://127.0.0.1:$PORT"
 echo "  waiting for TMRKZ (logs: docker compose logs -f backend web-build) …"
@@ -121,6 +147,23 @@ n=0
 until [ "$(code "$LOCAL/auth/realms/tmrkz/.well-known/openid-configuration")" = 200 ] && [ "$(code "$LOCAL/api/v1/auth/status")" = 200 ]; do
   n=$((n + 1)); [ $n -le 300 ] || { echo "TMRKZ did not become ready — see: docker compose logs backend web-build"; exit 1; }; sleep 3
 done
+# the platform accounts and their sign-in client are set by the one-time job keycloak-setup after Keycloak answers: a sign-in
+# before it has finished is refused by the identity provider («رفض مزود الهوية إتمام الدخول»), so wait for it (ADR-104)
+setup_done() {
+  KS="$(docker compose ps -a -q keycloak-setup 2>/dev/null | head -n 1)"
+  n=0
+  while [ -n "$KS" ] && [ "$(docker inspect -f '{{.State.Status}}' "$KS" 2>/dev/null)" != exited ] && [ $n -lt 100 ]; do
+    n=$((n + 1)); sleep 3
+  done
+  [ -z "$KS" ] || [ "$(docker inspect -f '{{.State.ExitCode}}' "$KS" 2>/dev/null)" = 0 ]
+}
+# a Keycloak that has only just started may answer one call with «unknown_error»; the job is safe to run again (it is run on
+# every start), so it is run once more before reporting
+if ! setup_done; then
+  echo "  keycloak-setup did not finish; running it once more"
+  docker compose up -d keycloak-setup >/dev/null 2>&1
+  setup_done || echo "  note: keycloak-setup did not finish cleanly — see: docker compose logs keycloak-setup"
+fi
 echo
 echo "  TMRKZ is running: $URL"
 echo "  sign in as admin or developer (passwords: TMRKZ_PLATFORM_ADMIN_PASSWORD / TMRKZ_PLATFORM_DEVELOPER_PASSWORD in .env)"

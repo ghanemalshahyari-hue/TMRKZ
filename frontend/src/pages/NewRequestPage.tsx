@@ -79,7 +79,7 @@ export function NewRequestPage() {
               ))}
             </tbody>
           </table>
-          {hub.unitsTotal > hub.units.length && <p className="micro muted">تُعرض أول {hub.units.length} وحدة من {hub.unitsTotal}.</p>}
+          {hub.unitsTotal > hub.units.length && <p className="micro muted">تُعرض {hub.units.length} وحدة من {hub.unitsTotal}: كل الوحدات المتمركزة وما فوقها، ثم الباقي بترتيب الهيكل.</p>}
         </div>
       )}
       {hub && hub.actions.length === 1 && !hub.units.length && (

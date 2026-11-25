@@ -25,7 +25,14 @@ NGINX
 # Poll the backend every 30 s for embedding-origin changes; reload nginx when they differ
 _embedding_poll() {
   _prev="'none'"
+  _conf="$(md5sum /etc/nginx/conf.d/default.conf 2>/dev/null)"
   while sleep 30; do
+    # ADR-104: a changed frontend/nginx.conf (an update) is loaded when it passes nginx -t; a broken one is not
+    _now="$(md5sum /etc/nginx/conf.d/default.conf 2>/dev/null)"
+    if [ "$_now" != "$_conf" ]; then
+      if nginx -t >/dev/null 2>&1; then nginx -s reload 2>/dev/null && _conf="$_now" && echo "[map-worker] nginx configuration reloaded"
+      else echo "[map-worker] nginx configuration changed but does not pass nginx -t: the running one is kept"; _conf="$_now"; fi
+    fi
     _fa="$(wget -qO- --timeout=3 http://backend:8080/api/v1/system/embedding/csp 2>/dev/null || true)"
     if [ -n "$_fa" ] && [ "$_fa" != "'none'" ]; then
       _new="'self' $_fa"

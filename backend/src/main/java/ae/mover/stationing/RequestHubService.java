@@ -2,6 +2,7 @@ package ae.mover.stationing;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -93,12 +94,51 @@ public class RequestHubService {
         return out;
     }
 
+    /** How many units the hub describes one by one (the per-unit state and actions are bulk-read for these only). */
+    static final int HUB_UNITS = 300;
+
+    /**
+     * The units the hub lists (ADR-103). Before, the first {@value #HUB_UNITS} of the reach in tree order — so with a large
+     * reach (the VM's 23,674 units) a stationed unit further down, the only kind a deployment-area or re-stationing request is
+     * made for, was never offered. Now every unit holding a stationing now and the units above it in the list come first,
+     * then the others in tree order while room remains; the tree order of the result is kept.
+     */
+    private List<Map<String, Object>> offered(List<Map<String, Object>> all, Instant now) {
+        if (all.size() <= HUB_UNITS) {
+            return all;
+        }
+        Map<String, String> parent = new HashMap<>();
+        for (Map<String, Object> u : all) {
+            parent.put(u.get("id").toString(), u.get("parentId") == null ? null : u.get("parentId").toString());
+        }
+        Set<UUID> ids = new java.util.LinkedHashSet<>();
+        parent.keySet().forEach(id -> ids.add(UUID.fromString(id)));
+        Set<String> keep = new HashSet<>();
+        posture.unitState(ids, now).forEach((id, row) -> {
+            for (String at = row.stationingId() == null ? null : id.toString(); at != null && parent.containsKey(at) && keep.add(at); ) {
+                at = parent.get(at);
+            }
+        });
+        int room = Math.max(0, HUB_UNITS - keep.size());
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> u : all) {
+            if (keep.contains(u.get("id").toString())) {
+                out.add(u);
+            } else if (room > 0) {
+                out.add(u);
+                room--;
+            }
+        }
+        return out;
+    }
+
     /** «طلب جديد»: the cards this person has, and for each unit in reach where it stands and what may be asked. */
     public Map<String, Object> hub(AccessContext ctx, Instant now) {
         Set<UUID> reach = new HashSet<>();
         CREATE.forEach(p -> reach.addAll(requests.reach(ctx, p)));
-        List<Map<String, Object>> all = requests.unitTree(reach);
-        List<Map<String, Object>> capped = all.stream().limit(300).toList();
+        // ADR-103: a retired unit is never asked for; it took a place in the list before
+        List<Map<String, Object>> all = requests.unitTree(requests.active(reach));
+        List<Map<String, Object>> capped = offered(all, now);
         // Bulk the per-unit state, site reference and open-DEPLOYMENT_AREAS request in three fixed queries, instead
         // of running up to five statements per unit inside the loop (ADR-094).
         java.util.LinkedHashSet<UUID> unitIds = new java.util.LinkedHashSet<>();
@@ -132,6 +172,7 @@ public class RequestHubService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("units", units);
         out.put("unitsTotal", all.size());
+        out.put("unitsShown", units.size());
         List<Map<String, Object>> cards = new ArrayList<>();
         Map<String, Object> mine = access.mine(ctx);
         boolean accessOpen = ((List<?>) mine.get("requests")).stream().anyMatch(r -> Set.of("SUBMITTED", "RETURNED").contains(String.valueOf(((Map<?, ?>) r).get("status"))));

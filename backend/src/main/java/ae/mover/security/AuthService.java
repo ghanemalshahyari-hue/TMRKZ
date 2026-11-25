@@ -51,11 +51,11 @@ public class AuthService {
      */
     @Transactional
     public LoginResult issueSession(UUID personId, String issuer, String idToken, Instant authenticatedAt, String ip, String userAgent) {
-        Map<String, Object> p = jdbc.sql("select id, username, display_name, status from person where id = :id")
+        Map<String, Object> p = jdbc.sql("select id, username, display_name, status, source, access_disabled from person where id = :id")
                 .param("id", personId).query().listOfRows().stream().findFirst()
                 .orElseThrow(() -> new ApiException(ErrorCode.IDENTITY_NOT_LINKED, "لا يوجد سجل شخص مرتبط بهذا الحساب."));
         if (!"ACTIVE".equals(p.get("status"))) {
-            throw new ApiException(ErrorCode.IDENTITY_NOT_LINKED, "سجل الشخص غير نشط في مصدر الموارد البشرية.");
+            throw inactive(p);
         }
         Instant now = clock.instant();
         byte[] bytes = new byte[32];
@@ -73,6 +73,20 @@ public class AuthService {
         Actor actor = new Actor(personId, (String) p.get("username"), (String) p.get("display_name"), Hashing.sha256(token));
         audit.recordAs(actor, "LOGIN", "PERSON", personId.toString(), actor.displayName(), Map.of("issuer", String.valueOf(issuer)), null);
         return new LoginResult(token, actor);
+    }
+
+    /**
+     * The real cause of a refused sign-in (ADR-103). A LOCAL account, or one switched off here, was ended in TMRKZ («حذف الحساب»
+     * or a replaced first-administrator identity); only an HR record that HR reports inactive is «inactive in HR». Before ADR-103
+     * every case blamed HR, which sent the VM investigation of 24–25 Nov 2026 to the HR mirror.
+     */
+    private static ApiException inactive(Map<String, Object> p) {
+        if (Boolean.TRUE.equals(p.get("access_disabled")) || "LOCAL".equals(p.get("source"))) {
+            return new ApiException(ErrorCode.IDENTITY_NOT_LINKED,
+                    "هذا الحساب موقوف في تمركز (أُنهي من بطاقة الحساب)؛ يعيده مدير الصلاحيات العام من بطاقة الحساب.",
+                    Map.of("reason", "ACCOUNT_REMOVED"));
+        }
+        return new ApiException(ErrorCode.IDENTITY_NOT_LINKED, "سجل الشخص غير نشط في مصدر الموارد البشرية.", Map.of("reason", "HR_INACTIVE"));
     }
 
     /** Records a fresh interactive authentication (step-up) on an existing session of the same person. */

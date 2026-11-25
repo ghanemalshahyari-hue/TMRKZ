@@ -307,7 +307,11 @@ public class AccessAdminService {
         out.put("systemRoles", global ? jdbc.sql("select code, name from role_def where system order by sort_order, name")
                 .query((rs, n) -> Map.<String, Object>of("code", rs.getString(1), "name", rs.getString(2))).list() : List.of());
         out.put("canEdit", mayEdit(ctx, person) && !(Boolean) out.get("system"));
-        out.put("canRetire", global && "LOCAL".equals(p.get("source")) && !(Boolean) out.get("system") && !grants.keys().same(ctx.personId(), person));
+        out.put("canRetire", global && "LOCAL".equals(p.get("source")) && !(Boolean) out.get("system") && !grants.keys().same(ctx.personId(), person)
+                && "ACTIVE".equals(p.get("status")));
+        // ADR-103: a local account ended by «حذف الحساب» comes back only through a global manager, with a reason
+        out.put("canReinstate", global && "LOCAL".equals(p.get("source")) && !(Boolean) out.get("system")
+                && !grants.keys().same(ctx.personId(), person) && "DISABLED".equals(p.get("status")));
         out.put("canEditProfile", mayEdit(ctx, person) && "LOCAL".equals(p.get("source")) && !(Boolean) out.get("system"));
         return out;
     }
@@ -345,6 +349,27 @@ public class AccessAdminService {
         }
         jdbc.sql("update person set display_name = :n where id = :p").param("n", name).param("p", person).update();
         audit.recordAs(ctx.actor(), "PERSON_PROFILE_CHANGED", "PERSON", person.toString(), null, Map.of("displayName", name), null);
+        return card(ctx, person);
+    }
+
+    /**
+     * «إعادة الحساب» (ADR-103): a local account ended by «حذف الحساب» is switched on again by a global manager, with a reason,
+     * audited. Only the account returns: the grants, unit entries, delegations and permits it ended stay ended and are given
+     * again one by one through the usual rules (least privilege). Before ADR-103 there was no way back except SQL on the server.
+     */
+    @Transactional
+    public Map<String, Object> reinstate(AccessContext ctx, UUID person, EndInput in) {
+        requireCovered(ctx, person);
+        if (!(Boolean) card(ctx, person).get("canReinstate")) {
+            throw ApiException.forbidden("يعيد الحسابات المحلية الموقوفة مدير الصلاحيات العام فقط.");
+        }
+        String reason = in == null || in.reason() == null ? "" : in.reason().trim();
+        if (reason.length() < 3) {
+            throw ApiException.validation("اذكر سبب إعادة الحساب.");
+        }
+        jdbc.sql("update person set status = 'ACTIVE', access_disabled = false, access_disabled_reason = null where id = :p")
+                .param("p", person).update();
+        audit.recordAs(ctx.actor(), "PERSON_REINSTATED", "PERSON", person.toString(), null, Map.of("grantsRestored", 0), reason);
         return card(ctx, person);
     }
 

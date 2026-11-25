@@ -1,0 +1,203 @@
+{
+  "stamp": "mwvmp89w",
+  "results": [
+    {
+      "id": "UC-00",
+      "pass": true,
+      "label": "make-release.sh signs the Desktop folder",
+      "extra": "release 20261125-043346-nogit: 828 files, 15440185 bytes"
+    },
+    {
+      "id": "UC-00",
+      "pass": true,
+      "label": "the maintenance worker is running",
+      "extra": ""
+    },
+    {
+      "id": "UC-01",
+      "pass": true,
+      "label": "the signed release is verified and compared",
+      "extra": "COMPARED"
+    },
+    {
+      "id": "UC-01",
+      "pass": true,
+      "label": "a new documentation file is «مضاف»",
+      "extra": ""
+    },
+    {
+      "id": "UC-01",
+      "pass": true,
+      "label": "a frontend file is «معدّل»",
+      "extra": ""
+    },
+    {
+      "id": "UC-01",
+      "pass": true,
+      "label": "a backend file is «معدّل»",
+      "extra": ""
+    },
+    {
+      "id": "UC-01",
+      "pass": true,
+      "label": "a file gone from the release is «محذوف»",
+      "extra": ""
+    },
+    {
+      "id": "UC-01",
+      "pass": true,
+      "label": "the Compose change is shown, not selected (explicit choice only)",
+      "extra": ""
+    },
+    {
+      "id": "UC-04",
+      "pass": true,
+      "label": "no protected or machine-specific path is even listed",
+      "extra": "5 rows"
+    },
+    {
+      "id": "UC-02",
+      "pass": true,
+      "label": "only the three differing files are uploaded (not the 800+ unchanged)",
+      "extra": "رفع الملفات المختلفة (3)"
+    },
+    {
+      "id": "UC-03",
+      "pass": true,
+      "label": "approved → built offline → backed up → applied → verified",
+      "extra": "DONE"
+    },
+    {
+      "id": "UC-03",
+      "pass": true,
+      "label": "the backend runs the new build",
+      "extra": "{\"probe\":\"e2e-mwvmp89w\",\"startedAt\":\"2026-11-25T04:34:12.003Z\"}"
+    },
+    {
+      "id": "UC-03",
+      "pass": true,
+      "label": "the web runs the new build",
+      "extra": ""
+    },
+    {
+      "id": "UC-03",
+      "pass": true,
+      "label": "the worker still reports alive right after a long update",
+      "extra": ""
+    },
+    {
+      "id": "UC-03",
+      "pass": true,
+      "label": "added and deleted files applied",
+      "extra": ""
+    },
+    {
+      "id": "UC-04",
+      "pass": true,
+      "label": ".env, the VM Compose file, certificates and the trust key are untouched",
+      "extra": ""
+    },
+    {
+      "id": "UC-04",
+      "pass": true,
+      "label": "the unselected Compose change was not applied",
+      "extra": ""
+    },
+    {
+      "id": "UC-04",
+      "pass": true,
+      "label": "every replaced or deleted file was backed up first",
+      "extra": "C:\\Users\\ADMIN\\AppData\\Local\\Temp\\claude\\9f5b532524e8b495\\fc86be8c-9d50-4581-9d5c-71b9bd5811c5\\scratchpad\\uc\\vm\\TMRKZ\\backups\\updates\\20261125T043348-fe14dc01"
+    },
+    {
+      "id": "UC-05",
+      "pass": true,
+      "label": "received, approved and done are in the audit log",
+      "extra": "200"
+    },
+    {
+      "id": "UC-06",
+      "pass": true,
+      "label": "rollback restores the previous backend",
+      "extra": "ROLLED_BACK {\"startedAt\":\"2026-11-25T04:35:11.259Z\"}"
+    },
+    {
+      "id": "UC-06",
+      "pass": true,
+      "label": "rollback restores the files exactly",
+      "extra": ""
+    },
+    {
+      "id": "UC-07",
+      "pass": true,
+      "label": "a release signed by another key is rejected",
+      "extra": "REJECTED"
+    },
+    {
+      "id": "UC-07",
+      "pass": true,
+      "label": "protected paths in a signed release are all blocked",
+      "extra": "../outside.txt,.env,certs/vm-test.pem,data/db/PG_VERSION,docker-compose.dc-hosts.yml,map-runtime/x,ops/local/.generated/release-trust.pub"
+    },
+    {
+      "id": "UC-07",
+      "pass": true,
+      "label": "a release that would delete most of the installation is flagged and never deletes by default",
+      "extra": "826 deletions"
+    },
+    {
+      "id": "UC-07",
+      "pass": true,
+      "label": "approving a blocked path is refused",
+      "extra": "400"
+    },
+    {
+      "id": "UC-07",
+      "pass": true,
+      "label": "a file changed after signing cannot be selected or uploaded",
+      "extra": ""
+    },
+    {
+      "id": "UC-08",
+      "pass": true,
+      "label": "a release that does not build with the existing libraries is refused",
+      "extra": "REJECTED"
+    },
+    {
+      "id": "UC-08",
+      "pass": true,
+      "label": "nothing was applied and the backend was not restarted",
+      "extra": ""
+    },
+    {
+      "id": "UC-09",
+      "pass": true,
+      "label": "a restart starts the last build without rebuilding",
+      "extra": ""
+    },
+    {
+      "id": "UC-10",
+      "pass": true,
+      "label": "start.sh starts with the loaded images and no archive",
+      "extra": "  images already loaded (tmrkz-images.tar not needed)"
+    },
+    {
+      "id": "UC-10",
+      "pass": true,
+      "label": "an extra Compose file is never silently left out",
+      "extra": "  docker-compose.dc-hosts.yml is in this folder, but .env does not name it in COMPOSE_FILE: docker compose would leave it out."
+    },
+    {
+      "id": "UC-10",
+      "pass": true,
+      "label": "the VM Compose file still untouched",
+      "extra": ""
+    },
+    {
+      "id": "UC-11",
+      "pass": true,
+      "label": "the offline map package is served",
+      "extra": "200"
+    }
+  ]
+}

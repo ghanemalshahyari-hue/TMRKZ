@@ -253,16 +253,13 @@ public class UnitMemberService {
                 throw ApiException.validation("لهذا المستخدم سجل في الموارد البشرية؛ ابحث عنه بالرقم العسكري أو رقم المستخدم.");
             }
             Map<String, Object> existing = jdbc.sql("""
-                    select id, employee_no, bootstrap, status from person where lower(username) = :l or lower(employee_no) = lower(:e)""")
+                    select p.id, p.employee_no, p.bootstrap, p.status, p.source,
+                           exists (select 1 from identity_link il where il.person_id = p.id and il.method = 'DIRECTORY') as directory_made
+                    from person p where lower(p.username) = :l or lower(p.employee_no) = lower(:e)""")
                     .param("l", login).param("e", LOCAL_USER_PREFIX + login).query().listOfRows().stream().findFirst().orElse(null);
             if (existing != null) {
                 person = (UUID) existing.get("id");
-                boolean ours = String.valueOf(existing.get("employee_no")).startsWith(LOCAL_USER_PREFIX)
-                        && !Boolean.TRUE.equals(existing.get("bootstrap"));
-                // an account another manager created stays theirs unless it is already inside this manager's reach
-                if (!ours || !"ACTIVE".equals(existing.get("status")) || !directory.covers(ctx, person)) {
-                    throw ApiException.validation("رقم المستخدم هذا مستخدم لحساب خارج نطاقك؛ يضيفه مدير صلاحيات يشمل نطاقه صاحبه.");
-                }
+                requireAddableAccount(ctx, person, existing);
             } else {
                 person = UUID.randomUUID();
                 String name = in.displayName() == null || in.displayName().isBlank() ? login : in.displayName().trim();
@@ -301,6 +298,33 @@ public class UnitMemberService {
         audit.recordAs(ctx.actor(), "UNIT_MEMBER_ADDED", "PERSON", person.toString(), null,
                 Map.of("organizationId", orgId.toString(), "acting", acting, "withoutHr", !fromHr), null);
         return Map.of("personId", person.toString(), "created", created, "already", false);
+    }
+
+    /**
+     * An existing account typed as a User ID (ADR-103). Two kinds of LOCAL account are user accounts: one made here
+     * («USER-login») and one made by the person's own first directory sign-in (ADR-068: linked DIRECTORY, carrying the
+     * directory's employee number or «DIR-login»). Before ADR-103 only the first kind was accepted, so even the global
+     * administrator was told that a person who had signed in was «outside your scope». Each refusal now names its real
+     * cause; the scope bound itself is unchanged — a manager adds only someone already inside their reach.
+     */
+    private void requireAddableAccount(AccessContext ctx, UUID person, Map<String, Object> p) {
+        String no = String.valueOf(p.get("employee_no"));
+        if (Boolean.TRUE.equals(p.get("bootstrap")) || no.startsWith("PLATFORM-")) {
+            throw ApiException.validation("رقم المستخدم هذا لحساب نظام (حساب منصة أو هوية التهيئة الأولى)؛ لا يُضاف مستخدماً لوحدة.");
+        }
+        boolean userAccount = "LOCAL".equals(p.get("source"))
+                && (no.startsWith(LOCAL_USER_PREFIX) || Boolean.TRUE.equals(p.get("directory_made")));
+        if (!userAccount) {
+            throw ApiException.validation("رقم المستخدم هذا مسجل لسجل آخر في تمركز لا يُضاف بهذه الطريقة؛ يراجعه مدير الصلاحيات العام.");
+        }
+        if (!"ACTIVE".equals(p.get("status"))) {
+            throw ApiException.validation("حساب رقم المستخدم هذا موقوف في تمركز (أُنهي من بطاقة الحساب)؛ يعيده مدير الصلاحيات العام"
+                    + " من بطاقة الحساب قبل إضافته.");
+        }
+        // an account another manager created stays theirs unless it is already inside this manager's reach
+        if (!directory.covers(ctx, person)) {
+            throw ApiException.validation("رقم المستخدم هذا مستخدم لحساب خارج نطاقك؛ يضيفه مدير صلاحيات يشمل نطاقه صاحبه.");
+        }
     }
 
     public record EndInput(UUID organizationId, String reason) {

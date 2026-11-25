@@ -390,6 +390,10 @@ export function AccountCardDialog({ personId, catalogue, onClose, onChanged }: {
     const reason = window.prompt('حذف الحساب المحلي ' + card.displayName + '؟ تُنهى كل صلاحياته ووحداته وتصاريحه ويُوقف. اكتب السبب:');
     if (reason && reason.trim()) void run(api.retireAccount(card.id, reason.trim()), 'حُذف الحساب (يبقى في سجل التدقيق)');
   };
+  const reinstate = () => {
+    const reason = window.prompt('إعادة الحساب ' + card.displayName + '؟ يعود الحساب نشطاً بلا صلاحيات ولا وحدات؛ تُمنح من جديد. اكتب السبب:');
+    if (reason && reason.trim()) void run(api.reinstateAccount(card.id, reason.trim()), 'أُعيد الحساب بلا صلاحيات (مسجل في التدقيق)');
+  };
   const systemRole = (code: string, held?: { id: string }) => {
     const unit = card.units[0];
     if (held) {
@@ -480,6 +484,7 @@ export function AccountCardDialog({ personId, catalogue, onClose, onChanged }: {
           </button>
         )}
         {card.canRetire && <button className="button danger" onClick={retire}>حذف الحساب</button>}
+        {card.canReinstate && <button className="button" onClick={reinstate}>إعادة الحساب</button>}
         <button className="button" onClick={onClose}>إغلاق</button>
       </div>
     </Dialog>

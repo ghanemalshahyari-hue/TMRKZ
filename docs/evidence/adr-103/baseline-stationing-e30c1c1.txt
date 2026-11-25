@@ -1,0 +1,262 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------------< ae.mover:mover-backend >-----------------------
+[INFO] Building MOVER backend 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.5.0:clean (default-clean) @ mover-backend ---
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ mover-backend ---
+[INFO] Copying 1 resource from src/main/resources to target/classes
+[INFO] Copying 81 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ mover-backend ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 194 source files with javac [debug parameters release 25] to target/classes
+[INFO] /repo/backend/src/main/java/ae/mover/hr/OracleUnitPayload.java: /repo/backend/src/main/java/ae/mover/hr/OracleUnitPayload.java uses unchecked or unsafe operations.
+[INFO] /repo/backend/src/main/java/ae/mover/hr/OracleUnitPayload.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ mover-backend ---
+[INFO] Copying 8 resources from src/test/resources to target/test-classes
+[INFO] 
+[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ mover-backend ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 66 source files with javac [debug parameters release 25] to target/test-classes
+[INFO] /repo/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java: /repo/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java uses or overrides a deprecated API.
+[INFO] /repo/backend/src/test/java/ae/mover/stationing/StationingFoundationIT.java: Recompile with -Xlint:deprecation for details.
+[INFO] /repo/backend/src/test/java/ae/mover/AdministrationAcceptanceIT.java: Some input files use unchecked or unsafe operations.
+[INFO] /repo/backend/src/test/java/ae/mover/AdministrationAcceptanceIT.java: Recompile with -Xlint:unchecked for details.
+[INFO] 
+[INFO] --- surefire:3.5.6:test (default-test) @ mover-backend ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running ae.mover.stationing.RestationingWorkflowIT
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+[ERROR] Tests run: 17, Failures: 8, Errors: 1, Skipped: 0, Time elapsed: 27.60 s <<< FAILURE! -- in ae.mover.stationing.RestationingWorkflowIT
+[ERROR] ae.mover.stationing.RestationingWorkflowIT.activationRefusedWhenGroundTakenSinceApproval -- Time elapsed: 2.482 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: 400
+ but was: 200
+	at ae.mover.stationing.RestationingWorkflowIT.activationRefusedWhenGroundTakenSinceApproval(RestationingWorkflowIT.java:249)
+
+[ERROR] ae.mover.stationing.RestationingWorkflowIT.checks -- Time elapsed: 0.833 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.RestationingWorkflowIT.checks(RestationingWorkflowIT.java:354)
+
+[ERROR] ae.mover.stationing.RestationingWorkflowIT.returnAndSelectiveReapproval -- Time elapsed: 0.594 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+[the carried stage is not decided again] 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "TEMPORARY_SCHEDULED"
+	at ae.mover.stationing.RestationingWorkflowIT.returnAndSelectiveReapproval(RestationingWorkflowIT.java:135)
+
+[ERROR] ae.mover.stationing.RestationingWorkflowIT.siteGeometryParity -- Time elapsed: 0.105 s <<< ERROR!
+java.nio.file.NoSuchFileException: ../frontend/src/lib/siteGeometryCases.json
+	at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:106)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:111)
+	at java.base/sun.nio.fs.UnixFileSystemProvider.newFileChannel(UnixFileSystemProvider.java:213)
+	at java.base/sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:244)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:357)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:399)
+	at java.base/java.nio.file.Files.readAllBytes(Files.java:2973)
+	at java.base/java.nio.file.Files.readString(Files.java:3043)
+	at java.base/java.nio.file.Files.readString(Files.java:3006)
+	at ae.mover.stationing.RestationingWorkflowIT.siteGeometryParity(RestationingWorkflowIT.java:467)
+
+[ERROR] ae.mover.stationing.RestationingWorkflowIT.activationRefusedOnDrift -- Time elapsed: 0.386 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: 400
+ but was: 200
+	at ae.mover.stationing.RestationingWorkflowIT.activationRefusedOnDrift(RestationingWorkflowIT.java:234)
+
+[ERROR] ae.mover.stationing.RestationingWorkflowIT.partialApproval -- Time elapsed: 0.805 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.RestationingWorkflowIT.partialApproval(RestationingWorkflowIT.java:196)
+
+[ERROR] ae.mover.stationing.RestationingWorkflowIT.inheritedSeat -- Time elapsed: 0.430 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.RestationingWorkflowIT.inheritedSeat(RestationingWorkflowIT.java:45)
+
+[ERROR] ae.mover.stationing.RestationingWorkflowIT.crossBranchInclusion -- Time elapsed: 0.542 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.RestationingWorkflowIT.crossBranchInclusion(RestationingWorkflowIT.java:386)
+
+[ERROR] ae.mover.stationing.RestationingWorkflowIT.permanentJourney -- Time elapsed: 0.584 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.RestationingWorkflowIT.permanentJourney(RestationingWorkflowIT.java:71)
+
+[INFO] Running ae.mover.stationing.SiteSetupIT
+[ERROR] Tests run: 9, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 2.179 s <<< FAILURE! -- in ae.mover.stationing.SiteSetupIT
+[ERROR] ae.mover.stationing.SiteSetupIT.readsLikeActivated -- Time elapsed: 0.252 s <<< FAILURE!
+java.lang.AssertionError: 
+[{"dataRevision":"770|796","unitsTotal":4,"sitesTotal":2,"summary":{"complete":1,"incomplete":2,"noStationing":1,"temporary":0,"expiring":0,"pending":0},"siteHubs":[{"siteId":"0a236b5a-3500-47df-ac35-aa09768d3906","siteCode":"S-0009","siteName":"موقع تهيئة G d039b1b2","anchor":{"lat":21.09,"lng":53.5},"unitsTotal":1,"completeCount":1,"incompleteCount":0,"temporaryCount":0,"expiringCount":0,"pendingCount":0},{"siteId":"745f83e8-8787-4458-838b-91b90ce2f78b","siteCode":"SSEC-d039b1b2","siteName":"موقع SSEC","anchor":{"lat":21.0,"lng":53.5},"unitsTotal":2,"completeCount":0,"incompleteCount":2,"temporaryCount":0,"expiringCount":0,"pendingCount":0}],"noStationingSummary":{"count":1}}] 
+Expecting actual not to be null
+	at ae.mover.stationing.SiteSetupIT.readsLikeActivated(SiteSetupIT.java:296)
+
+[INFO] Running ae.mover.stationing.StationingNextIT
+[ERROR] Tests run: 14, Failures: 9, Errors: 0, Skipped: 0, Time elapsed: 12.05 s <<< FAILURE! -- in ae.mover.stationing.StationingNextIT
+[ERROR] ae.mover.stationing.StationingNextIT.nearestScopeDecides -- Time elapsed: 0.955 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+[the nearest final holder] 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.StationingNextIT.nearestScopeDecides(StationingNextIT.java:413)
+
+[ERROR] ae.mover.stationing.StationingNextIT.deploymentAndPosture -- Time elapsed: 0.939 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.StationingNextIT.wholeRoute(StationingNextIT.java:107)
+	at ae.mover.stationing.StationingNextIT.deploymentAndPosture(StationingNextIT.java:619)
+
+[ERROR] ae.mover.stationing.StationingNextIT.initialStationingIsSiteSetup -- Time elapsed: 1.557 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.StationingNextIT.initialStationingIsSiteSetup(StationingNextIT.java:204)
+
+[ERROR] ae.mover.stationing.StationingNextIT.hierarchyLevelsWithNobodyAreSkipped -- Time elapsed: 0.682 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+[the final approval is never skipped] 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.StationingNextIT.hierarchyLevelsWithNobodyAreSkipped(StationingNextIT.java:302)
+
+[ERROR] ae.mover.stationing.StationingNextIT.aPathForEachType -- Time elapsed: 1.125 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.StationingNextIT.aPathForEachType(StationingNextIT.java:389)
+
+[ERROR] ae.mover.stationing.StationingNextIT.seatSurvivesHolderChange -- Time elapsed: 1.334 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+[the workflow continues] 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.StationingNextIT.seatSurvivesHolderChange(StationingNextIT.java:452)
+
+[ERROR] ae.mover.stationing.StationingNextIT.fyiReadsOneRequestOnly -- Time elapsed: 1.166 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.StationingNextIT.fyiReadsOneRequestOnly(StationingNextIT.java:533)
+
+[ERROR] ae.mover.stationing.StationingNextIT.operationalPosturePending -- Time elapsed: 0.754 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+[the payload carries the pending array] 
+Expecting value to be true but was false
+	at ae.mover.stationing.StationingNextIT.operationalPosturePending(StationingNextIT.java:707)
+
+[ERROR] ae.mover.stationing.StationingNextIT.siteRegistration -- Time elapsed: 1.262 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: 
+
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+	at ae.mover.stationing.StationingNextIT.wholeRoute(StationingNextIT.java:107)
+	at ae.mover.stationing.StationingNextIT.siteRegistration(StationingNextIT.java:755)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   RestationingWorkflowIT.activationRefusedOnDrift:234 
+expected: 400
+ but was: 200
+[ERROR]   RestationingWorkflowIT.activationRefusedWhenGroundTakenSinceApproval:249 
+expected: 400
+ but was: 200
+[ERROR]   RestationingWorkflowIT.checks:354 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   RestationingWorkflowIT.crossBranchInclusion:386 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   RestationingWorkflowIT.inheritedSeat:45 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   RestationingWorkflowIT.partialApproval:196 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   RestationingWorkflowIT.permanentJourney:71 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   RestationingWorkflowIT.returnAndSelectiveReapproval:135 [the carried stage is not decided again] 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "TEMPORARY_SCHEDULED"
+[ERROR]   SiteSetupIT.readsLikeActivated:296 [{"dataRevision":"770|796","unitsTotal":4,"sitesTotal":2,"summary":{"complete":1,"incomplete":2,"noStationing":1,"temporary":0,"expiring":0,"pending":0},"siteHubs":[{"siteId":"0a236b5a-3500-47df-ac35-aa09768d3906","siteCode":"S-0009","siteName":"موقع تهيئة G d039b1b2","anchor":{"lat":21.09,"lng":53.5},"unitsTotal":1,"completeCount":1,"incompleteCount":0,"temporaryCount":0,"expiringCount":0,"pendingCount":0},{"siteId":"745f83e8-8787-4458-838b-91b90ce2f78b","siteCode":"SSEC-d039b1b2","siteName":"موقع SSEC","anchor":{"lat":21.0,"lng":53.5},"unitsTotal":2,"completeCount":0,"incompleteCount":2,"temporaryCount":0,"expiringCount":0,"pendingCount":0}],"noStationingSummary":{"count":1}}] 
+Expecting actual not to be null
+[ERROR]   StationingNextIT.aPathForEachType:389 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   StationingNextIT.deploymentAndPosture:619->wholeRoute:107 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   StationingNextIT.fyiReadsOneRequestOnly:533 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   StationingNextIT.hierarchyLevelsWithNobodyAreSkipped:302 [the final approval is never skipped] 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   StationingNextIT.initialStationingIsSiteSetup:204 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   StationingNextIT.nearestScopeDecides:413 [the nearest final holder] 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   StationingNextIT.operationalPosturePending:707 [the payload carries the pending array] 
+Expecting value to be true but was false
+[ERROR]   StationingNextIT.seatSurvivesHolderChange:452 [the workflow continues] 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR]   StationingNextIT.siteRegistration:755->wholeRoute:107 
+expected: "APPROVED_NOT_ACTIVATED"
+ but was: "ACTIVATED_PERMANENT"
+[ERROR] Errors: 
+[ERROR]   RestationingWorkflowIT.siteGeometryParity:467 » NoSuchFile ../frontend/src/lib/siteGeometryCases.json
+[INFO] 
+[ERROR] Tests run: 40, Failures: 18, Errors: 1, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:06 min
+[INFO] Finished at: 2026-11-25T03:50:37Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.5.6:test (default-test) on project mover-backend: There are test failures.
+[ERROR] 
+[ERROR] See /repo/backend/target/surefire-reports for the individual test results.
+[ERROR] See dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+exit=1

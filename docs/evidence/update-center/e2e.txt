@@ -1,0 +1,36 @@
+PASS  UC-00  make-release.sh signs the Desktop folder  — release 20261125-043346-nogit: 828 files, 15440185 bytes
+PASS  UC-00  the maintenance worker is running
+PASS  UC-01  the signed release is verified and compared  — COMPARED
+PASS  UC-01  a new documentation file is «مضاف»
+PASS  UC-01  a frontend file is «معدّل»
+PASS  UC-01  a backend file is «معدّل»
+PASS  UC-01  a file gone from the release is «محذوف»
+PASS  UC-01  the Compose change is shown, not selected (explicit choice only)
+PASS  UC-04  no protected or machine-specific path is even listed  — 5 rows
+PASS  UC-02  only the three differing files are uploaded (not the 800+ unchanged)  — رفع الملفات المختلفة (3)
+PASS  UC-03  approved → built offline → backed up → applied → verified  — DONE
+PASS  UC-03  the backend runs the new build  — {"probe":"e2e-mwvmp89w","startedAt":"2026-11-25T04:34:12.003Z"}
+PASS  UC-03  the web runs the new build
+PASS  UC-03  the worker still reports alive right after a long update
+PASS  UC-03  added and deleted files applied
+PASS  UC-04  .env, the VM Compose file, certificates and the trust key are untouched
+PASS  UC-04  the unselected Compose change was not applied
+PASS  UC-04  every replaced or deleted file was backed up first  — C:\Users\ADMIN\AppData\Local\Temp\claude\9f5b532524e8b495\fc86be8c-9d50-4581-9d5c-71b9bd5811c5\scratchpad\uc\vm\TMRKZ\backups\updates\20261125T043348-fe14dc01
+PASS  UC-05  received, approved and done are in the audit log  — 200
+PASS  UC-06  rollback restores the previous backend  — ROLLED_BACK {"startedAt":"2026-11-25T04:35:11.259Z"}
+PASS  UC-06  rollback restores the files exactly
+PASS  UC-07  a release signed by another key is rejected  — REJECTED
+PASS  UC-07  protected paths in a signed release are all blocked  — ../outside.txt,.env,certs/vm-test.pem,data/db/PG_VERSION,docker-compose.dc-hosts.yml,map-runtime/x,ops/local/.generated/release-trust.pub
+PASS  UC-07  a release that would delete most of the installation is flagged and never deletes by default  — 826 deletions
+PASS  UC-07  approving a blocked path is refused  — 400
+PASS  UC-07  a file changed after signing cannot be selected or uploaded
+PASS  UC-08  a release that does not build with the existing libraries is refused  — REJECTED
+PASS  UC-08  nothing was applied and the backend was not restarted
+PASS  UC-09  a restart starts the last build without rebuilding
+PASS  UC-10  start.sh starts with the loaded images and no archive  —   images already loaded (tmrkz-images.tar not needed)
+PASS  UC-10  an extra Compose file is never silently left out  —   docker-compose.dc-hosts.yml is in this folder, but .env does not name it in COMPOSE_FILE: docker compose would leave it out.
+PASS  UC-10  the VM Compose file still untouched
+PASS  UC-11  the offline map package is served  — 200
+
+33/33 passed — evidence in C:\Users\ADMIN\AppData\Local\Temp\claude\9f5b532524e8b495\fc86be8c-9d50-4581-9d5c-71b9bd5811c5\scratchpad\uc\evidence
+exit=0

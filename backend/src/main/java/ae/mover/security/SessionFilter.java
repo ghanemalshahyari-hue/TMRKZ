@@ -41,6 +41,8 @@ public class SessionFilter extends OncePerRequestFilter {
             "POST /api/v1/auth/directory/login",
             "GET /api/v1/system/health",
             "GET /api/v1/system/embedding/csp",
+            // when this process started: the update worker's proof that a new build runs (ADR-104)
+            "GET /api/v1/system/liveness",
             "GET /api/v1/openapi.json");
 
     private final AuthService auth;

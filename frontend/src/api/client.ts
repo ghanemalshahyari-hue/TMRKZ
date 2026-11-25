@@ -572,7 +572,29 @@ export type WorkspaceUnit = {
   myRights: string[];
 };
 export type AccessRightDef = { key: string; label: string; byDefault: boolean };
-export type Administrator = { personId: string; displayName: string; username: string; employeeNumber: string | null; grantedAt: string; grantedBy: string };
+export type Administrator = { personId: string; displayName: string; username: string; employeeNumber: string | null; grantedAt: string; grantedBy: string | null; platform: boolean; effective: boolean };
+/** ADR-104: «مركز التحديث». */
+export type UpdateChange = {
+  path: string; class: 'app' | 'config' | 'docs' | 'protected' | 'dev'; change: 'ADDED' | 'MODIFIED' | 'DELETED' | 'BLOCKED';
+  sha256: string | null; size: number; installedSha256: string | null; blocked: boolean; reason: string | null; flags: string[]; uploaded?: boolean;
+};
+export type UpdateSession = {
+  id: string; release: string | null; state: string; message: string | null;
+  compare: null | { release: { release: string; createdAt: string; commit: string; localChanges: boolean; files: number }; signature: string;
+    baseline: boolean; unchanged: number; counts: Record<string, number>; changes: UpdateChange[] };
+  approval: null | { by: string; at: string; reason: string }; progress: { at: string; text: string }[]; buildLog: boolean;
+};
+export type UpdateOverview = {
+  worker: { alive: boolean; version: string | null; trustInstalled: boolean; baseline: boolean; lastSeen: string | null };
+  sessions: { id: string; release: string | null; state: string; message: string | null; createdAt: string; createdBy: string }[];
+};
+/** ADR-103: the two verified identity lookups for «مديرو النظام». */
+export type AdminLookup = 'EMPLOYEE_NUMBER' | 'DIRECTORY_ACCOUNT';
+/** The identity shown before the grant; {@code personId} is null for an HR employee imported on confirmation. */
+export type AdminCandidate = {
+  method: AdminLookup; value: string; verifiedBy: 'ORACLE_HR' | 'DIRECTORY_SIGN_IN'; personId: string | null; displayName: string;
+  employeeNumber: string | null; account: string | null; unitName: string | null; hrStatus: string | null; alreadyAdmin: boolean; confirmation: string;
+};
 export type DutyPermit = {
   id: string;
   person: { id: string; displayName: string; employeeNo: string };
@@ -607,6 +629,8 @@ export type AccountCard = {
   systemRoles: { code: string; name: string }[];
   canEdit: boolean;
   canRetire: boolean;
+  /** ADR-103: a local account ended by «حذف الحساب» may be brought back by a global manager. */
+  canReinstate?: boolean;
   canEditProfile: boolean;
 };
 export type ProvidingDepartment = { code: string; name: string; providers: number };
@@ -715,8 +739,22 @@ export const api = {
   setUnitLevel: (orgId: string, level: number | null) => call<void>('PUT', `/organizations/${orgId}/level`, { body: { level } }),
   // admin: administrator lifecycle
   listAdministrators: () => get<Administrator[]>('/administrators'),
-  addAdministrator: (username: string) => post<Administrator>('/administrators', { username }),
-  removeAdministrator: (personId: string) => del<void>(`/administrators/${personId}`),
+  // «مركز التحديث» (ADR-104): the maintenance worker applies; these calls hand it the signed release, the files and the approval
+  updatesOverview: () => get<UpdateOverview>('/updates'),
+  createUpdate: (release: string, signature: string, manifest: string) => post<UpdateSession>('/updates/sessions', { release, signature, manifest }),
+  updateSession: (id: string) => get<UpdateSession>(`/updates/sessions/${id}`),
+  uploadUpdateFile: async (id: string, path: string, content: Blob) => {
+    const res = await fetch(`${API_BASE}/updates/sessions/${id}/files?path=${encodeURIComponent(path)}`, {
+      method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/octet-stream', 'X-Requested-With': 'mover' }, body: content,
+    });
+    if (!res.ok) throw parseApiError(res.status, await res.text());
+  },
+  approveUpdate: (id: string, paths: string[], reason: string) => post<UpdateSession>(`/updates/sessions/${id}/approve`, { paths, reason }),
+  rollbackUpdate: (id: string, reason: string) => post<UpdateSession>(`/updates/sessions/${id}/rollback`, { reason }),
+  resolveAdministrator: (method: AdminLookup, value: string) => post<AdminCandidate>('/administrators/resolve', { method, value }),
+  addAdministrator: (c: AdminCandidate, reason: string) =>
+    post<Administrator>('/administrators', { method: c.method, value: c.value, confirmation: c.confirmation, reason }),
+  endAdministrator: (personId: string, reason: string) => post<void>(`/administrators/${personId}/end`, { reason }),
 
   // permissions studio (policy versions, scoped grants, explanations, OpenFGA sync)
   authzStatus: () => get<AuthzStatus>('/access/status'),
@@ -790,6 +828,7 @@ export const api = {
   setAccountActive: (id: string, active: boolean, reason?: string) => put<AccountCard>(`/access/workspace/people/${id}/active`, { active, reason }),
   setAccountProfile: (id: string, displayName: string) => put<AccountCard>(`/access/workspace/people/${id}/profile`, { displayName }),
   retireAccount: (id: string, reason: string) => post<AccountCard>(`/access/workspace/people/${id}/retire`, { reason }),
+  reinstateAccount: (id: string, reason: string) => post<AccountCard>(`/access/workspace/people/${id}/reinstate`, { reason }),
   departments: () => get<ProvidingDepartment[]>('/access/workspace/departments'),
   addDepartment: (code: string, name: string) => post<ProvidingDepartment[]>('/access/workspace/departments', { code, name }),
   setProvider: (id: string, roleCode: string, on: boolean) => put<string[]>(`/access/workspace/units/${id}/providers`, { roleCode, on }),

@@ -1407,3 +1407,41 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Arabic documentation:** `docs/ADMIN_UI_QUICK_START_AR.md` (admin UI guide), `docs/VM_BOOTSTRAP_AR.md` (VM bootstrap), `docs/VM_QUICK_START_AR.md` (VM quick start). `docs/VM_RUNBOOK.md` (operations runbook, English).
 - **Tests:** AuthorizationIT 10/10, IntegrationSettingsIT 2/2, AdministrationAcceptanceIT 8/8, OracleAbsenceIT 2/2, DbMigrationIT 1/1 — all green. Frontend 405/405 tests, type check and build clean.
 - **On the VM:** the next folder zip carries it (backend source, frontend build, V68 migration; no new `tmrkz-images.tar`).
+
+## VM incident investigation, verified administrators, one folder and the browser Update Center (25 Nov 2026; ADR-103, ADR-104)
+
+- **Delivered (ADR-103):** the «خارج نطاقك» refusal of accounts made by a first directory sign-in fixed (scope bound and HR
+  uniqueness kept); sign-in refusals name their cause (`ACCOUNT_REMOVED` / `HR_INACTIVE`); «إعادة الحساب» for removed local
+  accounts; «مديرو النظام» rebuilt with the two verified lookups (Oracle HR employee number, directory-verified account), a
+  confirmation fingerprint, least privilege, audit and the last-administrator rule (ADR-102's add failed on every call); the
+  request hub offers ACTIVE units only and every stationed unit; `ops/diagnose.sh` (read-only, redacted). Investigation and
+  proposals (not executed on the VM): `docs/VM_INCIDENT_2026-11-25.md`.
+- **Delivered (ADR-104):** managed-file rules, signed releases and the one-time transfer package (`ops/update/`), the
+  maintenance worker (service `maintenance`, existing image, no Docker socket), the backend broker and the «مركز التحديث» page,
+  self-reloading run scripts and nginx configuration, `start.sh` without the image archive and refusing an unnamed Compose
+  file, and waiting for `keycloak-setup` before announcing «running». Owner guide: `docs/UPDATE_CENTER_AR.md`.
+- **Checks:** backend `AuthzMirrorIT` 3/3, `UnitMemberIdentityIT` 4/4, `RequestHubReachIT` 1/1, `AdministratorLifecycleIT` 4/4,
+  `UpdateCenterIT` 3/3 and the affected classes (ADR-103); frontend type check clean, 407/407 (58 files), build clean; worker
+  compiled with `-Xlint:all` in `tmrkz/folder-backend:1`; release signature verified with `openssl`, package checksums OK;
+  `ops/diagnose.sh` answered every section on this PC's :8088 without changing anything; end to end
+  `tests/acceptance/update-center.mjs` on a throw-away installation laid out like the VM (project `tmrkz-vmsim`, port 8188,
+  `docker-compose.dc-hosts.yml` named in `COMPOSE_FILE`, no `tmrkz-images.tar`): 33/33 — compare; upload of the 3 differing files only (824 unchanged); offline build, backup, apply, backend and web verified; .env, certificates, the VM Compose file and the trust key byte-identical; the unselected Compose change not applied; audit; rollback restoring the files exactly; a foreign signature, protected paths, a mass deletion, a file changed after signing and a release that does not build all refused; restart without rebuild; start.sh without the archive and refusing an unnamed Compose file; offline map served. Defects the run found and fixed before this result: the page stopped following an approved update (states APPROVED/ROLLBACK_REQUESTED), a sign-in right after start was refused while keycloak-setup ran (start.sh waits, and runs it once more after a transient Keycloak error), start.sh counted only project «tmrkz» as its own on the port, a partial release proposed deleting the installation (MASS_DELETION, never preselected), and the worker's heartbeat stalled during long updates. Evidence:
+  `docs/evidence/update-center/`.
+- **Pre-existing failures (unchanged, same on an untouched `e30c1c1`):** `RestationingWorkflowIT` 8, `StationingNextIT` 9,
+  `SiteSetupIT` 1 — expectations from before ADR-095 (activation merged into the final approval). Not fixed here.
+- **Limits:** nothing was run on the real VM; its database and source edits are uninspected (run `sh ops/diagnose.sh` there).
+  The VM needs the one-time PAM bootstrap (`docs/UPDATE_CENTER_AR.md` §2) before browser updates. A Compose-file change needs
+  one `docker compose up -d` by the operator (the worker has no Docker socket by design). Files over 24 MB are not uploaded
+  through the browser. A changed `frontend/package-lock.json` (new npm library) is refused: it needs new images.
+
+### Acceptance matrix — ADR-102 requirements (owner, 25 Nov 2026: keep the incomplete ones explicitly open)
+
+| Requirement | State | Evidence |
+|---|---|---|
+| Browser-based updates | Implemented (ADR-104); verified on the simulated VM only — open on the real VM until its bootstrap and first update | `update-center.mjs` UC-01…UC-06 |
+| Folder comparison | Implemented (ADR-104): signed release vs installed files, local modifications since the last update flagged | UC-01, UC-07 |
+| Staged merging | Implemented (ADR-104): per-file selection, Compose files only by explicit choice, staged uploads checked against the signature | UC-01, UC-02, UC-04 |
+| Controlled maintenance | Implemented (ADR-104): restricted worker, offline build check, backup, verification, automatic and requested rollback | UC-03, UC-06, UC-08 |
+| Certificate import | **Open** — not implemented (certificates stay under `certs/` and `ops/local/.generated/`, protected from updates) | — |
+| ENV import | **Open** — not implemented (`.env` is protected; changed by the operator only) | — |
+| Embedding allowlist live reload | Implemented in ADR-102 (poller); not re-verified here | — |

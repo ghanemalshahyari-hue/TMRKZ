@@ -1302,7 +1302,16 @@ public class RestationingService {
      * the organisation is disclosed, so a requester needs no general view right; without the right the list is empty.
      */
     public List<Map<String, Object>> requestableUnits(AccessContext ctx) {
-        return unitTree(reach(ctx, Permission.CREATE_RESTATIONING));
+        return unitTree(active(reach(ctx, Permission.CREATE_RESTATIONING)));
+    }
+
+    /** ADR-103: only ACTIVE units are offered for a new request (a retired unit was listed before). */
+    public Set<UUID> active(Set<UUID> ids) {
+        if (ids.isEmpty()) {
+            return ids;
+        }
+        return new HashSet<>(jdbc.sql("select id from organization where status = 'ACTIVE' and id = any(string_to_array(:ids, ',')::uuid[])")
+                .param("ids", Db.ids(ids)).query(UUID.class).list());
     }
 
     /** The units a right reaches through the actor's grants, each confirmed like every other check. */

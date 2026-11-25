@@ -52,6 +52,8 @@ publish_docs() {
 }
 
 trap 'exit 0' TERM INT
+# ADR-104: when an update changes this script, the new copy takes over at the next check (no container restart)
+SELF="$(md5sum < "$0")"
 if [ "${TMRKZ_BUILD_ONLY:-}" = 1 ]; then build; exit $?; fi
 last="$(state)"
 if [ -f "$HTML/index.html" ] && [ "$(cat "$BUILT" 2>/dev/null)" = "$(key "$last")" ]; then
@@ -72,6 +74,7 @@ fi
 n=0
 while :; do
   sleep "$POLL" & wait $!
+  if [ "$(md5sum < "$0")" != "$SELF" ]; then echo "[web] this script was updated: running the new copy"; exec sh "$0"; fi
   now="$(state)"
   if [ "$now" != "$last" ]; then sleep 2; last="$(state)"; build && key "$last" > "$BUILT"; fi
   n=$((n + 1))

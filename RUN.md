@@ -152,9 +152,14 @@ The old VM folder stays in `~/TMRKZ.before-<date>`; delete it once the new one w
    - **IP address:** the address people will open. `127.0.0.1` means only inside the VM.
    - **Port:** for example `8088`.
 
-   It then does four things:
-   - checks and loads `tmrkz-images.tar` (1–2 minutes the first time);
+   It then does five things:
+   - uses the images already loaded on the machine; only when one is missing (or a newer `tmrkz-images.tar` is in the folder)
+     it checks and loads `tmrkz-images.tar` (1–2 minutes). An installation whose images are loaded needs neither the archive
+     nor its checksum file (ADR-104);
    - writes the address into `.env`;
+   - checks the Compose files: a third file such as `docker-compose.dc-hosts.yml` must be named in `.env`
+     (`COMPOSE_PATH_SEPARATOR=:` and `COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml:docker-compose.dc-hosts.yml`);
+     otherwise it stops and says so — a plain `docker compose up -d` would silently leave that file out;
    - runs `docker compose up -d`;
    - waits until TMRKZ answers. The first start builds the code inside the containers and takes a few minutes.
 
@@ -170,7 +175,9 @@ The old VM folder stays in `~/TMRKZ.before-<date>`; delete it once the new one w
    ```
    docker compose ps
    ```
-   - Running and healthy: `db`, `keycloak`, `openfga`, `backend`, `web-build`, `web`, `openldap`.
+   - Running and healthy: `db`, `keycloak`, `openfga`, `backend`, `web-build`, `web`, `openldap`, and `maintenance` (the Update
+     Center's worker, ADR-104).
+   - Read-only check of the whole installation (changes nothing, output redacted): `sh ops/diagnose.sh`.
    - Finished with `Exited (0)` (correct for one-time jobs): `db-init`, `openfga-migrate`, `keycloak-setup`.
 6. **Reach it from other computers.**
    - Open the port in the firewall, if one is active: `sudo ufw allow 8088/tcp`
@@ -190,6 +197,21 @@ The old VM folder stays in `~/TMRKZ.before-<date>`; delete it once the new one w
 | copy or back up everything | `docker compose stop`, copy or zip the whole folder, `docker compose up -d` |
 
 **Never** run `docker compose down -v`, and never delete files inside `data/`.
+
+## 5a. Updating from the browser — «مركز التحديث» (ADR-104)
+
+The VM is updated from the same TMRKZ folder you develop in; no separate deployment folder, no PAM command for routine
+updates. Details, the one-time set-up and the recovery steps: `docs/UPDATE_CENTER_AR.md`.
+
+1. On the PC, in the TMRKZ folder (Command Prompt): `"C:\Program Files\Git\bin\sh.exe" ops/update/make-release.sh`
+   — signs the list of application files (`release/`).
+2. Copy the TMRKZ folder to the computer that opens the VM's page (USB), open TMRKZ → «إدارة النظام» → «مركز التحديث»,
+   choose the folder. The page shows what is added, changed and deleted; only those files are uploaded.
+3. Write the reason, «اعتماد وتطبيق». The worker builds offline with the existing libraries, backs up, applies, restarts
+   only what changed and verifies — or rolls back by itself. «الرجوع إلى الإصدار السابق» undoes a finished update.
+
+`.env`, `certs/`, `data/`, `backups/`, `map-data/`, `map-runtime/`, `docker-compose.dc-hosts.yml` and `ops/local/.generated/`
+are never touched by an update; the Compose files change only when you select them.
 
 ## 6. Changing the code
 
