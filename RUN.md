@@ -11,7 +11,7 @@ Everything at the top of the folder, and nothing else:
 | `docker-compose.yml` + `docker-compose.override.yml` | how everything runs (Compose reads both automatically) |
 | `.env` | every setting and password (hidden file: `ls -a` shows it) |
 | `start.sh` | asks for the IP address and the port, loads the images, starts everything |
-| `tmrkz-images.tar` + `tmrkz-images.tar.sha256` | all Docker images in one file (about 1 GB) and its checksum |
+| `tmrkz-images.tar` + `tmrkz-images.tar.sha256` | all Docker images (linux/amd64) in one file (about 1 GB) and its checksum — or its 100 MB parts `tmrkz-images.tar.part-NN` with `tmrkz-images.tar.parts.sha256` |
 | `data/` | the data: `data/db` (PostgreSQL 17 database), `data/files` (uploads), `data/ldap-data` + `data/ldap-config` (local directory) |
 | `backups/` | database backups and dumps (`ops/backup.sh` writes here; the migration center reads it) |
 | `backend/`, `frontend/` | the code — a saved change is rebuilt and live in about 25 seconds, no image build |
@@ -153,19 +153,26 @@ The old VM folder stays in `~/TMRKZ.before-<date>`; delete it once the new one w
    - **Port:** for example `8088`.
 
    It then does five things:
+   - when the account cannot use Docker or write `.env` (the VM's PAM account is not root), runs itself again through `sudo`
+     — one password (ADR-107);
    - uses the images already loaded on the machine; only when one is missing (or a newer `tmrkz-images.tar` is in the folder)
-     it checks and loads `tmrkz-images.tar` (1–2 minutes). An installation whose images are loaded needs neither the archive
-     nor its checksum file (ADR-104);
+     it checks and loads `tmrkz-images.tar`, or its 100 MB parts `tmrkz-images.tar.part-NN` with `tmrkz-images.tar.parts.sha256`
+     (1–2 minutes). A damaged or missing part is named so only that part is sent again; images made for another processor
+     (an arm64 archive from a Mac) are refused. An installation whose images are loaded needs neither the archive nor its
+     checksum file (ADR-104, ADR-107);
    - writes the address into `.env`;
    - checks the Compose files: a third file such as `docker-compose.dc-hosts.yml` must be named in `.env`
      (`COMPOSE_PATH_SEPARATOR=:` and `COMPOSE_FILE=docker-compose.yml:docker-compose.override.yml:docker-compose.dc-hosts.yml`);
      otherwise it stops and says so — a plain `docker compose up -d` would silently leave that file out;
-   - runs `docker compose up -d`;
-   - waits until TMRKZ answers. The first start builds the code inside the containers and takes a few minutes.
+   - starts the backend and the web build first and follows them with a progress line each minute (the first start builds
+     the code inside the containers: several minutes on a small server); a build or start that fails stops here with its
+     cause and log lines instead of Compose's «dependency failed to start» (ADR-107); then starts the rest;
+   - waits until TMRKZ answers.
 
    The same by hand: set `TMRKZ_IP` and `TMRKZ_PORT` at the top of `.env`, then
    ```
-   docker load -i tmrkz-images.tar
+   docker load -i tmrkz-images.tar                                        # or, from the parts:
+   sha256sum -c tmrkz-images.tar.parts.sha256 && cat tmrkz-images.tar.part-* | docker load
    docker compose up -d
    ```
 4. **Open** `http://<IP>:<PORT>` and sign in.
@@ -309,7 +316,10 @@ When `backend/pom.xml` or `frontend/package-lock.json` gets a new dependency, th
    ```
    sh ops/local/workspace/pack-images.sh
    ```
-2. **Carry the new files** `tmrkz-images.tar` and `tmrkz-images.tar.sha256` to the VM's TMRKZ folder.
+   It makes every image for linux/amd64 (the VM's processor) whatever machine packs it. For a transfer that may break off
+   (PAM), split it: `sh ops/local/workspace/split-images.sh <folder>` (100 MB parts and their checksums).
+2. **Carry the new files** `tmrkz-images.tar` and `tmrkz-images.tar.sha256` — or the parts with `tmrkz-images.tar.parts.sha256`
+   and `tmrkz-images.tar.sha256` — to the VM's TMRKZ folder.
 3. **On the VM:**
    ```
    sh start.sh

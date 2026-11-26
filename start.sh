@@ -11,6 +11,19 @@
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")"
+# ADR-107: on the VM the PAM account is not root, and Docker and the root-owned .env answer it «permission denied». start.sh
+# then runs itself again as root through sudo (sudo asks for that account's password once); without sudo it says what to do.
+if [ "$(id -u 2>/dev/null || echo 0)" != 0 ] && ! { docker info >/dev/null 2>&1 && { [ ! -e .env ] || [ -w .env ]; } && [ -w . ]; }; then
+  if command -v sudo >/dev/null 2>&1 && [ -z "${TMRKZ_SUDO_DONE:-}" ]; then
+    echo "  the account $(id -un 2>/dev/null) cannot use Docker or write this folder's files (permission denied): start.sh runs again as root"
+    if sudo -v; then
+      exec sudo env TMRKZ_SUDO_DONE=1 TMRKZ_IP="${TMRKZ_IP:-}" TMRKZ_PORT="${TMRKZ_PORT:-}" sh "$(pwd)/start.sh"
+    fi
+  fi
+  echo "permission denied: the account $(id -un 2>/dev/null) cannot use Docker or write .env in $(pwd)."
+  echo "  run it as root:  sudo sh start.sh     (or: su -c 'sh start.sh')"
+  exit 1
+fi
 value() { sed -n "s/^$1=//p" .env 2>/dev/null | tail -n 1 | tr -d '\r' | tr -d "'\""; }
 # replaces or adds one setting without renaming .env (a shared folder may refuse a rename)
 setenv() {
@@ -67,7 +80,7 @@ if [ -n "$(docker ps -aq --filter label=com.docker.compose.project=tmrkz-mover 2
   docker volume rm tmrkz-mover_web-html tmrkz-mover_web-docs >/dev/null 2>&1 || true
 fi
 # the same folder everywhere (RUN.md, «The folder»): anything else at the top is named, nothing is moved or deleted
-extra="$(ls -A | grep -vxE '\.env|\.gitignore|\.gitattributes|\.github|\.vscode|\.zcode|\.git|AGENTS\.md|CLAUDE\.md|FINAL_HANDOFF_2026-11-18\.md|FONT-LICENSE\.txt|README\.md|RUN\.md|\.dockerignore|assets|backend|backups|certs|data|docker-compose\.yml|docker-compose\.override\.yml|docker-compose\.[A-Za-z0-9_-]+\.yml|docs|frontend|handoff|map-data|map-packages|map-runtime|ops|prototypes|release|start\.sh|tests|tmrkz-images\.tar|tmrkz-images\.tar\.sha256' | tr '\n' ' ' || true)"
+extra="$(ls -A | grep -vxE '\.env|\.gitignore|\.gitattributes|\.github|\.vscode|\.zcode|\.git|AGENTS\.md|CLAUDE\.md|FINAL_HANDOFF_2026-11-18\.md|FONT-LICENSE\.txt|README\.md|RUN\.md|\.dockerignore|assets|backend|backups|certs|data|docker-compose\.yml|docker-compose\.override\.yml|docker-compose\.[A-Za-z0-9_-]+\.yml|docs|frontend|handoff|map-data|map-packages|map-runtime|ops|prototypes|release|start\.sh|tests|tmrkz-images\.tar|tmrkz-images\.tar\.sha256|tmrkz-images\.tar\.part-[0-9]+|tmrkz-images\.tar\.parts\.sha256' | tr '\n' ' ' || true)"
 [ -z "$extra" ] || echo "  note: not part of the TMRKZ folder — move to its place (RUN.md, «The folder»): $extra"
 
 # 1. the address
@@ -102,25 +115,82 @@ setenv TMRKZ_HTTP_PORT "$PORT"
 
 # 2. the images (ADR-104): an installation whose images are all loaded starts without tmrkz-images.tar or its checksum file.
 #    The archive is loaded when an image is missing, or when an archive is present that differs from the last one loaded here.
+#    ADR-107: the archive may also come in parts (ops/local/workspace/split-images.sh: tmrkz-images.tar.part-00 … with
+#    tmrkz-images.tar.parts.sha256), which are loaded as they are; a damaged or missing part is named so only it is sent again.
+#    Nothing that fails its checksum is ever loaded.
 LOADED=ops/local/.generated/images-loaded.sha256
 mkdir -p ops/local/.generated data/db data/files data/ldap-data data/ldap-config
+IMAGES="tmrkz/folder-backend:1 tmrkz/folder-web:1 postgis/postgis:17-3.5-alpine tmrkz/keycloak:26.7.5-2 openfga/openfga:v1.8.16 osixia/openldap:1.5.0 nginx:1.28.3-alpine"
 missing=""
-for img in tmrkz/folder-backend:1 tmrkz/folder-web:1 postgis/postgis:17-3.5-alpine tmrkz/keycloak:26.7.5-2 openfga/openfga:v1.8.16 osixia/openldap:1.5.0 nginx:1.28.3-alpine; do
+for img in $IMAGES; do
   docker image inspect "$img" >/dev/null 2>&1 || missing="$missing $img"
 done
+sum256() { sha256sum 2>/dev/null || shasum -a 256; }
+ARCHIVE=""
+if [ -f tmrkz-images.tar.parts.sha256 ]; then
+  ARCHIVE=parts
+  PARTS="$(tr -d '\r' < tmrkz-images.tar.parts.sha256 | sed -n 's/^[0-9a-f]\{64\}  *\*\{0,1\}\(tmrkz-images\.tar\.part-[0-9]*\)$/\1/p')"
+  [ -n "$PARTS" ] || { echo "tmrkz-images.tar.parts.sha256 lists no part"; exit 1; }
+  [ ! -f tmrkz-images.tar ] || echo "  note: the parts are used; the whole tmrkz-images.tar here ($(wc -c < tmrkz-images.tar | tr -d ' ') bytes) is not, and can be deleted"
+elif [ -f tmrkz-images.tar ]; then
+  ARCHIVE=tar
+fi
 load_images() {
-  [ -f tmrkz-images.tar.sha256 ] || { echo "tmrkz-images.tar.sha256 is missing: the archive is not loaded without its checksum"; exit 1; }
-  echo "  checking tmrkz-images.tar …"
-  (sha256sum -c tmrkz-images.tar.sha256 >/dev/null 2>&1 || shasum -a 256 -c tmrkz-images.tar.sha256 >/dev/null) || { echo "tmrkz-images.tar is damaged (checksum)"; exit 1; }
-  echo "  docker load -i tmrkz-images.tar"; docker load -q -i tmrkz-images.tar >/dev/null && cp tmrkz-images.tar.sha256 "$LOADED"
+  [ -f tmrkz-images.tar.sha256 ] || { echo "tmrkz-images.tar.sha256 is missing: the images are not loaded without the archive's checksum — bring it with the archive"; exit 1; }
+  want="$(tr -d '\r' < tmrkz-images.tar.sha256 | cut -c1-64)"
+  if [ "$ARCHIVE" = parts ]; then
+    echo "  checking the $(echo "$PARTS" | wc -l | tr -d ' ') parts of tmrkz-images.tar …"
+    bad=""
+    for p in $PARTS; do [ -f "$p" ] || bad="$bad $p(missing)"; done
+    [ -z "$bad" ] || { echo "  not here yet — send these parts:$bad"; exit 1; }
+    # shellcheck disable=SC2086
+    if [ "$(cat $PARTS | sum256 | cut -c1-64)" != "$want" ]; then
+      for p in $PARTS; do
+        line="$(tr -d '\r' < tmrkz-images.tar.parts.sha256 | grep " \*\{0,1\}$p\$" | cut -c1-64 || true)"
+        [ "$(sum256 < "$p" | cut -c1-64)" = "$line" ] || bad="$bad $p($(wc -c < "$p" | tr -d ' ') bytes)"
+      done
+      [ -n "$bad" ] && echo "  damaged or incomplete — delete and send again only these parts:$bad" \
+                    || echo "  the parts do not belong to this tmrkz-images.tar.sha256 (parts of another archive?) — send the set again"
+      exit 1
+    fi
+    echo "  docker load (the parts of tmrkz-images.tar)"
+    # shellcheck disable=SC2086
+    cat $PARTS | docker load -q >/dev/null
+  else
+    echo "  checking tmrkz-images.tar …"
+    if [ "$(sum256 < tmrkz-images.tar | cut -c1-64)" != "$want" ]; then
+      echo "tmrkz-images.tar is damaged or incomplete ($(wc -c < tmrkz-images.tar | tr -d ' ') bytes here; it does not match tmrkz-images.tar.sha256)."
+      echo "  Delete it and send it again — or send its parts (ops/local/workspace/split-images.sh), so only a broken part is resent."
+      exit 1
+    fi
+    echo "  docker load -i tmrkz-images.tar"; docker load -q -i tmrkz-images.tar >/dev/null
+  fi
+  cp tmrkz-images.tar.sha256 "$LOADED"
 }
 if [ -n "$missing" ]; then
-  [ -f tmrkz-images.tar ] || { echo "images not loaded on this machine:$missing"; echo "bring tmrkz-images.tar and tmrkz-images.tar.sha256 (made on a connected machine: sh ops/local/workspace/pack-images.sh)"; exit 1; }
+  [ -n "$ARCHIVE" ] || { echo "images not loaded on this machine:$missing"; echo "bring tmrkz-images.tar (or its parts) and tmrkz-images.tar.sha256 (made on a connected machine: sh ops/local/workspace/pack-images.sh)"; exit 1; }
   load_images
-elif [ -f tmrkz-images.tar ] && [ -f tmrkz-images.tar.sha256 ] && ! cmp -s tmrkz-images.tar.sha256 "$LOADED" 2>/dev/null; then
+elif [ -n "$ARCHIVE" ] && [ -f tmrkz-images.tar.sha256 ] && ! cmp -s tmrkz-images.tar.sha256 "$LOADED" 2>/dev/null; then
   load_images
 else
   echo "  images already loaded (tmrkz-images.tar not needed)"
+fi
+# every image must be made for this machine's processor (ADR-107): an archive packed on a Mac (arm64) does not run on an
+# x86-64 server — its containers stop at once, and Compose reports only «dependency failed to start»
+case "$(docker info --format '{{.Architecture}}' 2>/dev/null)" in
+  x86_64|amd64) ARCH=amd64 ;; aarch64|arm64) ARCH=arm64 ;; *) ARCH="" ;;
+esac
+if [ -n "$ARCH" ]; then
+  wrong=""
+  for img in $IMAGES; do
+    a="$(docker image inspect --format '{{.Architecture}}' "$img" 2>/dev/null || true)"
+    [ -z "$a" ] || [ "$a" = "$ARCH" ] || wrong="$wrong $img ($a)"
+  done
+  if [ -n "$wrong" ]; then
+    echo "  these images are not made for this machine's processor ($ARCH):$wrong"
+    echo "  bring a tmrkz-images.tar packed for linux/$ARCH (sh ops/local/workspace/pack-images.sh) with its .sha256, then run start.sh again"
+    exit 1
+  fi
 fi
 
 # 3. the Compose files (ADR-104): plain «docker compose» reads only docker-compose.yml and docker-compose.override.yml. Another
@@ -139,13 +209,68 @@ for f in $(ls docker-compose.*.yml 2>/dev/null | grep -vx 'docker-compose.overri
 done
 [ -z "$CF" ] || echo "  Compose files (COMPOSE_FILE): $CF"
 
-# 4. start (the first start builds the backend and the web from the source: a few minutes)
-docker compose up -d
+# 4. start (ADR-107). The first start builds the backend and the web from the source — several minutes on a small server. They
+#    are started first and followed here: a slow first build is waited for (Compose alone gives up with «dependency failed to
+#    start» once the backend's health check has waited 10 minutes), and a build or a start that fails is reported at once with
+#    its cause and the lines that show it, instead of that bare message.
+why() {
+  for s in "$@"; do
+    echo "  ---- docker compose logs --tail=${TAIL:-25} $s"
+    docker compose logs --no-color --no-log-prefix --tail="${TAIL:-25}" "$s" 2>&1 | sed 's/^/    /'
+  done
+}
+stop_here() {
+  echo; echo "  TMRKZ did not start: $1"; shift; why "$@"
+  echo "  ---- docker compose ps -a"; docker compose ps -a --format 'table {{.Service}}\t{{.Status}}' 2>&1 | sed 's/^/    /'
+  echo "  a redacted report to send back: sh ops/diagnose.sh > /tmp/tmrkz-diagnose.txt"
+  exit 1
+}
+state_of() {  # running/healthy, running/starting, running/unhealthy, exited/ …
+  c="$(docker compose ps -a -q "$1" 2>/dev/null | head -n 1)"
+  [ -z "$c" ] || docker inspect -f '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$c" 2>/dev/null
+}
+logs_since() { docker compose logs --no-color --no-log-prefix --since "$SINCE" "$1" 2>/dev/null || true; }
+SINCE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+docker compose up -d backend web-build keycloak \
+  || stop_here "a server the application needs did not start (Compose names it above)" db db-init openfga-migrate openfga keycloak backend
+t=0
+while :; do
+  b="$(state_of backend || true)"; w="$(state_of web-build || true)"
+  [ "$b" = running/healthy ] && [ "$w" = running/healthy ] && break
+  case "$b" in running/*) ;; *) TAIL=60 stop_here "the backend container is not running (${b:-none}) — an image that does not run on this machine, or no memory" backend ;; esac
+  case "$w" in running/*) ;; *) TAIL=60 stop_here "the web build container is not running (${w:-none})" web-build ;; esac
+  bl="$(logs_since backend)"
+  if echo "$bl" | grep -q 'BUILD FAILED'; then
+    if echo "$bl" | grep -q 'COMPILATION ERROR'; then
+      TAIL=60 stop_here "the backend source in ./backend does not compile (the file and line are below)" backend
+    elif echo "$bl" | grep -qi 'offline mode\|could not resolve\|cannot access .* in offline'; then
+      TAIL=60 stop_here "a library the backend needs is not in tmrkz/folder-backend:1 (backend/pom.xml is newer than the image): bring a new tmrkz-images.tar" backend
+    else
+      TAIL=60 stop_here "the backend does not build from ./backend (the cause is in the lines below)" backend
+    fi
+  fi
+  if [ "$(echo "$bl" | grep -c 'the application stopped')" -ge 2 ]; then
+    TAIL=100 stop_here "the backend is built but stops while starting — the cause (database, migration, a setting) is in these lines" backend
+  fi
+  if logs_since web-build | grep -q 'BUILD FAILED\|dependencies are missing'; then
+    TAIL=60 stop_here "the web does not build from ./frontend with the libraries in tmrkz/folder-web:1" web-build
+  fi
+  t=$((t + 5))
+  [ $t -le 2700 ] || TAIL=60 stop_here "the backend or the web was still not ready after 45 minutes" backend web-build
+  if [ $((t % 60)) -eq 0 ]; then
+    phase=starting; echo "$bl" | grep -q 'build ready\|without building' || phase=building
+    [ "$b" = running/healthy ] && phase=ready
+    web=building; [ "$w" = running/healthy ] && web=ready
+    echo "  $((t / 60)) min — backend: $phase, web: $web (a first start on a small server takes several minutes)"
+  fi
+  sleep 5
+done
+docker compose up -d || stop_here "Compose could not start the remaining services (above)" web keycloak-setup maintenance
 URL="${HTTPS:-http://$IP:$PORT}"; LOCAL="http://127.0.0.1:$PORT"
-echo "  waiting for TMRKZ (logs: docker compose logs -f backend web-build) …"
+echo "  waiting for TMRKZ at $LOCAL …"
 n=0
 until [ "$(code "$LOCAL/auth/realms/tmrkz/.well-known/openid-configuration")" = 200 ] && [ "$(code "$LOCAL/api/v1/auth/status")" = 200 ]; do
-  n=$((n + 1)); [ $n -le 300 ] || { echo "TMRKZ did not become ready — see: docker compose logs backend web-build"; exit 1; }; sleep 3
+  n=$((n + 1)); [ $n -le 100 ] || stop_here "the address $LOCAL does not answer (web, sign-in or API)" web keycloak backend; sleep 3
 done
 # the platform accounts and their sign-in client are set by the one-time job keycloak-setup after Keycloak answers: a sign-in
 # before it has finished is refused by the identity provider («رفض مزود الهوية إتمام الدخول»), so wait for it (ADR-104)

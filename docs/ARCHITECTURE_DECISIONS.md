@@ -3130,3 +3130,42 @@ itself («it also happened everywhere»); a 14.8 km measuring line from a regist
   confirmed and is left for the owner.
 - **Release hygiene.** `gen-openapi.py` writes LF on every platform (it wrote CRLF on Windows, so the release hashed bytes
   differing from the commit).
+
+## ADR-107 Linux images for the VM, a transfer that can break off, and a start that names its failure (26 Nov 2026)
+
+**Context (owner, 26 Nov 2026, from the VM's screen).** On the VM `docker load -i tmrkz-images.tar` stopped with «short read …
+unexpected EOF»: the 1 GB file had arrived cut at 413,958,144 bytes through PAM, and without its `.sha256` start.sh refused it.
+The next start waited on the backend and Compose ended with «dependency failed to start». The USB's
+`0_IMAGES_IF_NEEDED/tmrkz-images.tar` (1,216,717,312 bytes, added on 25 Nov in the evening from the owner's Mac) carried
+`tmrkz/folder-backend:1`, `tmrkz/folder-web:1` and `tmrkz/keycloak:26.7.5-2` for **linux/arm64**, which an x86-64 server cannot
+run; the VM itself ran an unknown `tmrkz/folder-backend:1.2-pgrestore`. The tools of the USB ran Docker and wrote root-owned files
+(`.env`) as the PAM account, which is not root: «permission denied»; the bootstrap was sent into `/data`, which belongs to root.
+
+**Decision.**
+- `ops/local/workspace/pack-images.sh` makes every image for `linux/amd64` (`TMRKZ_IMAGE_PLATFORM` for another server), builds and
+  pulls with `--platform`, proves `pg_restore` in the backend image, refuses to save when any image lacks the platform, and saves
+  that platform only (`docker save --platform`).
+- `ops/local/workspace/split-images.sh <folder>` writes the archive as 100 MB parts with `tmrkz-images.tar.parts.sha256` and the
+  whole archive's `tmrkz-images.tar.sha256`, and proves that the parts join to it.
+- `start.sh`: (1) loads the parts directly (`cat parts | docker load`, no joined copy on the server) after the joined checksum
+  matches, and otherwise names each damaged or missing part so only that part is resent; (2) refuses images made for another
+  processor than the Docker engine's before Compose starts; (3) starts the backend, the web build and Keycloak first and follows
+  them: a slow first build is waited for up to 45 minutes with a progress line each minute, and a build that does not compile,
+  a missing library, an application that stops while starting, or a stopped container ends the start at once with its cause and
+  the log lines that show it — instead of Compose's bare «dependency failed to start»; (4) when the account cannot use Docker or
+  write `.env`, runs itself again as root through `sudo` (one password), and without sudo says how to run it.
+- `ops/vm/tmrkz-vm.sh` (the VM side of the USB connector): `check` names the parts to resend, `install` moves verified parts and the
+  new start.sh into the folder as root (the old single archive is removed), `cleanup` removes only the TMRKZ images that ran
+  before `install`, and only when no container uses them. The connector sends to `/data/tmrkz-incoming`, owned by the PAM
+  account, runs every command with `ssh -t` so sudo can ask for the password, and keeps its settings on the PC.
+
+**Evidence.** The new archive: 1,052,575,232 bytes, sha256 `614bed63…0970990`, eight images all `linux/amd64` with every layer present,
+`pg_restore (PostgreSQL) 17.12`; both images build the folder's source with no network. On this PC start.sh with the new images:
+every service healthy in 2 min 19 s. In a clean Docker 29.10.1 with no route out (`tests/acceptance/vm-sim/vmsim.sh`), 12 of 12
+checks: a cut part and a missing part named; an account without sudo told how to run it; the PAM account's start re-run through
+sudo, loaded from the parts, every service up, `pg_restore` in the running backend, the platform administrator signed in through
+Keycloak; an arm64 image refused before Compose; a backend that does not compile reported in 8 s with the compiler's line; a
+restart without a reload. `docs/evidence/vm-sim-adr107/`.
+
+**Not done.** Nothing has run on the real VM. Whether PAM allows a command with `ssh -t` (the connector's menu) is unknown there;
+the same steps by hand are in `0_COMMANDS.txt` of the USB.

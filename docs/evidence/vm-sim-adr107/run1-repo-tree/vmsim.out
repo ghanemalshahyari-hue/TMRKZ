@@ -1,0 +1,53 @@
+== setup 06:45:40
+PASS  no route out of the simulated VM (IP 172.19.0.2)
+29.10.1 x86_64 overlayfs
+0
+1.1G	/data/TMRKZ
+AGENTS.md CLAUDE.md FINAL_HANDOFF_2026-11-18.md FONT-LICENSE.txt README.md RUN.md assets backend docker-compose.override.yml docker-compose.yml docs frontend handoff map-packages ops start.sh tmrkz-images.tar.part-00 tmrkz-images.tar.part-01 tmrkz-images.tar.part-02 tmrkz-images.tar.part-03 tmrkz-images.tar.part-04 tmrkz-images.tar.part-05 tmrkz-images.tar.part-06 tmrkz-images.tar.part-07 tmrkz-images.tar.part-08 tmrkz-images.tar.part-09 tmrkz-images.tar.part-10 tmrkz-images.tar.parts.sha256 tmrkz-images.tar.sha256 
+== T1 damaged part 06:47:14
+PASS  T1 a cut part is named (rc=1):   damaged or incomplete — delete and send again only these parts: tmrkz-images.tar.part-03(41000000 bytes)
+== T2 missing part 06:47:17
+PASS  T2 a missing part is named (rc=1)
+== T3 account without Docker and without sudo 06:47:18
+-rw------- 1 root root 1567 Nov 26 02:47 /data/TMRKZ/.env
+PASS  T3 no sudo: says how to run it as root (rc=1)
+== T4 PAM account with sudo: fresh offline start from the parts 06:47:18
+   start.sh took 70 s
+PASS  T4 sudo re-run, parts loaded, everything started (rc=0)
+SERVICE           STATUS
+backend           Up 33 seconds (healthy)
+db                Up 51 seconds (healthy)
+db-init           Exited (0) 16 seconds ago
+keycloak          Up 39 seconds (healthy)
+keycloak-setup    Exited (0) 1 second ago
+maintenance       Up 17 seconds
+openfga           Up 39 seconds (healthy)
+openfga-migrate   Exited (0) 16 seconds ago
+openldap          Up 51 seconds
+web               Up 15 seconds (healthy)
+web-build         Up 51 seconds (healthy)
+PASS  T4 no unhealthy service
+tmrkz/folder-web:1 480MB
+tmrkz/folder-backend:1 1.03GB
+tmrkz/keycloak:26.7.5-2 756MB
+postgis/postgis:17-3.5-alpine 729MB
+nginx:1.28.3-alpine 92.5MB
+openfga/openfga:v1.8.16 102MB
+nginx:1.27-alpine 73.6MB
+osixia/openldap:1.5.0 373MB
+      8 linux/amd64
+pg_restore (PostgreSQL) 17.12 (Ubuntu 17.12-1.pgdg24.04+1)
+PASS  T4 pg_restore in the running backend
+PASS sign-in admin: /api/v1/me 200 username=admin role=AUDITOR
+PASS  T4 admin signs in (Keycloak → TMRKZ → /api/v1/me)
+== T5 an image for the wrong processor 06:48:31
+PASS  T5 arm64 image refused before Compose (rc=1)
+== T6 a backend that does not build 06:48:33
+   reported after 8 s
+PASS  T6 build failure named with the compiler's line (rc=1)
+== T7 restart after the fix: images already loaded, no reload 06:48:42
+   start.sh took 41 s
+PASS  T7 restart (rc=0)
+PASS sign-in admin: /api/v1/me 200 username=admin role=AUDITOR
+PASS  T7 admin signs in again
+== result: 12 passed, 0 failed 06:49:24

@@ -176,15 +176,18 @@ if [ -n "$SINCE" ]; then
   cat > "$BS/INSTALL.txt" <<EOF
 TMRKZ one-time bootstrap $ID (for a machine at commit $SINCE)
 
-Copy this whole folder to the machine, e.g. /data/tmrkz-bootstrap-$ID, then as the maintenance account (PAM, once):
-  cd /data/tmrkz-bootstrap-$ID
-  sh bootstrap.sh check /data/TMRKZ                    # read-only: checksums, signature, what this machine holds compared
+Copy this whole folder to a folder your PAM account can write, e.g. /data/tmrkz-incoming/1_VM_BOOTSTRAP (/data itself belongs to
+root), then, once (sudo asks for your password: Docker and .env belong to root — ADR-107):
+  cd /data/tmrkz-incoming/1_VM_BOOTSTRAP
+  sha256sum -c SHA256SUMS
+  sudo sh bootstrap.sh check /data/TMRKZ               # read-only: checksums, signature, what this machine holds compared
                                                        # with the release (files changed here are named), the Compose diff
-  sh bootstrap.sh apply /data/TMRKZ --with-config      # after reading the check; it stops if a file changed here would be
+  sudo sh bootstrap.sh apply /data/TMRKZ --with-config # after reading the check; it stops if a file changed here would be
                                                        # replaced: add --keep-local (leave them) or --overwrite-local
-  cd /data/TMRKZ && sh start.sh                        # the images are unchanged; no tmrkz-images.tar is needed
+  cd /data/TMRKZ && sh start.sh                        # runs itself through sudo when needed; loads tmrkz-images.tar or its
+                                                       # parts when the folder holds newer ones than those loaded
 Then in the browser: «إدارة النظام ← مركز التحديث» must show «عامل الصيانة يعمل». Later updates go through the browser only.
-Undo: sh bootstrap.sh restore /data/TMRKZ/backups/bootstrap/<time printed by apply>   then  sh start.sh
+Undo: sudo sh bootstrap.sh restore /data/TMRKZ/backups/bootstrap/<time printed by apply>   then  sh start.sh
 Never copied here and never needed on the machine: the release signing key, .env, data/, certs/, map-data/, map-runtime/.
 EOF
   ( cd "$BS" && sha256sum TMRKZ-bootstrap-"$ID".tar MANIFEST.tsv RELEASE.json RELEASE.sig release-trust.pub bootstrap.sh REMOVED.txt INSTALL.txt \

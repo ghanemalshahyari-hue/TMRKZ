@@ -1,0 +1,80 @@
+TMRKZ - image package manifest (26 Nov 2026, ADR-107)
+=====================================================
+
+Read from the 11 parts in this folder themselves (not from the build PC), 26 Nov 2026.
+
+Target platform : linux/amd64 (x86_64) - every image below, no exceptions
+Archive         : tmrkz-images.tar = tmrkz-images.tar.part-00 ... part-10 joined in order
+Size            : 1052575232 bytes
+sha256          : 614bed635cb3c7b526b816d6d742cf85bd0b5817a22c9ff139254af623970990
+Built by        : ops/local/workspace/pack-images.sh (forces linux/amd64, refuses to save any image of another platform,
+                  checks pg_restore 17 in the backend image)
+Source/release  : TMRKZ main 134ed77 + the ADR-107 changes = release 20261126-025729-134ed77-local
+                  (2_FIRST_BROWSER_UPDATE\TMRKZ on this USB). The backend and web images are the build tools: they
+                  compile the TMRKZ folder's own source when they start; the source is not inside the images.
+
+Images
+------
+The ID the VM shows after loading depends on its Docker storage:
+  "image store" ID  = Docker 29 with the containerd image store (docker info: driver-type io.containerd.snapshotter.v1)
+  "classic" ID      = the older overlay2 storage
+Either one matching is correct.
+
+tag                              platform     "image store" ID   "classic" ID       created (UTC)
+tmrkz/keycloak:26.7.5-2          linux/amd64  752582f09ea2       915b03270e7c       2026-11-16 10:23
+tmrkz/folder-backend:1           linux/amd64  582aa9272839       998ea873aed7       2026-11-26 02:35
+tmrkz/folder-web:1               linux/amd64  aaff87ae935d       77ee080ffb9a       2026-11-26 02:35
+postgis/postgis:17-3.5-alpine    linux/amd64  1e85984a7261       823c9d80930c       2026-08-31 11:37
+openfga/openfga:v1.8.16          linux/amd64  c88aebae6711       da18421b8b64       2025-06-17 10:49
+osixia/openldap:1.5.0            linux/amd64  0de385063591       2da3cf664891       2021-02-19 12:55
+nginx:1.28.3-alpine              linux/amd64  0dcc88822d45       dc73b49f5124       2026-03-24 23:11
+nginx:1.27-alpine                linux/amd64  62223d644fa2       6769dc3a703c       2025-04-16 14:50
+
+Full digests (sha256), same order - image store / classic:
+  tmrkz/keycloak:26.7.5-2        752582f09ea20a3d3399009a766f83d507f0ae168865de4b419bfad4f0741ec1
+                                 915b03270e7c2dfa3658335b41406e71c5077d84e385f9cf601a79aa7acae638
+  tmrkz/folder-backend:1         582aa92728399a175a3e7683450be17cc658f79fc1f8687df17f8568fa6bbeb3
+                                 998ea873aed74df91f3221913febff6a38d0ada55027fd8a32fd9357882a950c
+  tmrkz/folder-web:1             aaff87ae935d6b6959953c1bcc241c647ca4d932876ff790b0045ce6ff004339
+                                 77ee080ffb9aeb5c51f89658ef1094cbdb174d0c35f879ee196368f26ef5e802
+  postgis/postgis:17-3.5-alpine  1e85984a7261b01b38a8e7d4166abcdb35370e6b7667a6d6fd9caa057f64eab6
+                                 823c9d80930ce5f5fb4ed0f54a091abb79cfde1e34189aaeb69aeaf2720400a2
+  openfga/openfga:v1.8.16        c88aebae67115287a024fd5bb52c2094537f3ba5b635dc23e6f07400e8252da0
+                                 da18421b8b644677e7c62b9979472535d48e747cb4ca600c12987cbd0077467e
+  osixia/openldap:1.5.0          0de3850635911109f0daf8f5957808ec4f4eb827fbaaa339100b5f1bab925745
+                                 2da3cf664891c7393a5a2a1b0a4d7d354f7c63491fae94e0f60a2d66519865e1
+  nginx:1.28.3-alpine            0dcc88822d45581e65ae329f8be769762bf628d3b2bb7d2a077d4aa5c98b30e3
+                                 dc73b49f5124cf2ee538dfbdfbd121f0b4ccdcb20fea30f3a81bd477c02e2bb5
+  nginx:1.27-alpine              62223d644fa234c3a1cc785ee14242ec47a77364226f1c811d2f669f96dc2ac8
+                                 6769dc3a703c719c1d2756bda113659be28ae16cf0da58dd5fd823d6b9a050ea
+The archive also holds 4 small build records (attestations) next to these images; they are not images and Docker
+does not show them as images.
+
+The old arm64 images reported on the VM (do not appear in this package; menu 9 of CONNECT_VM.cmd removes them):
+  tmrkz/keycloak:26.7.5-2 889896134c48   tmrkz/folder-backend:1 acf5710e4fe4   tmrkz/folder-web:1 6635248839df
+
+Keycloak
+--------
+tmrkz/keycloak:26.7.5-2 is built from TMRKZ's own ops/keycloak/Dockerfile (Keycloak 26.7.5 with the TMRKZ theme and
+the TMRKZ realm), not an unrelated upstream image. On every start the step keycloak-setup applies the current settings
+from the folder and .env: sign-in page, public address, the admin and developer accounts and the manual sign-in
+client. A fresh offline start from exactly these parts signed admin in (4_ACCEPTANCE_AND_RECOVERY\VM_SIMULATION_ADR107.txt, T4).
+
+Checking on the VM
+------------------
+The normal way does every check below by itself: CONNECT_VM.cmd -> 2, then 3 (or by hand: READ_ME.txt).
+
+To check by hand, as in the deployment report:
+  cd /data/tmrkz-incoming
+  sha256sum -c tmrkz-images.tar.parts.sha256              # every part: OK
+  cat tmrkz-images.tar.part-* > tmrkz-images.tar          # the single file again (needs 1.1 GB free)
+  sha256sum -c tmrkz-images.tar.sha256                    # tmrkz-images.tar: OK
+  sudo docker load -i tmrkz-images.tar
+  for img in tmrkz/keycloak:26.7.5-2 tmrkz/folder-backend:1 tmrkz/folder-web:1; do
+    sudo docker image inspect "$img" --format '{{.RepoTags}} => {{.Os}}/{{.Architecture}} id={{.Id}}'
+  done
+  # expected: linux/amd64 three times, and an id from the table above
+  rm -f tmrkz-images.tar                                  # the joined copy is no longer needed
+
+Then start as usual: cd /data/TMRKZ && sh start.sh (it checks the processor of every image before starting).
+Data and volumes are kept: no "docker compose down -v", no volume deletion, no database re-initialisation.

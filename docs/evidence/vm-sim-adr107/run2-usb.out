@@ -1,0 +1,57 @@
+== setup 07:02:17  folder: F:/TMRKZ_FINAL_20261125_9c280bf/2_FIRST_BROWSER_UPDATE/TMRKZ  parts: F:/TMRKZ_FINAL_20261125_9c280bf/0_IMAGES_IF_NEEDED
+PASS  no route out of the simulated VM (IP 172.19.0.2)
+29.10.1 x86_64 overlayfs
+images before: 0
+1.0G	/data/TMRKZ
+FONT-LICENSE.txt README.md RUN.md assets backend docker-compose.override.yml docker-compose.yml docs frontend handoff map-packages ops start.sh tmrkz-images.tar.part-00 tmrkz-images.tar.part-01 tmrkz-images.tar.part-02 tmrkz-images.tar.part-03 tmrkz-images.tar.part-04 tmrkz-images.tar.part-05 tmrkz-images.tar.part-06 tmrkz-images.tar.part-07 tmrkz-images.tar.part-08 tmrkz-images.tar.part-09 tmrkz-images.tar.part-10 tmrkz-images.tar.parts.sha256 tmrkz-images.tar.sha256 
+== T1 damaged part 07:03:54
+PASS  T1 a cut part is named (rc=1):   damaged or incomplete — delete and send again only these parts: tmrkz-images.tar.part-03(41000000 bytes)
+== T2 missing part 07:03:56
+PASS  T2 a missing part is named (rc=1)
+== T3 account without Docker and without sudo 07:03:58
+-rw------- 1 root root 1567 Nov 26 03:03 /data/TMRKZ/.env
+PASS  T3 no sudo: says how to run it as root (rc=1)
+== T4 PAM account with sudo: fresh offline start from the parts 07:03:58
+   start.sh took 69 s
+PASS  T4 sudo re-run, parts loaded, everything started (rc=0)
+SERVICE           STATUS
+backend           Up 33 seconds (healthy)
+db                Up 51 seconds (healthy)
+db-init           Exited (0) 17 seconds ago
+keycloak          Up 39 seconds (healthy)
+keycloak-setup    Exited (0) 1 second ago
+maintenance       Up 17 seconds
+openfga           Up 39 seconds (healthy)
+openfga-migrate   Exited (0) 16 seconds ago
+openldap          Up 51 seconds
+web               Up 15 seconds (healthy)
+web-build         Up 51 seconds (healthy)
+PASS  T4 no unhealthy service
+tmrkz/folder-web:1 480MB
+tmrkz/folder-backend:1 1.03GB
+tmrkz/keycloak:26.7.5-2 756MB
+postgis/postgis:17-3.5-alpine 729MB
+nginx:1.28.3-alpine 92.5MB
+openfga/openfga:v1.8.16 102MB
+nginx:1.27-alpine 73.6MB
+osixia/openldap:1.5.0 373MB
+      8 linux/amd64
+pg_restore (PostgreSQL) 17.12 (Ubuntu 17.12-1.pgdg24.04+1)
+PASS  T4 pg_restore in the running backend
+PASS sign-in admin: /api/v1/me 200 username=admin role=AUDITOR
+PASS  T4 admin signs in (Keycloak → TMRKZ → /api/v1/me)
+== T5 an image for the wrong processor 07:05:10
+PASS  T5 arm64 image refused before Compose (rc=1)
+== T6 a backend that does not compile 07:05:15
+   reported after 7 s
+PASS  T6 compile error named with the compiler's line (rc=1)
+== T7 restart after the fix: images already loaded, no reload 07:05:25
+   start.sh took 40 s
+PASS  T7 restart (rc=0)
+PASS sign-in admin: /api/v1/me 200 username=admin role=AUDITOR
+PASS  T7 admin signs in again
+== T8 the USB helper: check, install, cleanup 07:06:06
+PASS  T8 helper names the part to resend
+PASS  T8 helper installs the checked parts and start.sh (as root, previous start.sh kept)
+PASS  T8 cleanup removes the old tag and keeps the running images
+== result: 15 passed, 0 failed 07:07:26

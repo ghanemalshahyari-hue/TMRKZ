@@ -1509,3 +1509,39 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Open:** the posture reach confirms each reached unit with OpenFGA one by one (~9 s for 5,000 units on the development
   machine; owner's decision on a batch confirmation). Nothing was run on the real VM: production acceptance waits for the VM
   checklist of the guide (bootstrap check and apply, first browser update, certificates, import, administrator lookup).
+
+## Linux images, image parts, start diagnostics and «permission denied» on the VM (26 Nov 2026; ADR-107)
+- **Delivered:** a new `tmrkz-images.tar` for linux/amd64 with `pg_restore` (the USB's 25 Nov evening archive was arm64 from the Mac);
+  `split-images.sh` 100 MB parts; start.sh loads parts, names a damaged/missing part, refuses another processor's image, follows the
+  first build and names why a start fails, and re-runs itself through sudo for the PAM account; `ops/vm/tmrkz-vm.sh` and the USB
+  connector send the parts and remove the old images. USB `F:\TMRKZ_FINAL_20261125_9c280bf` rebuilt with it.
+- **Checks:** this PC restarted on the new images (all healthy); clean offline Docker 29 simulation 12/12 (`docs/evidence/vm-sim-adr107/`).
+- **Open:** not run on the real VM; the VM's old `tmrkz/folder-backend:1.2-pgrestore` is removed by the connector's option 9 after a
+  good start; `ssh -t` through PAM untried.
+- **Resume (same day):** option 2 sends only the checksums first; `tmrkz-vm.sh state` then says what the VM already has whole
+  (in the transfer folder, or installed in `/data/TMRKZ` by an earlier run) and only missing or cut parts are sent, so a broken
+  or repeated run never resends a whole part; `install` also brings a newer start.sh when the parts were already there and leaves
+  start.sh alone when its backup cannot be written. The new helper ships in the USB's `0_UPDATE_TOOL/` (the copy in
+  `2_FIRST_BROWSER_UPDATE` is pinned by the signed release manifest and is unchanged). Checked: 11/11 helper cases in Ubuntu dash,
+  and the connector end to end with stand-in ssh/scp (break → rerun sends 2 of 3 parts → rerun sends none). The connector's
+  default PAM target is now the TMRKZ VM (it pointed at the MOVER VM). The old arm64 `tmrkz-images.tar` is gone from
+  the USB (checked 26 Nov 14:32).
+- **Image manifest (same day):** the VM team's report asked for one; `0_IMAGES_IF_NEEDED/IMAGES_MANIFEST.txt` (copy in
+  `docs/evidence/vm-sim-adr107/`) gives platform, tags, both kinds of image ID, build date, source/release and the report's
+  load-and-inspect check, read from the parts themselves. Checked 26 Nov 14:32: the 11 USB parts joined equal this PC's
+  amd64 `tmrkz-images.tar` (sha256 614bed63…0970990); all 929 files on the USB match `SHA256SUMS.txt`.
+- **VM backend did not compile (same day):**
+  - **Symptom.** On the VM, `LdapProperties.java` was the 20 Nov version, while `DirectoryAuthenticator` and `IntegrationSettingsService` were the 9c280bf versions.
+  - **Cause.** The one-time bootstrap is a delta from e30c1c1 and the VM was older, so files unchanged since e30c1c1 stayed old. This is a bootstrap gap: it leaves "earlier committed versions" to the browser update, which cannot run while the backend does not compile.
+  - **Reproduced exactly:** 982045e + the bootstrap's backend files give the VM's 11 errors.
+  - **Fix on the USB.** Folder `1_VM_FORCE_RELEASE`, used by connector option F, holds:
+    - the unchanged `bootstrap.sh`;
+    - a package of ALL 843 release files, each checked against the signed MANIFEST, so no new signature is needed;
+    - `force.sh`. It runs the bootstrap with `--overwrite-local --with-config`, and writes REMOVED.txt from the files under backend/ and frontend/ that the release lacks, excluding the rules' dev paths.
+  - **Checked on a stand-in of the VM:**
+    - check changes nothing;
+    - apply gives 845/845 release files, 0 still differing, and removes the stale file;
+    - `.env`, data, certs, dc-hosts, `.generated` and the images are untouched;
+    - restore gives an identical tree;
+    - the forced backend builds with 0 errors.
+  - **Next release:** make `make-release.sh --bootstrap` ship every release file, not the delta.

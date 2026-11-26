@@ -7,6 +7,9 @@
 # Then on any machine, offline, in this folder:   docker load -i tmrkz-images.tar   and   docker compose up -d
 # Needed again only when a dependency changes (pom.xml, package-lock.json) or a server image is upgraded.
 #   sh ops/local/workspace/pack-images.sh
+# Every image is made for the VM's processor, linux/amd64, whatever machine packs it (ADR-107: an archive packed on a Mac
+# carried arm64 images that an x86-64 server cannot run). TMRKZ_IMAGE_PLATFORM=linux/arm64 only for an arm64 server.
+# For a transfer that may break off (PAM), split the result afterwards: sh ops/local/workspace/split-images.sh <folder>
 set -eu
 export MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/../../.."
@@ -15,14 +18,19 @@ W=ops/local/workspace
 BACKEND=tmrkz/folder-backend:1
 WEB=tmrkz/folder-web:1
 SERVERS="postgis/postgis:17-3.5-alpine tmrkz/keycloak:26.7.5-2 openfga/openfga:v1.8.16 osixia/openldap:1.5.0 nginx:1.28.3-alpine nginx:1.27-alpine"
+PLATFORM="${TMRKZ_IMAGE_PLATFORM:-linux/amd64}"
+export DOCKER_DEFAULT_PLATFORM="$PLATFORM"
 say() { echo "[pack-images] $*"; }
+# the platform an image has for $PLATFORM ("" when it has none)
+platform_of() { docker image inspect --platform "$PLATFORM" --format '{{.Os}}/{{.Architecture}}' "$1" 2>/dev/null || true; }
 CTX="$(mktemp -d)"; trap 'rm -rf "$CTX"' EXIT
 
+# the base and server images, for $PLATFORM (a copy of another platform alone does not count)
 for img in maven:3.9.16-eclipse-temurin-25 node:24.18.1-alpine $SERVERS; do
-  docker image inspect "$img" >/dev/null 2>&1 && continue
+  [ "$(platform_of "$img")" = "$PLATFORM" ] && continue
   case "$img" in
-    tmrkz/keycloak:*) say "building $img"; docker compose -f docker-compose.yml build keycloak ;;
-    *) say "pulling $img"; docker pull -q "$img" >/dev/null ;;
+    tmrkz/keycloak:*) say "building $img for $PLATFORM"; docker compose -f docker-compose.yml build keycloak ;;
+    *) say "pulling $img for $PLATFORM"; docker pull -q --platform "$PLATFORM" "$img" >/dev/null ;;
   esac
 done
 
@@ -47,7 +55,7 @@ COPY backend-run.sh /usr/local/bin/tmrkz-backend-run
 WORKDIR /workspace
 ENTRYPOINT ["sh", "/usr/local/bin/tmrkz-backend-run"]
 EOF
-tar -C "$CTX/backend" -cf - . | docker build -q -t "$BACKEND" - >/dev/null
+tar -C "$CTX/backend" -cf - . | docker build -q --platform "$PLATFORM" -t "$BACKEND" - >/dev/null
 
 say "$WEB: Node and the web's dependencies"
 mkdir -p "$CTX/web" && cp frontend/package.json frontend/package-lock.json "$W/web-run.sh" "$CTX/web/"
@@ -59,14 +67,22 @@ COPY web-run.sh /usr/local/bin/tmrkz-web-run
 WORKDIR /workspace
 ENTRYPOINT ["sh", "/usr/local/bin/tmrkz-web-run"]
 EOF
-tar -C "$CTX/web" -cf - . | docker build -q -t "$WEB" - >/dev/null
+tar -C "$CTX/web" -cf - . | docker build -q --platform "$PLATFORM" -t "$WEB" - >/dev/null
 
 say "proving that both build this folder's source with no network"
-docker run --rm --network none -e TMRKZ_BUILD_ONLY=1 -v "$HERE/backend:/workspace/backend:ro" "$BACKEND"
-docker run --rm --network none -e TMRKZ_BUILD_ONLY=1 -e VITE_STATIONING_V3=true -v "$HERE/frontend:/workspace/frontend:ro" "$WEB"
+docker run --rm --platform "$PLATFORM" --network none -e TMRKZ_BUILD_ONLY=1 -v "$HERE/backend:/workspace/backend:ro" "$BACKEND"
+docker run --rm --platform "$PLATFORM" --network none -e TMRKZ_BUILD_ONLY=1 -e VITE_STATIONING_V3=true -v "$HERE/frontend:/workspace/frontend:ro" "$WEB"
+docker run --rm --platform "$PLATFORM" --network none --entrypoint pg_restore "$BACKEND" --version
 
-say "saving tmrkz-images.tar"
-docker save -o tmrkz-images.tar.part "$BACKEND" "$WEB" $SERVERS
+say "checking that every image is for $PLATFORM"
+for img in "$BACKEND" "$WEB" $SERVERS; do
+  got="$(platform_of "$img")"
+  [ "$got" = "$PLATFORM" ] || { say "STOP: $img is not available for $PLATFORM (${got:-none}) — nothing saved"; exit 1; }
+done
+
+say "saving tmrkz-images.tar ($PLATFORM only)"
+rm -f tmrkz-images.tar.part-* tmrkz-images.tar.parts.sha256
+docker save --platform "$PLATFORM" -o tmrkz-images.tar.part "$BACKEND" "$WEB" $SERVERS
 mv tmrkz-images.tar.part tmrkz-images.tar
-(sha256sum tmrkz-images.tar 2>/dev/null || shasum -a 256 tmrkz-images.tar) > tmrkz-images.tar.sha256
-say "ready: tmrkz-images.tar ($(du -h tmrkz-images.tar | cut -f1)) — on the machine: docker load -i tmrkz-images.tar; docker compose up -d"
+(sha256sum tmrkz-images.tar 2>/dev/null || shasum -a 256 tmrkz-images.tar) | sed 's/ \*/  /' > tmrkz-images.tar.sha256
+say "ready: tmrkz-images.tar ($(du -h tmrkz-images.tar | cut -f1), $PLATFORM) — on the machine: sh start.sh (or docker load -i tmrkz-images.tar; docker compose up -d)"
