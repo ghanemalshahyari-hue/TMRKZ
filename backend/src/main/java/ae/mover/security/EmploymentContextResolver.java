@@ -95,6 +95,57 @@ public class EmploymentContextResolver {
         return ids.size() == 1 ? ids.get(0) : null;
     }
 
+    /** How a unit name matched: the ONE active unit (Arabic-normalized), or null, and how many names matched (0, 1, or 2+ ambiguous). */
+    public record UnitNameMatch(UUID org, int count) {
+    }
+
+    /**
+     * Units matched by NAME, Arabic-normalized (owner, 26 Nov 2026). Used only for an explicit connect, and only when no Unit ID is
+     * stated or it matches no unit — sign-in placement stays Unit-ID only ({@link #unitById}). Never creates a unit; a name that
+     * matches more than one active unit is ambiguous (count &gt; 1) and places none.
+     */
+    public UnitNameMatch matchUnitByName(String name) {
+        String norm = normalizeArabic(name);
+        if (norm.isEmpty()) {
+            return new UnitNameMatch(null, 0);
+        }
+        UUID match = null;
+        int count = 0;
+        for (Map<String, Object> o : jdbc.sql("select id, name from organization where status = 'ACTIVE' and name is not null")
+                .query().listOfRows()) {
+            if (normalizeArabic((String) o.get("name")).equals(norm)) {
+                count++;
+                if (match == null) {
+                    match = (UUID) o.get("id");
+                }
+            }
+        }
+        return new UnitNameMatch(count == 1 ? match : null, count);
+    }
+
+    /** Arabic name key: tashkeel, superscript alef and tatweel dropped; alef/yaa/taa-marbuta folded; bidi marks dropped; spaces collapsed; lower-cased. */
+    static String normalizeArabic(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String s = raw.trim();
+        StringBuilder b = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if ((c >= 'ً' && c <= 'ْ') || c == 'ٰ' || c == 'ـ') {
+                continue; // diacritics, superscript alef, tatweel
+            }
+            switch (c) {
+                case 'أ', 'إ', 'آ', 'ٱ' -> b.append('ا'); // أ إ آ ٱ -> ا
+                case 'ى' -> b.append('ي');                                // ى -> ي
+                case 'ة' -> b.append('ه');                                // ة -> ه
+                case '‌', '‍', '‎', '‏' -> { }                  // zero-width / bidi marks
+                default -> b.append(Character.toLowerCase(c));
+            }
+        }
+        return b.toString().replaceAll("\\s+", " ").trim();
+    }
+
     /** The unit the person asks for and is routed by (access requests), or null. */
     public UUID unitOf(UUID person) {
         Source mode = mode();

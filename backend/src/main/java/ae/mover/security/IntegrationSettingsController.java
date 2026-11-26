@@ -36,14 +36,16 @@ public class IntegrationSettingsController {
     private final AccessService access;
     private final IntegrationSettingsService settings;
     private final DirectoryAuthenticator directory;
+    private final DirectoryConnectService connect;
     private final ae.mover.assistant.AssistantTester assistantTester;
     private final OidcClient oidc;
 
     public IntegrationSettingsController(AccessService access, IntegrationSettingsService settings, DirectoryAuthenticator directory,
-                                         OidcClient oidc, ae.mover.assistant.AssistantTester assistantTester) {
+                                         DirectoryConnectService connect, OidcClient oidc, ae.mover.assistant.AssistantTester assistantTester) {
         this.access = access;
         this.settings = settings;
         this.directory = directory;
+        this.connect = connect;
         this.assistantTester = assistantTester;
         this.oidc = oidc;
     }
@@ -82,6 +84,61 @@ public class IntegrationSettingsController {
         out.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
         settings.audited(ctx, "INTEGRATION_DIRECTORY_TESTED", Map.of("url", p.url(), "ok", r.ok(), "step", r.step(),
                 "withLogin", t.testLogin() != null && !t.testLogin().isBlank()));
+        return out;
+    }
+
+    /**
+     * «اعرض سمات مستخدم» (ADR-092 companion): reads one test user's full directory record with the values on the screen, so the
+     * attribute mapping can be confirmed before saving. Same inputs as the test; the typed password is used for one bind and
+     * dropped; nothing is stored. Permission-gated and audited (the login value itself is never written to the audit).
+     */
+    @PostMapping("/directory/inspect")
+    public Map<String, Object> inspectDirectory(Actor actor, @RequestBody DirectoryTest in) {
+        AccessContext ctx = access.context(actor);
+        ctx.require(Permission.CONFIGURE);
+        DirectoryTest t = in == null ? new DirectoryTest(null, null, null) : in;
+        LdapProperties p = settings.toLdap(t.settings(), settings.storedDirectoryPassword());
+        long started = System.nanoTime();
+        DirectoryAuthenticator.InspectResult r = directory.inspect(p, t.testLogin(), t.testPassword());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", r.ok());
+        out.put("step", r.step());
+        out.put("message", r.message());
+        out.put("dn", r.dn());
+        out.put("displayName", r.displayName());
+        out.put("attributes", r.attributes().stream().map(a -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("name", a.name());
+            m.put("values", a.values());
+            m.put("binary", a.binary());
+            return m;
+        }).toList());
+        out.put("url", p.url());
+        out.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
+        settings.audited(ctx, "INTEGRATION_DIRECTORY_INSPECTED", Map.of("url", p.url(), "ok", r.ok(), "step", r.step(),
+                "withLogin", t.testLogin() != null && !t.testLogin().isBlank()));
+        return out;
+    }
+
+    /**
+     * «اربط بالتطبيق» (ADR-092 companion): connects the inspected directory user to the app for real — person + identity link, and
+     * placement in their unit (by Unit ID, else by Arabic-normalized unit name). No role is granted. Writes to the database;
+     * permission-gated (configuration + global access management) inside the service, and audited.
+     */
+    @PostMapping("/directory/connect")
+    public Map<String, Object> connectDirectory(Actor actor, @RequestBody DirectoryTest in) {
+        AccessContext ctx = access.context(actor);
+        DirectoryTest t = in == null ? new DirectoryTest(null, null, null) : in;
+        DirectoryConnectService.ConnectResult r = connect.connect(ctx, t.settings(), t.testLogin(), t.testPassword());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", r.ok());
+        out.put("message", r.message());
+        out.put("personId", r.personId());
+        out.put("displayName", r.displayName());
+        out.put("employeeNumber", r.employeeNumber());
+        out.put("username", r.username());
+        out.put("unitName", r.unitName());
+        out.put("matchedBy", r.matchedBy());
         return out;
     }
 

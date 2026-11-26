@@ -29,7 +29,7 @@
 }
 
 /* ---- application frame ------------------------------------------------------------------------------------------- */
-.tz-app { min-height: 100dvh; display: flex; flex-direction: column; }
+.tz-app { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
 /* StationingShell takes the main area's height so its body is a flex column that owns its own scrolling (§7 scroll fix).
    The wizard inside scrolls while its sticky nav row stays visible; the shell header never scrolls. */
 .tz-stationing-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
@@ -43,7 +43,7 @@
 .tz-main { flex: 1; min-width: 0; outline: none; }
 .tz-app.is-page .tz-main { padding: 16px 20px; overflow: visible; min-height: 200px; }
 /* the console fills exactly the screen below the top bar; its columns scroll inside */
-.tz-app.is-console { height: 100dvh; }
+.tz-app.is-console { height: 100vh; height: 100dvh; }
 .tz-app.is-console .tz-main { padding: 0; flex: 1 1 0; min-height: 0; overflow: hidden; }
 .tz-app[data-view='home'] .tz-main { overflow: auto; }
 .tz-skip { position: absolute; inset-inline-start: 8px; top: -60px; z-index: 3000; background: var(--tz-teal); color: #04221c; padding: 8px 12px; border-radius: 8px; }

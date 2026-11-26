@@ -91,6 +91,19 @@ public class DirectoryAuthenticator {
     public record TestResult(boolean ok, String step, String message, String dn, String displayName) {
     }
 
+    /** One directory attribute of an inspected entry: its name, its value(s) as text, and whether the raw value was binary (hex). */
+    public record InspectAttr(String name, java.util.List<String> values, boolean binary) {
+    }
+
+    /**
+     * The full directory record of one test user (configuration preview, ADR-092 companion). Lets whoever configures the
+     * directory see every attribute the entry actually carries and confirm which attribute each mapped field should name,
+     * before saving. Never a credential; nothing is stored.
+     */
+    public record InspectResult(boolean ok, String step, String message, String dn, String displayName,
+                                java.util.List<InspectAttr> attributes) {
+    }
+
     /**
      * A test of unsaved settings (ADR-092), as MOVER's «اختبار الاتصال»: the protected channel is opened with the given trust
      * (certificate chain and host name checked); then, with a login and password, that person's own sign-in exactly as the
@@ -121,6 +134,207 @@ public class DirectoryAuthenticator {
             return new TestResult(false, e.failure().name(), cause == null ? message : message + " — " + cause.replaceAll("[\\r\\n]+", " "), null, null);
         } catch (NamingException e) {
             return new TestResult(false, "ERROR", "خطأ من الدليل: " + e.getMessage(), null, null);
+        } finally {
+            TESTING.remove();
+        }
+    }
+
+    /**
+     * Reads one directory entry for {@code login} and returns ALL of its attributes, so whoever configures the directory can
+     * see which attribute names actually carry the rank, unit, number and so on, and confirm the mapping before saving
+     * (ADR-092 companion). With the test user's own {@code password}: binds as that person (the only mode with no service
+     * account) when a bind pattern is known; otherwise the read-only service account searches. Binary values are shown as hex
+     * and long values are capped. Nothing is stored; a typed password is used for that one bind and dropped.
+     */
+    public InspectResult inspect(LdapProperties p, String login, String password) {
+        TESTING.set(p);
+        try {
+            if (!p.configured()) {
+                return new InspectResult(false, "NOT_CONFIGURED", "الإعدادات غير مكتملة.", null, null, java.util.List.of());
+            }
+            if (login == null || login.isBlank()) {
+                return new InspectResult(false, "INPUT", "اكتب اسم دخول مستخدم تجريبي للعرض.", null, null, java.util.List.of());
+            }
+            String target = bare(login.trim());
+            if (!DIRECT_LOGIN.matcher(target).matches()) {
+                return new InspectResult(false, "INPUT", "اسم الدخول غير صالح.", null, null, java.util.List.of());
+            }
+            boolean asUser = password != null && !password.isEmpty();
+            if (password != null && password.length() > 1024) {
+                return new InspectResult(false, "INPUT", "كلمة المرور غير صالحة.", null, null, java.util.List.of());
+            }
+            boolean canUserBind = p.direct() || p.upnSuffix() != null; // a known bind name for the login
+            boolean hasService = p.bindDn() != null && p.bindCredential() != null;
+            LdapContext ctx;
+            String step;
+            try {
+                if (asUser && canUserBind) {
+                    String principal = p.directBindPattern().replace(LdapProperties.USERNAME_MARKER, target);
+                    ctx = connect(principal, password, true);
+                    step = "USER_BIND";
+                } else if (hasService) {
+                    ctx = connect(p.bindDn(), p.bindCredential(), false);
+                    step = "SERVICE_BIND";
+                } else if (asUser) {
+                    return new InspectResult(false, "NO_SERVICE",
+                            "هذا الدليل يبحث بحساب خدمة؛ هيّئ حساب خدمة لعرض سجل مستخدم آخر.", null, null, java.util.List.of());
+                } else {
+                    return new InspectResult(false, "NO_SERVICE",
+                            "لا يوجد حساب خدمة: اكتب كلمة مرور المستخدم التجريبي ليُقرأ سجله بحسابه، أو هيّئ حساب خدمة.",
+                            null, null, java.util.List.of());
+                }
+            } catch (DirectoryException e) {
+                return inspectFailure(e);
+            }
+            try {
+                SearchResult entry = entryAllAttributes(ctx, target);
+                java.util.List<InspectAttr> attrs = readAll(entry.getAttributes());
+                String display = null;
+                for (InspectAttr at : attrs) {
+                    if (at.name().equalsIgnoreCase("displayName") && !at.values().isEmpty()) {
+                        display = at.values().get(0);
+                        break;
+                    }
+                    if (display == null && at.name().equalsIgnoreCase("cn") && !at.values().isEmpty()) {
+                        display = at.values().get(0);
+                    }
+                }
+                return new InspectResult(true, step, "قُرئ سجل المستخدم من الدليل.", entry.getNameInNamespace(), display, attrs);
+            } catch (DirectoryException e) {
+                return inspectFailure(e);
+            } catch (NamingException e) {
+                return new InspectResult(false, "ERROR", "خطأ من الدليل: " + e.getMessage(), null, null, java.util.List.of());
+            } finally {
+                close(ctx);
+            }
+        } finally {
+            TESTING.remove();
+        }
+    }
+
+    private static InspectResult inspectFailure(DirectoryException e) {
+        String message = switch (e.failure()) {
+            case INVALID_CREDENTIALS -> "رفض الدليل اسم المستخدم أو كلمة المرور، أو لا يوجد سجل بهذا الاسم.";
+            case AMBIGUOUS -> "اسم المستخدم يطابق أكثر من سجل في الدليل.";
+            case TLS -> "رُفض الاتصال المؤمَّن: الشهادة غير موثوقة أو اسم الخادم لا يطابقها.";
+            case NOT_CONFIGURED -> "الإعدادات غير مكتملة.";
+            case UNAVAILABLE -> "تعذر الوصول إلى الدليل (العنوان، المنفذ أو الجدار الناري).";
+        };
+        String cause = e.getCause() == null ? null : e.getCause().getMessage();
+        return new InspectResult(false, e.failure().name(), cause == null ? message : message + " — " + cause.replaceAll("[\\r\\n]+", " "),
+                null, null, java.util.List.of());
+    }
+
+    /** Exactly one entry for {@code login} under the users DN, with every attribute returned (not only the mapped ones). */
+    private SearchResult entryAllAttributes(LdapContext ctx, String login) throws NamingException, DirectoryException {
+        boolean ad = props().upnSuffix() != null;
+        String filter;
+        Object[] args;
+        if (ad) {
+            filter = "(&(objectClass=" + props().userObjectClass() + ")(|(sAMAccountName={0})(userPrincipalName={1})))";
+            args = new Object[]{login, login + "@" + props().upnSuffix()};
+        } else {
+            filter = "(&(objectClass=" + props().userObjectClass() + ")(" + props().usernameAttribute() + "={0}))";
+            args = new Object[]{login};
+        }
+        SearchControls controls = new SearchControls();
+        controls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+        controls.setCountLimit(2);
+        controls.setTimeLimit(props().readTimeoutMs());
+        controls.setReturningAttributes(null); // every attribute the entry carries
+        NamingEnumeration<SearchResult> results = ctx.search(props().usersDn(), filter, args, controls);
+        SearchResult first = null;
+        int count = 0;
+        try {
+            while (results.hasMore()) {
+                SearchResult r = results.next();
+                count++;
+                if (first == null) {
+                    first = r;
+                }
+            }
+        } catch (javax.naming.SizeLimitExceededException e) {
+            count = 2;
+        } catch (javax.naming.PartialResultException e) {
+            // Active Directory continuation references after this domain's entries (as in search()); ignored.
+        }
+        if (count == 0) {
+            throw invalid();
+        }
+        if (count > 1) {
+            throw new DirectoryException(Failure.AMBIGUOUS, "more than one directory entry for the login name", null);
+        }
+        return first;
+    }
+
+    /** Every attribute of an entry as text (binary values as hex), name-sorted, with caps so a preview cannot dump a huge blob. */
+    private static java.util.List<InspectAttr> readAll(Attributes a) throws NamingException {
+        java.util.List<InspectAttr> out = new java.util.ArrayList<>();
+        NamingEnumeration<? extends Attribute> e = a.getAll();
+        int attrs = 0;
+        while (e.hasMore() && attrs < 120) {
+            Attribute at = e.next();
+            attrs++;
+            java.util.List<String> values = new java.util.ArrayList<>();
+            boolean binary = false;
+            for (int i = 0; i < at.size() && i < 25; i++) {
+                Object v = at.get(i);
+                if (v instanceof byte[] b) {
+                    binary = true;
+                    values.add(capValue(HexFormat.of().formatHex(b)));
+                } else {
+                    values.add(capValue(String.valueOf(v)));
+                }
+            }
+            if (at.size() > 25) {
+                values.add("… (" + at.size() + ")");
+            }
+            out.add(new InspectAttr(at.getID(), values, binary));
+        }
+        out.sort(java.util.Comparator.comparing(x -> x.name().toLowerCase(Locale.ROOT)));
+        return out;
+    }
+
+    private static String capValue(String s) {
+        String t = s == null ? "" : s;
+        return t.length() > 512 ? t.substring(0, 512) + "…" : t;
+    }
+
+    /**
+     * The mapped {@link DirectoryUser} for {@code login} (connecting the user to the app, ADR-092 companion). Binds as the user
+     * when a password is given and a bind name is known (direct or AD), otherwise the read-only service account searches. Reads
+     * only the mapped attributes; nothing is stored.
+     */
+    public DirectoryUser read(LdapProperties p, String login, String password) throws DirectoryException {
+        TESTING.set(p);
+        try {
+            if (!p.configured()) {
+                throw new DirectoryException(Failure.NOT_CONFIGURED, "directory not configured", null);
+            }
+            if (login == null || login.isBlank()) {
+                throw invalid();
+            }
+            String target = bare(login.trim());
+            if (!DIRECT_LOGIN.matcher(target).matches()) {
+                throw invalid();
+            }
+            boolean asUser = password != null && !password.isEmpty() && password.length() <= 1024;
+            if (asUser && (p.direct() || p.upnSuffix() != null)) {
+                return authenticate(target, password);
+            }
+            if (p.bindDn() != null && p.bindCredential() != null) {
+                LdapContext ctx = connect(p.bindDn(), p.bindCredential(), false);
+                try {
+                    SearchResult entry = props().upnSuffix() != null ? uniqueAd(ctx, target, target + "@" + props().upnSuffix())
+                            : unique(ctx, props().usernameAttribute(), target);
+                    return user(entry);
+                } catch (NamingException e) {
+                    throw translate(e);
+                } finally {
+                    close(ctx);
+                }
+            }
+            throw new DirectoryException(Failure.NOT_CONFIGURED, "no service account and no user password to read the entry", null);
         } finally {
             TESTING.remove();
         }

@@ -301,6 +301,51 @@ public class UnitMemberService {
     }
 
     /**
+     * Places an already-known, active person in a unit as part of a GLOBAL provisioning action (directory connect, ADR-092
+     * companion): no role, and no unit-scoped right — global access management over everything instead — deduplicated and
+     * audited. Returns true when a placement was made, false when the person was already a user of the unit.
+     */
+    @Transactional
+    public boolean place(AccessContext ctx, UUID orgId, UUID person) {
+        if (orgId == null || person == null) {
+            throw ApiException.validation("اختر الوحدة والشخص.");
+        }
+        if (!ctx.canEverywhere(Permission.MANAGE_ACCESS)) {
+            throw ApiException.forbidden("يضع المستخدمين في وحداتهم مدير صلاحيات عام فقط.");
+        }
+        boolean active = jdbc.sql("""
+                select count(*) from organization o, person p
+                where o.id = :o and o.status = 'ACTIVE' and p.id = :p and p.status = 'ACTIVE'""")
+                .param("o", orgId).param("p", person).query(Integer.class).single() > 0;
+        if (!active) {
+            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, NOT_FOUND);
+        }
+        boolean user = jdbc.sql("""
+                select count(*) from (select person_id from unit_member where person_id = :p and organization_id = :o and ended_at is null
+                  union all select person_id from membership where person_id = :p and organization_id = :o and (valid_to is null or valid_to > now())) u""")
+                .param("p", person).param("o", orgId).query(Integer.class).single() > 0;
+        if (user) {
+            return false;
+        }
+        boolean posted = jdbc.sql("select count(*) from affiliation where person_id = :p and organization_id = :o and valid_to is null")
+                .param("p", person).param("o", orgId).query(Integer.class).single() > 0;
+        boolean acting = !posted && jdbc.sql("select count(*) from affiliation where person_id = :p and valid_to is null")
+                .param("p", person).query(Integer.class).single() > 0;
+        try {
+            jdbc.sql("""
+                    insert into unit_member(id, person_id, organization_id, acting, added_by, added_at)
+                    values (:id, :p, :o, :a, :by, :now)""")
+                    .param("id", UUID.randomUUID()).param("p", person).param("o", orgId).param("a", acting)
+                    .param("by", ctx.personId()).param("now", Db.ts(clock.instant())).update();
+        } catch (DuplicateKeyException e) {
+            return false;
+        }
+        audit.recordAs(ctx.actor(), "UNIT_MEMBER_ADDED", "PERSON", person.toString(), null,
+                Map.of("organizationId", orgId.toString(), "acting", acting, "connect", true), null);
+        return true;
+    }
+
+    /**
      * An existing account typed as a User ID (ADR-103). Two kinds of LOCAL account are user accounts: one made here
      * («USER-login») and one made by the person's own first directory sign-in (ADR-068: linked DIRECTORY, carrying the
      * directory's employee number or «DIR-login»). Before ADR-103 only the first kind was accepted, so even the global

@@ -13,6 +13,7 @@ import { UpdateCenter } from '../components/UpdateCenter';
 import { CertificateCenter } from '../components/CertificateCenter';
 import { EnvImport } from '../components/EnvImport';
 import { useApp } from '../lib/app';
+import { STATIONING_V3_ENABLED } from '../lib/stationingV3';
 import { formatBytes, fullTime } from '../lib/dates';
 import { INTEGRATION_STATUS } from '../lib/labels';
 import { parseOrgCsv } from '../lib/csv';
@@ -136,7 +137,7 @@ export function SettingsPage() {
 
   const groups: Group[] = useMemo(() => [
     { key: 'general', title: 'السياسات والبيئة', icon: 'filter', description: 'سياسات الطلب، صلاحيات تحديد المواقع، البيئة المستهدفة وحالة التكاملات.',
-      items: ['سياسات الطلب', 'التوقيع', 'المرفقات', 'رموز الوحدات', 'تحديد مواقع التمركز', 'البيئة', 'التكاملات'], testid: 'settings-group-policies', shown: true },
+      items: ['سياسات الطلب', 'التوقيع', 'المرفقات', 'رموز الوحدات', 'تحديد مواقع التمركز', 'سياسة التمركز', 'التضاريس', 'البيئة', 'التكاملات'], testid: 'settings-group-policies', shown: true },
     { key: 'identity', title: 'الهوية والدخول', icon: 'user', description: 'رسائل شاشة الدخول، الدليل المؤسسي وKeycloak والمساعد، واستيراد ملف إعدادات من تطبيق متوافق.',
       items: ['ملاحظات الدخول', 'إعدادات التكامل', 'الدليل المؤسسي', 'LDAP', 'Keycloak', 'المساعد الذكي', 'استيراد ملف إعدادات', '.env'],
       testid: 'settings-group-identity', shown: true },
@@ -295,8 +296,19 @@ export function SettingsPage() {
                 </p>
               )}
             </section>
+            {STATIONING_V3_ENABLED && configure && (
+              <section className="card padding" data-testid="settings-terrain-link">
+                <h2>سياسة التمركز والتضاريس</h2>
+                <p className="micro muted" style={{ margin: '0 0 10px' }}>
+                  قواعد التمركز وإعادة التمركز: المسافات والتضاريس (المسموح وغير المسموح)، مراحل الاعتماد، وتجاوز المسافة وإضافة وحدة من فرع آخر — تُحرَّر في صفحتها.
+                </p>
+                <button type="button" className="button" data-testid="settings-open-stationing-policy" onClick={() => app.navigate('stationingPolicy')}>
+                  فتح سياسة التمركز
+                </button>
+              </section>
+            )}
             <section className="card padding">
-              <h2>البيئة المستهدفة</h2>
+              <h2>البيئة المستهدفة <span className="pill">قراءة فقط</span></h2>
               <KeyValue k="النشر" v="Docker داخل شبكة معزولة" />
               <KeyValue k="اللغة والاتجاه" v="عربي / RTL" />
               <KeyValue k="المنطقة الزمنية" v={info?.timezone ?? s?.timezone ?? 'Asia/Dubai'} />
@@ -311,7 +323,7 @@ export function SettingsPage() {
               </p>
             </section>
             <section className="card padding">
-              <h2>التكاملات</h2>
+              <h2>التكاملات <span className="pill">قراءة فقط</span></h2>
               {integrations.map((i) => {
                 const [label, tone] = INTEGRATION_STATUS[i.status] ?? [i.status, ''];
                 return (

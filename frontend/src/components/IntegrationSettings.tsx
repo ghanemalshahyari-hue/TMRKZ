@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import type { DirectoryTestResult, IntegrationStatus, IntegrationView, OidcTestResult , AssistantView, AssistantForm, AssistantTestResult } from '../api/types';
+import type { DirectoryTestResult, DirectoryInspectResult, DirectoryConnectResult, IntegrationStatus, IntegrationView, OidcTestResult , AssistantView, AssistantForm, AssistantTestResult } from '../api/types';
 import { useApp } from '../lib/app';
 import { fullTime } from '../lib/dates';
 import {
@@ -87,8 +87,22 @@ function DirectorySection({ live, onChanged }: { live: IntegrationStatus['direct
   const [testLogin, setTestLogin] = useState('');
   const [testPassword, setTestPassword] = useState('');
   const [test, setTest] = useState<DirectoryTestResult | null>(null);
+  const [inspect, setInspect] = useState<DirectoryInspectResult | null>(null);
+  const [connected, setConnected] = useState<DirectoryConnectResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [showEnv, setShowEnv] = useState(false);
+
+  // the mapping preview: each app field, the directory attribute it is mapped to, and the value found on the test entry
+  const inspectMap: [string, keyof DirectoryForm][] = [
+    ['اسم الدخول', 'usernameAttribute'],
+    ['المعرّف الثابت', 'uuidAttribute'],
+    ['الرقم الوظيفي / العسكري', 'employeeNumberAttribute'],
+    ['الرتبة', 'rankAttribute'],
+    ['المنصب', 'positionAttribute'],
+    ['معرّف الوحدة', 'unitIdAttribute'],
+    ['اسم الوحدة', 'unitNameAttribute'],
+    ['الوحدة الرئيسية', 'mainUnitIdAttribute'],
+  ];
 
   const load = () =>
     api.integrationDirectory().then((v) => {
@@ -105,6 +119,8 @@ function DirectorySection({ live, onChanged }: { live: IntegrationStatus['direct
   const set = (p: Partial<DirectoryForm>) => {
     setForm({ ...form, ...p });
     setTest(null);
+    setInspect(null);
+    setConnected(null);
   };
   const act = async (fn: () => Promise<unknown>, done?: string) => {
     setBusy(true);
@@ -201,8 +217,8 @@ function DirectorySection({ live, onChanged }: { live: IntegrationStatus['direct
         <input className="toggle" type="checkbox" checked={form.enabled} onChange={(e) => set({ enabled: e.target.checked })} aria-label="تفعيل إعدادات الدليل" />
       </label>
       <div className="int-test">
-        <b>اختبار الاتصال</b>
-        <small className="muted">يستخدم القيم المكتوبة أعلاه كما هي، ولا يُحفظ منها شيء. مع اسم مستخدم وكلمة مرور يُجرَّب دخول ذلك الشخص نفسه.</small>
+        <b>اختبار الاتصال وعرض سمات مستخدم</b>
+        <small className="muted">يستخدم القيم المكتوبة أعلاه كما هي، ولا يُحفظ منها شيء. مع اسم مستخدم وكلمة مرور يُجرَّب دخول ذلك الشخص نفسه. «اعرض سمات المستخدم» يقرأ سجل الدليل كاملاً لذلك المستخدم ويبيّن أي سمة تحمل كل حقل، قبل الحفظ.</small>
         <div className="form-grid">
           <label className="field"><span>اسم مستخدم للتجربة (اختياري)</span><input dir="ltr" autoComplete="off" value={testLogin} onChange={(e) => setTestLogin(e.target.value)} /></label>
           <label className="field"><span>كلمة مروره</span><input type="password" dir="ltr" autoComplete="new-password" value={testPassword} onChange={(e) => setTestPassword(e.target.value)} /></label>
@@ -212,6 +228,9 @@ function DirectorySection({ live, onChanged }: { live: IntegrationStatus['direct
       <div className="flex" style={{ gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         <button className="button" disabled={busy || !!problem} onClick={() => act(async () => setTest(await api.testIntegrationDirectory(form, testLogin || undefined, testPassword || undefined)))}>
           اختبار الاتصال
+        </button>
+        <button className="button" disabled={busy || !!problem || !testLogin.trim()} data-testid="directory-inspect" title={!testLogin.trim() ? 'اكتب اسم مستخدم للتجربة أولاً' : undefined} onClick={() => { setConnected(null); act(async () => setInspect(await api.inspectIntegrationDirectory(form, testLogin || undefined, testPassword || undefined))); }}>
+          اعرض سمات المستخدم
         </button>
         <button className="button primary" disabled={busy || !!problem} onClick={() => act(async () => { setView(await api.saveIntegrationDirectory(form)); setForm({ ...form, bindPassword: '' }); onChanged(); }, 'حُفظت إعدادات الدليل المؤسسي وسرت فوراً')}>
           حفظ
@@ -229,6 +248,82 @@ function DirectorySection({ live, onChanged }: { live: IntegrationStatus['direct
         <div className={'note ' + (test.ok ? '' : 'red')} style={{ marginTop: 10 }} data-testid="directory-test-result">
           {test.message} ({test.elapsedMs} م.ث)
           {test.dn ? <div dir="ltr" className="micro">{test.dn}{test.displayName ? ' — ' + test.displayName : ''}</div> : null}
+        </div>
+      )}
+      {inspect && (
+        <div style={{ marginTop: 10 }} data-testid="directory-inspect-result">
+          <div className={'note ' + (inspect.ok ? '' : 'red')}>
+            {inspect.message}{inspect.ok ? ` (${inspect.elapsedMs} م.ث)` : ''}
+            {inspect.dn ? <div dir="ltr" className="micro">{inspect.dn}{inspect.displayName ? ' — ' + inspect.displayName : ''}</div> : null}
+          </div>
+          {inspect.ok && (
+            <>
+              <h3 className="int-inspect-h">المطابقة: الحقل في التطبيق ← سمة الدليل ← القيمة الفعلية</h3>
+              <div className="int-attr-scroll">
+                <table className="int-attr-table" data-testid="directory-inspect-map">
+                  <thead><tr><th>الحقل في التطبيق</th><th>سمة الدليل</th><th>القيمة الفعلية</th></tr></thead>
+                  <tbody>
+                    {inspectMap.map(([label, key]) => {
+                      const attrName = String(form[key] ?? '').trim();
+                      const found = attrName ? inspect.attributes.find((a) => a.name.toLowerCase() === attrName.toLowerCase()) : undefined;
+                      return (
+                        <tr key={label}>
+                          <td>{label}</td>
+                          <td dir="ltr">{attrName || <span className="muted">—</span>}</td>
+                          <td dir="ltr">{!attrName ? <span className="muted">غير محدد</span> : found ? found.values.join('، ') : <span className="muted">لا توجد سمة بهذا الاسم على السجل</span>}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <details className="int-more" style={{ marginTop: 8 }}>
+                <summary>كل السمات على السجل ({inspect.attributes.length})</summary>
+                <div className="int-attr-scroll">
+                  <table className="int-attr-table">
+                    <thead><tr><th>السمة</th><th>القيمة</th></tr></thead>
+                    <tbody>
+                      {inspect.attributes.map((a) => (
+                        <tr key={a.name}>
+                          <td dir="ltr">{a.name}{a.binary ? <span className="pill" style={{ marginInlineStart: 6 }}>ثنائي</span> : null}</td>
+                          <td dir="ltr">{a.values.join('، ')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+              <div className="int-connect">
+                <b>اربط هذا المستخدم بالتطبيق</b>
+                <small className="muted">
+                  تأكد أن المطابقة أعلاه صحيحة، ثم اربطه: يُنشأ سجل الشخص ورابط الهوية (فيُعرف دخوله)، ويُوضع في وحدته — بمطابقة معرّف الوحدة،
+                  وإلا باسم الوحدة (مطابقة عربية، وحدة واحدة فقط). لا تُمنح أي صلاحية. يكتب في قاعدة البيانات فعلياً.
+                </small>
+                <div className="flex" style={{ gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                  <button
+                    className="button primary"
+                    data-testid="directory-connect"
+                    disabled={busy || !testLogin.trim()}
+                    onClick={() => {
+                      if (!window.confirm('سيُنشأ سجل هذا المستخدم ويُربط ويُوضع في وحدته في قاعدة البيانات. متابعة؟')) return;
+                      act(async () => setConnected(await api.connectIntegrationDirectory(form, testLogin || undefined, testPassword || undefined)), undefined);
+                    }}
+                  >
+                    اربط بالتطبيق
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+          {connected && (
+            <div className={'note ' + (connected.matchedBy === 'ID' || connected.matchedBy === 'NAME' ? '' : 'red')} style={{ marginTop: 10 }} data-testid="directory-connect-result">
+              {connected.message}
+              <div dir="ltr" className="micro">
+                {connected.displayName}{connected.username ? ' · ' + connected.username : ''}{connected.employeeNumber ? ' · ' + connected.employeeNumber : ''}
+                {connected.unitName ? ' · ' + connected.unitName : ''}
+              </div>
+            </div>
+          )}
         </div>
       )}
       {showEnv && view && (

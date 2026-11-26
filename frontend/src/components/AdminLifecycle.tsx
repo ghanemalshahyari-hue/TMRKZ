@@ -35,12 +35,16 @@ export function AdminLifecycle() {
   const [password, setPassword] = useState('');
   const [needPassword, setNeedPassword] = useState(false);
   const [notice, setNotice] = useState('');
+  const [roles, setRoles] = useState<('SYSTEM_ADMIN' | 'DEVELOPER')[]>(['SYSTEM_ADMIN']);
+  const toggleRole = (r: 'SYSTEM_ADMIN' | 'DEVELOPER') =>
+    setRoles((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]));
+  const wantsDeveloper = roles.includes('DEVELOPER');
 
   const load = () => api.listAdministrators().then(setAdmins).catch((e: Error) => app.toast(e.message));
   useEffect(() => { void load(); }, []);
   useEffect(() => { if (adding && !options) api.adminLookupOptions().then(setOptions).catch(() => setOptions(null)); }, [adding]);
 
-  const reset = () => { setValue(''); setCandidate(null); setReason(''); setPassword(''); setNeedPassword(false); setNotice(''); };
+  const reset = () => { setValue(''); setCandidate(null); setReason(''); setPassword(''); setNeedPassword(false); setNotice(''); setRoles(['SYSTEM_ADMIN']); };
   const effectiveCount = admins.filter((a) => a.effective).length;
 
   const find = async () => {
@@ -65,14 +69,14 @@ export function AdminLifecycle() {
   };
 
   const grant = async () => {
-    if (!candidate || reason.trim().length < 3) return;
+    if (!candidate || reason.trim().length < 3 || roles.length === 0) return;
     setBusy(true);
     try {
-      await api.addAdministrator(candidate, reason.trim());
+      await api.addAdministrator(candidate, reason.trim(), roles);
       reset();
       setAdding(false);
       await load();
-      app.toast('مُنحت صلاحية مدير النظام (مسجلة في التدقيق)');
+      app.toast('مُنحت الصلاحية (مسجلة في التدقيق)');
     } catch (e) {
       app.toast((e as Error).message);
     } finally {
@@ -100,11 +104,12 @@ export function AdminLifecycle() {
   return (
     <section className="card padding" data-testid="admin-lifecycle" style={{ gridColumn: '1 / -1' }}>
       <div className="flex spread">
-        <h2>مديرو النظام</h2>
-        <button className="button small" onClick={() => { setAdding(!adding); reset(); }}>{adding ? 'إلغاء' : '＋ مدير جديد'}</button>
+        <h2>مديرو النظام والمطوّرون</h2>
+        <button className="button small" onClick={() => { setAdding(!adding); reset(); }}>{adding ? 'إلغاء' : '＋ منح صلاحية'}</button>
       </div>
       <p className="micro muted" style={{ margin: '6px 0 12px' }}>
-        صلاحية تهيئة النظام وإدارة الصلاحيات كاملة. يُعثر على الشخص بطريقة متحقق منها، وتُعرض هويته، ثم تُمنح بسبب مسجل في التدقيق.
+        يُعثر على الشخص بطريقة متحقق منها، وتُعرض هويته، ثم تُمنح بسبب مسجل في التدقيق. «مدير النظام»: تهيئة النظام وإدارة الصلاحيات.
+        «مطوّر النظام»: صلاحية كاملة على كل شيء، ولا يمنحها إلا مطوّر.
       </p>
 
       {adding && (
@@ -167,22 +172,41 @@ export function AdminLifecycle() {
                     : 'لم يدخل تمركز بعد: يُنشأ سجله عند التأكيد كما ينشئه دخوله الأول (مرتبطاً بمعرّفه الثابت في الدليل)، بلا أي صلاحية أخرى.'}
                 </p>
               )}
-              {candidate.alreadyAdmin ? (
-                <p className="micro">هذا الشخص مدير نظام بالفعل.</p>
-              ) : (
-                <>
-                  <input
-                    data-testid="admin-reason"
-                    placeholder="سبب المنح (يُسجل في التدقيق)"
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    style={{ width: '100%', marginTop: 8 }}
-                  />
-                  <button className="button primary" style={{ marginTop: 8 }} disabled={busy || reason.trim().length < 3} onClick={grant}>
-                    تأكيد منح صلاحية مدير النظام لهذا الشخص
-                  </button>
-                </>
+              <div className="flex" aria-label="الصلاحيات الممنوحة" style={{ gap: 16, marginTop: 10, flexWrap: 'wrap' }}>
+                <span className="micro muted">امنح:</span>
+                <label className="flex" style={{ gap: 6 }}>
+                  <input type="checkbox" checked={roles.includes('SYSTEM_ADMIN')} onChange={() => toggleRole('SYSTEM_ADMIN')} />
+                  مدير النظام
+                </label>
+                <label className="flex" style={{ gap: 6 }}>
+                  <input type="checkbox" data-testid="admin-role-developer" checked={roles.includes('DEVELOPER')} onChange={() => toggleRole('DEVELOPER')} />
+                  مطوّر النظام
+                </label>
+              </div>
+              {wantsDeveloper && (
+                <p className="micro" role="alert" style={{ color: 'var(--danger, #b42318)' }}>
+                  مطوّر النظام صلاحية كاملة على كل شيء (كل الصلاحيات في كل الوحدات)، ولا يمنحها إلا مطوّر. امنحها لمن يلزمه ذلك فقط.
+                </p>
               )}
+              {candidate.alreadyAdmin && roles.includes('SYSTEM_ADMIN') && (
+                <p className="micro muted">هذا الشخص مدير نظام بالفعل؛ لن تُكرَّر. يُضاف ما لا يملكه من الصلاحيات المختارة.</p>
+              )}
+              <input
+                data-testid="admin-reason"
+                placeholder="سبب المنح (يُسجل في التدقيق)"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                style={{ width: '100%', marginTop: 8 }}
+              />
+              <button className="button primary" style={{ marginTop: 8 }} disabled={busy || reason.trim().length < 3 || roles.length === 0} onClick={grant}>
+                {roles.length === 0
+                  ? 'اختر صلاحية واحدة على الأقل'
+                  : roles.length === 2
+                    ? 'تأكيد منح صلاحيتي مدير النظام ومطوّر النظام لهذا الشخص'
+                    : wantsDeveloper
+                      ? 'تأكيد منح صلاحية مطوّر النظام لهذا الشخص'
+                      : 'تأكيد منح صلاحية مدير النظام لهذا الشخص'}
+              </button>
             </div>
           )}
         </div>
@@ -194,6 +218,7 @@ export function AdminLifecycle() {
         <div key={a.personId} className="key-value" data-testid="admin-row" style={{ alignItems: 'center' }}>
           <span>
             <b>{a.displayName}</b>
+            {a.role === 'DEVELOPER' && <small className="muted" data-testid="admin-role-badge"> · مطوّر نظام</small>}
             {a.platform && <small className="muted"> · حساب منصة</small>}
             {!a.effective && <small> · غير فعّال (وحدته أو حسابه موقوف)</small>}
             <br />
@@ -217,7 +242,7 @@ export function AdminLifecycle() {
 
       {ending && (
         <div className="card padding" data-testid="admin-end" style={{ marginTop: 12 }}>
-          <p>سحب صلاحية مدير النظام عن <b>{ending.displayName}</b>؟</p>
+          <p>سحب صلاحية {ending.role === 'DEVELOPER' ? 'مطوّر النظام' : 'مدير النظام'} عن <b>{ending.displayName}</b>؟</p>
           <input placeholder="سبب السحب (يُسجل في التدقيق)" value={endReason} onChange={(e) => setEndReason(e.target.value)} style={{ width: '100%' }} />
           <div className="flex" style={{ gap: 8, marginTop: 8 }}>
             <button className="button danger" disabled={busy || endReason.trim().length < 3} onClick={end}>تأكيد السحب</button>

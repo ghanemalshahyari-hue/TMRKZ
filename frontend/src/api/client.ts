@@ -119,7 +119,7 @@ import type {
   Permission,
   Scope,
   RoutingLevelValue,
- IntegrationView, IntegrationStatus, DirectoryTestResult, OidcTestResult } from './types';
+ IntegrationView, IntegrationStatus, DirectoryTestResult, DirectoryInspectResult, DirectoryConnectResult, OidcTestResult } from './types';
 
 export const API_BASE = '/api/v1';
 
@@ -572,7 +572,7 @@ export type WorkspaceUnit = {
   myRights: string[];
 };
 export type AccessRightDef = { key: string; label: string; byDefault: boolean };
-export type Administrator = { personId: string; displayName: string; username: string; employeeNumber: string | null; grantedAt: string; grantedBy: string | null; platform: boolean; effective: boolean };
+export type Administrator = { personId: string; displayName: string; username: string; employeeNumber: string | null; grantedAt: string; grantedBy: string | null; platform: boolean; effective: boolean; role: 'SYSTEM_ADMIN' | 'DEVELOPER' };
 /** ADR-104: «مركز التحديث». */
 export type UpdateChange = {
   path: string; class: 'app' | 'config' | 'docs' | 'protected' | 'dev'; change: 'ADDED' | 'MODIFIED' | 'DELETED' | 'BLOCKED';
@@ -814,8 +814,8 @@ export const api = {
   applyImport: (id: string, fields: string[], reason: string) =>
     post<{ saved: string[]; fields: string[] }>(`/settings/integration/import/${id}/apply`, { fields, reason }),
   discardImport: (id: string) => del<void>(`/settings/integration/import/${id}`),
-  addAdministrator: (c: AdminCandidate, reason: string) =>
-    post<Administrator>('/administrators', { method: c.method, value: c.value, confirmation: c.confirmation, reason }),
+  addAdministrator: (c: AdminCandidate, reason: string, roles: ('SYSTEM_ADMIN' | 'DEVELOPER')[] = ['SYSTEM_ADMIN']) =>
+    post<Administrator>('/administrators', { method: c.method, value: c.value, confirmation: c.confirmation, reason, roles }),
   endAdministrator: (personId: string, reason: string) => post<void>(`/administrators/${personId}/end`, { reason }),
 
   // permissions studio (policy versions, scoped grants, explanations, OpenFGA sync)
@@ -1149,6 +1149,12 @@ export const api = {
   clearIntegrationDirectory: () => del<IntegrationView>('/settings/integration/directory'),
   testIntegrationDirectory: (form: DirectoryForm, testLogin?: string, testPassword?: string) =>
     post<DirectoryTestResult>('/settings/integration/directory/test', { settings: form, testLogin, testPassword }),
+  // «اعرض سمات مستخدم» (ADR-092 companion): the full directory record of one test user, to confirm the attribute mapping
+  inspectIntegrationDirectory: (form: DirectoryForm, testLogin?: string, testPassword?: string) =>
+    post<DirectoryInspectResult>('/settings/integration/directory/inspect', { settings: form, testLogin, testPassword }),
+  // «اربط بالتطبيق» (ADR-092 companion): create the person + identity link and place them in their unit (writes to the DB)
+  connectIntegrationDirectory: (form: DirectoryForm, testLogin?: string, testPassword?: string) =>
+    post<DirectoryConnectResult>('/settings/integration/directory/connect', { settings: form, testLogin, testPassword }),
   integrationOidc: () => get<IntegrationView>('/settings/integration/oidc'),
   saveIntegrationOidc: (form: OidcForm) => put<IntegrationView>('/settings/integration/oidc', form),
   clearIntegrationOidc: () => del<IntegrationView>('/settings/integration/oidc'),

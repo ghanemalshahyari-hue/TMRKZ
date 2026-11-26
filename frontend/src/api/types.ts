@@ -1004,6 +1004,9 @@ export type IntegrationView = {
 /** The live state of the integration sections (ADR-094): يعمل / غير متصل / غير مهيأ. */
 export type IntegrationStatus = { directory: { state: 'UP' | 'DOWN' | 'NOT_CONFIGURED'; message: string; url?: string }; oidc: { state: 'UP' | 'DOWN' | 'NOT_CONFIGURED'; message: string; issuer?: string }; checkedAt: string };
 export type DirectoryTestResult = { ok: boolean; step: string; message: string; dn?: string | null; displayName?: string | null; url: string; direct: boolean; elapsedMs: number };
+export type DirectoryInspectAttr = { name: string; values: string[]; binary: boolean };
+export type DirectoryInspectResult = { ok: boolean; step: string; message: string; dn?: string | null; displayName?: string | null; attributes: DirectoryInspectAttr[]; url: string; elapsedMs: number };
+export type DirectoryConnectResult = { ok: boolean; message: string; personId?: string | null; displayName?: string | null; employeeNumber?: string | null; username?: string | null; unitName?: string | null; matchedBy: 'ID' | 'NAME' | 'AMBIGUOUS' | 'NONE' };
 export type OidcTestResult = { ok: boolean; step: string; message: string; issuer: string; statedIssuer?: string | null; keys?: number | null; redirectUri: string; elapsedMs: number };
 /** ADR-056 + ADR-092 (owner, 20 Nov 2026): the AI model of «المساعد الذكي» as it comes from the settings endpoint. */
 export type AssistantView = {

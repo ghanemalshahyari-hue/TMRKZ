@@ -50,12 +50,13 @@ import ae.mover.security.OidcProperties;
 public class AdministratorService {
 
     public static final String ROLE = "SYSTEM_ADMIN";
+    public static final String DEVELOPER_ROLE = "DEVELOPER";
     public static final String EMPLOYEE_NUMBER = "EMPLOYEE_NUMBER";
     public static final String DIRECTORY_ACCOUNT = "DIRECTORY_ACCOUNT";
     private static final long LOCK_KEY = 0x544d524b5a41L; // "TMRKZA"
 
     public record AdminView(String personId, String displayName, String username, String employeeNumber, String grantedAt,
-                            String grantedBy, boolean platform, boolean effective) {
+                            String grantedBy, boolean platform, boolean effective, String role) {
     }
 
     public record ResolveInput(String method, String value, String directoryPassword) {
@@ -70,7 +71,19 @@ public class AdministratorService {
         }
     }
 
-    public record AddInput(String method, String value, String confirmation, String reason) {
+    /**
+     * {@code roles}: one or both of SYSTEM_ADMIN and DEVELOPER (falls back to {@code role}, else SYSTEM_ADMIN). Granting DEVELOPER
+     * (a full superuser) needs the actor to be a developer.
+     */
+    public record AddInput(String method, String value, String confirmation, String reason, String role, List<String> roles) {
+
+        public AddInput(String method, String value, String confirmation, String reason) {
+            this(method, value, confirmation, reason, null, null);
+        }
+
+        public AddInput(String method, String value, String confirmation, String reason, String role) {
+            this(method, value, confirmation, reason, role, null);
+        }
     }
 
     public record EndInput(String reason) {
@@ -174,28 +187,69 @@ public class AdministratorService {
         }
     }
 
+    /** The roles to grant: a de-duplicated subset of {SYSTEM_ADMIN, DEVELOPER} (from {@code roles}, else {@code role}, else SYSTEM_ADMIN). */
+    private static List<String> rolesOf(AddInput in) {
+        List<String> raw = in != null && in.roles() != null && !in.roles().isEmpty()
+                ? in.roles()
+                : List.of(in == null || in.role() == null || in.role().isBlank() ? ROLE : in.role().trim());
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<>();
+        for (String r : raw) {
+            String t = r == null ? "" : r.trim();
+            if (!ROLE.equals(t) && !DEVELOPER_ROLE.equals(t)) {
+                throw ApiException.validation("دور غير معروف: اختر مدير النظام أو مطوّر النظام.");
+            }
+            set.add(t);
+        }
+        if (set.isEmpty()) {
+            set.add(ROLE);
+        }
+        return List.copyOf(set);
+    }
+
+    /** A developer holds every permission in every unit; only such an actor may grant the developer role (no self-escalation from admin). */
+    private static boolean isDeveloper(AccessContext ctx) {
+        for (Permission p : Permission.values()) {
+            if (!ctx.canEverywhere(p)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** The person already holds {@code role} by a current grant. */
+    private boolean holdsRole(UUID person, String role) {
+        return jdbc.sql("select count(*) from membership where person_id = :p and role_code = :r"
+                + " and valid_from <= clock_timestamp() and (valid_to is null or valid_to > clock_timestamp())")
+                .param("p", person).param("r", role).query(Integer.class).single() > 0;
+    }
+
     /** A current system administrator grant of membership {@code m} (leading space: text blocks drop the trailing one before it). */
     private static final String CURRENT = " m.role_code = 'SYSTEM_ADMIN' and m.valid_from <= clock_timestamp() and (m.valid_to is null or m.valid_to > clock_timestamp())";
+    /** A current administrator-type grant — system administrator or developer: both are listed and ended through this facility (ADR-108). */
+    private static final String CURRENT_ADMIN = " m.role_code in ('SYSTEM_ADMIN', 'DEVELOPER') and m.valid_from <= clock_timestamp() and (m.valid_to is null or m.valid_to > clock_timestamp())";
 
     public List<AdminView> list(AccessContext ctx) {
         ctx.require(Permission.CONFIGURE);
         Map<String, AdminView> out = new LinkedHashMap<>();
         jdbc.sql("""
-                select m.person_id, p.display_name, p.username, p.employee_no, m.valid_from, g.display_name as granted_by,
+                select m.person_id, p.display_name, p.username, p.employee_no, m.valid_from, m.role_code, g.display_name as granted_by,
                        p.employee_no like 'PLATFORM-%' as platform,
                        o.status = 'ACTIVE' and not p.access_disabled as effective
                 from membership m
                 join person p on p.id = m.person_id and p.status = 'ACTIVE'
                 join organization o on o.id = m.organization_id
                 left join person g on g.id = m.granted_by
-                where """ + CURRENT + " order by m.valid_from")
+                where """ + CURRENT_ADMIN + " order by m.valid_from")
                 .query((rs, n) -> {
                     String id = rs.getString("person_id");
                     AdminView prior = out.get(id);
                     boolean effective = rs.getBoolean("effective") || prior != null && prior.effective();
+                    // a person holding both roles is shown as the higher one (developer)
+                    String role = DEVELOPER_ROLE.equals(rs.getString("role_code")) || (prior != null && DEVELOPER_ROLE.equals(prior.role()))
+                            ? DEVELOPER_ROLE : ROLE;
                     out.put(id, new AdminView(id, rs.getString("display_name"), rs.getString("username"), rs.getString("employee_no"),
                             prior != null ? prior.grantedAt() : Db.toInstant(rs.getTimestamp("valid_from")).toString(),
-                            prior != null ? prior.grantedBy() : rs.getString("granted_by"), rs.getBoolean("platform"), effective));
+                            prior != null ? prior.grantedBy() : rs.getString("granted_by"), rs.getBoolean("platform"), effective, role));
                     return null;
                 }).list();
         return List.copyOf(out.values());
@@ -384,32 +438,44 @@ public class AdministratorService {
     @Transactional
     public AdminView add(AccessContext ctx, AddInput in) {
         requireGlobal(ctx);
+        List<String> roles = rolesOf(in);
+        boolean dev = roles.contains(DEVELOPER_ROLE);
+        if (dev && !isDeveloper(ctx)) {
+            throw ApiException.forbidden("يمنح صلاحية مطوّر النظام مطوّرٌ فقط (من يملك كل الصلاحيات في كل الوحدات)؛ لا يمنحها مدير النظام.");
+        }
         String reason = in == null || in.reason() == null ? "" : in.reason().trim();
         if (reason.length() < 3) {
-            throw ApiException.validation("اذكر سبب منح صلاحية مدير النظام.");
+            throw ApiException.validation(dev ? "اذكر سبب منح الصلاحية (مطوّر النظام)." : "اذكر سبب منح صلاحية مدير النظام.");
         }
         lock();
         Resolved r = resolved(ctx, in.method(), in.value(), null, in.confirmation());
         if (in.confirmation() == null || !in.confirmation().equals(r.candidate().confirmation())) {
             throw new ApiException(ErrorCode.STALE_REVISION, "لم تُؤكد هذه الهوية كما عُرضت أو تغيرت بياناتها منذ العرض؛ اعرضها وأكدها من جديد.");
         }
-        if (r.candidate().alreadyAdmin()) {
-            throw ApiException.validation("هذا الشخص مدير نظام بالفعل.");
-        }
         UUID person = r.person() != null ? r.person() : r.entry() != null ? fromDirectory(r.entry()) : hrPeople.importOne(r.hr(), ctx.actor(),
                 "ADMINISTRATOR", null);
+        List<String> toGrant = roles.stream().filter(role -> !holdsRole(person, role)).toList();
+        if (toGrant.isEmpty()) {
+            throw ApiException.validation(roles.size() > 1 ? "هذا الشخص يملك هاتين الصلاحيتين بالفعل."
+                    : dev ? "هذا الشخص مطوّر نظام بالفعل." : "هذا الشخص مدير نظام بالفعل.");
+        }
         pending.remove(in.confirmation());
         UUID anchor = anchor();
-        Map<String, Object> made = grants.create(ctx, new GrantAdminService.GrantInput(person.toString(), anchor.toString(), ROLE,
-                "مدير نظام", null, null, null, null));
-        Map<String, Object> detail = new LinkedHashMap<>();
-        detail.put("method", r.candidate().method());
-        detail.put("verifiedBy", r.candidate().verifiedBy());
-        detail.put("key", r.candidate().value());
-        detail.put("membershipId", made.get("id"));
-        detail.put("importedFromHr", r.person() == null && r.hr() != null);
-        detail.put("createdFromDirectory", r.entry() != null);
-        audit.recordAs(ctx.actor(), "ADMIN_GRANTED", "PERSON", person.toString(), r.candidate().displayName(), detail, reason);
+        for (String role : toGrant) {
+            boolean roleDev = DEVELOPER_ROLE.equals(role);
+            Map<String, Object> made = grants.create(ctx, new GrantAdminService.GrantInput(person.toString(), anchor.toString(), role,
+                    roleDev ? "مطوّر نظام" : "مدير نظام", null, null, null, null));
+            Map<String, Object> detail = new LinkedHashMap<>();
+            detail.put("role", role);
+            detail.put("method", r.candidate().method());
+            detail.put("verifiedBy", r.candidate().verifiedBy());
+            detail.put("key", r.candidate().value());
+            detail.put("membershipId", made.get("id"));
+            detail.put("importedFromHr", r.person() == null && r.hr() != null);
+            detail.put("createdFromDirectory", r.entry() != null);
+            audit.recordAs(ctx.actor(), roleDev ? "DEVELOPER_GRANTED" : "ADMIN_GRANTED", "PERSON", person.toString(),
+                    r.candidate().displayName(), detail, reason);
+        }
         return list(ctx).stream().filter(a -> a.personId().equals(person.toString())).findFirst()
                 .orElseThrow(() -> new IllegalStateException("administrator just granted is not listed"));
     }
@@ -430,10 +496,10 @@ public class AdministratorService {
             throw ApiException.forbidden("هذا حساب منصة دائم؛ صلاحياته من إعدادات التثبيت لا من هنا.");
         }
         lock();
-        List<UUID> ids = jdbc.sql("select m.id from membership m where m.person_id = :p and " + CURRENT).param("p", person)
+        List<UUID> ids = jdbc.sql("select m.id from membership m where m.person_id = :p and " + CURRENT_ADMIN).param("p", person)
                 .query(UUID.class).list();
         if (ids.isEmpty()) {
-            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "هذا الشخص ليس مدير نظام حالياً.");
+            throw new ApiException(ErrorCode.RESOURCE_NOT_FOUND, "هذا الشخص ليس مدير نظام ولا مطوّر نظام حالياً.");
         }
         long others = jdbc.sql("""
                 select count(distinct m.person_id) from membership m
