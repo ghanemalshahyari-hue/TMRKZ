@@ -1611,3 +1611,12 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
   frontend 421/421 with `signOut.test.ts`, type check clean (`docs/evidence/signout-direct-20261127/`).
 - **Open:** not run against the owner's own Keycloak or on the VM; the post-logout redirect settings are now unused by sign-out
   (kept for existing `.env` files).
+
+## USB refreshed with release 20261127-071808-100f51d (27 Nov 2026; owner)
+- **Delivered:** `F:\TMRKZ_FINAL_20261127_2de0978` (the rename to …_100f51d was refused while the folder was open in Windows; its
+  START_HERE names the new release) carries the signed release 20261127-071808-100f51d (commit 100f51d, no local changes: adds
+  ADR-109 sign-out) in `2_FIRST_BROWSER_UPDATE\TMRKZ`, the hand-copy `TMRKZ`, the complete package of `1_VM_FORCE_RELEASE` (850
+  files) and `1_VM_BOOTSTRAP`. Images unchanged (no Dockerfile, pom or package file changed).
+- **Checks:** each copy matches the signed list (0 mismatches); `force.sh check` on a copy of 9c280bf: checksums OK, signature OK,
+  replace 34 / add 9 / remove 0; USB: TMRKZ 1832, MOVER 1455, DUTY 150 files, all OK.
+- **Open:** not run on the real VMs.
