@@ -1592,3 +1592,11 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
   type check clean; all files of the three USB folders match their `SHA256SUMS.txt` (TMRKZ 1828, MOVER 50, DUTY 150).
 - **Open:** not run on the real VMs. The owner's notes DUTY.txt, TMRKZ.txt, TNQ_V1.txt and the root «New Text Document.txt» left the
   USB root on 27 Nov ~08:25 (not by either session); the USB's Recycle Bin is empty.
+
+## USB refreshed with release 20261127-051513-2de0978 (27 Nov 2026; owner)
+- **Delivered:** the TMRKZ folder is now `F:\TMRKZ_FINAL_20261127_2de0978` and carries the signed release 20261127-051513-2de0978
+  (commit 2de0978, no local changes: adds the home page inbox fix) in `2_FIRST_BROWSER_UPDATE\TMRKZ`, the hand-copy `TMRKZ`, the
+  complete package of `1_VM_FORCE_RELEASE` (848 files) and `1_VM_BOOTSTRAP`; its texts name the new release. Images unchanged.
+- **Checks:** each copy matches the signed list (0 mismatches); the complete package's 848 files match it; `force.sh check` on a copy
+  of 9c280bf: checksums OK, signature OK, replace 32 / add 7 / remove 0; USB: TMRKZ 1828, MOVER 50, DUTY 150 files, all OK.
+- **Open:** not run on the real VMs.
