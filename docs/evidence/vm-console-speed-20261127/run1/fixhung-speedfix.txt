@@ -1,0 +1,7 @@
+MOVER helper 2026-11-27 on c289afc6e602 - speedfix - 2026-11-27 04:51
+web now: /health 2201 ms (http 200x3), worker-connections one-process
+fixing: web is stuck (its bare check takes 2201 ms) - recreating web from compose.yaml + compose.override.yaml ...
+ Container mover-web-1  Started
+web: healthy
+web after: /health 0 ms (http 200x5), worker-connections one-process
+FIXED

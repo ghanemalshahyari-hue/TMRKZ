@@ -1,0 +1,26 @@
+PASS  H sends the helpers from 0_UPDATE_TOOL\vm-tools
+PASS  helper is on the VM
+PASS  P menu entry shown for MOVER
+PASS  P times the app from this PC (curl.exe)
+PASS  P reports where it saved the report
+PASS  report saved on the kit: REPORTS/MOVER_SPEED_20261127-0907.txt
+PASS  report has the PC section with numbers
+PASS  report names the stall first
+PASS  report shows web eats CPU
+PASS  the PC timing scratch file is removed
+PASS  W names what it fixes
+PASS  W reports FIXED
+PASS  after W the report no longer finds the stall
+PASS  stall gone from the verdict
+PASS  2 checks the update folder and returns
+PASS  I checks for the release and returns
+PASS  F checks for the release and returns
+PASS  4 asks and cancels
+PASS  6 runs MOVER's status
+PASS  1 shows MOVER's status
+PASS  DUTY 2 checks the bundle and returns
+PASS  DUTY 4 asks and cancels
+PASS  P is MOVER-only
+PASS  no cmd.exe error in any console run
+
+== result: 24 passed, 0 failed

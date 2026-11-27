@@ -1,0 +1,44 @@
+lrwxrwxrwx 1 root root 4 Feb  4  2025 /bin/sh -> dash
+syntax ok (dash)
+PASS  healthy: runs to the end
+PASS  healthy: PC timings read
+PASS  healthy: names MOVER containers
+PASS  healthy: says nothing is slow
+PASS  healthy: no cause invented
+PASS  healthy: page profile off is explained
+PASS  healthy: database file listed
+PASS  healthy: TLS proxy timed
+PASS  healthy: exit 0
+PASS  stall: names the connection-limit stall first
+PASS  stall: points to the fix
+PASS  stall: shows gunicorn settings
+PASS  cpu: names the full CPU first
+PASS  cpu: names the biggest user
+PASS  steal: names VMware steal
+PASS  disk: names disk wait
+PASS  readiness: names the slow readiness/database check
+PASS  network: names the network between PC and server
+PASS  proxy: names the slow TLS proxy
+PASS  hung: names stuck web threads
+PASS  logs: route table: queue-heavy page
+PASS  logs: route table: SQL-heavy page
+PASS  logs: counts «server busy» refusals
+PASS  logs: counts «database is locked»
+PASS  logs: names the slowest page
+PASS  logs: counts errors
+PASS  logs: counts 5xx
+PASS  logs: names restarts
+PASS  logs: never prints a log line
+PASS  logs: never prints a client address
+PASS  fixstall: names what it fixes
+PASS  fixstall: recreates web
+PASS  fixstall: reports FIXED
+PASS  fixstall: web recreated from both compose files (no -f)
+PASS  fixhung: finds web stuck
+PASS  fixhung: reports FIXED after restart
+PASS  fixnothing: changes nothing when web is fine
+PASS  fixnothing: web left alone
+PASS  webdown: says web is not running
+PASS  webdown: exit 1
+
+== result: 40 passed, 0 failed

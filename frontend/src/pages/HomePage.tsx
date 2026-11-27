@@ -87,7 +87,9 @@ export function HomePage() {
     api.notifications().then(setNotes).catch(() => setNotes([]));
     if (role.isReviewer || role.isFinal || role.isOperations) api.tasks().then(setTasks).catch(() => setTasks([]));
     else setTasks([]);
-    if (role.isAccess) api.accessInbox().then(setInbox).catch(() => setInbox([]));
+    // the inbox answers a decision-maker only (REVIEW, AccessRequestService.inbox): an access manager without it got a 403 on
+    // every home page (the VM's browser console, 27 Nov 2026)
+    if (role.isAccess && role.isReviewer) api.accessInbox().then(setInbox).catch(() => setInbox([]));
     else setInbox([]);
     if (role.isRequester && !role.isConfig) api.requestOverview('MY_TURN').then(setMine).catch(() => setMine([]));
     else setMine([]);

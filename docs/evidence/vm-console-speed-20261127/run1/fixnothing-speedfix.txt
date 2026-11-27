@@ -1,0 +1,5 @@
+MOVER helper 2026-11-27 on c289afc6e602 - speedfix - 2026-11-27 04:51
+web now: /health 1 ms (http 200x3), worker-connections one-process
+
+NOTHING TO FIX in web: it answers its bare check in 1 ms and its settings are right.
+For the cause of the slowness run the speed report (menu P).

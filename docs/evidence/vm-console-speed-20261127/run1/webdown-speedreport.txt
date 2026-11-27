@@ -1,0 +1,2 @@
+MOVER helper 2026-11-27 on c289afc6e602 - speedreport - 2026-11-27 04:51
+web is not running here (no published port 5006): start it first (menu 3).

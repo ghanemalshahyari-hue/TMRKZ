@@ -1572,3 +1572,23 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
   on a copy of 9c280bf: package checksums OK, release signature OK, plan replace 31 / add 7 / remove 0; this PC's backend and web
   build compiled this code with the same three image IDs as the USB; all 1803 USB files match `SHA256SUMS.txt`.
 - **Open:** not run on the real VM; the VM simulation was not re-run for this release (no image or start change since ADR-107).
+
+## USB: one folder per app, Mac packaging fixed, the shared VM console repaired, MOVER speed report (27 Nov 2026; owner)
+- **USB:** `F:\TMRKZ_FINAL_20261127_34fa0d8` (renamed: it carries release 20261127-040505-34fa0d8), `F:\MOVER_FINAL_20261126_d27e5fe7`,
+  `F:\DUTY_FINAL_20261126_3f9d898`. The two packages named MOVER_UPDATE_20261126 / MOVER_CONSOLE_HEIGHT_FIX_20261126 were TMRKZ code
+  already in the release (the console-height app.css is older than the release's): moved into the TMRKZ folder's
+  `9_SUPERSEDED_DO_NOT_APPLY`. The owner's TMRKZ VM logs are in its `5_VM_NOTES`. Mac AppleDouble («._») files removed.
+- **Mac packaging:** DUTY's and MOVER's full release archives held a «._» file beside every file (907 / 1532), Mac xattr headers
+  and the Mac account (uid 501) as owner, extracted as root into the app folder by `release-tool.sh apply`. DUTY's is repacked:
+  exactly its 875 signed files, root-owned, no entry for the folder itself, signature still verifies. MOVER's was rebuilt clean by
+  the MOVER session (code under `source/`).
+- **Shared console `VM_CONSOLE.cmd`** (MOVER and DUTY kits): H, 2, I and F stopped cmd.exe (brackets inside `if ( … )` messages);
+  H and 2 looked for the helpers in the wrong folder; TMRKZ shortcuts named the old folder. Fixed. New for MOVER: **P** speed report
+  (PC + every layer on the VM, CPU/steal/memory/disk per container, errors/timeouts/refusals, slowest routes when
+  MOVER_PAGE_PROFILE=1, VERDICT; saved on the USB in `REPORTS\`) and **W** speed fix (stall or stuck web), in `mover-vm.sh`.
+- **TMRKZ:** the home page asked for the access-request inbox with MANAGE_ACCESS alone; the server answers REVIEW only, so an
+  access manager got a 403 on every home page (the VM's browser console). Now asked only with both (`HomePage.tsx`). Uncommitted.
+- **Checks:** stand-in VM 40/40 and the real console on Windows 24/24 (`docs/evidence/vm-console-speed-20261127/`); frontend 418/418,
+  type check clean; all files of the three USB folders match their `SHA256SUMS.txt` (TMRKZ 1828, MOVER 50, DUTY 150).
+- **Open:** not run on the real VMs. The owner's notes DUTY.txt, TMRKZ.txt, TNQ_V1.txt and the root «New Text Document.txt» left the
+  USB root on 27 Nov ~08:25 (not by either session); the USB's Recycle Bin is empty.

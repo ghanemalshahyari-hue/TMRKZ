@@ -1,0 +1,50 @@
+MOVER helper 2026-11-27 on 4f2d80d9565b - speedreport - 2026-11-27 05:07
+Read only: nothing is changed. About one minute; run it while people find MOVER slow.
+Timings, counts and settings only - no names, no log lines, no page contents.
+
+== 1. from your PC (as people see it)
+  /health (the bare check)                            8 ms  (first byte 7 ms)
+  sign-in page                                        8 ms  (slowest 8 ms; http 200x12)
+
+== 2. inside the server (median of several tries; slowest in brackets)
+  app, bare check /health                             1 ms  (1 ms; http 200x7)
+  app, readiness /health/ready (db + services)        0 ms  (1 ms; http 200x5)
+  app, sign-in page /login                            0 ms  (1 ms; http 200x5)
+  through the TLS proxy, /health                      3 ms  (3 ms; http 200x7)
+  through the TLS proxy, sign-in page                 3 ms  (3 ms; http 200x5)
+  download inside the server: 2253 Mbit/s
+
+== 3. the server (32 CPUs)
+  CPU over 2 s: busy 0% (programs 0%, system 0%); waiting for the disk 0%; taken by the VMware host (steal) 0%
+  load average: 0.45 0.49 0.52 (above 32 means more work than CPUs)
+  memory: 12241 MB available of 15841 MB; swap in use: 1188 MB
+  disk holding /srv/mover: 14% used, 843618 MB free
+
+== 4. containers (CPU 100% = one whole CPU; 3 samples)
+    340%  mover-web-1                          memory 22.0%  MOVER web
+      4%  mover-old-sync-1                     memory 3.0%  MOVER old-sync
+      1%  mover-proxy-1                        memory 0.4%  MOVER proxy
+  web          running, health healthy, restarts 0
+  proxy        running, health healthy, restarts 0
+  old-sync     running, health healthy, restarts 0
+
+== 5. web's settings
+  gunicorn: 4 processes x 128 threads, worker-connections 128
+  at most 3 requests run at once per process (TNQL_WEB_ACTIVE_REQUESTS); the rest wait in a queue
+  settings: TNQL_WEB_ACTIVE_REQUESTS=3 TNQL_WEB_CONNECTION_LIMIT=16 TNQL_WEB_PROCESSES=4 
+  compose.override.yaml: present
+
+== 6. the last 60 minutes (counts only)
+  web: errors (Tracebacks) 0, server errors (5xx answers) 0, «server busy» refusals 0, worker timeouts 0,
+       workers started 0, «database is locked» 0, «all threads busy» warnings 0
+  old-sync: errors (Tracebacks) 0
+
+== 7. the slowest pages (MOVER_PAGE_PROFILE: route, times, where the time goes; average ms)
+  no page timings: MOVER_PAGE_PROFILE is not 1 for web, so the report cannot name slow pages.
+  (The layers above still show where the time goes. To name pages: set MOVER_PAGE_PROFILE=1 for web for a
+   while, use the app as usual, run this report again, then set it back.)
+
+== 8. databases (files over 1 MB)
+
+== VERDICT (the most likely cause first)
+  1. CAUSE: memory is short (12241 MB available of 15841 MB, swap in use 1188 MB).

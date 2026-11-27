@@ -1,0 +1,56 @@
+MOVER helper 2026-11-27 on c289afc6e602 - speedreport - 2026-11-27 04:51
+Read only: nothing is changed. About one minute; run it while people find MOVER slow.
+Timings, counts and settings only - no names, no log lines, no page contents.
+
+== 1. from your PC (as people see it)
+  not measured: run the report from VM_CONSOLE.cmd (menu P), which times the app from the PC first
+
+== 2. inside the server (median of several tries; slowest in brackets)
+  app, bare check /health                             0 ms  (1 ms; http 200x7)
+  app, readiness /health/ready (db + services)        1 ms  (1 ms; http 200x5)
+  app, sign-in page /login                            1 ms  (1 ms; http 200x5)
+  through the TLS proxy, /health                      3 ms  (3 ms; http 200x7)
+  through the TLS proxy, sign-in page                 3 ms  (3 ms; http 200x5)
+  download inside the server: 2065 Mbit/s
+
+== 3. the server (32 CPUs)
+  CPU over 1 s: busy 10% (programs 10%, system 0%); waiting for the disk 0%; taken by the VMware host (steal) 0%
+  load average: 0.50 0.40 0.30 (above 32 means more work than CPUs)
+  memory: 8789 MB available of 15625 MB; swap in use: 0 MB
+  disk holding /srv/mover: 14% used, 843615 MB free
+
+== 4. containers (CPU 100% = one whole CPU; 3 samples)
+     12%  mover-web-1                          memory 8.1%  MOVER web
+      4%  mover-old-sync-1                     memory 3.0%  MOVER old-sync
+      3%  tnql-app                             memory 5.0%  (not MOVER)
+      1%  mover-proxy-1                        memory 0.4%  MOVER proxy
+  web          running, health healthy, restarts 2
+  proxy        running, health healthy, restarts 0
+  old-sync     running, health healthy, restarts 0
+
+== 5. web's settings
+  waitress: one process, 128 threads
+  at most 3 requests run at once per process (TNQL_WEB_ACTIVE_REQUESTS); the rest wait in a queue
+  settings: TNQL_WEB_ACTIVE_REQUESTS=3 TNQL_WEB_CONNECTION_LIMIT=512 TNQL_WEB_PROCESSES=4 
+  compose.override.yaml: present
+
+== 6. the last 60 minutes (counts only)
+  web: errors (Tracebacks) 1, server errors (5xx answers) 1, «server busy» refusals 2, worker timeouts 0,
+       workers started 0, «database is locked» 1, «all threads busy» warnings 0
+  old-sync: errors (Tracebacks) 0
+
+== 7. the slowest pages (MOVER_PAGE_PROFILE: route, times, where the time goes; average ms)
+      avg times slowest |  queue    sql openfga  templ  wlock   code | route - mostly
+     3300     6    3300 |   2400    150     30    200      0    520 | GET /center - mostly waiting for a free slot (queue)
+     1305     3    1305 |      5   1100     10     80      0    110 | GET /requests/<int:request_id> - mostly database (SQL)
+
+== 8. databases (files over 1 MB)
+  3 MB  data/transport_requests.db
+
+== VERDICT (the most likely cause first)
+  1. CAUSE: web refused 2 requests in the last hour with «server busy» (its queue was full or a request waited 30 s): more work arrives than 1 process(es) x 3 running request(s) can take.
+  2. CAUSE: 1 writes failed with «database is locked»: writers queue for SQLite's single write lock.
+  3. the slowest page: GET /center - mostly waiting for a free slot (queue), 3300 ms on average (6 times in the hour).
+  4. web logged 1 errors (Tracebacks) in the last hour.
+  5. 1 answers in the last hour were server errors (5xx).
+  6. containers that restarted since they were created: web (2).
