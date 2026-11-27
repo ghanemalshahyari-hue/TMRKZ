@@ -33,7 +33,8 @@ _embedding_poll() {
       if nginx -t >/dev/null 2>&1; then nginx -s reload 2>/dev/null && _conf="$_now" && echo "[map-worker] nginx configuration reloaded"
       else echo "[map-worker] nginx configuration changed but does not pass nginx -t: the running one is kept"; _conf="$_now"; fi
     fi
-    _fa="$(wget -qO- --timeout=3 http://backend:8080/api/v1/system/embedding/csp 2>/dev/null || true)"
+    # a backend that does not answer (restarting, still building) keeps the sites already allowed, it does not turn them off
+    _fa="$(wget -qO- --timeout=3 http://backend:8080/api/v1/system/embedding/csp 2>/dev/null)" || continue
     if [ -n "$_fa" ] && [ "$_fa" != "'none'" ]; then
       _new="'self' $_fa"
     else

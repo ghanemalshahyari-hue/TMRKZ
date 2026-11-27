@@ -31,6 +31,7 @@ import { clearDesktopUser, startDesktopNotifications } from './lib/desktopNotifi
 import { LAST_VIEW_KEY } from './lib/support';
 import { setGrantFacts, setSupportSeat } from './lib/navigation';
 import { setSiteSetupRule } from './lib/stationingHub';
+import { pageName, tabTitle } from './lib/title';
 import { SupportConsolePage } from './pages/SupportConsolePage';
 import { SupportPage } from './pages/SupportPage';
 import { FloatingAssist } from './components/assist/FloatingAssist';
@@ -274,6 +275,13 @@ function Workspace({ me, setMe }: { me: Me; setMe: (m: Me | null) => void }) {
     [can, me.summaryOnly, noAccess],
   );
   const more = useMemo(() => (noAccess ? [] : moreNav(can, me.summaryOnly)), [can, me.summaryOnly, noAccess]);
+  // the tab names the page on screen; the two request ways share a view, so the address is read again when it changes
+  useEffect(() => {
+    const name = () => (document.title = tabTitle(pageName(shownView, links, location.hash)));
+    name();
+    window.addEventListener('hashchange', name);
+    return () => window.removeEventListener('hashchange', name);
+  }, [shownView, links]);
   // Owner, 20 Nov 2026: the global «＋ إنشاء» button is removed from the top bar. The three way tabs on top handle their
   // requests; other requests (SITE_REGISTRATION, ACCESS) open through «المزيد → طلب جديد / طلب صلاحية» and context actions.
   const create: { id: string; label: string; href: string; icon: string }[] = [];

@@ -3169,3 +3169,32 @@ restart without a reload. `docs/evidence/vm-sim-adr107/`.
 
 **Not done.** Nothing has run on the real VM. Whether PAM allows a command with `ssh -t` (the connector's menu) is unknown there;
 the same steps by hand are in `0_COMMANDS.txt` of the USB.
+
+## ADR-108 A TMRKZ framed by an allowed site stays signed in (27 Nov 2026)
+
+**Problem (owner, 27 Nov).** After a site was added to «التضمين في مواقع أخرى», TMRKZ inside that site's frame lost its pages:
+the automatic sign-in showed the browser's empty "blocked" page, and the manual sign-in returned to the sign-in page every time,
+leaving every page empty. Reproduced in Edge with a stand-in https portal framing this PC's TMRKZ.
+
+**Causes.** (1) The session cookie was `SameSite=Strict` and the OIDC binding cookie `Lax`: inside another site's frame the browser
+keeps and sends only `SameSite=None` cookies, so no framed sign-in could hold. (2) Keycloak's sign-in pages send
+`frame-ancestors 'self'` and `X-Frame-Options: SAMEORIGIN`, so they could not be framed by the allowed site. (3) The web container's
+poller treated a backend that did not answer (restarting, still building) as "no allowed site" and turned framing off until the
+backend answered again.
+
+**Decision.**
+- `AuthController.sameSite`: every sign-in cookie (session and OIDC binding) is `SameSite=None` while the allowlist names a site
+  AND cookies are Secure (`TMRKZ_SECURE_COOKIE=true`, i.e. https, `ops/tls/enable.sh`); otherwise Strict/Lax as before. Writes
+  stay protected by `X-Requested-With: mover` (SessionFilter), which another site cannot send (no CORS is granted).
+- `frontend/nginx.conf`: with an allowed site, `X-Frame-Options` is left out (it cannot name a site); Keycloak's frame headers are
+  replaced by the same policy with the allowlist as ancestors (`frame-src 'self'; frame-ancestors …; object-src 'none'`). With no
+  allowed site every header is as before (DENY for TMRKZ, `'self'`/SAMEORIGIN for Keycloak).
+- `ops/local/map-worker.sh`: an unanswered poll keeps the sites already allowed.
+
+**Limit.** Over plain http a framed sign-in cannot hold (a `SameSite=None` cookie must be Secure, and an https portal may not frame
+an http page): embedding needs TMRKZ on https.
+
+**Evidence.** Edge, portal `https://localhost:9443` framing TMRKZ: before, the automatic path showed the blocked page and the manual
+path came back to the sign-in page with no cookie stored; after, Keycloak's page opens in the frame and the manual sign-in shows the
+home page (cookie `SameSite=None; Secure`). `EmbeddedSignInIT` 1/1 and `EnterpriseSignInIT` 9/9. Framing kept through 45 s with
+the backend stopped.

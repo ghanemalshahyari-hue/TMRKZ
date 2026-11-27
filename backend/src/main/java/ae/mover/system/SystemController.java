@@ -350,7 +350,7 @@ public class SystemController {
             m.put("tlsConfigured", false);
         }
 
-        m.put("embeddingAllowedOrigins", embeddingOrigins());
+        m.put("embeddingAllowedOrigins", embeddingOrigins(jdbc));
         m.put("version", version);
         m.put("serverTime", clock.instant().toString());
         m.put("database", jdbc.sql("select 1").query(Integer.class).single() == 1 ? "UP" : "DOWN");
@@ -361,7 +361,7 @@ public class SystemController {
     @GetMapping("/system/embedding")
     public Map<String, Object> getEmbedding(Actor actor) {
         access.context(actor).require(Permission.CONFIGURE);
-        return Map.of("allowedOrigins", embeddingOrigins());
+        return Map.of("allowedOrigins", embeddingOrigins(jdbc));
     }
 
     @PutMapping("/system/embedding")
@@ -395,11 +395,12 @@ public class SystemController {
 
     @GetMapping(value = "/system/embedding/csp", produces = "text/plain")
     public String embeddingCsp() {
-        List<String> origins = embeddingOrigins();
+        List<String> origins = embeddingOrigins(jdbc);
         return origins.isEmpty() ? "'none'" : "'self' " + String.join(" ", origins);
     }
 
-    private List<String> embeddingOrigins() {
+    /** The embedding allowlist (other sites that may frame TMRKZ); also read by the sign-in cookies (AuthController). */
+    public static List<String> embeddingOrigins(JdbcClient jdbc) {
         try {
             String raw = jdbc.sql("select value from system_setting where key = 'EMBEDDING_ALLOWED_ORIGINS'")
                     .query(String.class).optional().orElse("");

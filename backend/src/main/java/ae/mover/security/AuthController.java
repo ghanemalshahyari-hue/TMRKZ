@@ -130,7 +130,7 @@ public class AuthController {
         throttle.succeeded(username);
         AuthService.LoginResult r = auth.issueSession(person, directory.issuer(), null, now, ip, request.getHeader("User-Agent"));
         ResponseCookie session = ResponseCookie.from(SessionFilter.COOKIE, r.token()).httpOnly(true)
-                .secure(props.secureCookie()).sameSite("Strict").path("/").maxAge(auth.sessionLifetime()).build();
+                .secure(props.secureCookie()).sameSite(sameSite("Strict")).path("/").maxAge(auth.sessionLifetime()).build();
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, session.toString()).body(me(r.actor()));
     }
 
@@ -151,7 +151,7 @@ public class AuthController {
         throttle.succeeded(username);
         AuthService.LoginResult r = auth.issueSession(person, id.issuer(), id.idToken(), id.authTime(), ip, request.getHeader("User-Agent"));
         ResponseCookie session = ResponseCookie.from(SessionFilter.COOKIE, r.token()).httpOnly(true)
-                .secure(props.secureCookie()).sameSite("Strict").path("/").maxAge(auth.sessionLifetime()).build();
+                .secure(props.secureCookie()).sameSite(sameSite("Strict")).path("/").maxAge(auth.sessionLifetime()).build();
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, session.toString()).body(me(r.actor()));
     }
 
@@ -246,7 +246,7 @@ public class AuthController {
             AuthService.LoginResult r = auth.issueSession(person, id.issuer(), id.idToken(), id.authTime(),
                     request.getRemoteAddr(), request.getHeader("User-Agent"));
             ResponseCookie session = ResponseCookie.from(SessionFilter.COOKIE, r.token()).httpOnly(true)
-                    .secure(props.secureCookie()).sameSite("Strict").path("/").maxAge(auth.sessionLifetime()).build();
+                    .secure(props.secureCookie()).sameSite(sameSite("Strict")).path("/").maxAge(auth.sessionLifetime()).build();
             return ResponseEntity.status(HttpStatus.FOUND).header(HttpHeaders.LOCATION, id.returnTo())
                     .header(HttpHeaders.SET_COOKIE, session.toString()).header(HttpHeaders.SET_COOKIE, clear.toString()).build();
         } catch (ApiException e) {
@@ -258,7 +258,7 @@ public class AuthController {
     public ResponseEntity<Map<String, Object>> logout(Actor actor) {
         AuthService.Ended ended = auth.logout(actor);
         ResponseCookie cookie = ResponseCookie.from(SessionFilter.COOKIE, "").httpOnly(true).secure(props.secureCookie())
-                .sameSite("Strict").path("/").maxAge(0).build();
+                .sameSite(sameSite("Strict")).path("/").maxAge(0).build();
         // A provider session is ended at its own provider (ADR-071), which returns to the sign-in page; a directory session, or
         // one whose provider is no longer configured, returns directly. No provider ends another's session.
         String provider = ended.idToken() != null && !directory.issuer().equals(ended.issuer())
@@ -356,9 +356,19 @@ public class AuthController {
 
     // ---- helpers --------------------------------------------------------------------------------------------------
 
+    /**
+     * SameSite of the sign-in cookies (ADR-108): the given value, or None while the embedding allowlist names another site
+     * and the cookies are Secure (https). Inside another site's frame the browser keeps and sends only SameSite=None cookies,
+     * so Strict/Lax left a framed TMRKZ signed out: the sign-in page came back and every page stayed empty. Writes stay
+     * protected by the X-Requested-With header (SessionFilter), which another site cannot send.
+     */
+    private String sameSite(String normal) {
+        return props.secureCookie() && !ae.mover.system.SystemController.embeddingOrigins(jdbc).isEmpty() ? "None" : normal;
+    }
+
     private ResponseCookie browserCookie(String value, long maxAge) {
         // Lax: the provider sends the browser back with a top-level navigation that may cross sites.
-        return ResponseCookie.from(OIDC_COOKIE, value).httpOnly(true).secure(props.secureCookie()).sameSite("Lax")
+        return ResponseCookie.from(OIDC_COOKIE, value).httpOnly(true).secure(props.secureCookie()).sameSite(sameSite("Lax"))
                 .path(OIDC_PATH).maxAge(maxAge).build();
     }
 

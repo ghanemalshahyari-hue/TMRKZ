@@ -1545,3 +1545,19 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
     - restore gives an identical tree;
     - the forced backend builds with 0 errors.
   - **Next release:** make `make-release.sh --bootstrap` ship every release file, not the delta.
+
+## Embedded TMRKZ stays signed in (27 Nov 2026; ADR-108)
+- **Delivered:** with a site in «التضمين في مواقع أخرى» and https, the sign-in cookies are `SameSite=None` so TMRKZ inside that
+  site's frame signs in and shows its pages (before: blocked or empty); Keycloak's sign-in pages may be framed by the same sites;
+  `X-Frame-Options` is left out only while a site is allowed; an unanswered poll no longer turns framing off.
+- **Checks:** Edge with a stand-in https portal, before and after; `EmbeddedSignInIT` 1/1, `EnterpriseSignInIT` 9/9.
+- **Open:** embedding needs TMRKZ on https (`ops/tls/enable.sh`); not run on the real VM.
+
+## Browser tab: the application's mark and the page name (27 Nov 2026; owner)
+- **Delivered:** the tab icon is TMRKZ's own three-chevron mark on the top bar's background, sand in the light theme and dark in
+  the dark one, and it changes with the theme toggle (`frontend/public/favicon-light.svg`, `favicon-dark.svg`, `lib/theme.ts`).
+  The tab names the page on screen, then the application, all in Arabic («الرئيسية — تمركز», «تسجيل الدخول — تمركز»); before it was
+  «TMRKZ — المواقع والمرافق والإجراءات» on every page, which the tab cut off and showed in the wrong order.
+- **Checks:** `src/lib/title.test.ts` 3/3, `navigation.test.ts` 4/4, type check clean; headless Edge on :8088: title and icon on the
+  sign-in page and five pages, both themes (`docs/evidence/tab-title-icon-20261127/`).
+- **Open:** Keycloak's own sign-in pages keep Keycloak's icon.

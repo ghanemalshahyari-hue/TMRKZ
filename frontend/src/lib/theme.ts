@@ -21,8 +21,16 @@ export function initialTheme(saved: Theme | null): Theme {
 let current: Theme = initialTheme(stored());
 const listeners = new Set<() => void>();
 
+/** The tab icon of each theme: the application's mark on the top bar's own background (owner, 27 Nov 2026). */
+export function faviconFor(theme: Theme): string {
+  return `/favicon-${theme}.svg`;
+}
+
 function apply(theme: Theme) {
-  if (typeof document !== 'undefined') document.documentElement.dataset.theme = theme;
+  if (typeof document === 'undefined') return;
+  document.documentElement.dataset.theme = theme;
+  const icon = document.querySelector<HTMLLinkElement>('link[rel~="icon"]');
+  if (icon) icon.href = faviconFor(theme);
 }
 
 apply(current); // on import, before the first paint

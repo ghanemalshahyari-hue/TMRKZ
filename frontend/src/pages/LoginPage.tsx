@@ -5,6 +5,7 @@ import { ThemeToggle } from '../components/ThemeToggle';
 import { BrandMark } from '../components/shell/TopNavigation';
 import '../styles/signin.css';
 import { DEFAULT_BOARD, visibleNotes, type SignInBoard } from '../lib/signInNotes';
+import { tabTitle } from '../lib/title';
 
 /** Messages for the error the server put in the address after a refused automatic sign-in (never a fallback). */
 const ERRORS: Record<string, string> = {
@@ -99,6 +100,9 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
   const [busy, setBusy] = useState(false);
   // «إرشادات صفحة الدخول» (ADR-083): the board saved in the settings, read before signing in; the page's own notes otherwise
   const [board, setBoard] = useState<SignInBoard>(() => ({ ...DEFAULT_BOARD, notes: visibleNotes(DEFAULT_BOARD.notes, new Date().toISOString().slice(0, 10)) }));
+  useEffect(() => {
+    document.title = tabTitle('تسجيل الدخول');
+  }, []);
   useEffect(() => {
     api.signInNotices().then((r) => {
       if (r.saved) setBoard({ heading: r.heading ?? '', subheading: r.subheading ?? '', footer: r.footer ?? '', notes: (r.notes ?? []).map((n) => ({ ...n, hidden: false, from: null, to: null })) });
