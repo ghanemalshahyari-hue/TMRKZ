@@ -1561,3 +1561,14 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Checks:** `src/lib/title.test.ts` 3/3, `navigation.test.ts` 4/4, type check clean; headless Edge on :8088: title and icon on the
   sign-in page and five pages, both themes (`docs/evidence/tab-title-icon-20261127/`).
 - **Open:** Keycloak's own sign-in pages keep Keycloak's icon.
+
+## USB delivery refreshed with release 20261127-040505-34fa0d8 (27 Nov 2026; owner)
+- **Delivered:** `F:\TMRKZ_FINAL_20261125_9c280bf` now carries the signed release 20261127-040505-34fa0d8 (commit 34fa0d8, no local
+  changes, 850 files) in `2_FIRST_BROWSER_UPDATE\TMRKZ`, in the hand-copy folder `TMRKZ`, and as the complete package of
+  `1_VM_FORCE_RELEASE` (848 files: every release file but the two Compose files, which force.sh writes from `config/`); the
+  bootstrap package for a VM at e30c1c1/9c280bf in `1_VM_BOOTSTRAP`; START_HERE, TMRKZ_COPY_TO_VM and 0_HOW_IT_WORKS name it.
+  The image parts are unchanged: no library, Dockerfile or Keycloak file changed since they were built.
+- **Checks:** each release copy matches the signed list (0 mismatches); the complete package's 848 files match it; `force.sh check`
+  on a copy of 9c280bf: package checksums OK, release signature OK, plan replace 31 / add 7 / remove 0; this PC's backend and web
+  build compiled this code with the same three image IDs as the USB; all 1803 USB files match `SHA256SUMS.txt`.
+- **Open:** not run on the real VM; the VM simulation was not re-run for this release (no image or start change since ADR-107).
