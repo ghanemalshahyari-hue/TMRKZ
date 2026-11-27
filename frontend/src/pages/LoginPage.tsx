@@ -6,6 +6,7 @@ import { BrandMark } from '../components/shell/TopNavigation';
 import '../styles/signin.css';
 import { DEFAULT_BOARD, visibleNotes, type SignInBoard } from '../lib/signInNotes';
 import { tabTitle } from '../lib/title';
+import { signOutNotice } from '../lib/signOut';
 
 /** Messages for the error the server put in the address after a refused automatic sign-in (never a fallback). */
 const ERRORS: Record<string, string> = {
@@ -91,8 +92,8 @@ export function LoginPage({ onLogin }: { onLogin: (me: Me) => void }) {
   const [alert, setAlert] = useState<Alert | null>(() => {
     const error = readError(window.location.hash);
     if (error) return { kind: 'error', text: error };
-    if (new URLSearchParams(window.location.search).has('signed-out')) return { kind: 'success', text: 'تم تسجيل الخروج بنجاح' };
-    return null;
+    // ADR-109: sign-out always comes back here; the server ends the identity provider's session itself
+    return signOutNotice(window.location.search);
   });
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');

@@ -1600,3 +1600,14 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Checks:** each copy matches the signed list (0 mismatches); the complete package's 848 files match it; `force.sh check` on a copy
   of 9c280bf: checksums OK, signature OK, replace 32 / add 7 / remove 0; USB: TMRKZ 1828, MOVER 50, DUTY 150 files, all OK.
 - **Open:** not run on the real VMs.
+
+## Sign-out returns to the TMRKZ sign-in page (27 Nov 2026; owner; ADR-109)
+- **Delivered:** sign-out no longer sends the browser to Keycloak. It always lands on the TMRKZ sign-in page («تم تسجيل الخروج
+  بنجاح»); the server ends the Keycloak session itself (form POST to the end-session endpoint over the back channel with the
+  session's own ID token and client, no redirect). Automatic and manual platform sign-ins alike; directory sign-ins unchanged. If
+  Keycloak cannot end its session, TMRKZ's still ends and the sign-in page warns to close the browser on a shared PC.
+- **Checks:** real Keycloak 26.7.5 (TMRKZ's image and realm) 13/13 — after sign-out the same browser's automatic sign-in asks for the
+  password again; backend `EnterpriseSignInIT` 9, `DirectorySignInIT` 10, `DualProviderSignInIT` 1, `EmbeddedSignInIT` 1 (21/21);
+  frontend 421/421 with `signOut.test.ts`, type check clean (`docs/evidence/signout-direct-20261127/`).
+- **Open:** not run against the owner's own Keycloak or on the VM; the post-logout redirect settings are now unused by sign-out
+  (kept for existing `.env` files).

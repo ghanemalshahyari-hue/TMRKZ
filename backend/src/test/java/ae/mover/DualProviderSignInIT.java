@@ -84,9 +84,11 @@ class DualProviderSignInIT extends IntegrationTest {
         assertThat(stepUp).containsEntry("prompt", "login").containsEntry("max_age", "0");
         assertThat(location(local.get(callback(stepUp, localSubject, localLogin, EnterpriseSignInIT.platformIssuer(),
                 EnterpriseSignInIT.PLATFORM_KEY, role)))).isEqualTo("/#review");
+        EnterpriseSignInIT.LOGOUT_CALLS.clear();
         HttpResponse<String> out = local.post("/api/v1/auth/logout", "{}");
-        assertThat(JSON.readTree(out.body()).path("redirect").asText())
-                .startsWith(EnterpriseSignInIT.platformIssuer() + "/protocol/openid-connect/logout?").contains("id_token_hint=");
+        assertThat(JSON.readTree(out.body()).path("redirect").asText()).isEqualTo("/?signed-out=1");
+        assertThat(EnterpriseSignInIT.LOGOUT_CALLS).singleElement().satisfies(call -> assertThat(call)
+                .containsEntry("path", "/realms/platform/protocol/openid-connect/logout").containsKey("id_token_hint"));
         assertThat(local.get("/api/v1/me").statusCode()).isEqualTo(401);
         assertThat(EnterpriseSignInIT.TOKEN_CALLS).allMatch(path -> path.startsWith("/realms/platform/"));
 

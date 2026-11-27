@@ -515,32 +515,46 @@ public class OidcClient {
     }
 
     /**
-     * The end-session address of the provider that issued this session's ID token (the session's own issuer), or null when the
-     * session's issuer is no configured provider: then only the TMRKZ session ends. A platform session signed in with the
-     * password client logs out with that client and its token; no browser client is required for it.
+     * ADR-109 (owner, 27 Nov 2026): ends, server to server, the provider session that issued this TMRKZ session (the session's
+     * own issuer), so sign-out never sends the browser to the provider and always returns to the TMRKZ sign-in page. It is
+     * OIDC RP-initiated logout sent as a form POST over the back channel: the session's ID token as hint and the client it was
+     * issued to (a platform session from the manual form holds the password client's token: that client ends it). Without a
+     * post-logout address the provider redirects nowhere; with the hint it ends that session without its own cookie and without
+     * a confirmation page. Returns whether the provider ended it; false when the session's issuer is no configured provider, it
+     * holds no token, or the provider refused or could not be reached: then only the TMRKZ session ends.
      */
-    public String endSessionUrl(String sessionIssuer, String idToken) {
-        if (sessionIssuer == null) {
-            return null;
+    public boolean endProviderSession(String sessionIssuer, String idToken) {
+        if (sessionIssuer == null || idToken == null) {
+            return false;
         }
         Provider provider = providerOf(sessionIssuer);
         OidcProperties.Provider p = endpoints(provider);
         if (p.issuer() == null || !p.issuer().equals(sessionIssuer)) {
-            return null;
+            return false;
         }
-        // a platform session opened by the manual form holds the password client's token: that client ends it
         String client = props().passwordClientId() != null && sessionIssuer.equals(props().platformIssuer())
                 && audience(idToken).contains(props().passwordClientId()) ? props().passwordClientId() : p.clientId();
         if (client == null) {
-            return null;
+            return false;
         }
-        Map<String, String> q = new LinkedHashMap<>();
-        q.put("client_id", client);
-        q.put("post_logout_redirect_uri", p.postLogoutRedirectUri() == null ? "/" : p.postLogoutRedirectUri());
-        if (idToken != null) {
-            q.put("id_token_hint", idToken);
+        Map<String, String> body = new LinkedHashMap<>();
+        body.put("client_id", client);
+        body.put("id_token_hint", idToken);
+        try {
+            HttpResponse<Void> res = http().send(HttpRequest.newBuilder(URI.create(p.backChannelEndSessionEndpoint()))
+                    .timeout(Duration.ofMillis(Math.min(3000, props().httpTimeoutMs())))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString(form(body))).build(), HttpResponse.BodyHandlers.discarding());
+            if (res.statusCode() < 400) {
+                return true;
+            }
+            log.warn("Provider sign-out answered HTTP {}: only the TMRKZ session ended", res.statusCode());
+        } catch (java.io.IOException e) {
+            log.warn("Provider sign-out unreachable ({}): only the TMRKZ session ended", e.getClass().getSimpleName());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
-        return p.endSessionEndpoint() + "?" + form(q);
+        return false;
     }
 
     /** The audiences of a token this server stored after verifying it (read only to choose the logout client). */

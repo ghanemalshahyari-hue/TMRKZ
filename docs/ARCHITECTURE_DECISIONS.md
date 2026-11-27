@@ -3198,3 +3198,35 @@ an http page): embedding needs TMRKZ on https.
 path came back to the sign-in page with no cookie stored; after, Keycloak's page opens in the frame and the manual sign-in shows the
 home page (cookie `SameSite=None; Secure`). `EmbeddedSignInIT` 1/1 and `EnterpriseSignInIT` 9/9. Framing kept through 45 s with
 the backend stopped.
+
+## ADR-109 Sign-out returns to the TMRKZ sign-in page; the server ends the Keycloak session (27 Nov 2026)
+
+**Owner (27 Nov).** "When I sign out after signing in with Keycloak it should direct me back to the sign-in page, not Keycloak:
+Keycloak only when we sign in; sign-out not related to Keycloak."
+
+**Before.** `POST /auth/logout` deleted the TMRKZ session and, for a session issued by a provider (automatic sign-in, or a platform
+account's manual sign-in through the password client), answered the provider's end-session address (ADR-071); the browser was sent
+there and Keycloak's own page came up. A manual platform sign-in has no Keycloak browser session at all (direct grant), so that
+page was pure noise, and inside an embedding site's frame (ADR-108) it is refused outright.
+
+**Decision.**
+- The browser always goes to `/?signed-out=1` (the TMRKZ sign-in page with «تم تسجيل الخروج بنجاح»). It never visits the provider on
+  sign-out.
+- The server ends the provider session itself: `OidcClient.endProviderSession` sends OIDC RP-initiated logout as a form POST to the
+  session's own provider over the back channel (`internal-base-url` + `/protocol/openid-connect/logout`) with the stored ID token as
+  `id_token_hint` and the client it was issued to (`tmrkz-web`, or `tmrkz-platform-password` for a manual platform sign-in). No
+  `post_logout_redirect_uri` is sent, so nothing is redirected; with the hint Keycloak ends that session without its own cookie and
+  without a confirmation page. Timeout min(3 s, `http-timeout-ms`). ADR-071 holds: only the session's own provider is called.
+- If the provider refuses or cannot be reached, TMRKZ's session still ends and the browser goes to
+  `/?signed-out=1&provider-session=1`: the sign-in page warns «تم تسجيل الخروج من تمركز، لكن تعذر إنهاء جلسة مزود الهوية؛ أغلق المتصفح
+  إن كان الجهاز مشتركاً.» (the next automatic sign-in could otherwise pass without a password).
+- Directory (LDAP) sessions are unchanged: no provider is involved.
+- The post-logout redirect settings (`TMRKZ_OIDC_POST_LOGOUT_REDIRECT_URI` and the platform/local variants) are no longer used by
+  sign-out; they are kept so existing `.env` files and client registrations stay valid.
+
+**Evidence.** Real Keycloak 26.7.5 (TMRKZ's image and realm, public hostname + dynamic back channel as in `docker-compose.yml`), a
+fictional user: before sign-out a new automatic sign-in passes without the password; the back-channel POST answers 200, the user's
+Keycloak sessions go to 0, and the same browser's next automatic sign-in shows Keycloak's password form; the manual platform
+sign-in's session ends the same way (`tests/acceptance/signout/keycloak-signout.sh`, 13/13). `EnterpriseSignInIT` (end-session POST
+with the session's token and client, the provider-down warning), `DualProviderSignInIT` (the local platform realm is called),
+`DirectorySignInIT`, `EmbeddedSignInIT`.

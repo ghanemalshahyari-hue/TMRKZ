@@ -199,8 +199,9 @@ public record OidcProperties(
             return issuer + "/protocol/openid-connect/auth";
         }
 
-        String endSessionEndpoint() {
-            return issuer + "/protocol/openid-connect/logout";
+        /** The end-session endpoint over the back channel (ADR-109: TMRKZ ends the provider session itself). */
+        String backChannelEndSessionEndpoint() {
+            return backChannel() + "/protocol/openid-connect/logout";
         }
 
         String tokenEndpoint() {
@@ -262,10 +263,6 @@ public record OidcProperties(
 
     String authorizationEndpoint() {
         return automatic().authorizationEndpoint();
-    }
-
-    String endSessionEndpoint() {
-        return automatic().endSessionEndpoint();
     }
 
     String tokenEndpoint() {

@@ -1,0 +1,18 @@
+Keycloak: Keycloak 26.7.5
+Created new user with id 'ead058e7-d8d9-4f59-875b-2e257c1735eb'
+Created new client with id 'e94822f3-e60d-4516-9626-35fea7f989cb'
+PASS  Keycloak shows its sign-in form at first (yes)
+PASS  the code is exchanged over the back channel for an ID token (yes)
+PASS  the user has one Keycloak session (1)
+PASS  before sign-out, a new automatic sign-in passes without the password (SSO) (302)
+PASS  ... still one session (1)
+PASS  the back-channel end-session POST is accepted (no redirect, no confirmation) (200)
+PASS  the Keycloak session is gone (0)
+PASS  after sign-out, the same browser's automatic sign-in asks for the password again (200)
+PASS  ... and it is Keycloak's sign-in form (yes)
+PASS  the manual platform sign-in opens a Keycloak session (1)
+PASS  its sign-out is accepted over the back channel (200)
+PASS  that Keycloak session is gone too (0)
+PASS  (before) a browser sent to Keycloak's logout without a valid hint gets Keycloak's own page (200)
+
+== result: 13 passed, 0 failed

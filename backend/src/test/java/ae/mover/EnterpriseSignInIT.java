@@ -61,6 +61,9 @@ class EnterpriseSignInIT extends IntegrationTest {
     /** Every token-endpoint path called, in order (which realm the backend went to). */
     static final List<String> TOKEN_CALLS = new java.util.concurrent.CopyOnWriteArrayList<>();
     static volatile boolean tokenEndpointDown;
+    /** ADR-109: every back-channel end-session call (realm path + form), and whether that endpoint answers with an error. */
+    static final List<Map<String, String>> LOGOUT_CALLS = new java.util.concurrent.CopyOnWriteArrayList<>();
+    static volatile boolean logoutEndpointDown;
 
     /** {@code challenge}: the PKCE challenge of a code, or the password of a password grant. */
     record Grant(String challenge, String idToken) {
@@ -81,6 +84,16 @@ class EnterpriseSignInIT extends IntegrationTest {
                     ex.close();
                 });
                 PROVIDER.createContext("/realms/" + realm.getKey() + "/protocol/openid-connect/token", EnterpriseSignInIT::token);
+                // Keycloak's RP-initiated logout as a form POST: with an ID token hint and no post-logout address it ends the
+                // session and answers its own "signed out" page (200); nothing is redirected
+                PROVIDER.createContext("/realms/" + realm.getKey() + "/protocol/openid-connect/logout", ex -> {
+                    Map<String, String> form = new LinkedHashMap<>(parse(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
+                    form.put("path", ex.getRequestURI().getPath());
+                    form.put("method", ex.getRequestMethod());
+                    LOGOUT_CALLS.add(form);
+                    ex.sendResponseHeaders(logoutEndpointDown ? 502 : 200, -1);
+                    ex.close();
+                });
             }
             PROVIDER.start();
         } catch (Exception e) {
@@ -363,11 +376,30 @@ class EnterpriseSignInIT extends IntegrationTest {
         again.get(callbackFor(a2, subject, "renamed" + sfx));
         assertThat(JSON.readTree(again.get("/api/v1/me").body()).path("id").asText()).isEqualTo(person.toString());
 
-        // Logout ends the TMRKZ session and returns the provider's end-session address with the ID token hint.
+        // ADR-109: logout ends the TMRKZ session, ends the provider session from the server (the session's ID token as hint,
+        // the browser client it was issued to, no post-logout address) and sends the browser to the TMRKZ sign-in page.
+        String hint = jdbc.sql("select id_token from user_session where person_id = :p order by created_at desc limit 1")
+                .param("p", person).query(String.class).single();
+        LOGOUT_CALLS.clear();
         HttpResponse<String> out = again.post("/api/v1/auth/logout", "{}");
-        assertThat(JSON.readTree(out.body()).path("redirect").asText()).startsWith(issuer() + "/protocol/openid-connect/logout?")
-                .contains("id_token_hint=");
+        assertThat(JSON.readTree(out.body()).path("redirect").asText()).isEqualTo("/?signed-out=1");
+        assertThat(LOGOUT_CALLS).singleElement().satisfies(call -> assertThat(call)
+                .containsEntry("method", "POST").containsEntry("path", "/realms/test/protocol/openid-connect/logout")
+                .containsEntry("client_id", CLIENT).containsEntry("id_token_hint", hint).doesNotContainKey("post_logout_redirect_uri"));
         assertThat(again.get("/api/v1/me").statusCode()).isEqualTo(401);
+
+        // A provider that cannot end its session: TMRKZ's session still ends and the sign-in page says the other one may remain.
+        Browser third = new Browser();
+        Authorization a3 = authorizationOf(third.get("/api/v1/auth/oidc/start"));
+        third.get(callbackFor(a3, subject, "renamed" + sfx));
+        logoutEndpointDown = true;
+        try {
+            HttpResponse<String> kept = third.post("/api/v1/auth/logout", "{}");
+            assertThat(JSON.readTree(kept.body()).path("redirect").asText()).isEqualTo("/?signed-out=1&provider-session=1");
+            assertThat(third.get("/api/v1/me").statusCode()).isEqualTo(401);
+        } finally {
+            logoutEndpointDown = false;
+        }
     }
 
     @Test
@@ -570,9 +602,12 @@ class EnterpriseSignInIT extends IntegrationTest {
                 select issuer, authenticated_at is not null as fresh, id_token is not null as token from user_session
                 where person_id = :p order by created_at desc limit 1""").param("p", person).query().singleRow();
         assertThat(stored).containsEntry("issuer", issuer()).containsEntry("fresh", true).containsEntry("token", true);
-        // the session ends at the provider with the password client's own token
+        // the session ends at the provider, from the server, with the password client's own token; the browser goes to sign-in
+        LOGOUT_CALLS.clear();
         String out = JSON.readTree(b.post("/api/v1/auth/logout", "{}").body()).path("redirect").asText();
-        assertThat(out).startsWith(issuer() + "/protocol/openid-connect/logout?").contains("client_id=" + PASSWORD_CLIENT).contains("id_token_hint=");
+        assertThat(out).isEqualTo("/?signed-out=1");
+        assertThat(LOGOUT_CALLS).singleElement().satisfies(call -> assertThat(call)
+                .containsEntry("client_id", PASSWORD_CLIENT).containsKey("id_token_hint"));
         assertThat(b.get("/api/v1/me").statusCode()).isEqualTo(401);
 
         // A wrong platform password is refused by the provider and never tried against the directory (none is configured

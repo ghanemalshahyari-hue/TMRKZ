@@ -259,15 +259,17 @@ public class AuthController {
         AuthService.Ended ended = auth.logout(actor);
         ResponseCookie cookie = ResponseCookie.from(SessionFilter.COOKIE, "").httpOnly(true).secure(props.secureCookie())
                 .sameSite(sameSite("Strict")).path("/").maxAge(0).build();
-        // A provider session is ended at its own provider (ADR-071), which returns to the sign-in page; a directory session, or
-        // one whose provider is no longer configured, returns directly. No provider ends another's session.
-        String provider = ended.idToken() != null && !directory.issuer().equals(ended.issuer())
-                ? oidc.endSessionUrl(ended.issuer(), ended.idToken()) : null;
-        String redirect = provider != null ? provider : SIGNED_OUT;
+        // ADR-109 (owner, 27 Nov 2026): the browser always returns to the TMRKZ sign-in page, never to the provider. A provider
+        // session is ended by this server at its own provider (ADR-071: no provider ends another's); a directory session has
+        // none. When the provider could not end it, the sign-in page says so.
+        boolean providerSession = ended.idToken() != null && ended.issuer() != null && !directory.issuer().equals(ended.issuer());
+        String redirect = providerSession && !oidc.endProviderSession(ended.issuer(), ended.idToken()) ? SIGNED_OUT_PROVIDER_KEPT : SIGNED_OUT;
         return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, cookie.toString()).body(Map.of("redirect", redirect));
     }
 
     static final String SIGNED_OUT = "/?signed-out=1";
+    /** Signed out of TMRKZ, but the provider did not confirm the end of its own session. */
+    static final String SIGNED_OUT_PROVIDER_KEPT = "/?signed-out=1&provider-session=1";
 
     // ---- identities waiting for an access manager ---------------------------------------------------------------
 
