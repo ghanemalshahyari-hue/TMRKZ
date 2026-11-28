@@ -573,6 +573,14 @@ button.tz-summary-row:disabled { cursor: not-allowed; opacity: 0.6; }
 .tz-dash-centre { min-height: 400px; }
 .tz-dash-mapbox { min-height: 320px; }
 
+/* The dashboard fills the window (owner, 28 Nov 2026: no empty half under it on a tall screen): the three columns take
+   the height left under the banner and the indicators, the map grows with them, and the last card of each side column
+   reaches the bottom. Taller content still scrolls inside the main area. */
+.tz-app[data-view='home'] .tz-main { display: flex; flex-direction: column; }
+.tz-app[data-view='home'] .tz-main > .tz-dash-v2 { flex: 1 0 auto; }
+.tz-dash-v2 > .tz-dash-grid-wide { flex: 1 0 auto; }
+.tz-dash-v2 .tz-dash-side > .tz-dash-card:last-child { flex: 1 0 auto; }
+
 /* The attention rows are clickable chips that filter the map; the active one has an amber ring. */
 .tz-attn-row { display: inline-flex; align-items: center; gap: 10px; background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 6px 8px; width: 100%; text-align: inherit; cursor: pointer; color: var(--ink); font: inherit; text-decoration: none; }
 .tz-attn-row:hover { background: color-mix(in srgb, var(--home-attn) 10%, transparent); }

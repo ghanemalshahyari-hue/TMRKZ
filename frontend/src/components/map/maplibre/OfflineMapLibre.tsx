@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { Map as MlMap, type LayerSpecification, type LngLatBoundsLike } from 'maplibre-gl';
+import { LngLat, Map as MlMap, type GeoJSONSource, type LayerSpecification, type LngLatBoundsLike } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './offlineMap.css';
 import {
-  MODE_NOTICE,
+  COVERAGE_SOURCE,
   OVERLAY_ANCHOR,
+  WIDE_MAX_ZOOM,
   ROUTE_SHIELD,
   buildOfflineStyle,
   routeShield,
@@ -17,6 +18,7 @@ import {
 import { ensureOfflineMapSetup } from './setup';
 import { MAP_FONT_URL } from './mapPackage';
 import { drawGlyphsLeftToRight } from './glyphDirection';
+import { constrainToCoverage, coveragePolygon, packageExtent, type PackageExtent } from './packageCoverage';
 
 /**
  * Owner, 21 Nov 2026: the map follows the app theme by default; the viewer may override and force it to stay light with
@@ -66,7 +68,9 @@ export function showWholeCountry(map: MlMap, duration = 600): void {
 class FullViewControl {
   private box: HTMLDivElement | null = null;
 
-  onAdd(map: MlMap): HTMLElement {
+  constructor(private readonly show: () => void) {}
+
+  onAdd(): HTMLElement {
     const box = document.createElement('div');
     box.className = 'maplibregl-ctrl maplibregl-ctrl-group tz-fullview-ctrl';
     const b = document.createElement('button');
@@ -76,7 +80,7 @@ class FullViewControl {
     b.setAttribute('aria-label', 'الخريطة كاملة — عرض الدولة كاملة');
     b.dataset.testid = 'map-full-view';
     b.textContent = 'الخريطة كاملة';
-    b.addEventListener('click', () => showWholeCountry(map));
+    b.addEventListener('click', this.show);
     box.appendChild(b);
     this.box = box;
     return box;
@@ -150,18 +154,74 @@ export function OfflineMapLibre({
       maxBounds,
       attributionControl: { compact: false },
       canvasContextAttributes: { preserveDrawingBuffer },
+      // the container is followed by the one observer below, which knows whether the whole-country view is to be kept
+      trackResize: false,
     });
     drawGlyphsLeftToRight(map);
-    if (fullView) map.addControl(new FullViewControl(), 'bottom-right');
+    // The camera that shows the whole country, while nothing else has moved it (owner, 28 Nov 2026): a page that opens on
+    // the whole country keeps showing it when its box is laid out or resized after the first frame — before, a refresh fitted
+    // the country to the box's first, smaller size and the grown box then showed the empty space around the package.
+    const camera = () => {
+      const c = map.getCenter();
+      return [c.lng, c.lat, map.getZoom(), map.getBearing(), map.getPitch()];
+    };
+    let countryView: number[] | null = null;
+    const atCountryView = () => countryView !== null && camera().every((v, i) => Math.abs(v - countryView![i]) < 1e-9);
+    const showCountry = (duration: number) => {
+      if (duration > 0) map.once('moveend', () => { countryView = camera(); });
+      showWholeCountry(map, duration);
+      if (duration === 0) countryView = camera();
+    };
+    if (fullView) {
+      countryView = camera();
+      map.addControl(new FullViewControl(() => showCountry(600)), 'bottom-right');
+    }
+    // No empty edge (owner, 28 Nov 2026; ADR-110): once the package's extent is read, the region tile is hidden over the area
+    // the detailed tiles of the current zoom cover, and the camera stays on the region tile (packageCoverage.ts) — the whole
+    // country fits a box of any shape. A page that sets its own `maxBounds` keeps MapLibre's constraint. The map's size is
+    // read from the canvas's style, which MapLibre sets before it constrains on a resize, so the layout is never read while
+    // the map moves.
+    let removed = false;
+    let extent: PackageExtent | null = null;
+    let maskZoom = -1;
+    const updateMask = () => {
+      const source = extent && (map.getSource(COVERAGE_SOURCE) as GeoJSONSource | undefined);
+      const z = Math.floor(map.getZoom());
+      if (!source || !extent || z === maskZoom) return;
+      maskZoom = z;
+      source.setData({ type: 'Feature', properties: {}, geometry: coveragePolygon(extent, z) });
+    };
+    map.on('zoom', updateMask);
+    map.on('load', updateMask);
+    packageExtent(abs(basemapUrl)).then((found) => {
+      if (removed || !found) return;
+      extent = found;
+      updateMask();
+      if (maxBounds) return;
+      const country = atCountryView();
+      const canvas = map.getCanvas();
+      map.setTransformConstrain((lngLat, zoom) => {
+        const view = { width: parseFloat(canvas.style.width) || 0, height: parseFloat(canvas.style.height) || 0 };
+        const r = constrainToCoverage(found, lngLat, zoom, { ...view, bearing: map.getBearing(), padding: map.getPadding() }, {
+          minZoom: map.getMinZoom(),
+          maxZoom: map.getMaxZoom(),
+        }, WIDE_MAX_ZOOM);
+        return { center: new LngLat(r.lng, r.lat), zoom: r.zoom };
+      });
+      if (country) showCountry(0);
+    });
     mapRef.current = map;
     // the canvas follows its container whenever the layout changes it (window, fullscreen, panels, breakpoints, cards), not
-    // only on a window resize; one resize per frame, the view kept as it is (no refit)
+    // only on a window resize; one resize per frame; a view someone has moved is kept as it is, the untouched whole-country
+    // view is fitted again to the new size
     let resizeFrame = 0;
     const resizes = new ResizeObserver(() => {
       if (resizeFrame) return;
       resizeFrame = requestAnimationFrame(() => {
         resizeFrame = 0;
+        const country = atCountryView();
         map.resize();
+        if (country) showCountry(0);
       });
     });
     resizes.observe(host.current);
@@ -172,6 +232,7 @@ export function OfflineMapLibre({
       onReady?.(map);
     });
     return () => {
+      removed = true;
       resizes.disconnect();
       if (resizeFrame) cancelAnimationFrame(resizeFrame);
       mapRef.current = null;
@@ -190,9 +251,11 @@ export function OfflineMapLibre({
   return (
     <div className={'ml-offline' + (className ? ' ' + className : '')} data-mode={mode} data-map-theme={mapThemeOverride ?? undefined}>
       <div ref={host} className="ml-offline-canvas" />
-      <div className="ml-offline-notice" role="note" data-testid="map-source-notice">
-        {mode === 'terrain' && !hillshade ? 'طبقة طبيعة الأرض غير مثبتة في هذه الحزمة' : MODE_NOTICE[mode]}
-      </div>
+      {/* No label over the map (owner, 28 Nov 2026): the source notices live in the attribution line (offlineStyle.ts);
+          only a missing terrain layer is still said on the map */}
+      {mode === 'terrain' && !hillshade && (
+        <div className="ml-offline-notice" role="note" data-testid="map-source-notice">طبقة طبيعة الأرض غير مثبتة في هذه الحزمة</div>
+      )}
     </div>
   );
 }

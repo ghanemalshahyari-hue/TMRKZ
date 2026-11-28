@@ -59,18 +59,32 @@ export const SHADE_3D = 'terrain3d-shade';
 
 export const ROUTE_SHIELD = 'tmrkz-route-shield';
 
+/**
+ * No empty edge on a map of any shape (owner, 28 Nov 2026; ADR-110 corrected): the package holds, besides its detailed tiles
+ * around the country, whole low-zoom tiles of the region around it (zoom 3: 45–90° E, 0–41° N). Land, landcover and water
+ * of that one tile are drawn under the detailed map, enlarged; over the area the detailed tiles of the current zoom cover
+ * (`COVERAGE_SOURCE`, set by OfflineMapLibre from the package's extent) plain land hides them, so inside it the map is
+ * exactly the detailed one and only past it the region shows.
+ */
+export const WIDE_SOURCE = 'basemap-wide';
+export const WIDE_MAX_ZOOM = 3;
+export const COVERAGE_SOURCE = 'detailed-coverage';
+
 export const STREET_ATTRIBUTION =
   '© OpenStreetMap contributors (ODbL) · Protomaps — أسماء الطرق من OpenStreetMap وليست أسماء رسمية';
 /** The hillshade is a derived product, so it carries the licence's Article 6(b) notice word for word
- *  (map-packages/terrain-glo30-2026.11/LICENSE-NOTICE.txt); the DSM limitation is in MODE_NOTICE. */
+ *  (map-packages/terrain-glo30-2026.11/LICENSE-NOTICE.txt); the DSM limitation follows it (TERRAIN_SOURCE_ATTRIBUTION). */
 export const TERRAIN_ATTRIBUTION =
   'produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved';
 
-/** The notices the map shows beside the attribution, by mode. */
+/** The source notices by mode. Since 28 Nov 2026 (owner: no label over the map) they are said only in the attribution
+ *  line — the street one is part of STREET_ATTRIBUTION, the terrain one follows the Copernicus notice. */
 export const MODE_NOTICE: Record<BasemapMode, string> = {
   street: 'أسماء الطرق من OpenStreetMap وليست أسماء رسمية',
   terrain: 'طبيعة الأرض: Copernicus GLO-30 — نموذج سطح DSM وليس تضاريس رسمية (للعرض فقط)',
 };
+/** What the terrain sources show in the attribution line while the terrain is drawn: the licence notice, then the DSM limitation. */
+export const TERRAIN_SOURCE_ATTRIBUTION = `${TERRAIN_ATTRIBUTION} — ${MODE_NOTICE.terrain}`;
 
 const C = {
   land: '#f3f1ec',
@@ -107,6 +121,8 @@ function roadWidth(kind: string, base: number): ExpressionSpecification {
   return ['interpolate', ['exponential', 1.6], ['zoom'], 8, base * k * 0.4, 12, base * k * 1.6, 16, base * k * 7];
 }
 
+const LANDCOVER_COLOUR: ExpressionSpecification = ['match', ['get', 'kind'], ['barren', 'sand'], C.sand, ['grassland', 'forest', 'scrub', 'farmland'], C.park, C.land];
+
 function streetLayers(): LayerSpecification[] {
   const roads = (['minor_road', 'major_road', 'highway'] as const).flatMap((kind): LayerSpecification[] => [
     {
@@ -134,12 +150,15 @@ function streetLayers(): LayerSpecification[] {
   ]);
   return [
     { id: 'land', type: 'background', paint: { 'background-color': C.land }, metadata: group('street') },
+    { id: 'wide-landcover', type: 'fill', source: WIDE_SOURCE, 'source-layer': 'landcover', paint: { 'fill-color': LANDCOVER_COLOUR }, metadata: group('street') },
+    { id: 'wide-water', type: 'fill', source: WIDE_SOURCE, 'source-layer': 'water', paint: { 'fill-color': C.water }, metadata: group('street') },
+    { id: 'detailed-land', type: 'fill', source: COVERAGE_SOURCE, paint: { 'fill-color': C.land, 'fill-antialias': false }, metadata: group('street') },
     {
       id: 'landcover',
       type: 'fill',
       source: 'basemap',
       'source-layer': 'landcover',
-      paint: { 'fill-color': ['match', ['get', 'kind'], ['barren', 'sand'], C.sand, ['grassland', 'forest', 'scrub', 'farmland'], C.park, C.land] },
+      paint: { 'fill-color': LANDCOVER_COLOUR },
       metadata: group('street'),
     },
     {
@@ -167,7 +186,11 @@ function streetLayers(): LayerSpecification[] {
 }
 
 function terrainLayers(h: HillshadeSource | null | undefined): LayerSpecification[] {
-  const out: LayerSpecification[] = [{ id: 'terrain-land', type: 'background', paint: { 'background-color': C.landTerrain }, metadata: group('terrain') }];
+  const out: LayerSpecification[] = [
+    { id: 'terrain-land', type: 'background', paint: { 'background-color': C.landTerrain }, metadata: group('terrain') },
+    { id: 'wide-terrain-water', type: 'fill', source: WIDE_SOURCE, 'source-layer': 'water', paint: { 'fill-color': C.water, 'fill-opacity': 0.75 }, metadata: group('terrain') },
+    { id: 'detailed-terrain-land', type: 'fill', source: COVERAGE_SOURCE, paint: { 'fill-color': C.landTerrain, 'fill-antialias': false }, metadata: group('terrain') },
+  ];
   if (h?.kind === 'raster') {
     out.push({ id: 'terrain-hillshade', type: 'raster', source: 'hillshade', paint: { 'raster-opacity': 0.85 }, metadata: group('terrain') });
   } else if (h?.kind === 'raster-dem') {
@@ -306,14 +329,17 @@ export function buildOfflineStyle(o: OfflineStyleOptions): StyleSpecification {
   const mode = o.mode ?? 'street';
   const sources: StyleSpecification['sources'] = {
     basemap: { type: 'vector', url: 'pmtiles://' + o.basemapUrl, attribution: STREET_ATTRIBUTION },
+    // the same archive's region tile, enlarged past the detailed tiles (no TileJSON: its own zoom range)
+    [WIDE_SOURCE]: { type: 'vector', tiles: ['pmtiles://' + o.basemapUrl + '/{z}/{x}/{y}'], minzoom: 0, maxzoom: WIDE_MAX_ZOOM, attribution: STREET_ATTRIBUTION },
+    [COVERAGE_SOURCE]: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } },
   };
   if (o.hillshade?.kind === 'raster') {
-    sources.hillshade = { type: 'raster', url: 'pmtiles://' + o.hillshade.url, tileSize: 256, attribution: TERRAIN_ATTRIBUTION };
+    sources.hillshade = { type: 'raster', url: 'pmtiles://' + o.hillshade.url, tileSize: 256, attribution: TERRAIN_SOURCE_ATTRIBUTION };
   } else if (o.hillshade?.kind === 'raster-dem') {
-    sources.hillshade = { type: 'raster-dem', url: 'pmtiles://' + o.hillshade.url, tileSize: 256, encoding: o.hillshade.encoding ?? 'terrarium', attribution: TERRAIN_ATTRIBUTION };
+    sources.hillshade = { type: 'raster-dem', url: 'pmtiles://' + o.hillshade.url, tileSize: 256, encoding: o.hillshade.encoding ?? 'terrarium', attribution: TERRAIN_SOURCE_ATTRIBUTION };
   }
   if (o.terrain3d) {
-    sources[TERRAIN_3D_SOURCE] = { type: 'raster-dem', url: 'pmtiles://' + o.terrain3d.url, tileSize: o.terrain3d.tileSize, encoding: o.terrain3d.encoding, attribution: TERRAIN_ATTRIBUTION };
+    sources[TERRAIN_3D_SOURCE] = { type: 'raster-dem', url: 'pmtiles://' + o.terrain3d.url, tileSize: o.terrain3d.tileSize, encoding: o.terrain3d.encoding, attribution: TERRAIN_SOURCE_ATTRIBUTION };
   }
   const layers = [...streetLayers(), ...terrainLayers(o.hillshade), ...(o.terrain3d ? terrain3dLayers() : []), ...labelLayers(o.labels ?? 'ar')].map((l) => withVisibility(l, mode));
   return {

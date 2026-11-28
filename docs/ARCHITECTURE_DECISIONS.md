@@ -3230,3 +3230,78 @@ Keycloak sessions go to 0, and the same browser's next automatic sign-in shows K
 sign-in's session ends the same way (`tests/acceptance/signout/keycloak-signout.sh`, 13/13). `EnterpriseSignInIT` (end-session POST
 with the session's token and client, the provider-down warning), `DualProviderSignInIT` (the local platform realm is called),
 `DirectorySignInIT`, `EmbeddedSignInIT`.
+
+## ADR-110 No empty edge on the map, and no label over it (28 Nov 2026)
+
+**Owner (28 Nov).** After a refresh the home map showed empty corners around the map, and a name over the map; both to go.
+
+**Before.** The offline package (`uae.pmtiles`) holds the tiles touching its extent (51.13–56.69 E, 22.45–26.33 N), whole, at
+every zoom: a low zoom shows Qatar to Iran, a high zoom little more than the UAE, and past those tiles only the style's background.
+A whole-country page fitted the country once, at the box's first size; when the box then grew (the home page's layout settles after
+the first frame) the view stayed zoomed out and the empty background showed. MapLibre's own constraint knows one fixed box only.
+The source notice «أسماء الطرق من OpenStreetMap وليست أسماء رسمية» (terrain: the DSM limitation) sat over the map's top corner.
+
+**Decision.**
+- `packageCoverage.ts`: the installed package's extent is read from its PMTiles header; `constrainToCoverage` keeps the camera where
+  every pixel has a tile of its zoom (⌊zoom⌋ for the 512-pixel vector source): the zoom is raised only when the screen is wider or
+  taller than those tiles, then the centre is moved inwards just enough; bearing and padding are taken into account, min/max zoom
+  kept. `OfflineMapLibre` sets it with `map.setTransformConstrain` once the header is read, for every map that sets no `maxBounds`.
+- A whole-country map is fitted again when its box changes size, as long as nothing has moved its camera; a moved view is kept.
+  MapLibre's own resize tracking is off (`trackResize: false`): the component's one observer resizes, so it can tell.
+- The floating notice is gone. The street notice is already part of the OSM attribution line; the terrain sources' attribution is
+  the Copernicus notice word for word followed by the DSM limitation (`TERRAIN_SOURCE_ATTRIBUTION`). Only a missing terrain layer is
+  still said on the map. The attribution line stays (ODbL, Copernicus).
+
+**Limits.** A tilted 3D view is constrained by its centre and zoom like a flat one: towards the horizon it may still reach past the
+package. The constraint follows the basemap; the hillshade package may cover a little less.
+
+**Evidence.** `packageCoverage.test.ts` 5 (every size and place lands on the tiles; a camera on them is left unchanged; limits,
+bearing, padding); Edge on :8088, home page at 1440×1000, 2560×1300 and 1000×1100 after reload, full zoom-out and drags to two
+corners: the four edge strips hold only land and sea colours, no notice; frontend 428/428, type check clean.
+
+## ADR-111 A main deployment area may be drawn past its maximum, with a warning; a sub-area may not (28 Nov 2026)
+
+**Owner (28 Nov).** «مناطق الانتشار الرئيسية يسمح لها أنه يرسم فوق الحد ولكن مع تنبيه. يعني يقدر يرسم. أما مناطق الانتشار
+الفرعية لا يسمح».
+
+**Before (ADR-106, 25 Nov).** Both areas stopped at their farthest distance on the map (arrow, ready shape, move, drawn corner, and
+brought back after the terrain check); the server refused a distance past the maximum and the exception margin, and inside the
+margin asked for a written reason (ADR-078).
+
+**Decision.**
+- Map (`DeploymentAreasRequest.tsx`, `STOPS_AT_REACH`, `reachFor`, `BEYOND_MAX` in `deploymentAreasFlow.ts`): the main area is
+  placed, moved and drawn wherever it is put; past its maximum (the ground's under it once assessed, else the most any ground allows;
+  the exception margin plays no part) the arrow, chips, details and review say «! أبعد من الحد الأقصى — يقرره المعتمد النهائي». The
+  sub-area keeps every stop of ADR-106.
+- Server (`RestationingChecks.deploymentLeg`): in a request, a main area farther than its effective maximum is `NEEDS_EXCEPTION`
+  with no problem and no reason asked — flagged on every stage and decided by the final approver with the request, as an oversized
+  site (ADR-087); a reason written anyway is carried with the flag. Nearer than its minimum, a terrain tie and occupied ground still
+  block. The sub-area is unchanged (margin with reason, refused past it).
+- «التهيئة» (site setup) is unchanged: it has no approval route, so nothing could decide the excess there.
+
+**Evidence.** `RestationingWorkflowIT` 17/17 (a main area 12 km and 8.5 km away flagged, not refused, no reason; nearer than the
+minimum refused; the sub-area within the margin needs a reason, past it refused; the existing flag-and-decide journey), `SiteSetupIT`
+9/9; `deploymentAreasFlow.test.ts` (rule and limits); frontend 428/428.
+
+### ADR-110 correction — the region drawn around the country instead of a cropped view; the screens fill the window (28 Nov 2026)
+
+**Owner.** "You made it worse" (the home map on a wide, short box showed a cropped, shifted view), then "fill the empty space":
+on a tall window the home page left its lower part empty.
+
+**Why the first version failed.** Keeping the camera on the detailed tiles alone means a box wider than those tiles at the
+zoom that fits the country must zoom in: on the owner's 2,100 × 540-pixel home map the south and west of the UAE were cut.
+
+**Decision.**
+- The package's region tile (zoom 3, 45–90° E, 0–41° N, whole: landcover, water) is drawn under the detailed map, enlarged
+  (`WIDE_SOURCE`, tile URLs on the same archive with `maxzoom` 3). Over the area the detailed tiles of the current zoom cover,
+  a plain-land mask (`COVERAGE_SOURCE`, set by `OfflineMapLibre` on every zoom step from `coveragePolygon`) hides it, so inside
+  that area the map is exactly the detailed one and the coarse region never shows through the detailed coast.
+- The camera constraint keeps the view on the region tile (`maxTileZoom` 3): the whole country fits a box of any shape,
+  unshifted; the view still cannot leave the region.
+- `prototype.css` (kept verbatim) zooms the page to 0.9, so `100dvh` was 90 % of the window: the shell divides by the same
+  factor (`--page-zoom`), and the home dashboard's grid, map and last side cards take the height left (`app.css`).
+
+**Evidence.** `packageCoverage.test.ts` 7 (a 2,100 × 540 box keeps the country fit unshifted; the mask polygon); frontend
+430/430; Edge on :8088 at 1910×963@2, 1440×1000, 2560×1300 and 1000×1100 after reload, zoom-out and drags: the edges hold land,
+sand and sea only; the home page at 1910×963, 1920×1200 and 1440×900 fills the window (no empty space, no scroll); the
+re-stationing, stationing, posture and site-setup screens fill the window with no page scroll.

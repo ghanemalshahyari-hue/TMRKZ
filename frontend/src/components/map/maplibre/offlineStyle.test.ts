@@ -15,8 +15,10 @@ describe('offline MapLibre style', () => {
     expect(style.glyphs).toBeUndefined();
     expect(style.sprite).toBeUndefined();
     expect(style['font-faces']).toEqual({ [LABEL_FONT]: [{ url: opts.fontUrl }] });
-    const urls = Object.values(style.sources).map((s) => ('url' in s ? s.url : ''));
-    expect(urls).toEqual(['pmtiles://' + opts.basemapUrl, 'pmtiles://' + opts.hillshade.url]);
+    const urls = Object.values(style.sources).flatMap((s) => ('url' in s && s.url ? [s.url] : 'tiles' in s && s.tiles ? s.tiles : []));
+    // the archive, its region tile enlarged past the detailed tiles (ADR-110), the hillshade; the detailed area is a local shape
+    expect(urls).toEqual(['pmtiles://' + opts.basemapUrl, 'pmtiles://' + opts.basemapUrl + '/{z}/{x}/{y}', 'pmtiles://' + opts.hillshade.url]);
+    expect(style.sources['detailed-coverage']?.type).toBe('geojson');
     for (const l of style.layers) {
       if (l.type === 'symbol') expect(l.layout?.['text-font']).toEqual([LABEL_FONT]);
     }

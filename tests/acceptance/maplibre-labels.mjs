@@ -313,7 +313,8 @@ await page.close();
         street: vis('road-highway'),
         terrain: vis('terrain-hillshade'),
         labels: vis('label-road'),
-        notice: document.querySelector('[data-testid=map-source-notice]').textContent,
+        // no label over the map since 28 Nov 2026 (owner): the source notices are read from the attribution line
+        notice: document.querySelector('[data-testid=map-source-notice]')?.textContent ?? document.querySelector('.maplibregl-ctrl-attrib')?.textContent ?? '',
         attribution: document.querySelector('.maplibregl-ctrl-attrib')?.textContent ?? '',
         lumaStd: +Math.sqrt(s2 / n - (s / n) ** 2).toFixed(2),
       };

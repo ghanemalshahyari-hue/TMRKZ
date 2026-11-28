@@ -340,3 +340,23 @@ export function reachText(r: Reach): string {
   if (r.exceptionM > 0) parts.push(kmChip(r.exceptionM) + ' استثناء');
   return 'الحد الأقصى ' + kmChip(r.maxM) + (parts.length > 1 ? ' (' + parts.join(' + ') + ')' : '');
 }
+
+/**
+ * Which areas the map stops at their farthest distance (owner, 28 Nov 2026): the sub-area is never placed, moved or drawn
+ * beyond it; the main area may be, with a warning, and the request then goes with it flagged on every stage for the final
+ * approver to decide (RestationingChecks.deploymentLeg on the server).
+ */
+export const STOPS_AT_REACH: Record<AreaRole, boolean> = { primary: false, alternative: true };
+
+/** What a main area farther than its maximum says (pointer, chips, review). */
+export const BEYOND_MAX: Verdict = { text: '! أبعد من الحد الأقصى — يقرره المعتمد النهائي', tone: 'warn' };
+
+/**
+ * The farthest distance of an area as the page states it: the sub-area's limit where the map stops it (with the exception
+ * margin when the policy gives one); the main area's maximum past which it is sent with the warning — the exception margin
+ * plays no part there, the final approver decides any distance beyond the maximum.
+ */
+export function reachFor(role: AreaRole, leg: ReachLeg, policy: ReachPolicy, assessedMaxM?: number | null): Reach {
+  const r = reachOf(leg, policy, assessedMaxM);
+  return STOPS_AT_REACH[role] ? r : { ...r, exceptionM: 0, maxM: r.maxM - r.exceptionM };
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AREA_NAME, RESTATION_STEPS, areaStepProblem, areaVerdict, campTree, flowStepProblem, isFlowPurpose, measuredFrom, overReason, requestIntoFlow, requestingUnitOf, restationingChoices, siteShapeKind, startStep, unitChoices, unitForest, verdictOf,
-  largestTerrainAddM, reachOf, reachText,
+  largestTerrainAddM, reachOf, reachText, reachFor, STOPS_AT_REACH, BEYOND_MAX,
 } from './deploymentAreasFlow';
 import { destination, distanceM, withinM } from './geo';
 
@@ -210,5 +210,26 @@ describe('the farthest an area may be (owner, 25 Nov 2026)', () => {
     expect(distanceM(far, back)).toBeCloseTo(22_200 - distanceM(o, back), -1);
     const near = destination(o, 60, 4000);
     expect(withinM(o, near, 7000)).toBe(near);
+  });
+});
+
+describe('a main area may go past its maximum with a warning; a sub-area may not (owner, 28 Nov 2026)', () => {
+  const allowances = { FLAT: 0, UNDULATING: 500, ROLLING: 1000, HILLY: 1500, MOUNTAINOUS: 2000 };
+  const withException = { terrainAllowancesM: allowances, exception: { allowed: true, maxExtraM: 1000 } };
+  const leg = { minM: 5000, maxM: 8000, terrainApplies: true };
+
+  it('stops only the sub-area at its farthest distance', () => {
+    expect(STOPS_AT_REACH).toEqual({ primary: false, alternative: true });
+    expect(BEYOND_MAX.tone).toBe('warn');
+    expect(BEYOND_MAX.text).toContain('المعتمد النهائي');
+  });
+
+  it("the sub-area's limit keeps the exception margin; the main area's maximum leaves it out (the final approver decides past it)", () => {
+    expect(reachFor('alternative', leg, withException)).toEqual(reachOf(leg, withException));
+    expect(reachFor('alternative', leg, withException).maxM).toBe(11000);
+    expect(reachFor('primary', leg, withException)).toEqual({ baseMaxM: 8000, terrainM: 2000, exceptionM: 0, maxM: 10000, assessed: false });
+    // once the ground under it is assessed, the server's effective maximum there
+    expect(reachFor('primary', leg, withException, 9000).maxM).toBe(9000);
+    expect(reachText(reachFor('primary', leg, withException, 9000))).not.toContain('استثناء');
   });
 });

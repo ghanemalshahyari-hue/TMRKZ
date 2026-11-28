@@ -222,8 +222,9 @@ try {
     { arabic: arabic.length, sampleArabic: arabic.slice(0, 4), routes: [...new Set(routes)].slice(0, 8) });
   ok(latin.length + mixed.length >= 1, 'LB2', 'English (fallback) and mixed Arabic/Latin/digit labels drawn', { latin: [...new Set(latin)].slice(0, 5), mixed: [...new Set(mixed)].slice(0, 5) });
   const attribution = await page.locator('.maplibregl-ctrl-attrib').first().textContent();
-  const notice = await page.locator('[data-testid=map-source-notice]').first().textContent();
-  ok(attribution.includes('© OpenStreetMap contributors (ODbL)') && notice.includes('وليست أسماء رسمية'), 'LB3', 'street attribution (ODbL) and the unofficial road-name notice', { attribution, notice });
+  // no label over the map since 28 Nov 2026 (owner): the unofficial road-name notice is part of the attribution line
+  const notices = await page.locator('[data-testid=map-source-notice]').count();
+  ok(attribution.includes('© OpenStreetMap contributors (ODbL)') && attribution.includes('وليست أسماء رسمية') && notices === 0, 'LB3', 'street attribution (ODbL) with the unofficial road-name notice, no label over the map', { attribution, notices });
 
   // the four-part site (current site of the fixture section) is named once
   const pm = await pageAs(REQ.draft4.user);
@@ -286,8 +287,8 @@ try {
     await page.screenshot({ path: shot(`S8-terrain-${name}.png`) });
   }
   const shade = mapResponses.slice(before404).filter((r) => r.url.includes('hillshade'));
-  const terrainNotice = await page.locator('[data-testid=map-source-notice]').first().textContent();
   const terrainAttr = await page.locator('.maplibregl-ctrl-attrib').first().textContent();
+  const terrainNotice = terrainAttr; // the DSM limitation follows the Copernicus notice in the attribution line (28 Nov 2026)
   ok(shade.length > 0 && shade.every((r) => r.status === 206) && terrainNotice.includes('DSM') && terrainAttr.includes('produced using Copernicus WorldDEM-30'),
     'TR2', 'terrain over the UAE, the eastern mountains and Liwa read from the packaged hillshade (range requests), DSM notice and Copernicus 6(b) attribution',
     { hillshadeRequests: shade.length, statuses: [...new Set(shade.map((r) => r.status))], notice: terrainNotice });

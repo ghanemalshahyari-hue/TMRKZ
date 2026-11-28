@@ -19,7 +19,7 @@ import {
   AREA_NAME, FLOW_STAGES, FLOW_STEPS, areaChip, areaVerdict, campTree, flowStepProblem, kmChip, measuredFrom, overReason, rangeText, requestingUnitOf,
   restationingChoices, siteShapeKind, startStep, unitChoices, unitForest, verdictOf,
   type AreaRole, type CampNode, type FlowPurpose, type UnitNode,
-  requestIntoFlow, type FlowKind, reachOf, reachText,
+  requestIntoFlow, type FlowKind, reachFor, reachText, BEYOND_MAX, STOPS_AT_REACH,
 } from '../lib/deploymentAreasFlow';
 import { distanceM, withinM, type LatLng } from '../lib/geo';
 import { PURPOSE_WRITES } from '../lib/requestPurpose';
@@ -223,14 +223,22 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
     // beyond the base maximum but within what the ground under it adds (the server's assessment): within the policy
     const leg = legOf(r);
     const ground = assessedOf(r);
+    // a main area past its maximum (the ground's under it once assessed, else the most any ground allows) is kept, with
+    // the warning; the final approver decides it with the request (owner, 28 Nov 2026)
+    const limit = r === 'primary' && leg && policy ? (ground?.maxM ?? reachFor(r, leg, policy.values).maxM) : null;
+    if (limit != null && d > limit + 1) {
+      return { distance: d, area: areaOf(g), verdict: BEYOND_MAX, over: `أبعد بـ${kmChip(d - limit)} من الحد الأقصى (${kmChip(limit)}): تُرسل مع تنبيه، ويقررها المعتمد النهائي مع الطلب.` };
+    }
     const byGround = !!leg && !!ground && d > leg.maxM && d <= ground.maxM;
     return { distance: d, area: areaOf(g), verdict: byGround ? { text: '✓ ضمن المسموح بطبيعة الأرض', tone: 'ok' as const } : verdictOf(d, leg), over: byGround ? '' : overReason(d, leg) };
   };
   const siteMeasure = newSite ? { distance: siteGeom ? distanceM(centreOf(siteGeom), centreOf(newSite)) : null, area: areaOf(newSite) } : null;
   const siteOver = !!siteMeasure && maxSite != null && siteMeasure.area > maxSite + 0.5;
   // the farthest the area of this step may be (owner, 25 Nov 2026): while it moves, the base maximum with the most any ground
-  // can add (and the exception margin when the policy gives one); once it is placed, the ground under it decides
-  const liveReach = role && policy ? reachOf(policy.values[role], policy.values) : null;
+  // can add (and the exception margin when the policy gives one); once it is placed, the ground under it decides. Only the
+  // sub-area is stopped there; the main area may go farther, with the warning (owner, 28 Nov 2026)
+  const liveReach = role && policy ? reachFor(role, policy.values[role], policy.values) : null;
+  const stopsAtReach = !!role && STOPS_AT_REACH[role];
   const openingRef = useRef(false);
   const openedShape = useRef<GeoPolygon | null>(null);
   const assessedRole = useRef<AreaRole | null>(null);
@@ -294,14 +302,16 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
       clearArrow();
       return;
     }
-    // an area's arrow stops at the farthest it may be (owner, 25 Nov 2026): the base maximum with the most the ground can add
+    // a sub-area's arrow stops at the farthest it may be (owner, 25 Nov 2026): the base maximum with the most the ground can
+    // add; a main area's goes on, past its maximum with the warning (owner, 28 Nov 2026)
     const pointer = { lat: e.lngLat.lat, lng: e.lngLat.lng };
     const r = role ? liveReach : null;
-    const head = r ? withinM(o, pointer, r.maxM) : pointer;
+    const head = r && stopsAtReach ? withinM(o, pointer, r.maxM) : pointer;
     const atLimit = head !== pointer;
     const d = distanceM(o, head);
+    const beyond = !!r && !stopsAtReach && d > r.maxM + 1;
     // the new site has no range (for information); an area has the policy's
-    const v = role ? verdictOf(d, legOf(role)) : null;
+    const v = role ? (beyond ? BEYOND_MAX : verdictOf(d, legOf(role))) : null;
     // the shaft from the origin to the head and the head itself, drawn in screen space so the head keeps its size
     const a = m.project([o.lng, o.lat]);
     const b = atLimit ? m.project([head.lng, head.lat]) : e.point;
@@ -323,7 +333,7 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
     // At the limit the words say so: the area is placed there, never beyond.
     tip.textContent = atLimit && r ? reachText(r) + ' · تُوضع هنا' : v ? kmChip(d) + ' · ' + v.text : kmChip(d);
     tip.className = 'da-hover is-' + (atLimit ? 'warn' : v?.tone ?? 'none');
-    tip.dataset.limit = atLimit ? 'max' : '';
+    tip.dataset.limit = atLimit ? 'max' : beyond ? 'beyond' : '';
     tip.style.transform = `translate(${Math.round(b.x + 16)}px, ${Math.round(b.y + 18)}px)`;
     tip.hidden = false;
   };
@@ -356,9 +366,10 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
       return;
     }
     if (target === 'site') setCopied(null);
-    // a ready area is placed no farther than its reach, on the bearing of the click (the copy is moved by the editor's own)
+    // a ready sub-area is placed no farther than its reach, on the bearing of the click (the copy is moved by the editor's
+    // own); a main area where it is clicked
     const o = role ? originOf(role) : null;
-    const ring = readyShape(o && liveReach ? withinM(o, at, liveReach.maxM) : at, shape, sizeFor(target));
+    const ring = readyShape(o && liveReach && stopsAtReach ? withinM(o, at, liveReach.maxM) : at, shape, sizeFor(target));
     editor.current?.load({ type: 'Polygon', coordinates: [[...ring, ring[0]].map((q) => [q.lng, q.lat])] } as unknown as SiteGeometry, false);
     setTool('select');
   };
@@ -394,11 +405,12 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
     });
   }, [target, mapReady, unitId, picked.join(','), policy?.version]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // the editor stops the area at its reach: a move, a placement or a drawn corner goes no farther (owner, 25 Nov 2026)
+  // the editor stops the sub-area at its reach: a move, a placement or a drawn corner goes no farther (owner, 25 Nov 2026);
+  // the main area is not stopped (owner, 28 Nov 2026)
   const reachFrom = role ? originOf(role) : null;
   useEffect(() => {
-    editor.current?.setReach(reachFrom && liveReach ? { at: reachFrom, maxM: liveReach.maxM } : null);
-  }, [mapReady, role, reachFrom?.lat, reachFrom?.lng, liveReach?.maxM]); // eslint-disable-line react-hooks/exhaustive-deps
+    editor.current?.setReach(reachFrom && liveReach && stopsAtReach ? { at: reachFrom, maxM: liveReach.maxM } : null);
+  }, [mapReady, role, reachFrom?.lat, reachFrom?.lng, liveReach?.maxM, stopsAtReach]); // eslint-disable-line react-hooks/exhaustive-deps
   // once the area is placed or changed, the ground under it decides its own maximum (the server's terrain assessment, read
   // only): an area beyond that is brought back along its bearing to it. A saved area as opened is left as it is.
   const roleShape = role ? areas[role] : null;
@@ -416,10 +428,11 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
     let live = true;
     const settle = (effectiveMaxM: number | null, label: string) => {
       if (!live) return;
-      const r = reachOf(leg, policy.values, effectiveMaxM);
+      const r = reachFor(role, leg, policy.values, effectiveMaxM);
       const c = centreOf(roleShape as unknown as SiteGeometry);
-      // beyond the limit (with the same margin the editor keeps from it): brought back to it, at most a few times in a row
-      if (distanceM(o, c) > r.maxM - Math.max(10, r.maxM * 0.005) + 1 && autoMoves.current < 4) {
+      // a sub-area beyond the limit (with the same margin the editor keeps from it): brought back to it, at most a few
+      // times in a row; a main area stays where it is put, with the warning (owner, 28 Nov 2026)
+      if (STOPS_AT_REACH[role] && distanceM(o, c) > r.maxM - Math.max(10, r.maxM * 0.005) + 1 && autoMoves.current < 4) {
         autoMoves.current += 1;
         editor.current?.moveTo(withinM(o, c, r.maxM));
         return;
@@ -741,7 +754,7 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
             <div><dt>المساحة</dt><dd>{areaChip(x.area)}</dd></div>
             <div><dt>التضاريس</dt><dd>{leg?.terrainApplies ? 'تُحسب فئة الانحدار وسماحها عند فحص الخادم.' : 'لا تؤثر في هذه المسافة في السياسة النافذة.'}</dd></div>
             <div><dt>الحد الأدنى</dt><dd>{leg ? kmChip(leg.minM) : '—'}</dd></div>
-            <div><dt>الحد الأقصى</dt><dd>{leg && policy ? (assessedOf(r)?.text ?? reachText(reachOf(leg, policy.values))) : '—'}</dd></div>
+            <div><dt>الحد الأقصى</dt><dd>{leg && policy ? (assessedOf(r)?.text ?? reachText(reachFor(r, leg, policy.values))) : '—'}</dd></div>
             <div><dt>سبب التجاوز</dt><dd>{x.over || '—'}</dd></div>
             {(leg?.minAreaM2 != null || leg?.maxAreaM2 != null) && <div><dt>حدود المساحة</dt><dd>{leg?.minAreaM2 != null ? areaChip(leg.minAreaM2) : '—'} – {leg?.maxAreaM2 != null ? areaChip(leg.maxAreaM2) : '—'}</dd></div>}
             <div><dt>نسخة السياسة</dt><dd>{policy ? policy.version : 'لا سياسة نافذة'}</dd></div>
@@ -828,7 +841,9 @@ export function DeploymentAreasRequest({ onClose, purpose = 'DEPLOYMENT_AREAS', 
           <p className="micro tz-muted" data-testid={`reach-${r}`}>
             {assessedOf(r)
               ? `${assessedOf(r)!.moved ? 'أُعيدت المنطقة إلى أقصى مسافة تسمح بها الأرض تحتها — ' : ''}على هذه الأرض${assessedOf(r)!.label ? ` («${assessedOf(r)!.label}»)` : ''}: ${assessedOf(r)!.text}.`
-              : `تتوقف المنطقة عند ${reachText(reachOf(leg, policy.values))}، ولا تُوضع أبعد منه.`}
+              : STOPS_AT_REACH[r]
+                ? `تتوقف المنطقة عند ${reachText(reachFor(r, leg, policy.values))}، ولا تُوضع أبعد منه.`
+                : `${reachText(reachFor(r, leg, policy.values))}؛ يمكن وضعها أبعد منه، فتُرسل مع تنبيه ويقررها المعتمد النهائي.`}
           </p>
         )}
         {chips(r)}

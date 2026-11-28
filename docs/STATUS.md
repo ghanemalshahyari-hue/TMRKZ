@@ -1620,3 +1620,48 @@ Delivered on the one app (:8088); the fictional environment is recreated with `s
 - **Checks:** each copy matches the signed list (0 mismatches); `force.sh check` on a copy of 9c280bf: checksums OK, signature OK,
   replace 34 / add 9 / remove 0; USB: TMRKZ 1832, MOVER 1455, DUTY 150 files, all OK.
 - **Open:** not run on the real VMs.
+
+## Home PC on the folder layout; no empty map edge; main areas past their maximum (28 Nov 2026; owner; ADR-110, ADR-111)
+- **Home PC:** pulled to `fa3fea2` and moved to the folder run (`start.sh`, project `tmrkz`, data in `data/`): images
+  `tmrkz/folder-backend:1`/`folder-web:1` built here, the `tmrkz-mover_*` volumes copied into `data/` (kept unchanged as the
+  rollback; full dump in `backups/`), database V53 → V69. `.env` needed `LOCAL_LDAP_ADMIN_PASSWORD` and
+  `TMRKZ_TRUSTSTORE_DIR=./ops/keycloak/truststores`: `start.sh` adds neither when `.env` names an outside directory (here MOVER's
+  `mover-ldap`), and without its CA Keycloak's user lookup failed and `keycloak-setup` stopped — open fix in `start.sh`.
+- **Map (ADR-110):** no empty edge at any zoom or size; the whole-country view refitted when its box grows; no notice over the map
+  (the attribution line carries it).
+- **Deployment areas (ADR-111):** a main area may be drawn past its maximum, with a warning, and goes to the final approver; the
+  sub-area still stops at its limit; setup unchanged.
+- **Checks:** frontend 428/428 and type check; `RestationingWorkflowIT` 17/17, `SiteSetupIT` 9/9 (the earlier listed failures of
+  these classes no longer occur); Edge on :8088 home map at three sizes.
+- **Not run:** the deployment-area page in a browser with a requester account (no request was created on :8088); the browser
+  acceptance scripts updated for the removed notice (`map-package.mjs`, `maplibre-labels.mjs`, `restationing-geometry.mjs`).
+
+## Home PC :8088 reset to the units; 300,000 Oracle people and their directory accounts (28 Nov 2026; owner)
+- **Reset (owner: "remove everything, only keep the units"):** one transaction deleted every site, stationing, deployment
+  area, request of every kind, notification, task, workflow run, person, link and grant; kept the 75 units and their
+  configuration, the policy, roles, workflows, forms, settings, the requestable roles, the audit log and the platform account
+  `admin` (its two grants). The append-only guards were lifted inside that transaction only and restored before its commit;
+  OpenFGA reconciled by itself (60 stale tuples removed). Backups first: `backups/before-reset-20261128T100412Z/`
+  (tmrkz, keycloak, openfga). The UI could not do this: a site is locked while a request refers to it, and requests have no
+  delete.
+- **Oracle sandbox (`mover-oracle-hr`, `HR_AI`):** the 100,000 synthetic people replaced by 300,000 (fixed seed) on the same 74
+  units: 88 % in service, 8 % retired, 3 % ended, 1 % dismissed; ranks from جندي to لواء and 3 % civilians; 90 % with a domain
+  account; 30 % with a new number; 5 % attached to another unit, 2.5 % transferred; leave, loan, course, sick and mission
+  states; one commander per unit holding its `DIRECTOR_POS_ID`; 6,155 medical exemptions. Previous rows kept in
+  `HR_EMPLOYEES_T_BAK_20261128` and `HR_MED_EXEMPTIONS_T_BAK_20261128`.
+- **Directory:** TMRKZ now signs in against its own directory (`openldap`, `dc=tmrkz,dc=local`), no longer MOVER's
+  `mover-ldap`: 270,116 accounts with Oracle's username, number, unit, rank and position (`uid`, `employeeNumber`,
+  `departmentNumber`, `ou`, `employeeType`, `title`), plus 25 directory-only accounts and 75 deliberate mismatches (unit,
+  number, rank/position). One test password for all, in `ops/local/.generated/directory-test-password`; the cases in
+  `ops/local/.generated/directory-test-accounts.csv` (both git-ignored). `.env` names the directory, the self-bind pattern
+  `uid={username},ou=people,dc=tmrkz,dc=local` and the local CA truststore; Keycloak's federation re-pointed (accounts imported
+  from mover-ldap removed). The directory lets signed-in users read entries (passwords keep their own rule): with the
+  default «self read» rule a person's own search under `ou=people` answered «No Such Object».
+- **Checks (directory sign-in, manual and automatic):** commanders and people in service signed in and matched to Oracle; a
+  directory unit, number, rank or position that differs from Oracle shows Oracle's; a person not in service in Oracle is
+  refused «سجلك غير نشط»; a directory-only account is refused and referred to the access manager; a wrong password is refused;
+  an Oracle-only person is found by number for «إضافة مستخدم» and «مديرو النظام». The test sign-ins were wiped again after.
+- **Map and layout correction (owner: "you made it worse", "fill the empty space"; ADR-110 correction):** the region tile
+  is drawn around the country instead of cropping the view, so the whole country shows in a box of any shape with no empty
+  edge; every full-height screen now fills the window (the page's 0.9 zoom had left a tenth of it empty), and the home map
+  grows into the free height.

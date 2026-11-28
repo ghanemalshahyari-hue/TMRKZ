@@ -352,15 +352,38 @@ class RestationingWorkflowIT extends RestationingTestBase {
         Map<String, Object> one = permanent(List.of(sec));
         one.put("alternative", null);
         assertThat(problems(create("req", one))).anyMatch(p -> p.contains("مطلوبتان"));
-        // out of range, and within the exception margin without a written reason
+        // a main area farther than its maximum is drawn and sent with a warning (owner, 28 Nov 2026): flagged, never refused,
+        // and no written reason is asked — past the exception margin too
         Map<String, Object> far = permanent(List.of(sec));
         far.put("primary", square(lat0 - 0.01, lng0 + offsetLng(12_000), 0.002));
-        assertThat(problems(create("req", far))).anyMatch(p -> p.contains("خارج النطاق"));
+        far.put("alternative", square(lat0 - 0.01 + offsetLat(4_000), lng0 + offsetLng(12_000), 0.002));
+        String farId = create("req", far);
+        assertThat(problems(farId)).as("the main area 12 km away: a warning, not a refusal").isEmpty();
+        JsonNode farLeg = login("req").get("/restationing-requests/" + farId + "/checks").body().path("legs").get(0);
+        assertThat(farLeg.path("leg").asText()).isEqualTo("primary");
+        assertThat(farLeg.path("status").asText()).isEqualTo("NEEDS_EXCEPTION");
+        // nearer than its minimum still blocks a main area
+        Map<String, Object> near = permanent(List.of(sec));
+        near.put("primary", square(lat0 - 0.01, lng0 + offsetLng(3_000), 0.002));
+        near.put("alternative", square(lat0 - 0.01 + offsetLat(4_000), lng0 + offsetLng(3_000), 0.002));
+        assertThat(problems(create("req", near))).anyMatch(p -> p.contains("منطقة الانتشار الرئيسية خارج النطاق"));
+        // the sub-area keeps its range: within the exception margin a written reason is needed (ADR-078), past it refused
+        Map<String, Object> subMargin = permanent(List.of(sec));
+        subMargin.put("alternative", square(lat0 - 0.01 + offsetLat(5_500), lng0 + offsetLng(6_000), 0.002));
+        String subId = create("req", subMargin);
+        assertThat(problems(subId)).anyMatch(p -> p.contains("منطقة الانتشار الفرعية تتجاوز المسموح"));
+        subMargin.put("exceptions", Map.of("alternative", "الأرض الخالية الوحيدة للفرعية"));
+        login("req").put("/restationing-requests/" + subId + "/content", subMargin);
+        assertThat(problems(subId)).isEmpty();
+        Map<String, Object> subFar = permanent(List.of(sec));
+        subFar.put("alternative", square(lat0 - 0.01 + offsetLat(7_000), lng0 + offsetLng(6_000), 0.002));
+        assertThat(problems(create("req", subFar))).anyMatch(p -> p.contains("منطقة الانتشار الفرعية خارج النطاق"));
+        // a main area just past its maximum: no reason needed; one written is carried with the flag
         Map<String, Object> margin = permanent(List.of(sec));
         margin.put("primary", square(lat0 - 0.01, lng0 + offsetLng(8_500), 0.002));
         margin.put("alternative", square(lat0 - 0.01 + offsetLat(4_000), lng0 + offsetLng(8_500), 0.002));
         String mid = create("req", margin);
-        assertThat(problems(mid)).as("beyond the range: a written reason is needed").anyMatch(p -> p.contains("تتجاوز المسموح"));
+        assertThat(problems(mid)).as("past its maximum a main area needs no written reason").isEmpty();
         margin.put("exceptions", Map.of("primary", "طريق الوصول الوحيد يمر من هناك"));
         login("req").put("/restationing-requests/" + mid + "/content", margin);
         assertThat(problems(mid)).isEmpty();

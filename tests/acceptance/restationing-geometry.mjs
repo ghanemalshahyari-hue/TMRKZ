@@ -481,7 +481,7 @@ try {
     const centreOf = async (sel) => { const e = await page.locator(sel).first().boundingBox(); return { x: e.x + e.width / 2, y: e.y + e.height / 2 }; };
     const targets = [
       ['PTR1', 'released over the map attribution', await centreOf('.rs-map-card .maplibregl-ctrl-attrib')],
-      ['PTR2', 'released over another map control (the map-source notice)', await centreOf('.rs-map-card [data-testid=map-source-notice]')],
+      ['PTR2', 'released over another map control («الخريطة كاملة»; the map-source notice was removed 28 Nov 2026)', await centreOf('.rs-map-card [data-testid=map-full-view]')],
       ['PTR3', 'released outside the map canvas', { x: b.x + b.width + 120 < 1590 ? b.x + b.width + 120 : b.x - 120, y: b.y + b.height / 2 }],
     ];
     for (const [key, label, release] of targets) {

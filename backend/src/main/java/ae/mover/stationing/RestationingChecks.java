@@ -567,6 +567,18 @@ public class RestationingChecks {
             }
         }
         LegCheck check = DeploymentRules.leg(cfg, policy, distance, decision);
+        // A main area farther than its maximum is drawn and sent with a warning (owner, 28 Nov 2026): flagged on every stage
+        // and decided by the final approver with the request, as an oversized site (ADR-087) — no written reason is asked.
+        // Nearer than its minimum, a terrain tie and occupied ground still block. The sub-area keeps its range (and the
+        // exception margin with its reason, ADR-078). The setup has no approval route (exceptionReason null): unchanged there.
+        boolean mainBeyond = "primary".equals(key) && exceptionReason != null && check.distanceM() != null
+                && check.distanceM() > check.effectiveMaxM()
+                && (check.status() == LegStatus.OUT_OF_RANGE || check.status() == LegStatus.NEEDS_EXCEPTION);
+        if (mainBeyond) {
+            check = new LegCheck(check.baseMinM(), check.baseMaxM(), check.effectiveMinM(), check.effectiveMaxM(), check.exceptionMaxM(),
+                    check.distanceM(), check.terrain(), LegStatus.NEEDS_EXCEPTION);
+            return new Leg(key, label, check, t, conflicts);
+        }
         switch (check.status()) {
             case OUT_OF_RANGE -> problems.add(label + " خارج النطاق المسموح (" + Math.round(check.distanceM()) + " م، المسموح "
                     + Math.round(check.effectiveMinM()) + "–" + Math.round(check.effectiveMaxM()) + " م).");
